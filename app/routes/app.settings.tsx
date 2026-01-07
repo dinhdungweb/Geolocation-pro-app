@@ -33,13 +33,14 @@ interface Settings {
     excludeBots: boolean;
     excludedIPs: string;
     cookieDuration: number;
-    cookieDuration: number;
     blockedTitle: string;
     blockedMessage: string;
+    template: string;
 }
 
 const defaultSettings: Omit<Settings, "id"> = {
     mode: "popup",
+    template: "modal",
     popupTitle: "Would you like to switch to a local version?",
     popupMessage: "We noticed you are visiting from {country}. Would you like to go to {target}?",
     confirmBtnText: "Go now",
@@ -96,11 +97,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const cookieDuration = parseInt(formData.get("cookieDuration") as string) || 7;
         const blockedTitle = formData.get("blockedTitle") as string;
         const blockedMessage = formData.get("blockedMessage") as string;
+        const template = formData.get("template") as string || "modal";
 
         await prisma.settings.upsert({
             where: { shop },
             update: {
                 mode,
+                template,
                 popupTitle,
                 popupMessage,
                 confirmBtnText,
@@ -117,6 +120,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             create: {
                 shop,
                 mode,
+                template,
                 popupTitle,
                 popupMessage,
                 confirmBtnText,
@@ -146,6 +150,7 @@ export default function SettingsPage() {
 
     // Form state
     const [mode, setMode] = useState(settings.mode);
+    const [template, setTemplate] = useState(settings.template || "modal");
     const [popupTitle, setPopupTitle] = useState(settings.popupTitle);
     const [popupMessage, setPopupMessage] = useState(settings.popupMessage);
     const [confirmBtnText, setConfirmBtnText] = useState(settings.confirmBtnText);
@@ -170,6 +175,7 @@ export default function SettingsPage() {
     const handleSave = useCallback(() => {
         const formData = new FormData();
         formData.append("mode", mode);
+        formData.append("template", template);
         formData.append("popupTitle", popupTitle);
         formData.append("popupMessage", popupMessage);
         formData.append("confirmBtnText", confirmBtnText);
@@ -185,7 +191,7 @@ export default function SettingsPage() {
 
         fetcher.submit(formData, { method: "POST" });
     }, [
-        mode, popupTitle, popupMessage, confirmBtnText, cancelBtnText,
+        mode, template, popupTitle, popupMessage, confirmBtnText, cancelBtnText,
         popupBgColor, popupTextColor, popupBtnColor, excludeBots, excludedIPs,
         cookieDuration, fetcher
     ]);
@@ -194,6 +200,12 @@ export default function SettingsPage() {
         { label: "Popup (Recommended)", value: "popup" },
         { label: "Auto Redirect", value: "auto_redirect" },
         { label: "Disabled", value: "disabled" },
+    ];
+
+    const templateOptions = [
+        { label: "Modal (Centered)", value: "modal" },
+        { label: "Top Bar", value: "top_bar" },
+        { label: "Bottom Bar", value: "bottom_bar" },
     ];
 
     return (
@@ -234,12 +246,25 @@ export default function SettingsPage() {
                             </BlockStack>
                         </Card>
                     </Layout.Section>
+                </Layout>
 
-                    {/* Popup Customization */}
-                    {mode === "popup" && (
+                {/* Popup Customization Row - Only show if mode is popup */}
+                {mode === "popup" && (
+                    <Layout>
                         <Layout.Section>
                             <Card>
                                 <BlockStack gap="400">
+                                    <Text as="h2" variant="headingMd">
+                                        Popup Appearance
+                                    </Text>
+                                    <Select
+                                        label="Template Design"
+                                        options={templateOptions}
+                                        value={template}
+                                        onChange={setTemplate}
+                                        helpText="Choose how the popup appears on the visitor's screen."
+                                    />
+                                    <Divider />
                                     <Text as="h2" variant="headingMd">
                                         Popup Customization
                                     </Text>
@@ -301,8 +326,112 @@ export default function SettingsPage() {
                                 </BlockStack>
                             </Card>
                         </Layout.Section>
-                    )}
 
+                        {/* Preview Section - Side by Side with options */}
+                        <Layout.Section variant="oneThird">
+                            <div style={{ position: 'sticky', top: '20px' }}>
+                                <Card>
+                                    <BlockStack gap="400">
+                                        <Text as="h2" variant="headingMd">
+                                            Popup Preview
+                                        </Text>
+                                        <div
+                                            style={{
+                                                position: "relative",
+                                                height: "300px",
+                                                backgroundColor: "#f4f6f8",
+                                                border: "1px solid #ddd",
+                                                borderRadius: "8px",
+                                                overflow: "hidden",
+                                                display: "flex",
+                                                alignItems: template === "modal" ? "center" : (template === "top_bar" ? "flex-start" : "flex-end"),
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            {/* Mock Page Content */}
+                                            <div style={{ position: "absolute", top: 20, left: 20, right: 20, bottom: 20, opacity: 0.3 }}>
+                                                <div style={{ height: "20px", width: "100px", background: "#ccc", marginBottom: "20px" }}></div>
+                                                <div style={{ height: "150px", width: "100%", background: "#ccc", marginBottom: "20px" }}></div>
+                                                <div style={{ height: "20px", width: "80%", background: "#ccc" }}></div>
+                                            </div>
+
+                                            {/* Preview Element */}
+                                            <div
+                                                style={{
+                                                    padding: template === "modal" ? "20px" : "12px 20px",
+                                                    borderRadius: template === "modal" ? "8px" : "0",
+                                                    backgroundColor: popupBgColor,
+                                                    color: popupTextColor,
+                                                    width: template === "modal" ? "90%" : "100%",
+                                                    maxWidth: template === "modal" ? "300px" : "100%",
+                                                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                                    display: "flex",
+                                                    flexDirection: template === "modal" ? "column" : "row",
+                                                    alignItems: "center",
+                                                    gap: "10px",
+                                                    justifyContent: template === "modal" ? "center" : "space-between",
+                                                    textAlign: template === "modal" ? "center" : "left",
+                                                    border: template === "modal" ? "1px solid #ddd" : "none",
+                                                    zIndex: 10,
+                                                }}
+                                            >
+                                                <div style={{ flex: 1 }}>
+                                                    {template === "modal" && (
+                                                        <Text as="h3" variant="headingMd" fontWeight="bold">
+                                                            {popupTitle}
+                                                        </Text>
+                                                    )}
+                                                    <p style={{ margin: template === "modal" ? "10px 0" : "0", fontSize: template === "modal" ? "14px" : "13px" }}>
+                                                        {template !== "modal" && <strong style={{ marginRight: 5 }}>{popupTitle}</strong>}
+                                                        {popupMessage
+                                                            .replace("{country}", "US")
+                                                            .replace("{target}", "US Store")}
+                                                    </p>
+                                                </div>
+
+                                                <InlineStack gap="200">
+                                                    <button
+                                                        style={{
+                                                            backgroundColor: popupBtnColor,
+                                                            color: "#fff",
+                                                            border: "none",
+                                                            padding: template === "modal" ? "8px 16px" : "6px 12px",
+                                                            borderRadius: "4px",
+                                                            cursor: "pointer",
+                                                            fontSize: "13px",
+                                                            whiteSpace: "nowrap",
+                                                        }}
+                                                    >
+                                                        {confirmBtnText}
+                                                    </button>
+                                                    <button
+                                                        style={{
+                                                            backgroundColor: "transparent",
+                                                            border: `1px solid ${popupTextColor}`,
+                                                            color: popupTextColor,
+                                                            padding: template === "modal" ? "8px 16px" : "6px 12px",
+                                                            borderRadius: "4px",
+                                                            cursor: "pointer",
+                                                            fontSize: "13px",
+                                                            whiteSpace: "nowrap",
+                                                        }}
+                                                    >
+                                                        {cancelBtnText}
+                                                    </button>
+                                                </InlineStack>
+                                            </div>
+                                        </div>
+                                        <Text as="p" tone="subdued">
+                                            Preview shows how the popup will appear relative to the screen.
+                                        </Text>
+                                    </BlockStack>
+                                </Card>
+                            </div>
+                        </Layout.Section>
+                    </Layout>
+                )}
+
+                <Layout>
                     <Layout.Section>
                         <Card>
                             <BlockStack gap="400">
@@ -362,63 +491,6 @@ export default function SettingsPage() {
                             </BlockStack>
                         </Card>
                     </Layout.Section>
-
-                    {/* Preview */}
-                    {mode === "popup" && (
-                        <Layout.Section variant="oneThird">
-                            <Card>
-                                <BlockStack gap="400">
-                                    <Text as="h2" variant="headingMd">
-                                        Popup Preview
-                                    </Text>
-                                    <div
-                                        style={{
-                                            padding: "20px",
-                                            borderRadius: "8px",
-                                            backgroundColor: popupBgColor,
-                                            color: popupTextColor,
-                                            border: "1px solid #ddd",
-                                        }}
-                                    >
-                                        <Text as="h3" variant="headingMd" fontWeight="bold">
-                                            {popupTitle}
-                                        </Text>
-                                        <p style={{ margin: "10px 0" }}>
-                                            {popupMessage
-                                                .replace("{country}", "United States")
-                                                .replace("{target}", "US Store")}
-                                        </p>
-                                        <InlineStack gap="200">
-                                            <button
-                                                style={{
-                                                    backgroundColor: popupBtnColor,
-                                                    color: "#fff",
-                                                    border: "none",
-                                                    padding: "8px 16px",
-                                                    borderRadius: "4px",
-                                                    cursor: "pointer",
-                                                }}
-                                            >
-                                                {confirmBtnText}
-                                            </button>
-                                            <button
-                                                style={{
-                                                    backgroundColor: "transparent",
-                                                    border: `1px solid ${popupTextColor}`,
-                                                    color: popupTextColor,
-                                                    padding: "8px 16px",
-                                                    borderRadius: "4px",
-                                                    cursor: "pointer",
-                                                }}
-                                            >
-                                                {cancelBtnText}
-                                            </button>
-                                        </InlineStack>
-                                    </div>
-                                </BlockStack>
-                            </Card>
-                        </Layout.Section>
-                    )}
                 </Layout>
             </BlockStack>
         </Page>

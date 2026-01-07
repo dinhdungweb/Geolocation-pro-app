@@ -124,106 +124,89 @@
     return null;
   };
 
-  // Create and show popup
+    // Create and show popup
   const showPopup = (config, rule, countryCode) => {
     const popup = config.popup || {};
+    const template = popup.template || 'modal'; // 'modal', 'top_bar', 'bottom_bar'
     const container = document.getElementById('geolocation-app-container');
     if (!container) return;
 
-    // Get country name - Complete ISO 3166-1 alpha-2 codes (249 countries/territories)
-    const countryNames = {
-      // A
-      AD: 'Andorra', AE: 'United Arab Emirates', AF: 'Afghanistan', AG: 'Antigua and Barbuda',
-      AI: 'Anguilla', AL: 'Albania', AM: 'Armenia', AO: 'Angola', AQ: 'Antarctica',
-      AR: 'Argentina', AS: 'American Samoa', AT: 'Austria', AU: 'Australia', AW: 'Aruba',
-      AX: 'Åland Islands', AZ: 'Azerbaijan',
-      // B
-      BA: 'Bosnia and Herzegovina', BB: 'Barbados', BD: 'Bangladesh', BE: 'Belgium',
-      BF: 'Burkina Faso', BG: 'Bulgaria', BH: 'Bahrain', BI: 'Burundi', BJ: 'Benin',
-      BL: 'Saint Barthélemy', BM: 'Bermuda', BN: 'Brunei', BO: 'Bolivia',
-      BQ: 'Caribbean Netherlands', BR: 'Brazil', BS: 'Bahamas', BT: 'Bhutan',
-      BV: 'Bouvet Island', BW: 'Botswana', BY: 'Belarus', BZ: 'Belize',
-      // C
-      CA: 'Canada', CC: 'Cocos Islands', CD: 'DR Congo', CF: 'Central African Republic',
-      CG: 'Congo', CH: 'Switzerland', CI: 'Ivory Coast', CK: 'Cook Islands', CL: 'Chile',
-      CM: 'Cameroon', CN: 'China', CO: 'Colombia', CR: 'Costa Rica', CU: 'Cuba',
-      CV: 'Cape Verde', CW: 'Curaçao', CX: 'Christmas Island', CY: 'Cyprus', CZ: 'Czechia',
-      // D
-      DE: 'Germany', DJ: 'Djibouti', DK: 'Denmark', DM: 'Dominica', DO: 'Dominican Republic',
-      DZ: 'Algeria',
-      // E
-      EC: 'Ecuador', EE: 'Estonia', EG: 'Egypt', EH: 'Western Sahara', ER: 'Eritrea',
-      ES: 'Spain', ET: 'Ethiopia',
-      // F
-      FI: 'Finland', FJ: 'Fiji', FK: 'Falkland Islands', FM: 'Micronesia', FO: 'Faroe Islands',
-      FR: 'France',
-      // G
-      GA: 'Gabon', GB: 'United Kingdom', GD: 'Grenada', GE: 'Georgia', GF: 'French Guiana',
-      GG: 'Guernsey', GH: 'Ghana', GI: 'Gibraltar', GL: 'Greenland', GM: 'Gambia',
-      GN: 'Guinea', GP: 'Guadeloupe', GQ: 'Equatorial Guinea', GR: 'Greece',
-      GS: 'South Georgia', GT: 'Guatemala', GU: 'Guam', GW: 'Guinea-Bissau', GY: 'Guyana',
-      // H
-      HK: 'Hong Kong', HM: 'Heard Island', HN: 'Honduras', HR: 'Croatia', HT: 'Haiti',
-      HU: 'Hungary',
-      // I
-      ID: 'Indonesia', IE: 'Ireland', IL: 'Israel', IM: 'Isle of Man', IN: 'India',
-      IO: 'British Indian Ocean Territory', IQ: 'Iraq', IR: 'Iran', IS: 'Iceland', IT: 'Italy',
-      // J
-      JE: 'Jersey', JM: 'Jamaica', JO: 'Jordan', JP: 'Japan',
-      // K
-      KE: 'Kenya', KG: 'Kyrgyzstan', KH: 'Cambodia', KI: 'Kiribati', KM: 'Comoros',
-      KN: 'Saint Kitts and Nevis', KP: 'North Korea', KR: 'South Korea', KW: 'Kuwait',
-      KY: 'Cayman Islands', KZ: 'Kazakhstan',
-      // L
-      LA: 'Laos', LB: 'Lebanon', LC: 'Saint Lucia', LI: 'Liechtenstein', LK: 'Sri Lanka',
-      LR: 'Liberia', LS: 'Lesotho', LT: 'Lithuania', LU: 'Luxembourg', LV: 'Latvia',
-      LY: 'Libya',
-      // M
-      MA: 'Morocco', MC: 'Monaco', MD: 'Moldova', ME: 'Montenegro', MF: 'Saint Martin',
-      MG: 'Madagascar', MH: 'Marshall Islands', MK: 'North Macedonia', ML: 'Mali',
-      MM: 'Myanmar', MN: 'Mongolia', MO: 'Macau', MP: 'Northern Mariana Islands',
-      MQ: 'Martinique', MR: 'Mauritania', MS: 'Montserrat', MT: 'Malta', MU: 'Mauritius',
-      MV: 'Maldives', MW: 'Malawi', MX: 'Mexico', MY: 'Malaysia', MZ: 'Mozambique',
-      // N
-      NA: 'Namibia', NC: 'New Caledonia', NE: 'Niger', NF: 'Norfolk Island', NG: 'Nigeria',
-      NI: 'Nicaragua', NL: 'Netherlands', NO: 'Norway', NP: 'Nepal', NR: 'Nauru',
-      NU: 'Niue', NZ: 'New Zealand',
-      // O
-      OM: 'Oman',
-      // P
-      PA: 'Panama', PE: 'Peru', PF: 'French Polynesia', PG: 'Papua New Guinea',
-      PH: 'Philippines', PK: 'Pakistan', PL: 'Poland', PM: 'Saint Pierre and Miquelon',
-      PN: 'Pitcairn', PR: 'Puerto Rico', PS: 'Palestine', PT: 'Portugal', PW: 'Palau',
-      PY: 'Paraguay',
-      // Q
-      QA: 'Qatar',
-      // R
-      RE: 'Réunion', RO: 'Romania', RS: 'Serbia', RU: 'Russia', RW: 'Rwanda',
-      // S
-      SA: 'Saudi Arabia', SB: 'Solomon Islands', SC: 'Seychelles', SD: 'Sudan',
-      SE: 'Sweden', SG: 'Singapore', SH: 'Saint Helena', SI: 'Slovenia',
-      SJ: 'Svalbard and Jan Mayen', SK: 'Slovakia', SL: 'Sierra Leone', SM: 'San Marino',
-      SN: 'Senegal', SO: 'Somalia', SR: 'Suriname', SS: 'South Sudan',
-      ST: 'São Tomé and Príncipe', SV: 'El Salvador', SX: 'Sint Maarten', SY: 'Syria',
-      SZ: 'Eswatini',
-      // T
-      TC: 'Turks and Caicos', TD: 'Chad', TF: 'French Southern Territories', TG: 'Togo',
-      TH: 'Thailand', TJ: 'Tajikistan', TK: 'Tokelau', TL: 'Timor-Leste', TM: 'Turkmenistan',
-      TN: 'Tunisia', TO: 'Tonga', TR: 'Turkey', TT: 'Trinidad and Tobago', TV: 'Tuvalu',
-      TW: 'Taiwan', TZ: 'Tanzania',
-      // U
-      UA: 'Ukraine', UG: 'Uganda', UM: 'U.S. Minor Outlying Islands', US: 'United States',
-      UY: 'Uruguay', UZ: 'Uzbekistan',
-      // V
-      VA: 'Vatican City', VC: 'Saint Vincent and the Grenadines', VE: 'Venezuela',
-      VG: 'British Virgin Islands', VI: 'U.S. Virgin Islands', VN: 'Việt Nam', VU: 'Vanuatu',
-      // W
-      WF: 'Wallis and Futuna', WS: 'Samoa',
-      // X (no standard ISO codes)
-      // Y
-      YE: 'Yemen', YT: 'Mayotte',
-      // Z
-      ZA: 'South Africa', ZM: 'Zambia', ZW: 'Zimbabwe'
+    // Get country name
+    const countryNames = { /* ... keep existing country map if needed, or assume it's global scope ... */ 
+        // Small compromise: re-using the existing map or moving it out would be cleaner, 
+        // but for now I'll just restore the map or rely on it being defined if I move it.
+        // wait, I can function-scope it again or just copy it. 
+        // To be safe and keep it clean, let's assume I replaced the *entire* function content
+        // which implies I need to re-declare variables.
+        // Actually, for brevity in this tool call, I will retain the country map logic 
+        // but since I am replacing the whole function block, I must include it.
+        // Start country map
+       AD: 'Andorra', AE: 'United Arab Emirates', AF: 'Afghanistan', AG: 'Antigua and Barbuda',
+       AI: 'Anguilla', AL: 'Albania', AM: 'Armenia', AO: 'Angola', AQ: 'Antarctica',
+       AR: 'Argentina', AS: 'American Samoa', AT: 'Austria', AU: 'Australia', AW: 'Aruba',
+       AX: 'Åland Islands', AZ: 'Azerbaijan',
+       BA: 'Bosnia and Herzegovina', BB: 'Barbados', BD: 'Bangladesh', BE: 'Belgium',
+       BF: 'Burkina Faso', BG: 'Bulgaria', BH: 'Bahrain', BI: 'Burundi', BJ: 'Benin',
+       BL: 'Saint Barthélemy', BM: 'Bermuda', BN: 'Brunei', BO: 'Bolivia',
+       BQ: 'Caribbean Netherlands', BR: 'Brazil', BS: 'Bahamas', BT: 'Bhutan',
+       BV: 'Bouvet Island', BW: 'Botswana', BY: 'Belarus', BZ: 'Belize',
+       CA: 'Canada', CC: 'Cocos Islands', CD: 'DR Congo', CF: 'Central African Republic',
+       CG: 'Congo', CH: 'Switzerland', CI: 'Ivory Coast', CK: 'Cook Islands', CL: 'Chile',
+       CM: 'Cameroon', CN: 'China', CO: 'Colombia', CR: 'Costa Rica', CU: 'Cuba',
+       CV: 'Cape Verde', CW: 'Curaçao', CX: 'Christmas Island', CY: 'Cyprus', CZ: 'Czechia',
+       DE: 'Germany', DJ: 'Djibouti', DK: 'Denmark', DM: 'Dominica', DO: 'Dominican Republic',
+       DZ: 'Algeria',
+       EC: 'Ecuador', EE: 'Estonia', EG: 'Egypt', EH: 'Western Sahara', ER: 'Eritrea',
+       ES: 'Spain', ET: 'Ethiopia',
+       FI: 'Finland', FJ: 'Fiji', FK: 'Falkland Islands', FM: 'Micronesia', FO: 'Faroe Islands',
+       FR: 'France',
+       GA: 'Gabon', GB: 'United Kingdom', GD: 'Grenada', GE: 'Georgia', GF: 'French Guiana',
+       GG: 'Guernsey', GH: 'Ghana', GI: 'Gibraltar', GL: 'Greenland', GM: 'Gambia',
+       GN: 'Guinea', GP: 'Guadeloupe', GQ: 'Equatorial Guinea', GR: 'Greece',
+       GS: 'South Georgia', GT: 'Guatemala', GU: 'Guam', GW: 'Guinea-Bissau', GY: 'Guyana',
+       HK: 'Hong Kong', HM: 'Heard Island', HN: 'Honduras', HR: 'Croatia', HT: 'Haiti',
+       HU: 'Hungary',
+       ID: 'Indonesia', IE: 'Ireland', IL: 'Israel', IM: 'Isle of Man', IN: 'India',
+       IO: 'British Indian Ocean Territory', IQ: 'Iraq', IR: 'Iran', IS: 'Iceland', IT: 'Italy',
+       JE: 'Jersey', JM: 'Jamaica', JO: 'Jordan', JP: 'Japan',
+       KE: 'Kenya', KG: 'Kyrgyzstan', KH: 'Cambodia', KI: 'Kiribati', KM: 'Comoros',
+       KN: 'Saint Kitts and Nevis', KP: 'North Korea', KR: 'South Korea', KW: 'Kuwait',
+       KY: 'Cayman Islands', KZ: 'Kazakhstan',
+       LA: 'Laos', LB: 'Lebanon', LC: 'Saint Lucia', LI: 'Liechtenstein', LK: 'Sri Lanka',
+       LR: 'Liberia', LS: 'Lesotho', LT: 'Lithuania', LU: 'Luxembourg', LV: 'Latvia',
+       LY: 'Libya',
+       MA: 'Morocco', MC: 'Monaco', MD: 'Moldova', ME: 'Montenegro', MF: 'Saint Martin',
+       MG: 'Madagascar', MH: 'Marshall Islands', MK: 'North Macedonia', ML: 'Mali',
+       MM: 'Myanmar', MN: 'Mongolia', MO: 'Macau', MP: 'Northern Mariana Islands',
+       MQ: 'Martinique', MR: 'Mauritania', MS: 'Montserrat', MT: 'Malta', MU: 'Mauritius',
+       MV: 'Maldives', MW: 'Malawi', MX: 'Mexico', MY: 'Malaysia', MZ: 'Mozambique',
+       NA: 'Namibia', NC: 'New Caledonia', NE: 'Niger', NF: 'Norfolk Island', NG: 'Nigeria',
+       NI: 'Nicaragua', NL: 'Netherlands', NO: 'Norway', NP: 'Nepal', NR: 'Nauru',
+       NU: 'Niue', NZ: 'New Zealand',
+       OM: 'Oman',
+       PA: 'Panama', PE: 'Peru', PF: 'French Polynesia', PG: 'Papua New Guinea',
+       PH: 'Philippines', PK: 'Pakistan', PL: 'Poland', PM: 'Saint Pierre and Miquelon',
+       PN: 'Pitcairn', PR: 'Puerto Rico', PS: 'Palestine', PT: 'Portugal', PW: 'Palau',
+       PY: 'Paraguay',
+       QA: 'Qatar',
+       RE: 'Réunion', RO: 'Romania', RS: 'Serbia', RU: 'Russia', RW: 'Rwanda',
+       SA: 'Saudi Arabia', SB: 'Solomon Islands', SC: 'Seychelles', SD: 'Sudan',
+       SE: 'Sweden', SG: 'Singapore', SH: 'Saint Helena', SI: 'Slovenia',
+       SJ: 'Svalbard and Jan Mayen', SK: 'Slovakia', SL: 'Sierra Leone', SM: 'San Marino',
+       SN: 'Senegal', SO: 'Somalia', SR: 'Suriname', SS: 'South Sudan',
+       ST: 'São Tomé and Príncipe', SV: 'El Salvador', SX: 'Sint Maarten', SY: 'Syria',
+       SZ: 'Eswatini',
+       TC: 'Turks and Caicos', TD: 'Chad', TF: 'French Southern Territories', TG: 'Togo',
+       TH: 'Thailand', TJ: 'Tajikistan', TK: 'Tokelau', TL: 'Timor-Leste', TM: 'Turkmenistan',
+       TN: 'Tunisia', TO: 'Tonga', TR: 'Turkey', TT: 'Trinidad and Tobago', TV: 'Tuvalu',
+       TW: 'Taiwan', TZ: 'Tanzania',
+       UA: 'Ukraine', UG: 'Uganda', UM: 'U.S. Minor Outlying Islands', US: 'United States',
+       UY: 'Uruguay', UZ: 'Uzbekistan',
+       VA: 'Vatican City', VC: 'Saint Vincent and the Grenadines', VE: 'Venezuela',
+       VG: 'British Virgin Islands', VI: 'U.S. Virgin Islands', VN: 'Việt Nam', VU: 'Vanuatu',
+       WF: 'Wallis and Futuna', WS: 'Samoa',
+       YE: 'Yemen', YT: 'Mayotte',
+       ZA: 'South Africa', ZM: 'Zambia', ZW: 'Zimbabwe' // End country map
     };
     const countryName = countryNames[countryCode] || countryCode;
 
@@ -235,7 +218,7 @@
       // Keep original if not valid URL
     }
 
-    log('Showing popup for', countryName, '->', targetName);
+    log('Showing popup for', countryName, '->', targetName, 'Template:', template);
 
     // Default values
     const title = popup.title || 'Redirect Available';
@@ -248,76 +231,90 @@
     const textColor = popup.textColor || '#333333';
     const btnColor = popup.btnColor || '#007bff';
 
-    // Create popup HTML
+    // Template Specific Styles
+    let overlayStyle = '';
+    let contentStyle = '';
+    
+    if (template === 'top_bar') {
+        overlayStyle = `
+            position: fixed; top: 0; left: 0; right: 0;
+            background: ${bgColor}; color: ${textColor};
+            padding: 12px 20px;
+            z-index: 999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 15px;
+            animation: geo-slide-down 0.3s ease;
+        `;
+        contentStyle = `display: flex; align-items: center; gap: 15px; flex: 1;`;
+    } else if (template === 'bottom_bar') {
+        overlayStyle = `
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: ${bgColor}; color: ${textColor};
+            padding: 12px 20px;
+            z-index: 999999;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 15px;
+            animation: geo-slide-up 0.3s ease;
+        `;
+        contentStyle = `display: flex; align-items: center; gap: 15px; flex: 1;`;
+    } else {
+        // Default Modal
+        overlayStyle = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999999;
+            display: flex; align-items: center; justify-content: center;
+            animation: geo-fade-in 0.3s ease;
+        `;
+        contentStyle = `
+            background: ${bgColor}; color: ${textColor};
+            padding: 24px; border-radius: 12px;
+            max-width: 400px; width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            animation: geo-slide-up 0.3s ease;
+            position: relative;
+        `;
+    }
+
+    // HTML Construction based on template
+    let htmlContent = '';
+    
+    if (template === 'modal') {
+        htmlContent = `
+            <div id="geo-popup-modal" style="${contentStyle}">
+                <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">${title}</h3>
+                <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">${message}</p>
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                    <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
+                    <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Bar Template (Top/Bottom)
+        htmlContent = `
+            <div id="geo-bar-content" style="${contentStyle}">
+                <span style="font-weight: 600; font-size: 14px;">${title}</span>
+                <span style="font-size: 14px; opacity: 0.9; margin-right: auto;">${message}</span>
+                <div style="display: flex; gap: 10px;">
+                     <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;">${confirmBtn}</button>
+                     <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;">${cancelBtn}</button>
+                </div>
+            </div>
+        `;
+    }
+
     container.innerHTML = `
-      <div id="geo-popup-overlay" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        animation: geo-fade-in 0.3s ease;
-      ">
-        <div id="geo-popup-modal" style="
-          background: ${bgColor};
-          color: ${textColor};
-          padding: 24px;
-          border-radius: 12px;
-          max-width: 400px;
-          width: 90%;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-          text-align: center;
-          animation: geo-slide-up 0.3s ease;
-        ">
-          <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">
-            ${title}
-          </h3>
-          <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">
-            ${message}
-          </p>
-          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <button id="geo-confirm-btn" style="
-              background: ${btnColor};
-              color: #fff;
-              border: none;
-              padding: 12px 24px;
-              border-radius: 6px;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              transition: opacity 0.2s;
-            ">${confirmBtn}</button>
-            <button id="geo-cancel-btn" style="
-              background: transparent;
-              color: ${textColor};
-              border: 1px solid ${textColor};
-              padding: 12px 24px;
-              border-radius: 6px;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              opacity: 0.7;
-              transition: opacity 0.2s;
-            ">${cancelBtn}</button>
-          </div>
-        </div>
+      <div id="geo-popup-overlay" style="${overlayStyle}">
+        ${htmlContent}
       </div>
       <style>
-        @keyframes geo-fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes geo-slide-up {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        #geo-confirm-btn:hover { opacity: 0.9; }
-        #geo-cancel-btn:hover { opacity: 1; }
+        @keyframes geo-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes geo-slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes geo-slide-down { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       </style>
     `;
 
@@ -335,15 +332,16 @@
       trackEvent('clicked_no', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
       container.style.display = 'none';
     });
-
-    document.getElementById('geo-popup-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'geo-popup-overlay') {
-        // Just close without setting cookie - will show again next visit
-        trackEvent('dismissed', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
-        container.style.display = 'none';
-        log('Popup dismissed, will show again next visit');
-      }
-    });
+    
+    // Only close on overlay click for Modal
+    if (template === 'modal') {
+        document.getElementById('geo-popup-overlay').addEventListener('click', (e) => {
+          if (e.target.id === 'geo-popup-overlay') {
+            trackEvent('dismissed', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+            container.style.display = 'none';
+          }
+        });
+    }
 
   };
 

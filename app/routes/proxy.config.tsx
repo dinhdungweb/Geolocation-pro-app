@@ -47,6 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 cookieDuration: true,
                 blockedTitle: true,
                 blockedMessage: true,
+                template: true,
             },
         });
 
@@ -154,6 +155,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 bgColor: settings.popupBgColor,
                 textColor: settings.popupTextColor,
                 btnColor: settings.popupBtnColor,
+                template: settings.template || "modal",
             },
             excludeBots: settings.excludeBots,
             cookieDuration: settings.cookieDuration,

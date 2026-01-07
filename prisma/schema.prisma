@@ -63,6 +63,7 @@ model Settings {
   shop            String   @unique // Mỗi shop có 1 bản settings
   // Chế độ hoạt động
   mode            String   @default("popup") // "popup" | "auto_redirect" | "disabled"
+  template        String   @default("modal") // "modal" | "top_bar" | "bottom_bar"
   // Cấu hình popup
   popupTitle      String   @default("Would you like to switch to a local version?")
   popupMessage    String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
