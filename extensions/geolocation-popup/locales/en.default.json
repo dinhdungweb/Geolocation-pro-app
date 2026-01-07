@@ -1,0 +1,6 @@
+{
+    "geolocation_popup": {
+        "name": "Geolocation Redirect",
+        "description": "Redirect visitors to the right store based on their location"
+    }
+}

@@ -1,0 +1,124 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// Geolocation App: Luật chuyển hướng theo quốc gia
+model RedirectRule {
+  id           String   @id @default(uuid())
+  shop         String   // Shop domain
+  name         String   // Tên rule (ví dụ: "Vietnam Redirect")
+  countryCodes String   // Mã quốc gia, phân tách bằng dấu phẩy (VN,TH,SG)
+  targetUrl    String   // URL hoặc Market ID để chuyển hướng
+  isActive       Boolean  @default(true)
+  priority       Int      @default(0) // Priority cao hơn = ưu tiên hơn
+  ruleType       String   @default("redirect") // "redirect" or "block"
+  
+  // Scheduling
+  scheduleEnabled Boolean @default(false)
+  startTime      String?  // "09:00"
+  endTime        String?  // "17:00"
+  daysOfWeek     String?  // "1,2,3,4,5" (Mon-Fri)
+  timezone       String?  // "Asia/Ho_Chi_Minh" (default to shop timezone if null)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shop])
+}
+
+// Geolocation App: Cấu hình chung
+model Settings {
+  id              String   @id @default(uuid())
+  shop            String   @unique // Mỗi shop có 1 bản settings
+  // Chế độ hoạt động
+  mode            String   @default("popup") // "popup" | "auto_redirect" | "disabled"
+  // Cấu hình popup
+  popupTitle      String   @default("Would you like to switch to a local version?")
+  popupMessage    String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
+  confirmBtnText  String   @default("Go now")
+  cancelBtnText   String   @default("Stay here")
+  popupBgColor    String   @default("#ffffff")
+  popupTextColor  String   @default("#333333")
+  popupBtnColor   String   @default("#007bff")
+  
+  // Blocking Settings
+  blockedTitle    String   @default("Access Denied")
+  blockedMessage  String   @default("We do not offer services in your country/region.")
+
+  // SEO: Bot Exclusion
+  excludeBots     Boolean  @default(true)
+  // Loại trừ IP
+  excludedIPs     String   @default("") // Danh sách IP được loại trừ
+  // Cookie duration (days)
+  cookieDuration  Int      @default(7)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+
+// Analytics: Thống kê theo quốc gia (hàng ngày)
+model AnalyticsCountry {
+  id           String   @id @default(uuid())
+  shop         String
+  date         DateTime // Ngày ghi nhận số liệu (đã bỏ phần time)
+  countryCode  String
+  visitors     Int      @default(0)
+  popupShown   Int      @default(0)
+  redirected   Int      @default(0)
+  blocked      Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([shop, date, countryCode])
+  @@index([shop, date])
+}
+
+// Analytics: Thống kê theo Rule (hàng ngày)
+model AnalyticsRule {
+  id           String   @id @default(uuid())
+  shop         String
+  date         DateTime
+  ruleId       String
+  ruleName     String   // Lưu lại tên rule tại thời điểm đó
+  seen           Int      @default(0)
+  clickedYes     Int      @default(0)
+  clickedNo      Int      @default(0)
+  dismissed      Int      @default(0)
+  autoRedirected Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([shop, date, ruleId])
+  @@index([shop, date])
+}

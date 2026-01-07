@@ -1,0 +1,579 @@
+{% comment %}
+  Geolocation Popup - Theme App Extension
+  This block injects the geolocation detection and popup script into the storefront.
+  
+  Uses App Proxy to fetch config: https://shop.myshopify.com/apps/geolocation/config
+{% endcomment %}
+
+<div id="geolocation-app-container" style="display: none;"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // Configuration - Use App Proxy URL and Shopify's native country detection
+  const GEOLOCATION_CONFIG = {
+    shop: '{{ shop.permanent_domain }}',
+    // App Proxy URL - Shopify routes /apps/geolocation/* to our app
+    proxyUrl: '/apps/geolocation/config',
+    analyticsUrl: '/apps/geolocation/analytics',
+    // Country code detected by Shopify (official API, always available)
+    visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
+  };
+
+  // Debug mode
+  const DEBUG = true;
+  const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
+
+  // Cookie utilities
+  const CookieManager = {
+    set(name, value, days) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+    },
+    get(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    },
+    has(name) {
+      return this.get(name) !== null;
+    },
+    remove(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }
+  };
+
+  // Bot detection
+  const isBot = () => {
+    const botPatterns = /bot|crawl|spider|slurp|mediapartners|facebookexternalhit|bingpreview|linkedinbot|googlebot/i;
+    return botPatterns.test(navigator.userAgent);
+  };
+
+  // Get country from Shopify (no external API call needed!)
+  const getVisitorCountry = () => {
+    const country = GEOLOCATION_CONFIG.visitorCountry.toUpperCase();
+    log('Visitor country (from Shopify):', country || 'Not detected');
+    return country || null;
+  };
+
+  // Fetch config from App Proxy
+  const fetchConfig = async () => {
+    try {
+      // Use App Proxy URL - this is a stable URL that Shopify routes to our app
+      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
+      log('Fetching config from:', apiUrl);
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      log('Config loaded:', data);
+      return data;
+    } catch (error) {
+      log('Could not fetch config:', error);
+      return null;
+    }
+  };
+  
+  // Track analytics event
+  const trackEvent = async (type, data = {}) => {
+    try {
+      if (window.Shopify && window.Shopify.designMode) return; // Don't track in editor
+
+      // For 'visit', only track once per session
+      if (type === 'visit') {
+        if (sessionStorage.getItem('geo_visit_tracked')) return;
+        sessionStorage.setItem('geo_visit_tracked', 'true');
+      }
+
+      const payload = {
+        shop: GEOLOCATION_CONFIG.shop,
+        type,
+        ...data
+      };
+
+      // Use beacon if available for redirects to ensure it sends before page unload
+      if (type === 'redirected' && navigator.sendBeacon) {
+         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+         navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob);
+         return;
+      }
+
+      fetch(GEOLOCATION_CONFIG.analyticsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true // Important for redirects
+      }).catch(err => log('Analytics error:', err));
+    } catch (e) {
+      log('Analytics failed:', e);
+    }
+  };
+
+  // Find matching rule for country
+  const findMatchingRule = (rules, countryCode) => {
+    if (!rules || !countryCode) return null;
+    
+    for (const rule of rules) {
+      if (rule.countries.includes(countryCode)) {
+        return rule;
+      }
+    }
+    return null;
+  };
+
+  // Create and show popup
+  const showPopup = (config, rule, countryCode) => {
+    const popup = config.popup || {};
+    const container = document.getElementById('geolocation-app-container');
+    if (!container) return;
+
+    // Get country name - Complete ISO 3166-1 alpha-2 codes (249 countries/territories)
+    const countryNames = {
+      // A
+      AD: 'Andorra', AE: 'United Arab Emirates', AF: 'Afghanistan', AG: 'Antigua and Barbuda',
+      AI: 'Anguilla', AL: 'Albania', AM: 'Armenia', AO: 'Angola', AQ: 'Antarctica',
+      AR: 'Argentina', AS: 'American Samoa', AT: 'Austria', AU: 'Australia', AW: 'Aruba',
+      AX: 'Åland Islands', AZ: 'Azerbaijan',
+      // B
+      BA: 'Bosnia and Herzegovina', BB: 'Barbados', BD: 'Bangladesh', BE: 'Belgium',
+      BF: 'Burkina Faso', BG: 'Bulgaria', BH: 'Bahrain', BI: 'Burundi', BJ: 'Benin',
+      BL: 'Saint Barthélemy', BM: 'Bermuda', BN: 'Brunei', BO: 'Bolivia',
+      BQ: 'Caribbean Netherlands', BR: 'Brazil', BS: 'Bahamas', BT: 'Bhutan',
+      BV: 'Bouvet Island', BW: 'Botswana', BY: 'Belarus', BZ: 'Belize',
+      // C
+      CA: 'Canada', CC: 'Cocos Islands', CD: 'DR Congo', CF: 'Central African Republic',
+      CG: 'Congo', CH: 'Switzerland', CI: 'Ivory Coast', CK: 'Cook Islands', CL: 'Chile',
+      CM: 'Cameroon', CN: 'China', CO: 'Colombia', CR: 'Costa Rica', CU: 'Cuba',
+      CV: 'Cape Verde', CW: 'Curaçao', CX: 'Christmas Island', CY: 'Cyprus', CZ: 'Czechia',
+      // D
+      DE: 'Germany', DJ: 'Djibouti', DK: 'Denmark', DM: 'Dominica', DO: 'Dominican Republic',
+      DZ: 'Algeria',
+      // E
+      EC: 'Ecuador', EE: 'Estonia', EG: 'Egypt', EH: 'Western Sahara', ER: 'Eritrea',
+      ES: 'Spain', ET: 'Ethiopia',
+      // F
+      FI: 'Finland', FJ: 'Fiji', FK: 'Falkland Islands', FM: 'Micronesia', FO: 'Faroe Islands',
+      FR: 'France',
+      // G
+      GA: 'Gabon', GB: 'United Kingdom', GD: 'Grenada', GE: 'Georgia', GF: 'French Guiana',
+      GG: 'Guernsey', GH: 'Ghana', GI: 'Gibraltar', GL: 'Greenland', GM: 'Gambia',
+      GN: 'Guinea', GP: 'Guadeloupe', GQ: 'Equatorial Guinea', GR: 'Greece',
+      GS: 'South Georgia', GT: 'Guatemala', GU: 'Guam', GW: 'Guinea-Bissau', GY: 'Guyana',
+      // H
+      HK: 'Hong Kong', HM: 'Heard Island', HN: 'Honduras', HR: 'Croatia', HT: 'Haiti',
+      HU: 'Hungary',
+      // I
+      ID: 'Indonesia', IE: 'Ireland', IL: 'Israel', IM: 'Isle of Man', IN: 'India',
+      IO: 'British Indian Ocean Territory', IQ: 'Iraq', IR: 'Iran', IS: 'Iceland', IT: 'Italy',
+      // J
+      JE: 'Jersey', JM: 'Jamaica', JO: 'Jordan', JP: 'Japan',
+      // K
+      KE: 'Kenya', KG: 'Kyrgyzstan', KH: 'Cambodia', KI: 'Kiribati', KM: 'Comoros',
+      KN: 'Saint Kitts and Nevis', KP: 'North Korea', KR: 'South Korea', KW: 'Kuwait',
+      KY: 'Cayman Islands', KZ: 'Kazakhstan',
+      // L
+      LA: 'Laos', LB: 'Lebanon', LC: 'Saint Lucia', LI: 'Liechtenstein', LK: 'Sri Lanka',
+      LR: 'Liberia', LS: 'Lesotho', LT: 'Lithuania', LU: 'Luxembourg', LV: 'Latvia',
+      LY: 'Libya',
+      // M
+      MA: 'Morocco', MC: 'Monaco', MD: 'Moldova', ME: 'Montenegro', MF: 'Saint Martin',
+      MG: 'Madagascar', MH: 'Marshall Islands', MK: 'North Macedonia', ML: 'Mali',
+      MM: 'Myanmar', MN: 'Mongolia', MO: 'Macau', MP: 'Northern Mariana Islands',
+      MQ: 'Martinique', MR: 'Mauritania', MS: 'Montserrat', MT: 'Malta', MU: 'Mauritius',
+      MV: 'Maldives', MW: 'Malawi', MX: 'Mexico', MY: 'Malaysia', MZ: 'Mozambique',
+      // N
+      NA: 'Namibia', NC: 'New Caledonia', NE: 'Niger', NF: 'Norfolk Island', NG: 'Nigeria',
+      NI: 'Nicaragua', NL: 'Netherlands', NO: 'Norway', NP: 'Nepal', NR: 'Nauru',
+      NU: 'Niue', NZ: 'New Zealand',
+      // O
+      OM: 'Oman',
+      // P
+      PA: 'Panama', PE: 'Peru', PF: 'French Polynesia', PG: 'Papua New Guinea',
+      PH: 'Philippines', PK: 'Pakistan', PL: 'Poland', PM: 'Saint Pierre and Miquelon',
+      PN: 'Pitcairn', PR: 'Puerto Rico', PS: 'Palestine', PT: 'Portugal', PW: 'Palau',
+      PY: 'Paraguay',
+      // Q
+      QA: 'Qatar',
+      // R
+      RE: 'Réunion', RO: 'Romania', RS: 'Serbia', RU: 'Russia', RW: 'Rwanda',
+      // S
+      SA: 'Saudi Arabia', SB: 'Solomon Islands', SC: 'Seychelles', SD: 'Sudan',
+      SE: 'Sweden', SG: 'Singapore', SH: 'Saint Helena', SI: 'Slovenia',
+      SJ: 'Svalbard and Jan Mayen', SK: 'Slovakia', SL: 'Sierra Leone', SM: 'San Marino',
+      SN: 'Senegal', SO: 'Somalia', SR: 'Suriname', SS: 'South Sudan',
+      ST: 'São Tomé and Príncipe', SV: 'El Salvador', SX: 'Sint Maarten', SY: 'Syria',
+      SZ: 'Eswatini',
+      // T
+      TC: 'Turks and Caicos', TD: 'Chad', TF: 'French Southern Territories', TG: 'Togo',
+      TH: 'Thailand', TJ: 'Tajikistan', TK: 'Tokelau', TL: 'Timor-Leste', TM: 'Turkmenistan',
+      TN: 'Tunisia', TO: 'Tonga', TR: 'Turkey', TT: 'Trinidad and Tobago', TV: 'Tuvalu',
+      TW: 'Taiwan', TZ: 'Tanzania',
+      // U
+      UA: 'Ukraine', UG: 'Uganda', UM: 'U.S. Minor Outlying Islands', US: 'United States',
+      UY: 'Uruguay', UZ: 'Uzbekistan',
+      // V
+      VA: 'Vatican City', VC: 'Saint Vincent and the Grenadines', VE: 'Venezuela',
+      VG: 'British Virgin Islands', VI: 'U.S. Virgin Islands', VN: 'Việt Nam', VU: 'Vanuatu',
+      // W
+      WF: 'Wallis and Futuna', WS: 'Samoa',
+      // X (no standard ISO codes)
+      // Y
+      YE: 'Yemen', YT: 'Mayotte',
+      // Z
+      ZA: 'South Africa', ZM: 'Zambia', ZW: 'Zimbabwe'
+    };
+    const countryName = countryNames[countryCode] || countryCode;
+
+    // Parse target name from URL
+    let targetName = rule.targetUrl;
+    try {
+      targetName = new URL(rule.targetUrl).hostname;
+    } catch (e) {
+      // Keep original if not valid URL
+    }
+
+    log('Showing popup for', countryName, '->', targetName);
+
+    // Default values
+    const title = popup.title || 'Redirect Available';
+    const message = (popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
+      .replace('{country}', countryName)
+      .replace('{target}', targetName);
+    const confirmBtn = popup.confirmBtn || 'Go now';
+    const cancelBtn = popup.cancelBtn || 'Stay here';
+    const bgColor = popup.bgColor || '#ffffff';
+    const textColor = popup.textColor || '#333333';
+    const btnColor = popup.btnColor || '#007bff';
+
+    // Create popup HTML
+    container.innerHTML = `
+      <div id="geo-popup-overlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: geo-fade-in 0.3s ease;
+      ">
+        <div id="geo-popup-modal" style="
+          background: ${bgColor};
+          color: ${textColor};
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+          text-align: center;
+          animation: geo-slide-up 0.3s ease;
+        ">
+          <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">
+            ${title}
+          </h3>
+          <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">
+            ${message}
+          </p>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button id="geo-confirm-btn" style="
+              background: ${btnColor};
+              color: #fff;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 6px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: opacity 0.2s;
+            ">${confirmBtn}</button>
+            <button id="geo-cancel-btn" style="
+              background: transparent;
+              color: ${textColor};
+              border: 1px solid ${textColor};
+              padding: 12px 24px;
+              border-radius: 6px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              opacity: 0.7;
+              transition: opacity 0.2s;
+            ">${cancelBtn}</button>
+          </div>
+        </div>
+      </div>
+      <style>
+        @keyframes geo-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes geo-slide-up {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        #geo-confirm-btn:hover { opacity: 0.9; }
+        #geo-cancel-btn:hover { opacity: 1; }
+      </style>
+    `;
+
+    container.style.display = 'block';
+
+    // Event listeners
+    document.getElementById('geo-confirm-btn').addEventListener('click', () => {
+      CookieManager.set('geo_choice', 'redirected', config.cookieDuration || 7);
+      trackEvent('redirected', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+      window.location.href = rule.targetUrl;
+    });
+
+    document.getElementById('geo-cancel-btn').addEventListener('click', () => {
+      CookieManager.set('geo_choice', 'stayed', config.cookieDuration || 7);
+      trackEvent('clicked_no', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+      container.style.display = 'none';
+    });
+
+    document.getElementById('geo-popup-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'geo-popup-overlay') {
+        // Just close without setting cookie - will show again next visit
+        trackEvent('dismissed', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+        container.style.display = 'none';
+        log('Popup dismissed, will show again next visit');
+      }
+    });
+
+  };
+
+  // Create and show Block Screen
+  const showBlockScreen = (config, rule, countryCode) => {
+    const blockedSettings = config.blocked || {};
+    const title = blockedSettings.title || 'Access Denied';
+    const message = blockedSettings.message || 'We do not offer services in your country/region.';
+
+    // Create blocking overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'geo-block-screen';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+        color: #fff;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        padding: 20px;
+    `;
+
+    overlay.innerHTML = `
+        <div style="
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            animation: geo-fade-in 0.5s ease-out;
+        ">
+            <div style="margin-bottom: 24px;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="fill: none !important; color: #ffffff !important; stroke: #ffffff !important; width: 64px !important; height: 64px !important; display: block !important; margin: 0 auto !important;">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <path d="m9 9 6 6"></path>
+                    <path d="m15 9-6 6"></path>
+                </svg>
+            </div>
+            <h1 style="
+                font-size: 24px;
+                font-weight: 600;
+                margin: 0 0 16px;
+                letter-spacing: -0.5px;
+                color: #ffffff;
+            ">${title}</h1>
+            <p style="
+                font-size: 16px;
+                line-height: 1.6;
+                color: rgba(255, 255, 255, 0.8);
+                margin: 0;
+            ">${message}</p>
+        </div>
+        <style>
+            @keyframes geo-fade-in {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+        </style>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden'; // Disable scrolling
+
+    trackEvent('blocked', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+    log('Access blocked for country:', countryCode);
+  };
+
+  // Main function
+  const init = async () => {
+    log('Initializing...');
+
+    // Skip in Theme Editor / Preview mode - let merchants work in peace
+    if (window.Shopify && window.Shopify.designMode) {
+      log('Theme Editor detected, skipping redirect');
+      return;
+    }
+    
+    // Also skip if in preview/customize mode via URL
+    if (window.location.search.includes('preview_theme_id') || 
+        window.location.pathname.includes('/editor')) {
+      log('Theme preview mode detected, skipping redirect');
+      return;
+    }
+
+    // Get country from Shopify first (no API call needed - instant!)
+    const countryCode = getVisitorCountry();
+    if (!countryCode) {
+      log('Could not detect country - Shopify may not provide country info');
+      return;
+    }
+
+    // Fetch config from App Proxy - check this BEFORE cookies
+    const fetchConfig = async () => {
+      try {
+        const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      } catch (error) {
+        log('Could not fetch config:', error);
+        return null;
+      }
+    };
+
+    const config = await fetchConfig();
+    
+    if (!config) {
+      log('Could not fetch config - App Proxy may not be configured yet');
+      return;
+    }
+
+    // Check if app is disabled FIRST - this takes priority over everything
+    if (!config.enabled || config.mode === 'disabled') {
+      log('App disabled in settings');
+      return;
+    }
+
+    // Track visit FIRST - before any other checks (cookies, rules, etc.)
+    trackEvent('visit', { countryCode });
+
+    // Check bot exclusion
+    if (config.excludeBots && isBot()) {
+      log('Bot detected, skipping');
+      return;
+    }
+
+    // NOW check cookie - but only for popup mode (auto_redirect ignores cookies)
+    if (config.mode === 'popup' && CookieManager.has('geo_choice')) {
+      log('User preference found, skipping popup. Use GeolocationDebug.clearPreference() to reset.');
+      return;
+    }
+
+    log('Looking for rule matching:', countryCode);
+    log('Available rules:', config.rules);
+
+    // Find matching rule
+    const matchingRule = findMatchingRule(config.rules, countryCode);
+    if (!matchingRule) {
+      log('No matching rule for country:', countryCode);
+      return;
+    }
+
+    log('Matching rule found:', matchingRule);
+
+    log('Matching rule found:', matchingRule);
+
+    // Handle based on rule type - Check BLOCK FIRST
+    if (matchingRule.ruleType === 'block') {
+        log('Blocking access due to rule:', matchingRule.name);
+        showBlockScreen(config, matchingRule, countryCode);
+        return;
+    }
+
+    // Check if already on target (only for redirects)
+    if (matchingRule.targetUrl && window.location.href.includes(matchingRule.targetUrl)) {
+      log('Already on target URL');
+      return;
+    }
+
+
+
+    // Handle based on mode
+    if (config.mode === 'auto_redirect') {
+      // Force redirect - no cookie, always redirect
+      log('Force redirecting to:', matchingRule.targetUrl);
+      trackEvent('auto_redirected', { countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
+      window.location.href = matchingRule.targetUrl;
+    } else {
+      // Popup mode - will set cookie when user makes choice
+      log('Showing popup');
+      trackEvent('popup_shown', { countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
+      showPopup(config, matchingRule, countryCode);
+    }
+  };
+
+  // Expose debug functions globally
+  window.GeolocationDebug = {
+    clearPreference: () => {
+      CookieManager.remove('geo_choice');
+      console.log('Cleared! Refresh the page to test again.');
+    },
+    testPopup: async () => {
+      CookieManager.remove('geo_choice');
+      await init();
+    },
+    getConfig: async () => {
+      // Need to re-define fetchConfig or access it via init if scoped, for this debug simple version:
+      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
+      const response = await fetch(apiUrl);
+      return response.json();
+    }
+  };
+
+  // Run when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  log('Script loaded. Debug: GeolocationDebug.clearPreference(), GeolocationDebug.getConfig()');
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Geolocation Popup",
+  "target": "body",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Configure redirect rules and popup settings in the Geolocation app admin."
+    },
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable Geolocation Popup",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

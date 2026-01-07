@@ -1,0 +1,13 @@
+api_version = "2024-10"
+
+[[extensions]]
+
+uid = "862b6fed-5fb7-4ce9-aa37-442f34bc3a93334efce1"
+
+type = "theme"
+name = "Geolocation Popup"
+handle = "geolocation-popup"
+
+[[extensions.targeting]]
+module = "./blocks/geolocation-popup.liquid"
+target = "body"
