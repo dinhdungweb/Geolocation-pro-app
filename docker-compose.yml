@@ -1,0 +1,48 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Database URL inside the container network
+      - DATABASE_URL=postgresql://root:rootpassword@db:5432/geolocation_app?schema=public
+      - NODE_ENV=production
+      - PORT=3000
+      # ENV variables passed from host .env file
+      - SHOPIFY_API_KEY=${SHOPIFY_API_KEY}
+      - SHOPIFY_API_SECRET=${SHOPIFY_API_SECRET}
+      - SCOPES=${SCOPES}
+      - HOST=${HOST}
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=rootpassword
+      - POSTGRES_DB=geolocation_app
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  caddy:
+    image: caddy:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
