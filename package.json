@@ -1,5 +1,5 @@
 {
-  "name": "geolocation-redirect-pro",
+  "name": "geo-redirect-country-blocker",
   "private": true,
   "scripts": {
     "build": "remix vite:build",

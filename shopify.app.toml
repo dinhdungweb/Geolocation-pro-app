@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "4c49c8e60e7361bcba5aff29006e1d94"
-name = "Geolocation Redirect Pro"
+name = "Geo: Redirect & Country Blocker"
 application_url = "https://example.com"
 embedded = true
 

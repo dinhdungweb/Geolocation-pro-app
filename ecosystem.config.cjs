@@ -1,7 +1,7 @@
 module.exports = {
     apps: [
         {
-            name: "geolocation-pro-app",
+            name: "geo-redirect-country-blocker",
             script: "npm",
             args: "run start",
             env: {
