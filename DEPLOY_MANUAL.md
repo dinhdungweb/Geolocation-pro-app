@@ -78,7 +78,7 @@ SHOPIFY_API_KEY=your_api_key
 SHOPIFY_API_SECRET=your_api_secret
 SCOPES=write_products,read_locales
 HOST=https://app.yourdomain.com
-PORT=3000
+PORT=3001
 ```
 
 ### Đẩy Database Schema
@@ -116,7 +116,7 @@ server {
     server_name app.yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
