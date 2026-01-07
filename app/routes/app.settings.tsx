@@ -15,10 +15,12 @@ import {
     Banner,
     Divider,
     InlineStack,
+    CalloutCard,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
 
 interface Settings {
     id: string;
@@ -57,8 +59,18 @@ const defaultSettings: Omit<Settings, "id"> = {
 
 // Loader: Fetch settings for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
+
+    const billingCheck = await billing.check({
+        plans: ALL_PAID_PLANS as any,
+        isTest: true,
+    });
+
+    // Explicitly check for active subscription, default to FREE_PLAN if none
+    const activeSubscription = billingCheck.appSubscriptions[0];
+    const currentPlan = activeSubscription ? activeSubscription.name : FREE_PLAN;
+    const isFreePlan = currentPlan === FREE_PLAN;
 
     let settings = await prisma.settings.findUnique({
         where: { shop },
@@ -74,7 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
     }
 
-    return json({ settings, shop });
+    return json({ settings, shop, isFreePlan });
 };
 
 // Action: Update settings
@@ -144,7 +156,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function SettingsPage() {
-    const { settings } = useLoaderData<typeof loader>();
+    const { settings, isFreePlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const shopify = useAppBridge();
 
@@ -216,6 +228,18 @@ export default function SettingsPage() {
                 </button>
             </TitleBar>
             <BlockStack gap="500">
+                {isFreePlan && (
+                    <CalloutCard
+                        title="Upgrade to Premium"
+                        illustration="https://cdn.shopify.com/s/assets/admin/checkout/settings-customizecart-705f57c725ac05be5a34ec20c05b94298cb8afd10aac7bd9c7ad02030f48cfa0.svg"
+                        primaryAction={{
+                            content: 'View plans',
+                            url: '/app/pricing',
+                        }}
+                    >
+                        <p>Increase your visitor limit and unlock advanced features like Country Blocking by upgrading to a paid plan.</p>
+                    </CalloutCard>
+                )}
                 <Layout>
                     {/* Mode Selection */}
                     <Layout.Section>

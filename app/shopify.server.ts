@@ -2,10 +2,13 @@ import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+
+import { PREMIUM_PLAN, PLUS_PLAN } from "./billing.config";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -16,6 +19,40 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  billing: {
+    [PREMIUM_PLAN]: {
+      lineItems: [
+        {
+          amount: 4.99,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+        {
+          amount: 100.00, // Capped amount (Spending Limit)
+          currencyCode: "USD",
+          interval: BillingInterval.Usage,
+          terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
+        },
+      ],
+      trialDays: 14,
+    },
+    [PLUS_PLAN]: {
+      lineItems: [
+        {
+          amount: 7.99,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+        {
+          amount: 100.00, // Capped amount (Spending Limit)
+          currencyCode: "USD",
+          interval: BillingInterval.Usage,
+          terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
+        },
+      ],
+      trialDays: 14,
+    },
+  },
   future: {
     unstable_newEmbeddedAuthStrategy: true,
   },

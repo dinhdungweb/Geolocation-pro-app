@@ -30,6 +30,7 @@ import {
 import { SearchIcon, XIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
 
 // Complete ISO 3166-1 alpha-2 country list
@@ -183,7 +184,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         orderBy: { priority: "desc" },
     });
 
-    return json({ rules, shop });
+    // Check for active subscription
+    const { billing } = await authenticate.admin(request);
+    const billingConfig = await billing.check({
+        plans: ALL_PAID_PLANS as any,
+        isTest: true,
+    });
+    const hasProPlan = billingConfig.hasActivePayment;
+
+    return json({ rules, shop, hasProPlan });
 };
 
 // Action: Handle CRUD operations
@@ -283,9 +292,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function RulesPage() {
-    const { rules } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const [modalOpen, setModalOpen] = useState(false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
 
     // Form state
@@ -607,13 +617,28 @@ export default function RulesPage() {
                                     name="ruleType"
                                     onChange={() => setFormRuleType("redirect")}
                                 />
-                                <RadioButton
-                                    label="Block Access"
-                                    checked={formRuleType === "block"}
-                                    id="actionBlock"
-                                    name="ruleType"
-                                    onChange={() => setFormRuleType("block")}
-                                />
+                                <div onClick={() => {
+                                    if (!hasProPlan) {
+                                        setFormRuleType("redirect");
+                                        setShowUpgradeModal(true);
+                                    }
+                                }}>
+                                    <RadioButton
+                                        label={
+                                            <InlineStack gap="200">
+                                                <span>Block Access</span>
+                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
+                                            </InlineStack>
+                                        }
+                                        checked={formRuleType === "block"}
+                                        id="actionBlock"
+                                        name="ruleType"
+                                        disabled={!hasProPlan}
+                                        onChange={() => {
+                                            if (hasProPlan) setFormRuleType("block");
+                                        }}
+                                    />
+                                </div>
                             </InlineStack>
                         </BlockStack>
 
@@ -697,6 +722,30 @@ export default function RulesPage() {
                             </BlockStack>
                         )}
                     </FormLayout>
+                </Modal.Section>
+            </Modal>
+
+            {/* Upgrade Modal */}
+            <Modal
+                open={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                title="Upgrade to Pro"
+                primaryAction={{
+                    content: "View Plans",
+                    url: "/app/pricing",
+                }}
+                secondaryActions={[
+                    {
+                        content: "Cancel",
+                        onAction: () => setShowUpgradeModal(false),
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <Text as="p">
+                        The Country Blocking feature is only available on the Pro plan.
+                        Upgrade now to protect your store from unwanted traffic.
+                    </Text>
                 </Modal.Section>
             </Modal>
         </Page >
