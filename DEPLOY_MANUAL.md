@@ -90,10 +90,10 @@ npx prisma migrate deploy
 
 ## 4. Chạy Ứng Dụng Với PM2
 
-Mình đã tạo sẵn file `ecosystem.config.js` trong code. Bạn chỉ cần chạy:
+Mình đã tạo sẵn file `ecosystem.config.cjs` trong code. Bạn chỉ cần chạy:
 
 ```bash
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 pm2 save
 pm2 startup
 ```
