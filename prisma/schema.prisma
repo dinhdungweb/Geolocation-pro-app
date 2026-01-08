@@ -33,16 +33,18 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
-// Geolocation App: Luật chuyển hướng theo quốc gia
+// Geolocation App: Luật chuyển hướng theo quốc gia hoặc IP
 model RedirectRule {
   id           String   @id @default(uuid())
   shop         String   // Shop domain
-  name         String   // Tên rule (ví dụ: "Vietnam Redirect")
-  countryCodes String   // Mã quốc gia, phân tách bằng dấu phẩy (VN,TH,SG)
-  targetUrl    String   // URL hoặc Market ID để chuyển hướng
-  isActive       Boolean  @default(true)
-  priority       Int      @default(0) // Priority cao hơn = ưu tiên hơn
-  ruleType       String   @default("redirect") // "redirect" or "block"
+  name         String   // Tên rule (ví dụ: "Vietnam Redirect" hoặc "Block Spam IPs")
+  countryCodes String   @default("") // Mã quốc gia, phân tách bằng dấu phẩy (VN,TH,SG)
+  ipAddresses  String   @default("") // Danh sách IP hoặc CIDR, phân tách bằng dấu phẩy (1.2.3.4, 10.0.0.0/24)
+  matchType    String   @default("country") // "country" | "ip" - loại điều kiện match
+  targetUrl    String   @default("") // URL để chuyển hướng (để trống nếu block)
+  isActive     Boolean  @default(true)
+  priority     Int      @default(0) // Priority cao hơn = ưu tiên hơn
+  ruleType     String   @default("redirect") // "redirect" or "block"
   
   // Scheduling
   scheduleEnabled Boolean @default(false)
@@ -54,7 +56,9 @@ model RedirectRule {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+
   @@index([shop])
+  @@index([shop, matchType])
 }
 
 // Geolocation App: Cấu hình chung
@@ -122,4 +126,20 @@ model AnalyticsRule {
 
   @@unique([shop, date, ruleId])
   @@index([shop, date])
+}
+
+// Monthly Usage: Track total visitors per month for billing
+model MonthlyUsage {
+  id              String   @id @default(uuid())
+  shop            String
+  yearMonth       String   // "2026-01" format
+  totalVisitors   Int      @default(0)  // Total affected = redirected + blocked
+  redirected      Int      @default(0)  // Visitors redirected
+  blocked         Int      @default(0)  // Visitors blocked
+  chargedVisitors Int      @default(0)  // Visitors already charged for overage
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([shop, yearMonth])
+  @@index([shop])
 }

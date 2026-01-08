@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
+import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 /**
@@ -30,6 +31,47 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         );
     }
 
+    // Get visitor IP from request headers
+    // Priority: x-shopify-client-ip > cf-connecting-ip > x-forwarded-for
+    const getVisitorIP = (): string => {
+        // 1. X-Shopify-Client-IP - This is the REAL visitor IP forwarded by Shopify
+        const shopifyClientIP = request.headers.get("x-shopify-client-ip");
+        if (shopifyClientIP) return shopifyClientIP;
+
+        // 2. Cloudflare
+        const cfIP = request.headers.get("cf-connecting-ip");
+        if (cfIP) return cfIP;
+
+        // 3. X-Real-IP
+        const realIP = request.headers.get("x-real-ip");
+        if (realIP) return realIP;
+
+        // 4. True-Client-IP
+        const trueClientIP = request.headers.get("true-client-ip");
+        if (trueClientIP) return trueClientIP;
+
+        // 5. X-Client-IP
+        const clientIP = request.headers.get("x-client-ip");
+        if (clientIP) return clientIP;
+
+        // 6. X-Forwarded-For (first IP is original client)
+        const forwardedFor = request.headers.get("x-forwarded-for");
+        if (forwardedFor) {
+            return forwardedFor.split(",")[0].trim();
+        }
+
+        return "0.0.0.0";
+    };
+
+    const visitorIP = getVisitorIP();
+
+    // Verify App Proxy Signature
+    try {
+        await authenticate.public.appProxy(request);
+    } catch (error) {
+        return json({ error: "Unauthorized: Invalid signature" }, { status: 401, headers });
+    }
+
     try {
         // Fetch settings for the shop
         const settings = await prisma.settings.findUnique({
@@ -44,6 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 popupTextColor: true,
                 popupBtnColor: true,
                 excludeBots: true,
+                excludedIPs: true,
                 cookieDuration: true,
                 blockedTitle: true,
                 blockedMessage: true,
@@ -51,11 +94,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             },
         });
 
-        // Fetch active rules for the shop
-        const rules = await prisma.redirectRule.findMany({
+        // Fetch active COUNTRY rules for the shop
+        const countryRules = await prisma.redirectRule.findMany({
             where: {
                 shop,
                 isActive: true,
+                matchType: "country",
             },
             orderBy: { priority: "desc" },
             select: {
@@ -73,8 +117,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             },
         });
 
-        // Filter rules based on schedule
-        const activeRules = rules.filter(rule => {
+        // Fetch active IP rules for the shop
+        const ipRulesRaw = await prisma.redirectRule.findMany({
+            where: {
+                shop,
+                isActive: true,
+                matchType: "ip",
+            },
+            orderBy: { priority: "desc" },
+            select: {
+                id: true,
+                name: true,
+                ipAddresses: true,
+                targetUrl: true,
+                priority: true,
+                ruleType: true,
+            },
+        });
+
+        // Filter country rules based on schedule
+        const activeCountryRules = countryRules.filter(rule => {
             if (!rule.scheduleEnabled) return true;
 
             const timezone = rule.timezone || "UTC";
@@ -89,12 +151,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 const hour = parts.find(p => p.type === 'hour')?.value;
                 const minute = parts.find(p => p.type === 'minute')?.value;
                 const currentTime = `${hour}:${minute}`;
-
-                // Get current day index (0=Sun, 1=Mon...)
-                // Intl 'weekday' returns "Mon", "Tue"... we need 0-6
-                const dayMap: { [key: string]: string } = { "Sun": "0", "Mon": "1", "Tue": "2", "Wed": "3", "Thu": "4", "Fri": "5", "Sat": "6" };
-                const weekdayPart = parts.find(p => p.type === 'dayPeriod' || p.type === 'weekday')?.value; // Note: 'dayPeriod' is AM/PM, 'weekday' is needed. 
-                // Let's rely on standard Date getDay() adjusted for timezone
 
                 // Reliable way: Create a date object string in the target timezone
                 const targetTimeStr = now.toLocaleString("en-US", { timeZone: timezone });
@@ -128,14 +184,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                     enabled: false,
                     mode: "disabled",
                     rules: [],
+                    ipRules: [],
+                    visitorIP,
                     message: "No settings configured for this shop"
                 },
                 { headers }
             );
         }
 
-        // Transform rules to a simpler format for frontend
-        const transformedRules = activeRules.map((rule) => ({
+        // Check if visitor IP is in excluded list
+        const excludedIPsList = settings.excludedIPs
+            ? settings.excludedIPs.split(",").map(ip => ip.trim())
+            : [];
+        const isIPExcluded = excludedIPsList.includes(visitorIP);
+
+        // Transform country rules to a simpler format for frontend
+        const transformedCountryRules = activeCountryRules.map((rule) => ({
             ruleId: rule.id,
             name: rule.name,
             countries: rule.countryCodes.split(",").map((c) => c.trim().toUpperCase()),
@@ -144,9 +208,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             priority: rule.priority,
         }));
 
+        // Transform IP rules for frontend
+        const transformedIPRules = ipRulesRaw.map((rule) => ({
+            ruleId: rule.id,
+            name: rule.name,
+            ips: rule.ipAddresses.split(",").map((ip) => ip.trim()),
+            targetUrl: rule.targetUrl,
+            ruleType: rule.ruleType,
+            priority: rule.priority,
+        }));
+
         const response = {
             enabled: settings.mode !== "disabled",
             mode: settings.mode,
+            visitorIP, // Send visitor IP to frontend
+            isIPExcluded, // Whether this IP is in the exclusion list
             popup: {
                 title: settings.popupTitle,
                 message: settings.popupMessage,
@@ -163,10 +239,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 title: settings.blockedTitle,
                 message: settings.blockedMessage,
             },
-            rules: transformedRules,
+            rules: transformedCountryRules, // Country rules
+            ipRules: transformedIPRules, // IP rules
         };
 
-        console.log(`[Proxy] Config for ${shop}:`, response);
+        console.log(`[Proxy] Config for ${shop}, visitorIP: ${visitorIP}:`, response);
 
         return json(response, { headers });
     } catch (error) {

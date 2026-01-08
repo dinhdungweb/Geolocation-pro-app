@@ -14,12 +14,13 @@ import {
   IndexTable,
   Button,
   Banner,
+  ProgressBar,
   useIndexResourceState,
   useBreakpoints,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS } from "../billing.config";
+import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN, OVERAGE_RATE } from "../billing.config";
 import prisma from "../db.server";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
@@ -77,17 +78,84 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     isTest: true,
   });
   const hasProPlan = billingConfig.hasActivePayment;
+  const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
+  const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+
+  // Get current month usage
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+    where: {
+      shop_yearMonth: {
+        shop,
+        yearMonth,
+      },
+    },
+  });
+  const currentUsage = monthlyUsage?.totalVisitors || 0;
+  const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
+
+  // Calculate and charge overage if applicable (only for paid plans)
+  if (hasProPlan && currentUsage > planLimit) {
+    // DOUBLE CHECK: Fetch latest usage from DB to ensure no race condition
+    const latestUsageResult = await (prisma as any).monthlyUsage.findUnique({
+      where: { shop_yearMonth: { shop, yearMonth } },
+    });
+
+    // Use latest data or fallback to current (if findUnique fails which is unlikely)
+    const latestTotal = latestUsageResult?.totalVisitors || currentUsage;
+    const latestCharged = latestUsageResult?.chargedVisitors || chargedVisitors;
+    const overageVisitors = latestTotal - planLimit - latestCharged;
+
+    if (overageVisitors > 0) {
+      // Calculate charge amount ($0.002 per visitor)
+      const chargeAmount = overageVisitors * OVERAGE_RATE;
+
+      try {
+        // Create usage record in Shopify
+        await billing.createUsageRecord({
+          description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
+          price: {
+            amount: chargeAmount,
+            currencyCode: "USD",
+          },
+          isTest: true,
+        });
+
+        // Update chargedVisitors to prevent double charging
+        await (prisma as any).monthlyUsage.update({
+          where: {
+            shop_yearMonth: {
+              shop,
+              yearMonth,
+            },
+          },
+          data: {
+            chargedVisitors: { increment: overageVisitors },
+          },
+        });
+
+        console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
+      } catch (error) {
+        console.error("[Billing] Failed to create usage record:", error);
+      }
+    }
+  }
 
   // If not Pro, we don't fetch or return detailed analytics to save resources
   if (!hasProPlan) {
     return json({
       shop,
       hasProPlan,
+      currentPlan,
+      planLimit,
+      currentUsage,
       stats: {
         totalRules: rulesCount,
         activeRules: activeRulesCount,
         mode: settings?.mode || "disabled",
         totalRedirected: "0", // Hidden
+        totalBlocked: "0", // Hidden
       },
       visitsData: [],
       popupsData: [],
@@ -135,8 +203,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   ]);
 
-  // Aggregate total redirected for banner
+  // Aggregate total redirected and blocked for banner
   const totalRedirected = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.redirected || 0), 0) : 0;
+  const totalBlocked = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.blocked || 0), 0) : 0;
 
   // Process visits data
   const visitsData: VisitsDataItem[] = Array.isArray(countryStats) ? (countryStats as any[]).map((stat: any, index: number) => ({
@@ -180,11 +249,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json({
     shop,
     hasProPlan,
+    currentPlan,
+    planLimit,
+    currentUsage,
     stats: {
       totalRules: rulesCount,
       activeRules: activeRulesCount,
       mode: settings?.mode || "disabled",
       totalRedirected: totalRedirected.toLocaleString(),
+      totalBlocked: totalBlocked.toLocaleString(),
     },
     visitsData,
     popupsData,
@@ -196,8 +269,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 export default function Index() {
-  const { shop, hasProPlan, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
+  const { shop, hasProPlan, currentPlan, planLimit, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
   const { smUp } = useBreakpoints();
+
+  // Calculate usage percentage
+  const usagePercent = Math.min(100, Math.round((currentUsage / planLimit) * 100));
+  const isNearLimit = usagePercent >= 80;
+  const isOverLimit = currentUsage > planLimit;
 
   const handleOpenThemeEditor = () => {
     const shopName = shop.replace('.myshopify.com', '');
@@ -278,12 +356,49 @@ export default function Index() {
 
         {/* Banner */}
         <CalloutCard
-          title={`Visitors redirected: ${stats.totalRedirected}`}
+          title={`Visitors: ${stats.totalRedirected} redirected, ${stats.totalBlocked} blocked`}
           illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
           primaryAction={{ content: 'Rate Us', url: '#' }}
         >
-          <p>Congratulations! Geolocation Redirect Pro has automatically redirected <strong>{stats.totalRedirected}</strong> visitors in the last 30 days.</p>
+          <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
         </CalloutCard>
+
+        {/* Usage Progress Bar */}
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between">
+              <Text as="h3" variant="headingSm">Monthly Usage</Text>
+              <Badge tone={isOverLimit ? "critical" : isNearLimit ? "warning" : "success"}>
+                {currentPlan}
+              </Badge>
+            </InlineStack>
+            <BlockStack gap="200">
+              <InlineStack align="space-between">
+                <Text as="p" variant="bodySm">
+                  <strong>{currentUsage.toLocaleString()}</strong> / {planLimit.toLocaleString()} visitors
+                </Text>
+                <Text as="p" variant="bodySm" tone={isOverLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
+                  {usagePercent}%
+                </Text>
+              </InlineStack>
+              <ProgressBar
+                progress={usagePercent}
+                tone={isOverLimit ? "critical" : undefined}
+                size="small"
+              />
+            </BlockStack>
+            {isOverLimit && (
+              <Banner tone="critical">
+                You have exceeded your plan limit. Consider upgrading to avoid overage charges.
+              </Banner>
+            )}
+            {isNearLimit && !isOverLimit && (
+              <Banner tone="warning">
+                You're approaching your plan limit ({usagePercent}% used). Consider upgrading.
+              </Banner>
+            )}
+          </BlockStack>
+        </Card>
 
         {!hasProPlan && (
           <CalloutCard

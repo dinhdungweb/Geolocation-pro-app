@@ -1,8 +1,16 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
+import { authenticate } from "../shopify.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    // 1. Verify App Proxy Signature
+    try {
+        await authenticate.public.appProxy(request);
+    } catch (error) {
+        return json({ error: "Unauthorized: Invalid signature" }, { status: 401 });
+    }
+
     if (request.method !== "POST") {
         return json({ error: "Method not allowed" }, { status: 405 });
     }
@@ -86,6 +94,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     },
                 });
             }
+        }
+
+        // 3. Update Monthly Usage (for billing - only count redirected + blocked)
+        if (type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
+            type === 'ip_redirected' || type === 'ip_blocked') {
+            const now = new Date();
+            const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+            const usageUpdateData: any = {
+                totalVisitors: { increment: 1 },
+            };
+
+            if (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') {
+                usageUpdateData.redirected = { increment: 1 };
+            }
+            if (type === 'blocked' || type === 'ip_blocked') {
+                usageUpdateData.blocked = { increment: 1 };
+            }
+
+            await (prisma as any).monthlyUsage.upsert({
+                where: {
+                    shop_yearMonth: {
+                        shop,
+                        yearMonth,
+                    },
+                },
+                update: usageUpdateData,
+                create: {
+                    shop,
+                    yearMonth,
+                    totalVisitors: 1,
+                    redirected: (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
+                    blocked: (type === 'blocked' || type === 'ip_blocked') ? 1 : 0,
+                },
+            });
         }
 
         return json({ success: true });

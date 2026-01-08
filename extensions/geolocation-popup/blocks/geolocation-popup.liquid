@@ -21,8 +21,8 @@
     visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
   };
 
-  // Debug mode
-  const DEBUG = true;
+  // Debug mode - set to false for production
+  const DEBUG = false;
   const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
 
   // Cookie utilities
@@ -416,8 +416,81 @@
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden'; // Disable scrolling
 
-    trackEvent('blocked', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
     log('Access blocked for country:', countryCode);
+  };
+
+  // Check if IP matches a pattern (supports IPv4, IPv6, exact match, and CIDR)
+  const isIPMatch = (visitorIP, ipPattern) => {
+    if (!visitorIP || !ipPattern) return false;
+    
+    const trimmedPattern = ipPattern.trim();
+    const trimmedIP = visitorIP.trim();
+    
+    // Exact match (works for both IPv4 and IPv6)
+    if (trimmedIP === trimmedPattern) return true;
+    
+    // Lowercase comparison for IPv6 (IPv6 is case-insensitive)
+    if (trimmedIP.toLowerCase() === trimmedPattern.toLowerCase()) return true;
+    
+    // Check if it's IPv6
+    const isIPv6 = trimmedIP.includes(':');
+    const isPatternIPv6 = trimmedPattern.includes(':');
+    
+    // IPv6 prefix match (e.g., "2a06:98c0::" matches "2a06:98c0:3600::103")
+    if (isIPv6 && isPatternIPv6) {
+      // Remove trailing :: for prefix comparison
+      const patternPrefix = trimmedPattern.replace(/::$/, '').toLowerCase();
+      if (trimmedIP.toLowerCase().startsWith(patternPrefix)) {
+        return true;
+      }
+      
+      // CIDR notation for IPv6 (e.g., 2a06:98c0::/32)
+      if (trimmedPattern.includes('/')) {
+        const [network] = trimmedPattern.split('/');
+        const networkPrefix = network.replace(/::$/, '').toLowerCase();
+        if (trimmedIP.toLowerCase().startsWith(networkPrefix)) {
+          return true;
+        }
+      }
+    }
+    
+    // IPv4 CIDR notation support (/24, /16, /8)
+    if (!isIPv6 && !isPatternIPv6 && trimmedPattern.includes('/')) {
+      const [network, bits] = trimmedPattern.split('/');
+      const maskBits = parseInt(bits, 10);
+      
+      const ipParts = trimmedIP.split('.').map(Number);
+      const networkParts = network.split('.').map(Number);
+      
+      if (ipParts.length === 4 && networkParts.length === 4) {
+        if (maskBits === 24) {
+          return ipParts[0] === networkParts[0] && 
+                 ipParts[1] === networkParts[1] && 
+                 ipParts[2] === networkParts[2];
+        } else if (maskBits === 16) {
+          return ipParts[0] === networkParts[0] && 
+                 ipParts[1] === networkParts[1];
+        } else if (maskBits === 8) {
+          return ipParts[0] === networkParts[0];
+        }
+      }
+    }
+    
+    return false;
+  };
+
+  // Find matching IP rule
+  const findMatchingIPRule = (ipRules, visitorIP) => {
+    if (!ipRules || !visitorIP || visitorIP === '0.0.0.0') return null;
+    
+    for (const rule of ipRules) {
+      for (const ipPattern of rule.ips) {
+        if (isIPMatch(visitorIP, ipPattern)) {
+          return rule;
+        }
+      }
+    }
+    return null;
   };
 
   // Main function
@@ -439,13 +512,9 @@
 
     // Get country from Shopify first (no API call needed - instant!)
     const countryCode = getVisitorCountry();
-    if (!countryCode) {
-      log('Could not detect country - Shopify may not provide country info');
-      return;
-    }
 
     // Fetch config from App Proxy - check this BEFORE cookies
-    const fetchConfig = async () => {
+    const fetchConfigData = async () => {
       try {
         const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
         const response = await fetch(apiUrl);
@@ -457,7 +526,7 @@
       }
     };
 
-    const config = await fetchConfig();
+    const config = await fetchConfigData();
     
     if (!config) {
       log('Could not fetch config - App Proxy may not be configured yet');
@@ -470,12 +539,63 @@
       return;
     }
 
+    // Get visitor IP from config (already extracted from x-shopify-client-ip header)
+    const visitorIP = config.visitorIP || '0.0.0.0';
+    log('Visitor IP:', visitorIP);
+
     // Track visit FIRST - before any other checks (cookies, rules, etc.)
-    trackEvent('visit', { countryCode });
+    trackEvent('visit', { countryCode, visitorIP });
 
     // Check bot exclusion
     if (config.excludeBots && isBot()) {
       log('Bot detected, skipping');
+      return;
+    }
+
+    // Check if IP is in the global exclusion list
+    if (config.isIPExcluded) {
+      log('IP is in exclusion list, skipping all rules');
+      return;
+    }
+
+    // ========== IP RULES CHECK (PRIORITY 1) ==========
+    // IP rules are checked FIRST and have highest priority
+    if (config.ipRules && config.ipRules.length > 0) {
+      log('Checking IP rules for:', visitorIP);
+      log('Available IP rules:', config.ipRules);
+      
+      const matchingIPRule = findMatchingIPRule(config.ipRules, visitorIP);
+      
+      if (matchingIPRule) {
+        log('Matching IP rule found:', matchingIPRule);
+        
+        // Handle IP rule - Block
+        if (matchingIPRule.ruleType === 'block') {
+          log('Blocking access due to IP rule:', matchingIPRule.name);
+          trackEvent('ip_blocked', { visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
+          showBlockScreen(config, matchingIPRule, visitorIP);
+          return;
+        }
+        
+        // Handle IP rule - Redirect
+        if (matchingIPRule.ruleType === 'redirect') {
+          // Check if already on target
+          if (matchingIPRule.targetUrl && window.location.href.includes(matchingIPRule.targetUrl)) {
+            log('Already on target URL for IP rule');
+            return;
+          }
+          
+          log('Redirecting due to IP rule:', matchingIPRule.name);
+          trackEvent('ip_redirected', { visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
+          window.location.href = matchingIPRule.targetUrl;
+          return;
+        }
+      }
+    }
+
+    // ========== COUNTRY RULES CHECK (PRIORITY 2) ==========
+    if (!countryCode) {
+      log('Could not detect country - Shopify may not provide country info');
       return;
     }
 
@@ -485,23 +605,22 @@
       return;
     }
 
-    log('Looking for rule matching:', countryCode);
-    log('Available rules:', config.rules);
+    log('Looking for country rule matching:', countryCode);
+    log('Available country rules:', config.rules);
 
-    // Find matching rule
+    // Find matching country rule
     const matchingRule = findMatchingRule(config.rules, countryCode);
     if (!matchingRule) {
       log('No matching rule for country:', countryCode);
       return;
     }
 
-    log('Matching rule found:', matchingRule);
-
-    log('Matching rule found:', matchingRule);
+    log('Matching country rule found:', matchingRule);
 
     // Handle based on rule type - Check BLOCK FIRST
     if (matchingRule.ruleType === 'block') {
-        log('Blocking access due to rule:', matchingRule.name);
+        log('Blocking access due to country rule:', matchingRule.name);
+        trackEvent('blocked', { countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
         showBlockScreen(config, matchingRule, countryCode);
         return;
     }
@@ -511,8 +630,6 @@
       log('Already on target URL');
       return;
     }
-
-
 
     // Handle based on mode
     if (config.mode === 'auto_redirect') {

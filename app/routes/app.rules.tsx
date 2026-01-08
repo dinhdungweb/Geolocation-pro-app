@@ -180,7 +180,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const shop = session.shop;
 
     const rules = await prisma.redirectRule.findMany({
-        where: { shop },
+        where: {
+            shop,
+            matchType: "country", // Only show country rules, not IP rules
+        },
         orderBy: { priority: "desc" },
     });
 
@@ -224,6 +227,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     isActive: true,
                     ruleType,
+                    matchType: "country", // Mark as country rule
                     scheduleEnabled,
                     startTime,
                     endTime,
