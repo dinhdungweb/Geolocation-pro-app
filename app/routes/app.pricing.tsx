@@ -177,31 +177,7 @@ export default function PricingPage() {
                     </Grid>
                 </Box>
 
-                <Card>
-                    <BlockStack gap="300">
-                        <Text as="h3" variant="headingSm">Overage Pricing</Text>
-                        <Text as="p" tone="subdued">
-                            If you exceed your plan's visitor limit, additional visitors are charged at <strong>$100 per 50,000 visitors</strong> (~$0.002 per visitor).
-                        </Text>
-                        <BlockStack gap="100">
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                • Free plan: Overage after 100 visitors/mth
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                • Premium plan: Overage after 750 visitors/mth
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                • Plus plan: Overage after 1,500 visitors/mth
-                            </Text>
-                        </BlockStack>
-                        <Divider />
-                        <InlineStack gap="400">
-                            <Text as="p" variant="bodySm" tone="subdued">✓ 14-day free trial</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">✓ Cancel anytime</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">✓ Secure payments via Shopify</Text>
-                        </InlineStack>
-                    </BlockStack>
-                </Card>
+
             </BlockStack>
         </Page>
     );
