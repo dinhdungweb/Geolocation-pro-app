@@ -193,7 +193,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         plans: ALL_PAID_PLANS as any,
         isTest: true,
     });
-    const hasProPlan = billingConfig.hasActivePayment;
+    const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 
     return json({ rules, shop, hasProPlan });
 };
