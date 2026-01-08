@@ -19,6 +19,20 @@ export default function App() {
         />
         <Meta />
         <Links />
+        <style>{`
+          body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f1f2f4;
+            font-family: "Inter", sans-serif;
+          }
+          #root, body > div {
+             height: 100%;
+          }
+        `}</style>
       </head>
       <body suppressHydrationWarning>
         <Outlet />
