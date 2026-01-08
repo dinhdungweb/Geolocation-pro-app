@@ -177,6 +177,41 @@ export default function PricingPage() {
                     </Grid>
                 </Box>
 
+                <Box paddingBlockStart="800" paddingBlockEnd="400">
+                    <BlockStack gap="600">
+                        <Divider />
+                        <InlineStack align="center" gap="800">
+                            <Text as="span" variant="bodyMd" tone="subdued">✓ 14-day free trial</Text>
+                            <Text as="span" variant="bodyMd" tone="subdued">✓ Cancel anytime</Text>
+                            <Text as="span" variant="bodyMd" tone="subdued">✓ Secure payments via Shopify</Text>
+                        </InlineStack>
+
+                        <Box paddingBlockStart="400">
+                            <BlockStack gap="400">
+                                <Text as="h3" variant="headingMd" alignment="center">Frequently Asked Questions</Text>
+                                <Grid>
+                                    <Grid.Cell columnSpan={{ xs: 6, md: 3 }}>
+                                        <Box padding="400">
+                                            <BlockStack gap="200">
+                                                <Text as="p" fontWeight="bold">How does the 14-day trial work?</Text>
+                                                <Text as="p" tone="subdued">You can try all Pro features for 14 days. You won't be charged until the trial ends.</Text>
+                                            </BlockStack>
+                                        </Box>
+                                    </Grid.Cell>
+                                    <Grid.Cell columnSpan={{ xs: 6, md: 3 }}>
+                                        <Box padding="400">
+                                            <BlockStack gap="200">
+                                                <Text as="p" fontWeight="bold">Can I change plans later?</Text>
+                                                <Text as="p" tone="subdued">Yes, you can upgrade or downgrade your plan at any time from this page.</Text>
+                                            </BlockStack>
+                                        </Box>
+                                    </Grid.Cell>
+                                </Grid>
+                            </BlockStack>
+                        </Box>
+                    </BlockStack>
+                </Box>
+
 
             </BlockStack>
         </Page>
