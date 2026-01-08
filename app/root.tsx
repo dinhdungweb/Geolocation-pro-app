@@ -8,7 +8,7 @@ import {
 
 export default function App() {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -19,22 +19,8 @@ export default function App() {
         />
         <Meta />
         <Links />
-        <style>{`
-          body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            background-color: #f1f2f4;
-            font-family: "Inter", sans-serif;
-          }
-          #root, body > div {
-             height: 100%;
-          }
-        `}</style>
       </head>
-      <body suppressHydrationWarning>
+      <body>
         <Outlet />
         <ScrollRestoration />
         <Scripts />
