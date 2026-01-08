@@ -319,12 +319,14 @@ export default function IPRulesPage() {
             } : undefined}
             image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
         >
-            <p>Block or redirect specific IP addresses to protect your store.</p>
-            {!hasProPlan && (
-                <Banner tone="warning">
-                    IP Rules is a Pro feature. Upgrade your plan to create IP rules.
-                </Banner>
-            )}
+            <BlockStack gap="400">
+                <p>Block or redirect specific IP addresses to protect your store.</p>
+                {!hasProPlan && (
+                    <Banner tone="warning">
+                        IP Rules is a Pro feature. Upgrade your plan to create IP rules.
+                    </Banner>
+                )}
+            </BlockStack>
         </EmptyState>
     );
 

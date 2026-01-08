@@ -504,7 +504,9 @@ export default function RulesPage() {
             action={{ content: "Add Rule", onAction: () => handleOpenModal() }}
             image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
         >
-            <p>Set up rules to redirect customers based on their location.</p>
+            <BlockStack gap="400">
+                <p>Set up rules to redirect customers based on their location.</p>
+            </BlockStack>
         </EmptyState>
     );
 
