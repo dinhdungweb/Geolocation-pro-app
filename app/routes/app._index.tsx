@@ -142,27 +142,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  // If not Pro, we don't fetch or return detailed analytics to save resources
-  if (!hasProPlan) {
-    return json({
-      shop,
-      hasProPlan,
-      currentPlan,
-      planLimit,
-      currentUsage,
-      stats: {
-        totalRules: rulesCount,
-        activeRules: activeRulesCount,
-        mode: settings?.mode || "disabled",
-        totalRedirected: "0", // Hidden
-        totalBlocked: "0", // Hidden
-      },
-      visitsData: [],
-      popupsData: [],
-      autoRedirectsData: [],
-      blocksData: [],
-    });
-  }
+
 
   // Date range: Last 30 days
   const thirtyDaysAgo = new Date();
@@ -400,20 +380,7 @@ export default function Index() {
           </BlockStack>
         </Card>
 
-        {!hasProPlan && (
-          <CalloutCard
-            title="Unlock Advanced Analytics"
-            illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705280535"
-            primaryAction={{
-              content: 'Upgrade to Pro',
-              url: '/app/pricing',
-            }}
-          >
-            <p>
-              You are on the Free plan. Upgrade to view detailed traffic logs, blocked attempts, and rule performance.
-            </p>
-          </CalloutCard>
-        )}
+
 
         {/* Main Section */}
         <Layout>
@@ -425,29 +392,23 @@ export default function Index() {
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
                 </div>
-                {hasProPlan ? (
-                  <IndexTable
-                    condensed={!smUp}
-                    resourceName={resourceNameVisits}
-                    itemCount={visitsData.length}
-                    selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
-                    onSelectionChange={handleVisitsSelectionChange}
-                    headings={[
-                      { title: 'Country' },
-                      { title: 'Visitors', alignment: 'end' },
-                      { title: 'Popup/banners', alignment: 'end' },
-                      { title: 'Redirected', alignment: 'end' },
-                      { title: 'Blocked', alignment: 'end' },
-                    ]}
-                    selectable={false}
-                  >
-                    {visitsRowMarkup}
-                  </IndexTable>
-                ) : (
-                  <div style={{ padding: '20px', textAlign: 'center', background: '#f9fafb' }}>
-                    <Text as="p" tone="subdued">Detailed traffic data is hidden on the Free plan.</Text>
-                  </div>
-                )}
+                <IndexTable
+                  condensed={!smUp}
+                  resourceName={resourceNameVisits}
+                  itemCount={visitsData.length}
+                  selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
+                  onSelectionChange={handleVisitsSelectionChange}
+                  headings={[
+                    { title: 'Country' },
+                    { title: 'Visitors', alignment: 'end' },
+                    { title: 'Popup/banners', alignment: 'end' },
+                    { title: 'Redirected', alignment: 'end' },
+                    { title: 'Blocked', alignment: 'end' },
+                  ]}
+                  selectable={false}
+                >
+                  {visitsRowMarkup}
+                </IndexTable>
               </BlockStack>
             </Card>
           </Layout.Section>
@@ -483,30 +444,24 @@ export default function Index() {
                     <Text as="h3" variant="headingMd">Blocked Traffic</Text>
                     <Text as="p" tone="subdued">Visitors blocked by rule/country.</Text>
                   </div>
-                  {hasProPlan ? (
-                    <IndexTable
-                      condensed={!smUp}
-                      resourceName={{ singular: 'block', plural: 'blocks' }}
-                      itemCount={blocksData.length}
-                      headings={[{ title: 'Block' }, { title: 'Count' }]}
-                      selectable={false}
-                    >
-                      {blocksData.length > 0 ? (
-                        blocksData.map((item: any, index: number) => (
-                          <IndexTable.Row id={item.id} key={item.id} position={index}>
-                            <IndexTable.Cell>{item.block}</IndexTable.Cell>
-                            <IndexTable.Cell>{item.blocked}</IndexTable.Cell>
-                          </IndexTable.Row>
-                        ))
-                      ) : (
-                        <EmptyAuthState title="No blocked traffic recorded" />
-                      )}
-                    </IndexTable>
-                  ) : (
-                    <div style={{ padding: '20px', textAlign: 'center' }}>
-                      <Text as="p" tone="subdued">Upgrade to see blocked traffic.</Text>
-                    </div>
-                  )}
+                  <IndexTable
+                    condensed={!smUp}
+                    resourceName={{ singular: 'block', plural: 'blocks' }}
+                    itemCount={blocksData.length}
+                    headings={[{ title: 'Block' }, { title: 'Count' }]}
+                    selectable={false}
+                  >
+                    {blocksData.length > 0 ? (
+                      blocksData.map((item: any, index: number) => (
+                        <IndexTable.Row id={item.id} key={item.id} position={index}>
+                          <IndexTable.Cell>{item.block}</IndexTable.Cell>
+                          <IndexTable.Cell>{item.blocked}</IndexTable.Cell>
+                        </IndexTable.Row>
+                      ))
+                    ) : (
+                      <EmptyAuthState title="No blocked traffic recorded" />
+                    )}
+                  </IndexTable>
                 </BlockStack>
               </Card>
             </BlockStack>
@@ -514,68 +469,64 @@ export default function Index() {
         </Layout>
 
         {/* Banners/Popups and Instant Redirects - Side by Side */}
-        {hasProPlan ? (
-          <>
-            <Layout>
-              <Layout.Section variant="oneHalf">
-                <Card padding="0">
-                  <BlockStack gap="0">
-                    <div style={{ padding: '16px' }}>
-                      <Text as="h3" variant="headingMd">Banners and Popups</Text>
-                      <Text as="p" tone="subdued">Popup interactions in the last 30 days.</Text>
-                    </div>
-                    <IndexTable
-                      condensed={!smUp}
-                      resourceName={{ singular: 'rule', plural: 'rules' }}
-                      itemCount={popupsData.length}
-                      headings={[
-                        { title: 'Rule' },
-                        { title: 'Seen', alignment: 'end' },
-                        { title: 'Clicked Yes', alignment: 'end' },
-                        { title: 'Clicked No', alignment: 'end' },
-                        { title: 'Dismissed', alignment: 'end' }
-                      ]}
-                      selectable={false}
-                    >
-                      {popupsData.length > 0 ? (
-                        popupsRowMarkup
-                      ) : (
-                        <EmptyAuthState title="No popup data" />
-                      )}
-                    </IndexTable>
-                  </BlockStack>
-                </Card>
-              </Layout.Section>
+        <Layout>
+          <Layout.Section variant="oneHalf">
+            <Card padding="0">
+              <BlockStack gap="0">
+                <div style={{ padding: '16px' }}>
+                  <Text as="h3" variant="headingMd">Banners and Popups</Text>
+                  <Text as="p" tone="subdued">Popup interactions in the last 30 days.</Text>
+                </div>
+                <IndexTable
+                  condensed={!smUp}
+                  resourceName={{ singular: 'rule', plural: 'rules' }}
+                  itemCount={popupsData.length}
+                  headings={[
+                    { title: 'Rule' },
+                    { title: 'Seen', alignment: 'end' },
+                    { title: 'Clicked Yes', alignment: 'end' },
+                    { title: 'Clicked No', alignment: 'end' },
+                    { title: 'Dismissed', alignment: 'end' }
+                  ]}
+                  selectable={false}
+                >
+                  {popupsData.length > 0 ? (
+                    popupsRowMarkup
+                  ) : (
+                    <EmptyAuthState title="No popup data" />
+                  )}
+                </IndexTable>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
 
-              <Layout.Section variant="oneHalf">
-                <Card padding="0">
-                  <BlockStack gap="0">
-                    <div style={{ padding: '16px' }}>
-                      <Text as="h3" variant="headingMd">Instant Redirects</Text>
-                      <Text as="p" tone="subdued">Auto-redirects in the last 30 days.</Text>
-                    </div>
-                    <IndexTable
-                      condensed={!smUp}
-                      resourceName={{ singular: 'rule', plural: 'rules' }}
-                      itemCount={autoRedirectsData.length}
-                      headings={[
-                        { title: 'Rule' },
-                        { title: 'Redirected', alignment: 'end' }
-                      ]}
-                      selectable={false}
-                    >
-                      {autoRedirectsData.length > 0 ? (
-                        autoRedirectsRowMarkup
-                      ) : (
-                        <EmptyAuthState title="No auto-redirect data" />
-                      )}
-                    </IndexTable>
-                  </BlockStack>
-                </Card>
-              </Layout.Section>
-            </Layout>
-          </>
-        ) : null}
+          <Layout.Section variant="oneHalf">
+            <Card padding="0">
+              <BlockStack gap="0">
+                <div style={{ padding: '16px' }}>
+                  <Text as="h3" variant="headingMd">Instant Redirects</Text>
+                  <Text as="p" tone="subdued">Auto-redirects in the last 30 days.</Text>
+                </div>
+                <IndexTable
+                  condensed={!smUp}
+                  resourceName={{ singular: 'rule', plural: 'rules' }}
+                  itemCount={autoRedirectsData.length}
+                  headings={[
+                    { title: 'Rule' },
+                    { title: 'Redirected', alignment: 'end' }
+                  ]}
+                  selectable={false}
+                >
+                  {autoRedirectsData.length > 0 ? (
+                    autoRedirectsRowMarkup
+                  ) : (
+                    <EmptyAuthState title="No auto-redirect data" />
+                  )}
+                </IndexTable>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
       </BlockStack>
     </Page>
   );

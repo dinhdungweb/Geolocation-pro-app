@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, useLoaderData } from "@remix-run/react";
 import { useState } from "react";
@@ -19,6 +19,10 @@ import polarisTranslations from "@shopify/polaris/locales/en.json";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+  return login(request);
+};
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
