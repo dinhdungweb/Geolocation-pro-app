@@ -159,6 +159,12 @@ export default function IPRulesPage() {
     const [formRuleType, setFormRuleType] = useState("block");
 
     const { smUp } = useBreakpoints();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const resourceName = {
         singular: "IP rule",
         plural: "IP rules",
@@ -346,7 +352,7 @@ export default function IPRulesPage() {
                                 emptyStateMarkup
                             ) : (
                                 <IndexTable
-                                    condensed={!smUp}
+                                    condensed={mounted ? !smUp : false}
                                     resourceName={resourceName}
                                     itemCount={rules.length}
                                     selectedItemsCount={
