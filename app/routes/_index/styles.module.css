@@ -2,72 +2,111 @@
   align-items: center;
   display: flex;
   justify-content: center;
-  height: 100%;
+  min-height: 100vh;
   width: 100%;
-  text-align: center;
-  padding: 1rem;
-}
-
-.heading,
-.text {
-  padding: 0;
-  margin: 0;
-}
-
-.text {
-  font-size: 1.2rem;
-  padding-bottom: 2rem;
+  background-color: #f1f2f4;
+  /* Shopify Admin BG */
+  font-family: -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color: #202223;
+  padding: 2rem;
 }
 
 .content {
-  display: grid;
-  gap: 2rem;
+  background: #ffffff;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+}
+
+.heading {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #1a1a1a;
+}
+
+.text {
+  font-size: 0.95rem;
+  color: #6d7175;
+  margin-bottom: 2rem;
+  line-height: 1.5;
 }
 
 .form {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin: 0 auto;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+  text-align: left;
 }
 
 .label {
-  display: grid;
-  gap: 0.2rem;
-  max-width: 20rem;
-  text-align: left;
-  font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #4a4a4a;
 }
 
 .input {
-  padding: 0.4rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #008060;
+  /* Shopify Green */
+  box-shadow: 0 0 0 2px rgba(0, 128, 96, 0.2);
 }
 
 .button {
-  padding: 0.4rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #008060;
+  /* Shopify Green */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+}
+
+.button:hover {
+  background-color: #006e52;
 }
 
 .list {
   list-style: none;
   padding: 0;
-  padding-top: 3rem;
   margin: 0;
-  display: flex;
-  gap: 2rem;
-}
-
-.list > li {
-  max-width: 20rem;
+  display: grid;
+  gap: 1rem;
   text-align: left;
+  border-top: 1px solid #e1e3e5;
+  padding-top: 1.5rem;
 }
 
-@media only screen and (max-width: 50rem) {
-  .list {
-    display: block;
-  }
+.list li {
+  font-size: 0.9rem;
+  color: #5c5f62;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
 
-  .list > li {
-    padding-bottom: 1rem;
-  }
+.list li strong {
+  color: #202223;
+  font-weight: 600;
 }
