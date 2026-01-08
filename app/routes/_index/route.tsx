@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, useLoaderData } from "@remix-run/react";
+import { useState } from "react";
 
 import { login } from "../../shopify.server";
 
@@ -18,6 +19,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { showForm } = useLoaderData<typeof loader>();
+  const [shop, setShop] = useState("");
+
+  const handleShopChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    let value = event.target.value;
+    // Auto-remove protocol and trailing slash
+    value = value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    setShop(value);
+  };
 
   return (
     <div className={styles.index}>
@@ -44,6 +53,8 @@ export default function App() {
                 className={styles.input}
                 type="text"
                 name="shop"
+                value={shop}
+                onChange={handleShopChange}
                 placeholder="example.myshopify.com"
                 required
               />
