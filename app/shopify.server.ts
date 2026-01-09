@@ -34,7 +34,7 @@ const shopify = shopifyApp({
           terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
         },
       ],
-      trialDays: 14,
+      trialDays: 7,
     },
     [PLUS_PLAN]: {
       lineItems: [
@@ -50,7 +50,7 @@ const shopify = shopifyApp({
           terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
         },
       ],
-      trialDays: 14,
+      trialDays: 7,
     },
   },
   future: {
