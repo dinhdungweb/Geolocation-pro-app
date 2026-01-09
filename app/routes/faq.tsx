@@ -1,4 +1,4 @@
-import { Page, Card, BlockStack, Text, Accordion, List } from "@shopify/polaris";
+import { Page, Card, BlockStack, Text, List } from "@shopify/polaris";
 import type { LinksFunction } from "@remix-run/node";
 import styles from "@shopify/polaris/build/esm/styles.css?url";
 
