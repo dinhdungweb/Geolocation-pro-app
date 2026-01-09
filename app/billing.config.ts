@@ -1,7 +1,7 @@
 // Billing plan constants - shared between server and client
-export const FREE_PLAN = "Free";
-export const PREMIUM_PLAN = "Premium";
-export const PLUS_PLAN = "Plus";
+export const FREE_PLAN = "free";
+export const PREMIUM_PLAN = "premium";
+export const PLUS_PLAN = "plus";
 
 export const ALL_PAID_PLANS = [PREMIUM_PLAN, PLUS_PLAN];
 export const ALL_PLANS = [FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN];
