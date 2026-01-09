@@ -86,13 +86,14 @@ interface PlanCardProps {
     name: string;
     price: string;
     visitorLimit: number;
+    features: string[];
     isCurrentPlan: boolean;
     isFree?: boolean;
     hasTrial?: boolean;
     onSelect: () => void;
 }
 
-function PlanCard({ name, price, visitorLimit, isCurrentPlan, isFree, hasTrial, onSelect }: PlanCardProps) {
+function PlanCard({ name, price, visitorLimit, features, isCurrentPlan, isFree, hasTrial, onSelect }: PlanCardProps) {
     return (
         <Card background={isCurrentPlan ? "bg-surface-success" : "bg-surface"}>
             <BlockStack gap="400">
@@ -105,13 +106,22 @@ function PlanCard({ name, price, visitorLimit, isCurrentPlan, isFree, hasTrial, 
                 </BlockStack>
                 <Divider />
                 <BlockStack gap="200">
-                    <Text as="p" tone={isFree ? "success" : "subdued"}>
-                        {isFree ? "FREE " : ""}for stores up to {visitorLimit.toLocaleString()} visitors/mth
-                    </Text>
+                    <Text as="p" fontWeight="bold">Features:</Text>
+                    <BlockStack gap="100">
+                        {features.map((feature, index) => (
+                            <InlineStack key={index} gap="200" align="start">
+                                <Text as="span" tone="success">✓</Text>
+                                <Text as="span" variant="bodyMd">{feature}</Text>
+                            </InlineStack>
+                        ))}
+                    </BlockStack>
+
                     {hasTrial && !isFree && (
-                        <Text as="p" variant="bodySm" tone="subdued">
-                            7-day free trial
-                        </Text>
+                        <Box paddingBlockStart="200">
+                            <Text as="p" variant="bodySm" tone="subdued">
+                                7-day free trial
+                            </Text>
+                        </Box>
                     )}
                 </BlockStack>
                 {isCurrentPlan ? (
@@ -140,18 +150,33 @@ export default function PricingPage() {
             name: FREE_PLAN,
             price: "0",
             visitorLimit: PLAN_LIMITS[FREE_PLAN],
+            features: [
+                `${PLAN_LIMITS[FREE_PLAN]} Visitors / month`,
+                "Geolocation Redirects",
+                "Basic Analytics",
+            ],
             isFree: true,
         },
         {
             name: PREMIUM_PLAN,
             price: "4.99",
             visitorLimit: PLAN_LIMITS[PREMIUM_PLAN],
+            features: [
+                `${PLAN_LIMITS[PREMIUM_PLAN]} Visitors / month`,
+                "Country Blocking",
+                "Schedule Rules",
+            ],
             hasTrial: true,
         },
         {
             name: PLUS_PLAN,
             price: "7.99",
             visitorLimit: PLAN_LIMITS[PLUS_PLAN],
+            features: [
+                `${PLAN_LIMITS[PLUS_PLAN]} Visitors / month`,
+                "All Premium Features",
+                "High-traffic Support",
+            ],
             hasTrial: true,
         },
     ];
@@ -167,6 +192,7 @@ export default function PricingPage() {
                                     name={plan.name}
                                     price={plan.price}
                                     visitorLimit={plan.visitorLimit}
+                                    features={plan.features}
                                     isCurrentPlan={currentPlan === plan.name}
                                     isFree={plan.isFree}
                                     hasTrial={plan.hasTrial}
