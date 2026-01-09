@@ -2,7 +2,7 @@
 
 client_id = "4c49c8e60e7361bcba5aff29006e1d94"
 name = "Geo: Redirect & Country Block"
-application_url = "https://geopro.shopifytools.site"
+application_url = "https://geopro.bluepeaks.top"
 embedded = true
 
 [build]
@@ -13,11 +13,11 @@ api_version = "2026-04"
 
   [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
-  uri = "https://geopro.shopifytools.site/webhooks/app/scopes_update"
+  uri = "https://geopro.bluepeaks.top/webhooks/app/scopes_update"
 
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
-  uri = "https://geopro.shopifytools.site/webhooks/app/uninstalled"
+  uri = "https://geopro.bluepeaks.top/webhooks/app/uninstalled"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -25,13 +25,13 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://geopro.shopifytools.site/auth/callback",
-  "https://geopro.shopifytools.site/auth/shopify/callback"
+  "https://geopro.bluepeaks.top/auth/callback",
+  "https://geopro.bluepeaks.top/auth/shopify/callback"
 ]
 
 # App Proxy - Provides stable URL for storefront extension API calls
 [app_proxy]
-url = "https://geopro.shopifytools.site/proxy"
+url = "https://geopro.bluepeaks.top/proxy"
 subpath = "geolocation"
 prefix = "apps"
 
