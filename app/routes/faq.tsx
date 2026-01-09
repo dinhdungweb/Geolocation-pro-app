@@ -22,7 +22,7 @@ export default function FAQ() {
 
                 <div style={{ marginBottom: "20px" }}>
                     <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>Is there a free trial?</h3>
-                    <p style={{ color: "#444" }}>Yes, all paid plans come with a 14-day free trial so you can test all features risk-free.</p>
+                    <p style={{ color: "#444" }}>Yes, all paid plans come with a 7-day free trial so you can test all features risk-free.</p>
                 </div>
 
                 <div style={{ marginBottom: "20px" }}>

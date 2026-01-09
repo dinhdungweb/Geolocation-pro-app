@@ -110,7 +110,7 @@ function PlanCard({ name, price, visitorLimit, isCurrentPlan, isFree, hasTrial, 
                     </Text>
                     {hasTrial && !isFree && (
                         <Text as="p" variant="bodySm" tone="subdued">
-                            14-day free trial
+                            7-day free trial
                         </Text>
                     )}
                 </BlockStack>
@@ -181,7 +181,7 @@ export default function PricingPage() {
                     <BlockStack gap="600">
                         <Divider />
                         <InlineStack align="center" gap="800">
-                            <Text as="span" variant="bodyMd" tone="subdued">✓ 14-day free trial</Text>
+                            <Text as="span" variant="bodyMd" tone="subdued">✓ 7-day free trial</Text>
                             <Text as="span" variant="bodyMd" tone="subdued">✓ Cancel anytime</Text>
                             <Text as="span" variant="bodyMd" tone="subdued">✓ Secure payments via Shopify</Text>
                         </InlineStack>
@@ -193,8 +193,8 @@ export default function PricingPage() {
                                     <Grid.Cell columnSpan={{ xs: 6, md: 3 }}>
                                         <Box padding="400">
                                             <BlockStack gap="200">
-                                                <Text as="p" fontWeight="bold">How does the 14-day trial work?</Text>
-                                                <Text as="p" tone="subdued">You can try all Pro features for 14 days. You won't be charged until the trial ends.</Text>
+                                                <Text as="p" fontWeight="bold">How does the 7-day trial work?</Text>
+                                                <Text as="p" tone="subdued">You can try all Pro features for 7 days. You won't be charged until the trial ends.</Text>
                                             </BlockStack>
                                         </Box>
                                     </Grid.Cell>
