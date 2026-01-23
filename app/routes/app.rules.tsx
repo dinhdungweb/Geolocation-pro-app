@@ -27,7 +27,7 @@ import {
     Select,
     RadioButton,
 } from "@shopify/polaris";
-import { SearchIcon, XIcon } from "@shopify/polaris-icons";
+import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
@@ -160,12 +160,15 @@ const ALL_COUNTRIES = [
 ].sort((a, b) => a.label.localeCompare(b.label));
 
 const REGIONS = {
-    Asia: ["AF", "BD", "BN", "KH", "CN", "HK", "IN", "ID", "JP", "KZ", "LA", "MO", "MY", "MV", "MN", "MM", "NP", "KP", "PK", "PH", "SG", "KR", "LK", "TW", "TH", "UZ", "VN"],
-    Europe: ["AT", "BY", "BE", "BG", "HR", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT", "LV", "LT", "LU", "NL", "NO", "PL", "PT", "RO", "RU", "RS", "SK", "SI", "ES", "SE", "CH", "UA", "GB"],
-    Americas: ["AR", "BO", "BR", "CA", "CL", "CO", "CR", "CU", "DO", "EC", "SV", "GT", "HN", "JM", "MX", "NI", "PA", "PY", "PE", "PR", "US", "UY", "VE"],
-    MiddleEast: ["BH", "EG", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "QA", "SA", "SY", "TR", "AE", "YE"],
-    Africa: ["DZ", "CM", "ET", "GH", "CI", "KE", "MA", "NG", "SN", "ZA", "TZ", "TN", "UG", "ZW"],
-    Oceania: ["AU", "FJ", "NZ", "PG"]
+    "North America": ["CA", "US", "MX"],
+    "Central America & Caribbean": ["AG", "AI", "AW", "BB", "BL", "BM", "BQ", "BS", "BZ", "CR", "CU", "CW", "DM", "DO", "GD", "GP", "GT", "HN", "HT", "JM", "KN", "KY", "LC", "MF", "MQ", "MS", "NI", "PA", "PM", "PR", "SV", "SX", "TC", "TT", "VC", "VG", "VI"],
+    "South America": ["AR", "BO", "BR", "CL", "CO", "EC", "FK", "GF", "GY", "PE", "PY", "SR", "UY", "VE"],
+    Europe: ["AD", "AL", "AT", "AX", "BA", "BE", "BG", "BY", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FO", "FR", "GB", "GG", "GI", "GR", "HR", "HU", "IE", "IM", "IS", "IT", "JE", "LI", "LT", "LU", "LV", "MC", "MD", "ME", "MK", "MT", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE", "SI", "SJ", "SK", "SM", "UA", "VA", "XK"],
+    Asia: ["AF", "BD", "BN", "BT", "CN", "HK", "ID", "IN", "JP", "KG", "KH", "KP", "KR", "KZ", "LA", "LK", "MM", "MN", "MO", "MV", "MY", "NP", "PH", "PK", "SG", "TH", "TJ", "TM", "TW", "UZ", "VN"],
+    "Middle East": ["AE", "BH", "IL", "IQ", "IR", "JO", "KW", "LB", "OM", "PS", "QA", "SA", "SY", "TR", "YE"],
+    Africa: ["AO", "BF", "BI", "BJ", "BW", "CD", "CF", "CG", "CI", "CM", "CV", "DJ", "DZ", "EG", "ER", "ET", "GA", "GH", "GM", "GN", "GQ", "GW", "KE", "KM", "LR", "LS", "LY", "MA", "MG", "ML", "MR", "MU", "MW", "MZ", "NA", "NE", "NG", "RE", "RW", "SC", "SD", "SH", "SL", "SN", "SO", "SS", "ST", "SZ", "TD", "TG", "TN", "TZ", "UG", "YT", "ZA", "ZM", "ZW"],
+    Oceania: ["AS", "AU", "CK", "FJ", "FM", "GU", "KI", "MH", "MP", "NC", "NF", "NR", "NU", "NZ", "PF", "PG", "PN", "PW", "SB", "TK", "TL", "TO", "TV", "VU", "WF", "WS"],
+    Other: ["AQ", "BV", "CC", "CX", "GS", "HM", "IO", "TF", "UM"]
 };
 
 interface RedirectRule {
@@ -326,6 +329,7 @@ export default function RulesPage() {
 
     // Autocomplete state
     const [inputValue, setInputValue] = useState("");
+    const [expandedRegions, setExpandedRegions] = useState<string[]>([]);
 
     const { smUp } = useBreakpoints();
     const resourceName = {
@@ -367,6 +371,7 @@ export default function RulesPage() {
             setEndTime(editingRule.endTime || "17:00");
             setActiveDays(editingRule.daysOfWeek ? editingRule.daysOfWeek.split(",") : ["1", "2", "3", "4", "5"]);
             setTimezone(editingRule.timezone || "Asia/Ho_Chi_Minh");
+            setExpandedRegions([]); // Reset expansion
         } else {
             setFormName("");
             setSelectedCountries([]);
@@ -378,6 +383,7 @@ export default function RulesPage() {
             setEndTime("17:00");
             setActiveDays(["1", "2", "3", "4", "5"]);
             setTimezone("Asia/Ho_Chi_Minh");
+            setExpandedRegions([]);
         }
         setInputValue("");
     }, [editingRule, modalOpen]);
@@ -459,6 +465,34 @@ export default function RulesPage() {
         // Add countries from region that aren't already selected
         const countriesToAdd = REGIONS[region].filter(c => !selectedCountries.includes(c));
         setSelectedCountries([...selectedCountries, ...countriesToAdd]);
+    };
+
+    const toggleRegionExpansion = (region: string) => {
+        setExpandedRegions(prev =>
+            prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
+        );
+    };
+
+    const toggleRegionSelection = (region: keyof typeof REGIONS) => {
+        const regionCountries = REGIONS[region];
+        const allSelected = regionCountries.every(c => selectedCountries.includes(c));
+
+        if (allSelected) {
+            // Deselect all
+            setSelectedCountries(selectedCountries.filter(c => !regionCountries.includes(c)));
+        } else {
+            // Select all
+            const toAdd = regionCountries.filter(c => !selectedCountries.includes(c));
+            setSelectedCountries([...selectedCountries, ...toAdd]);
+        }
+    };
+
+    const toggleCountrySelection = (countryCode: string) => {
+        if (selectedCountries.includes(countryCode)) {
+            setSelectedCountries(selectedCountries.filter(c => c !== countryCode));
+        } else {
+            setSelectedCountries([...selectedCountries, countryCode]);
+        }
     };
 
     const promotedBulkActions = [
@@ -611,38 +645,78 @@ export default function RulesPage() {
                             autoComplete="off"
                         />
 
-                        {/* Country Autocomplete */}
+                        {/* Hierarchical Country Selector */}
                         <BlockStack gap="200">
-                            <Text as="p" variant="bodySm">Quick Select:</Text>
-                            <InlineStack gap="200" wrap>
-                                <Button size="slim" onClick={() => handleBulkSelect("ALL")}>Select All</Button>
-                                <Button size="slim" onClick={() => handleBulkSelect("CLEAR")}>Clear All</Button>
-                                {Object.keys(REGIONS).map((region) => (
-                                    <Button key={region} size="slim" onClick={() => handleBulkSelect(region as any)}>
-                                        {region}
-                                    </Button>
-                                ))}
-                            </InlineStack>
-                            <Autocomplete
-                                options={filteredOptions.map(c => ({ value: c.value, label: `${c.label} (${c.value})` }))}
-                                selected={[]}
-                                onSelect={handleCountrySelect}
-                                textField={textField}
+                            <Text as="p" variant="bodySm">Countries</Text>
+
+                            {/* Search and Bulk Actions */}
+                            <TextField
+                                label="Search countries/regions"
+                                labelHidden
+                                placeholder="Search countries..."
+                                value={inputValue}
+                                onChange={setInputValue}
+                                prefix={<Icon source={SearchIcon} />}
+                                autoComplete="off"
                             />
 
-                            {/* Selected countries as tags */}
-                            {selectedCountries.length > 0 && (
-                                <LegacyStack spacing="tight">
-                                    {selectedCountries.map((code) => (
-                                        <Tag key={code} onRemove={() => removeCountry(code)}>
-                                            {getCountryLabel(code)} ({code})
-                                        </Tag>
-                                    ))}
-                                </LegacyStack>
-                            )}
+                            <InlineStack gap="200">
+                                <Button size="slim" onClick={() => handleBulkSelect("ALL")}>Select All</Button>
+                                <Button size="slim" onClick={() => handleBulkSelect("CLEAR")}>Clear All</Button>
+                            </InlineStack>
+
+                            {/* Tree View */}
+                            <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dfe3e8', borderRadius: '4px', padding: '8px' }}>
+                                {Object.entries(REGIONS).map(([regionName, codes]) => {
+                                    // Filter logic
+                                    const matchingCountryCodes = codes.filter(code => {
+                                        if (!inputValue) return true;
+                                        const label = getCountryLabel(code).toLowerCase();
+                                        const region = regionName.toLowerCase();
+                                        const search = inputValue.toLowerCase();
+                                        return label.includes(search) || code.toLowerCase().includes(search) || region.includes(search);
+                                    });
+
+                                    if (matchingCountryCodes.length === 0) return null;
+
+                                    const isAllSelected = matchingCountryCodes.every(c => selectedCountries.includes(c));
+                                    const isSomeSelected = matchingCountryCodes.some(c => selectedCountries.includes(c));
+                                    const isIndeterminate = isSomeSelected && !isAllSelected;
+                                    const isExpanded = expandedRegions.includes(regionName) || !!inputValue; // Auto expand on search
+
+                                    return (
+                                        <div key={regionName} style={{ marginBottom: '4px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0' }}>
+                                                <div onClick={() => toggleRegionExpansion(regionName)} style={{ cursor: 'pointer', marginRight: '4px' }}>
+                                                    <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
+                                                </div>
+                                                <Checkbox
+                                                    label={regionName}
+                                                    checked={isIndeterminate ? "indeterminate" : isAllSelected}
+                                                    onChange={() => toggleRegionSelection(regionName as any)}
+                                                />
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div style={{ paddingLeft: '28px' }}>
+                                                    {matchingCountryCodes.map(code => (
+                                                        <div key={code} style={{ padding: '2px 0' }}>
+                                                            <Checkbox
+                                                                label={`${getCountryLabel(code)} (${code})`}
+                                                                checked={selectedCountries.includes(code)}
+                                                                onChange={() => toggleCountrySelection(code)}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
 
                             <Text as="p" variant="bodySm" tone="subdued">
-                                Search and select countries. Selected: {selectedCountries.length}
+                                Selected: {selectedCountries.length} countries
                             </Text>
                         </BlockStack>
 
