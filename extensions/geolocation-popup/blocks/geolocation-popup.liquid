@@ -51,6 +51,15 @@
 
   // Get country from Shopify (no external API call needed!)
   const getVisitorCountry = () => {
+    // 1. Check for test_country query param (for debugging)
+    const urlParams = new URLSearchParams(window.location.search);
+    const testCountry = urlParams.get('test_country');
+    if (testCountry) {
+        log('Test country forced:', testCountry);
+        return testCountry.toUpperCase();
+    }
+
+    // 2. Default to Shopify detection
     const country = GEOLOCATION_CONFIG.visitorCountry.toUpperCase();
     log('Visitor country (from Shopify):', country || 'Not detected');
     return country || null;
