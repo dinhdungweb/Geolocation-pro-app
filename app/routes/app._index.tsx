@@ -299,7 +299,13 @@ export default function Index() {
       <IndexTable.Row id={id} key={id} position={index}>
         <IndexTable.Cell>
           <InlineStack gap="200" align="start" blockAlign="center">
-            <span style={{ fontSize: '20px' }}>{getCountryFlag(code)}</span>
+            <img
+              src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`}
+              srcSet={`https://flagcdn.com/w80/${code.toLowerCase()}.png 2x`}
+              width="30"
+              alt={country}
+              style={{ borderRadius: '2px', objectFit: 'cover' }}
+            />
             <Text variant="bodyMd" fontWeight="bold" as="span">{country}</Text>
           </InlineStack>
         </IndexTable.Cell>
