@@ -159,6 +159,15 @@ const ALL_COUNTRIES = [
     { label: "Papua New Guinea", value: "PG" },
 ].sort((a, b) => a.label.localeCompare(b.label));
 
+const REGIONS = {
+    Asia: ["AF", "BD", "BN", "KH", "CN", "HK", "IN", "ID", "JP", "KZ", "LA", "MO", "MY", "MV", "MN", "MM", "NP", "KP", "PK", "PH", "SG", "KR", "LK", "TW", "TH", "UZ", "VN"],
+    Europe: ["AT", "BY", "BE", "BG", "HR", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT", "LV", "LT", "LU", "NL", "NO", "PL", "PT", "RO", "RU", "RS", "SK", "SI", "ES", "SE", "CH", "UA", "GB"],
+    Americas: ["AR", "BO", "BR", "CA", "CL", "CO", "CR", "CU", "DO", "EC", "SV", "GT", "HN", "JM", "MX", "NI", "PA", "PY", "PE", "PR", "US", "UY", "VE"],
+    MiddleEast: ["BH", "EG", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "QA", "SA", "SY", "TR", "AE", "YE"],
+    Africa: ["DZ", "CM", "ET", "GH", "CI", "KE", "MA", "NG", "SN", "ZA", "TZ", "TN", "UG", "ZW"],
+    Oceania: ["AU", "FJ", "NZ", "PG"]
+};
+
 interface RedirectRule {
     id: string;
     name: string;
@@ -438,6 +447,20 @@ export default function RulesPage() {
         setSelectedCountries(selectedCountries.filter(c => c !== countryToRemove));
     }, [selectedCountries]);
 
+    const handleBulkSelect = (region: keyof typeof REGIONS | "ALL" | "CLEAR") => {
+        if (region === "CLEAR") {
+            setSelectedCountries([]);
+            return;
+        }
+        if (region === "ALL") {
+            setSelectedCountries(ALL_COUNTRIES.map(c => c.value));
+            return;
+        }
+        // Add countries from region that aren't already selected
+        const countriesToAdd = REGIONS[region].filter(c => !selectedCountries.includes(c));
+        setSelectedCountries([...selectedCountries, ...countriesToAdd]);
+    };
+
     const promotedBulkActions = [
         {
             content: "Delete selected",
@@ -590,6 +613,16 @@ export default function RulesPage() {
 
                         {/* Country Autocomplete */}
                         <BlockStack gap="200">
+                            <Text as="p" variant="bodySm">Quick Select:</Text>
+                            <InlineStack gap="200" wrap>
+                                <Button size="slim" onClick={() => handleBulkSelect("ALL")}>Select All</Button>
+                                <Button size="slim" onClick={() => handleBulkSelect("CLEAR")}>Clear All</Button>
+                                {Object.keys(REGIONS).map((region) => (
+                                    <Button key={region} size="slim" onClick={() => handleBulkSelect(region as any)}>
+                                        {region}
+                                    </Button>
+                                ))}
+                            </InlineStack>
                             <Autocomplete
                                 options={filteredOptions.map(c => ({ value: c.value, label: `${c.label} (${c.value})` }))}
                                 selected={[]}
