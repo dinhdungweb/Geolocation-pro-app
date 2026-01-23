@@ -22,6 +22,7 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN, OVERAGE_RATE } from "../billing.config";
 import prisma from "../db.server";
+import { COUNTRY_MAP, getCountryFlag } from "../utils/countries";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -31,13 +32,7 @@ const EmptyAuthState = ({ title }: { title: string }) => (
 
 // Helper to get country name (simplified version of the one in app.rules.tsx)
 //Ideally this should be shared, but for now we put it here or rely on code.
-const COUNTRY_MAP: Record<string, string> = {
-  "VN": "Vietnam", "US": "United States", "CN": "China", "IN": "India", "GB": "United Kingdom",
-  "SG": "Singapore", "AE": "United Arab Emirates", "KR": "South Korea", "MY": "Malaysia",
-  "JP": "Japan", "DE": "Germany", "AU": "Australia", "FR": "France", "CA": "Canada",
-  "TH": "Thailand", "ID": "Indonesia", "PH": "Philippines", "RU": "Russia",
-  // Add more as needed or import full list
-};
+// Used from shared utils now
 
 
 // Interface for the data items to fix implicit any
@@ -304,20 +299,7 @@ export default function Index() {
       <IndexTable.Row id={id} key={id} position={index}>
         <IndexTable.Cell>
           <InlineStack gap="200" align="start" blockAlign="center">
-            <span style={{ fontSize: '20px' }}>{
-              code === 'VN' ? '🇻🇳' :
-                code === 'CN' ? '🇨🇳' :
-                  code === 'US' ? '🇺🇸' :
-                    code === 'IN' ? '🇮🇳' :
-                      code === 'GB' ? '🇬🇧' :
-                        code === 'SG' ? '🇸🇬' :
-                          code === 'AE' ? '🇦🇪' :
-                            code === 'KR' ? '🇰🇷' :
-                              code === 'MY' ? '🇲🇾' :
-                                code === 'JP' ? '🇯🇵' :
-                                  code === 'DE' ? '🇩🇪' :
-                                    code === 'AU' ? '🇦🇺' : '🏳️'
-            }</span>
+            <span style={{ fontSize: '20px' }}>{getCountryFlag(code)}</span>
             <Text variant="bodyMd" fontWeight="bold" as="span">{country}</Text>
           </InlineStack>
         </IndexTable.Cell>
