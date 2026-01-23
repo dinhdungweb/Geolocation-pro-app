@@ -23,11 +23,12 @@ import {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing } = await authenticate.admin(request);
+    const isTest = process.env.NODE_ENV !== "production";
 
     // Restore billing check
     const billingCheck = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: true,
+        isTest,
     });
 
     const currentPlan = billingCheck.appSubscriptions[0]?.name || FREE_PLAN;
@@ -40,6 +41,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { billing } = await authenticate.admin(request);
+    const isTest = process.env.NODE_ENV !== "production";
     const formData = await request.formData();
     const selectedPlan = formData.get("plan") as string;
     const currentPlan = formData.get("currentPlan") as string;
@@ -50,14 +52,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             // Get active subscription to cancel it
             const billingCheck = await billing.check({
                 plans: ALL_PAID_PLANS as any,
-                isTest: true,
+                isTest,
             });
 
             const subscription = billingCheck.appSubscriptions[0];
             if (subscription) {
                 await billing.cancel({
                     subscriptionId: subscription.id,
-                    isTest: true,
+                    isTest,
                     prorate: true,
                 });
             }
@@ -68,11 +70,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (ALL_PAID_PLANS.includes(selectedPlan)) {
             await billing.require({
                 plans: [selectedPlan] as any,
-                isTest: true,
+                isTest,
                 onFailure: async () => {
                     return billing.request({
                         plan: selectedPlan as any,
-                        isTest: true,
+                        isTest,
                     });
                 },
             });
