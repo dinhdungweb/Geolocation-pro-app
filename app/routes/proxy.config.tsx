@@ -65,20 +65,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const visitorIP = getVisitorIP();
 
-    // Lookup country from IP using free API (ip-api.com)
-    // This ensures we get the REAL country, not cached Shopify value
+    // Lookup country from IP using free API
+    // Using ipwho.is instead of ip-api.com because it supports HTTPS
     let detectedCountry = "";
     try {
-        // ip-api.com is free for non-commercial use (45 requests/minute)
-        const geoResponse = await fetch(`http://ip-api.com/json/${visitorIP}?fields=countryCode`);
+        // ipwho.is is free and supports HTTPS (ip-api.com free tier is HTTP only which may be blocked)
+        const geoResponse = await fetch(`https://ipwho.is/${visitorIP}?fields=country_code`);
         if (geoResponse.ok) {
             const geoData = await geoResponse.json();
-            if (geoData.countryCode) {
-                detectedCountry = geoData.countryCode;
+            console.log(`[Proxy] Geo lookup response for ${visitorIP}:`, geoData);
+            if (geoData.country_code) {
+                detectedCountry = geoData.country_code;
+                console.log(`[Proxy] Detected country from IP: ${detectedCountry}`);
             }
+        } else {
+            console.log(`[Proxy] Geo API returned status: ${geoResponse.status}`);
         }
     } catch (error) {
-        console.log(`[Proxy] Could not lookup country for IP ${visitorIP}:`, error);
+        console.error(`[Proxy] Could not lookup country for IP ${visitorIP}:`, error);
     }
 
     // Verify App Proxy Signature
