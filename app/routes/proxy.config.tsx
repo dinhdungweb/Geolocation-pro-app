@@ -65,35 +65,34 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const visitorIP = getVisitorIP();
 
-    // Detect country from request headers (no external API needed!)
-    // Priority: cf-ipcountry (Cloudflare) > x-country-code > fallback to empty
-    const getVisitorCountry = (): string => {
-        // 1. Cloudflare's country header (Shopify uses Cloudflare CDN)
-        const cfCountry = request.headers.get("cf-ipcountry");
-        if (cfCountry && cfCountry !== "XX") {
-            console.log(`[Proxy] Country from Cloudflare: ${cfCountry}`);
-            return cfCountry.toUpperCase();
+    // Lookup country from IP using ipwho.is (free, HTTPS, no limit)
+    // Cloudflare headers are NOT forwarded by Shopify App Proxy, so we need external API
+    let detectedCountry = "";
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
+        const geoResponse = await fetch(`https://ipwho.is/${visitorIP}?fields=country_code`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (geoResponse.ok) {
+            const geoData = await geoResponse.json();
+            if (geoData.success !== false && geoData.country_code) {
+                detectedCountry = geoData.country_code;
+                console.log(`[Proxy] Country detected from IP ${visitorIP}: ${detectedCountry}`);
+            } else {
+                console.log(`[Proxy] Geo API returned error for ${visitorIP}:`, geoData.message || 'Unknown error');
+            }
         }
-
-        // 2. Some CDNs/proxies add this header
-        const xCountry = request.headers.get("x-country-code");
-        if (xCountry) {
-            console.log(`[Proxy] Country from x-country-code: ${xCountry}`);
-            return xCountry.toUpperCase();
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            console.log(`[Proxy] Geo API timeout for IP ${visitorIP}`);
+        } else {
+            console.error(`[Proxy] Could not lookup country for IP ${visitorIP}:`, error.message);
         }
-
-        // 3. Vercel/Netlify header
-        const xVercelCountry = request.headers.get("x-vercel-ip-country");
-        if (xVercelCountry) {
-            console.log(`[Proxy] Country from Vercel: ${xVercelCountry}`);
-            return xVercelCountry.toUpperCase();
-        }
-
-        console.log(`[Proxy] No country header found for IP: ${visitorIP}`);
-        return "";
-    };
-
-    const detectedCountry = getVisitorCountry();
+    }
 
     // Verify App Proxy Signature
     try {
