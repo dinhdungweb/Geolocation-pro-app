@@ -436,24 +436,26 @@ export default function Index() {
                     <Text as="h3" variant="headingMd">Blocked Traffic</Text>
                     <Text as="p" tone="subdued">Visitors blocked by rule/country.</Text>
                   </div>
-                  <IndexTable
-                    condensed={!smUp}
-                    resourceName={{ singular: 'block', plural: 'blocks' }}
-                    itemCount={blocksData.length}
-                    headings={[{ title: 'Block' }, { title: 'Count' }]}
-                    selectable={false}
-                  >
-                    {blocksData.length > 0 ? (
-                      blocksData.map((item: any, index: number) => (
-                        <IndexTable.Row id={item.id} key={item.id} position={index}>
-                          <IndexTable.Cell>{item.block}</IndexTable.Cell>
-                          <IndexTable.Cell>{item.blocked}</IndexTable.Cell>
-                        </IndexTable.Row>
-                      ))
-                    ) : (
-                      <EmptyAuthState title="No blocked traffic recorded" />
-                    )}
-                  </IndexTable>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    <IndexTable
+                      condensed={!smUp}
+                      resourceName={{ singular: 'block', plural: 'blocks' }}
+                      itemCount={blocksData.length}
+                      headings={[{ title: 'Block' }, { title: 'Count' }]}
+                      selectable={false}
+                    >
+                      {blocksData.length > 0 ? (
+                        blocksData.map((item: any, index: number) => (
+                          <IndexTable.Row id={item.id} key={item.id} position={index}>
+                            <IndexTable.Cell>{item.block}</IndexTable.Cell>
+                            <IndexTable.Cell>{item.blocked}</IndexTable.Cell>
+                          </IndexTable.Row>
+                        ))
+                      ) : (
+                        <EmptyAuthState title="No blocks found" />
+                      )}
+                    </IndexTable>
+                  </div>
                 </BlockStack>
               </Card>
             </BlockStack>
