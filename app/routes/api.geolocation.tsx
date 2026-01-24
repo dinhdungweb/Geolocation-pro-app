@@ -12,6 +12,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
 
+    // Get Visitor IP
+    // Shopify passes the real client IP in this header for App Proxy requests
+    const visitorIP = request.headers.get("x-shopify-client-ip") ||
+        request.headers.get("x-forwarded-for")?.split(',')[0] ||
+        "0.0.0.0";
+
     // CORS headers for cross-origin requests from storefront
     const headers = {
         "Access-Control-Allow-Origin": "*",
@@ -40,20 +46,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 popupBgColor: true,
                 popupTextColor: true,
                 popupBtnColor: true,
+                blockedTitle: true,
+                blockedMessage: true,
                 excludeBots: true,
+                excludedIPs: true,
                 cookieDuration: true,
             },
         });
 
         // Fetch active rules for the shop
-        const rules = await prisma.redirectRule.findMany({
+        const allRules = await prisma.redirectRule.findMany({
             where: {
                 shop,
                 isActive: true,
             },
             orderBy: { priority: "desc" },
             select: {
+                id: true,
+                name: true,
+                matchType: true,
+                ruleType: true,
                 countryCodes: true,
+                ipAddresses: true,
                 targetUrl: true,
                 priority: true,
             },
@@ -65,23 +79,49 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 {
                     enabled: false,
                     mode: "disabled",
+                    visitorIP,
                     rules: [],
+                    ipRules: []
                 },
                 { headers }
             );
         }
 
-        // Transform rules to a simpler format for frontend
-        const transformedRules = rules.map((rule) => ({
-            countries: rule.countryCodes.split(",").map((c) => c.trim().toUpperCase()),
-            targetUrl: rule.targetUrl,
-            priority: rule.priority,
-        }));
+        // Check if visitor IP is globally excluded
+        const isIPExcluded = settings.excludedIPs
+            ? settings.excludedIPs.split(',').map(ip => ip.trim()).includes(visitorIP)
+            : false;
+
+        // Transform Country rules
+        const rules = allRules
+            .filter(r => r.matchType === 'country')
+            .map((rule) => ({
+                ruleId: rule.id,
+                name: rule.name,
+                ruleType: rule.ruleType,
+                countries: rule.countryCodes.split(",").map((c) => c.trim().toUpperCase()),
+                targetUrl: rule.targetUrl,
+                priority: rule.priority,
+            }));
+
+        // Transform IP rules
+        const ipRules = allRules
+            .filter(r => r.matchType === 'ip')
+            .map((rule) => ({
+                ruleId: rule.id,
+                name: rule.name,
+                ruleType: rule.ruleType,
+                ips: rule.ipAddresses.split(",").map((ip) => ip.trim()),
+                targetUrl: rule.targetUrl,
+                priority: rule.priority,
+            }));
 
         return json(
             {
                 enabled: settings.mode !== "disabled",
                 mode: settings.mode,
+                visitorIP,
+                isIPExcluded,
                 popup: {
                     title: settings.popupTitle,
                     message: settings.popupMessage,
@@ -91,9 +131,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                     textColor: settings.popupTextColor,
                     btnColor: settings.popupBtnColor,
                 },
+                blocked: {
+                    title: settings.blockedTitle,
+                    message: settings.blockedMessage,
+                },
                 excludeBots: settings.excludeBots,
                 cookieDuration: settings.cookieDuration,
-                rules: transformedRules,
+                rules: rules,
+                ipRules: ipRules,
             },
             { headers }
         );

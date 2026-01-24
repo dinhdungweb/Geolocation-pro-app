@@ -21,8 +21,9 @@
     visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
   };
 
-  // Debug mode - set to false for production
-  const DEBUG = false;
+  // Debug mode - check URL for ?debug=true
+  const urlParams = new URLSearchParams(window.location.search);
+  const DEBUG = urlParams.get('debug') === 'true';
   const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
 
   // Cookie utilities
@@ -103,13 +104,15 @@
         ...data
       };
 
-      // Use beacon if available for redirects to ensure it sends before page unload
-      if (type === 'redirected' && navigator.sendBeacon) {
+      // Use beacon if available for all events to ensure reliable delivery
+      if (navigator.sendBeacon) {
+         // Create blob with correct content type
          const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-         navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob);
-         return;
+         const success = navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob);
+         if (success) return;
       }
 
+      // Fallback to fetch if beacon fails or not supported
       fetch(GEOLOCATION_CONFIG.analyticsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
