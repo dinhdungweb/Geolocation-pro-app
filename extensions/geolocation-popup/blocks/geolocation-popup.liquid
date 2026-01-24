@@ -50,8 +50,8 @@
     return botPatterns.test(navigator.userAgent);
   };
 
-  // Get country from Shopify (no external API call needed!)
-  const getVisitorCountry = () => {
+  // Get country - prioritize API detection over Shopify Liquid (which can be cached)
+  const getVisitorCountry = (config = null) => {
     // 1. Check for test_country query param (for debugging)
     const urlParams = new URLSearchParams(window.location.search);
     const testCountry = urlParams.get('test_country');
@@ -60,7 +60,13 @@
         return testCountry.toUpperCase();
     }
 
-    // 2. Default to Shopify detection
+    // 2. Use detectedCountry from API (IP-based, bypasses CDN cache)
+    if (config && config.detectedCountry) {
+        log('Visitor country (from IP lookup):', config.detectedCountry);
+        return config.detectedCountry.toUpperCase();
+    }
+
+    // 3. Fallback to Shopify detection
     const country = GEOLOCATION_CONFIG.visitorCountry.toUpperCase();
     log('Visitor country (from Shopify):', country || 'Not detected');
     return country || null;
@@ -522,10 +528,7 @@
       return;
     }
 
-    // Get country from Shopify first (no API call needed - instant!)
-    const countryCode = getVisitorCountry();
-
-    // Fetch config from App Proxy - check this BEFORE cookies
+    // Fetch config from App Proxy FIRST - we need detectedCountry from it
     const fetchConfigData = async () => {
       try {
         const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
@@ -554,6 +557,9 @@
     // Get visitor IP from config (already extracted from x-shopify-client-ip header)
     const visitorIP = config.visitorIP || '0.0.0.0';
     log('Visitor IP:', visitorIP);
+
+    // Get country code - prioritize IP-based detection from API over cached Shopify value
+    const countryCode = getVisitorCountry(config);
 
     // Track visit FIRST - before any other checks (cookies, rules, etc.)
     trackEvent('visit', { countryCode, visitorIP });

@@ -65,6 +65,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const visitorIP = getVisitorIP();
 
+    // Lookup country from IP using free API (ip-api.com)
+    // This ensures we get the REAL country, not cached Shopify value
+    let detectedCountry = "";
+    try {
+        // ip-api.com is free for non-commercial use (45 requests/minute)
+        const geoResponse = await fetch(`http://ip-api.com/json/${visitorIP}?fields=countryCode`);
+        if (geoResponse.ok) {
+            const geoData = await geoResponse.json();
+            if (geoData.countryCode) {
+                detectedCountry = geoData.countryCode;
+            }
+        }
+    } catch (error) {
+        console.log(`[Proxy] Could not lookup country for IP ${visitorIP}:`, error);
+    }
+
     // Verify App Proxy Signature
     try {
         await authenticate.public.appProxy(request);
@@ -222,6 +238,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             enabled: settings.mode !== "disabled",
             mode: settings.mode,
             visitorIP, // Send visitor IP to frontend
+            detectedCountry, // Country detected from IP (bypasses CDN cache)
             isIPExcluded, // Whether this IP is in the exclusion list
             popup: {
                 title: settings.popupTitle,
