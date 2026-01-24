@@ -382,23 +382,25 @@ export default function Index() {
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
                 </div>
-                <IndexTable
-                  condensed={!smUp}
-                  resourceName={resourceNameVisits}
-                  itemCount={visitsData.length}
-                  selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
-                  onSelectionChange={handleVisitsSelectionChange}
-                  headings={[
-                    { title: 'Country' },
-                    { title: 'Visitors', alignment: 'end' },
-                    { title: 'Popup/banners', alignment: 'end' },
-                    { title: 'Redirected', alignment: 'end' },
-                    { title: 'Blocked', alignment: 'end' },
-                  ]}
-                  selectable={false}
-                >
-                  {visitsRowMarkup}
-                </IndexTable>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <IndexTable
+                    condensed={!smUp}
+                    resourceName={resourceNameVisits}
+                    itemCount={visitsData.length}
+                    selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
+                    onSelectionChange={handleVisitsSelectionChange}
+                    headings={[
+                      { title: 'Country' },
+                      { title: 'Visitors', alignment: 'end' },
+                      { title: 'Popup/banners', alignment: 'end' },
+                      { title: 'Redirected', alignment: 'end' },
+                      { title: 'Blocked', alignment: 'end' },
+                    ]}
+                    selectable={false}
+                  >
+                    {visitsRowMarkup}
+                  </IndexTable>
+                </div>
               </BlockStack>
             </Card>
           </Layout.Section>
