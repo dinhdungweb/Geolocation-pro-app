@@ -78,9 +78,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const updateRuleData: any = {};
             if (type === 'popup_shown') updateRuleData.seen = { increment: 1 };
             if (type === 'redirected') updateRuleData.clickedYes = { increment: 1 };
-            if (type === 'auto_redirected') updateRuleData.autoRedirected = { increment: 1 };
+            if (type === 'auto_redirected' || type === 'ip_redirected') updateRuleData.autoRedirected = { increment: 1 };
             if (type === 'clicked_no') updateRuleData.clickedNo = { increment: 1 };
             if (type === 'dismissed') updateRuleData.dismissed = { increment: 1 };
+            if (type === 'ip_blocked') updateRuleData.blocked = { increment: 1 };
 
             if (Object.keys(updateRuleData).length > 0) {
                 await (prisma as any).analyticsRule.upsert({
@@ -102,7 +103,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         ruleName: ruleName || 'Unknown Rule',
                         seen: type === 'popup_shown' ? 1 : 0,
                         clickedYes: type === 'redirected' ? 1 : 0,
-                        autoRedirected: type === 'auto_redirected' ? 1 : 0,
+                        autoRedirected: (type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
                         clickedNo: type === 'clicked_no' ? 1 : 0,
                         dismissed: type === 'dismissed' ? 1 : 0,
                     },

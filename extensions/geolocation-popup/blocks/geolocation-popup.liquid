@@ -472,25 +472,26 @@
       }
     }
     
-    // IPv4 CIDR notation support (/24, /16, /8)
+    // IPv4 CIDR notation support (any mask from /1 to /32)
     if (!isIPv6 && !isPatternIPv6 && trimmedPattern.includes('/')) {
       const [network, bits] = trimmedPattern.split('/');
       const maskBits = parseInt(bits, 10);
+      
+      if (isNaN(maskBits) || maskBits < 0 || maskBits > 32) return false;
       
       const ipParts = trimmedIP.split('.').map(Number);
       const networkParts = network.split('.').map(Number);
       
       if (ipParts.length === 4 && networkParts.length === 4) {
-        if (maskBits === 24) {
-          return ipParts[0] === networkParts[0] && 
-                 ipParts[1] === networkParts[1] && 
-                 ipParts[2] === networkParts[2];
-        } else if (maskBits === 16) {
-          return ipParts[0] === networkParts[0] && 
-                 ipParts[1] === networkParts[1];
-        } else if (maskBits === 8) {
-          return ipParts[0] === networkParts[0];
-        }
+        // Convert IP and network to 32-bit integers
+        const ipInt = (ipParts[0] << 24) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
+        const netInt = (networkParts[0] << 24) + (networkParts[1] << 16) + (networkParts[2] << 8) + networkParts[3];
+        
+        // Create subnet mask (e.g., /24 = 0xFFFFFF00)
+        const mask = maskBits === 0 ? 0 : (~0 << (32 - maskBits)) >>> 0;
+        
+        // Compare masked values
+        return ((ipInt >>> 0) & mask) === ((netInt >>> 0) & mask);
       }
     }
     
