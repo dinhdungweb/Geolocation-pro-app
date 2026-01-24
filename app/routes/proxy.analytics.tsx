@@ -18,8 +18,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
         const url = new URL(request.url);
         const shop = url.searchParams.get("shop");
-        const data = await request.json();
-        const { type, countryCode, ruleId, ruleName } = data; // shop is in query param
+
+        // Safely parse JSON body (may be empty from sendBeacon edge cases)
+        let data;
+        try {
+            const text = await request.text();
+            if (!text || text.trim() === '') {
+                console.log('[Analytics] Empty request body received');
+                return json({ error: "Empty body" }, { status: 400 });
+            }
+            data = JSON.parse(text);
+        } catch (parseError) {
+            console.error('[Analytics] JSON parse error:', parseError);
+            return json({ error: "Invalid JSON" }, { status: 400 });
+        }
+
+        const { type, countryCode, ruleId, ruleName } = data;
 
         if (!shop || !type) {
             return json({ error: "Missing required fields" }, { status: 400 });
