@@ -382,7 +382,7 @@ export default function Index() {
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
                 </div>
-                <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: '440px', overflowY: 'auto' }}>
                   <IndexTable
                     condensed={!smUp}
                     resourceName={resourceNameVisits}
