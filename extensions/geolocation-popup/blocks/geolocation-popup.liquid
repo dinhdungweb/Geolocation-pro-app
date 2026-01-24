@@ -590,7 +590,7 @@
         // Handle IP rule - Block
         if (matchingIPRule.ruleType === 'block') {
           log('Blocking access due to IP rule:', matchingIPRule.name);
-          trackEvent('ip_blocked', { visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
+          trackEvent('ip_blocked', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
           showBlockScreen(config, matchingIPRule, visitorIP);
           return;
         }
@@ -604,7 +604,7 @@
           }
           
           log('Redirecting due to IP rule:', matchingIPRule.name);
-          trackEvent('ip_redirected', { visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
+          trackEvent('ip_redirected', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
           window.location.href = matchingIPRule.targetUrl;
           return;
         }

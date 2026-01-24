@@ -47,8 +47,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const updateData: any = {};
             if (type === 'visit') updateData.visitors = { increment: 1 };
             if (type === 'popup_shown') updateData.popupShown = { increment: 1 };
-            if (type === 'redirected' || type === 'auto_redirected') updateData.redirected = { increment: 1 };
-            if (type === 'blocked') updateData.blocked = { increment: 1 };
+            if (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') updateData.redirected = { increment: 1 };
+            if (type === 'blocked' || type === 'ip_blocked') updateData.blocked = { increment: 1 };
 
             if (Object.keys(updateData).length > 0) {
                 await (prisma as any).analyticsCountry.upsert({
@@ -66,8 +66,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         countryCode,
                         visitors: type === 'visit' ? 1 : 0,
                         popupShown: type === 'popup_shown' ? 1 : 0,
-                        redirected: (type === 'redirected' || type === 'auto_redirected') ? 1 : 0,
-                        blocked: type === 'blocked' ? 1 : 0,
+                        redirected: (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
+                        blocked: (type === 'blocked' || type === 'ip_blocked') ? 1 : 0,
                     },
                 });
             }
