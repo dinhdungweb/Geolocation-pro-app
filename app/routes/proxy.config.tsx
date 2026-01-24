@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { getCountryFromIP } from "../utils/maxmind.server";
 
 /**
  * App Proxy endpoint for geolocation config
@@ -65,33 +66,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const visitorIP = getVisitorIP();
 
-    // Lookup country from IP using ipwho.is (free, HTTPS, no limit)
-    // Cloudflare headers are NOT forwarded by Shopify App Proxy, so we need external API
+    // Lookup country from IP using MaxMind GeoLite2 database (local, fast, no limits)
     let detectedCountry = "";
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-
-        const geoResponse = await fetch(`https://ipwho.is/${visitorIP}?fields=country_code`, {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (geoResponse.ok) {
-            const geoData = await geoResponse.json();
-            if (geoData.success !== false && geoData.country_code) {
-                detectedCountry = geoData.country_code;
-                console.log(`[Proxy] Country detected from IP ${visitorIP}: ${detectedCountry}`);
-            } else {
-                console.log(`[Proxy] Geo API returned error for ${visitorIP}:`, geoData.message || 'Unknown error');
-            }
+        detectedCountry = await getCountryFromIP(visitorIP);
+        if (detectedCountry) {
+            console.log(`[Proxy] Country detected from IP ${visitorIP}: ${detectedCountry}`);
+        } else {
+            console.log(`[Proxy] Could not detect country for IP ${visitorIP}`);
         }
     } catch (error: any) {
-        if (error.name === 'AbortError') {
-            console.log(`[Proxy] Geo API timeout for IP ${visitorIP}`);
-        } else {
-            console.error(`[Proxy] Could not lookup country for IP ${visitorIP}:`, error.message);
-        }
+        console.error(`[Proxy] MaxMind lookup error for IP ${visitorIP}:`, error.message);
     }
 
     // Verify App Proxy Signature
