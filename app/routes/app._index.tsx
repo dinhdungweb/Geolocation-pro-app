@@ -322,6 +322,26 @@ export default function Index() {
   return (
     <Page>
       <TitleBar title="Geolocation Redirect Pro" />
+      <style>
+        {`
+          @media (min-width: 48em) {
+            .table-scroll-container {
+              max-height: 440px;
+              overflow-y: auto;
+            }
+            .table-scroll-container-short {
+              max-height: 200px;
+              overflow-y: auto;
+            }
+            .table-scroll-container th {
+              position: static !important;
+            }
+            .table-scroll-container .Polaris-IndexTable__StickyTable {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
       <BlockStack gap="500">
 
         {/* Banner */}
@@ -382,7 +402,7 @@ export default function Index() {
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
                 </div>
-                <div style={{ maxHeight: '440px', overflowY: 'auto' }}>
+                <div className="table-scroll-container">
                   <IndexTable
                     condensed={!smUp}
                     resourceName={resourceNameVisits}
@@ -436,7 +456,7 @@ export default function Index() {
                     <Text as="h3" variant="headingMd">Blocked Traffic</Text>
                     <Text as="p" tone="subdued">Visitors blocked by rule/country.</Text>
                   </div>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  <div className="table-scroll-container-short">
                     <IndexTable
                       condensed={!smUp}
                       resourceName={{ singular: 'block', plural: 'blocks' }}
