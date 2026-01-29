@@ -137,7 +137,7 @@ export default function VisitorLogs() {
     );
 
     return (
-        <Page title="Visitor Logs" subtitle="Detailed logs of all visitor interactions">
+        <Page title="Visitor Logs" subtitle="Detailed logs of all visitor interactions" fullWidth>
             <Layout>
                 <Layout.Section>
                     <Card>
