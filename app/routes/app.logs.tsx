@@ -140,7 +140,7 @@ export default function VisitorLogs() {
         <Page title="Visitor Logs" subtitle="Detailed logs of all visitor interactions" fullWidth>
             <Layout>
                 <Layout.Section>
-                    <Card>
+                    <Card padding="0">
                         {logs.length > 0 ? (
                             <>
                                 <IndexTable
