@@ -158,7 +158,7 @@ export default function VisitorLogs() {
                                 >
                                     {rowMarkup}
                                 </IndexTable>
-                                <div style={{ padding: "16px 16px 60px 16px", display: "flex", justifyContent: "center" }}>
+                                <div style={{ padding: "16px", display: "flex", justifyContent: "center" }}>
                                     <Pagination
                                         hasPrevious={page > 1}
                                         onPrevious={handlePreviousPage}
@@ -177,6 +177,7 @@ export default function VisitorLogs() {
                         )}
 
                     </Card>
+                    <div style={{ height: "60px" }} />
                 </Layout.Section>
             </Layout>
         </Page>
