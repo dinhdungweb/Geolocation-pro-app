@@ -341,13 +341,13 @@
     // Event listeners
     document.getElementById('geo-confirm-btn').addEventListener('click', () => {
       CookieManager.set('geo_choice', 'redirected', config.cookieDuration || 7);
-      trackEvent('redirected', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+      trackEvent('redirected', { visitorIP: config.visitorIP, countryCode, ruleId: rule.ruleId, ruleName: rule.name });
       window.location.href = rule.targetUrl;
     });
 
     document.getElementById('geo-cancel-btn').addEventListener('click', () => {
       CookieManager.set('geo_choice', 'stayed', config.cookieDuration || 7);
-      trackEvent('clicked_no', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+      trackEvent('clicked_no', { visitorIP: config.visitorIP, countryCode, ruleId: rule.ruleId, ruleName: rule.name });
       container.style.display = 'none';
     });
     
@@ -355,7 +355,7 @@
     if (template === 'modal') {
         document.getElementById('geo-popup-overlay').addEventListener('click', (e) => {
           if (e.target.id === 'geo-popup-overlay') {
-            trackEvent('dismissed', { countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+            trackEvent('dismissed', { visitorIP: config.visitorIP, countryCode, ruleId: rule.ruleId, ruleName: rule.name });
             container.style.display = 'none';
           }
         });
@@ -639,7 +639,7 @@
     // Handle based on rule type - Check BLOCK FIRST
     if (matchingRule.ruleType === 'block') {
         log('Blocking access due to country rule:', matchingRule.name);
-        trackEvent('blocked', { countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
+        trackEvent('blocked', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
         showBlockScreen(config, matchingRule, countryCode);
         return;
     }
@@ -654,12 +654,12 @@
     if (config.mode === 'auto_redirect') {
       // Force redirect - no cookie, always redirect
       log('Force redirecting to:', matchingRule.targetUrl);
-      trackEvent('auto_redirected', { countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
+      trackEvent('auto_redirected', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
       window.location.href = matchingRule.targetUrl;
     } else {
       // Popup mode - will set cookie when user makes choice
       log('Showing popup');
-      trackEvent('popup_shown', { countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
+      trackEvent('popup_shown', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
       showPopup(config, matchingRule, countryCode);
     }
   };

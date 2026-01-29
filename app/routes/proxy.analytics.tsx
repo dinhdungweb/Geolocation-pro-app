@@ -33,10 +33,43 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return json({ error: "Invalid JSON" }, { status: 400 });
         }
 
-        const { type, countryCode, ruleId, ruleName } = data;
+        const { type, countryCode, ruleId, ruleName, visitorIP } = data;
 
         if (!shop || !type) {
             return json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        // 0. Save Detailed Visitor Log
+        if (visitorIP) {
+            const userAgent = request.headers.get("user-agent") || "Unknown";
+
+            // Map event type to action string
+            let action = type;
+            if (type === 'redirected') action = 'clicked_redirect';
+            if (type === 'auto_redirected') action = 'auto_redirect';
+            if (type === 'ip_redirected') action = 'ip_redirect';
+            if (type === 'ip_blocked') action = 'ip_block';
+            if (type === 'clicked_no') action = 'declined';
+            if (type === 'dismissed') action = 'dismissed';
+            if (type === 'popup_shown') action = 'popup_shown';
+
+            try {
+                await prisma.visitorLog.create({
+                    data: {
+                        shop,
+                        ipAddress: visitorIP,
+                        countryCode: countryCode || null,
+                        city: null,
+                        action,
+                        ruleName: ruleName || null,
+                        targetUrl: data.targetUrl || null, // Assuming targetUrl might be passed, or we can infer it? For now null is fine or we can add it to frontend payload if needed.
+                        userAgent,
+                    }
+                });
+            } catch (logError) {
+                console.error('[Analytics] Error saving visitor log:', logError);
+                // Don't fail the request if logging fails
+            }
         }
 
         const today = new Date();

@@ -143,3 +143,19 @@ model MonthlyUsage {
   @@unique([shop, yearMonth])
   @@index([shop])
 }
+
+// Logs: Chi tiết từng khách truy cập
+model VisitorLog {
+  id           String   @id @default(uuid())
+  shop         String
+  ipAddress    String
+  countryCode  String?
+  city         String?  // Optional: nếu sau này muốn mở rộng
+  action       String   // "visit", "redirected", "blocked", "auto_redirect", "ip_block", "ip_redirect"
+  ruleName     String?  // Tên rule đã trigger (nếu có)
+  targetUrl    String?  // URL chuyển hướng (nếu có)
+  userAgent    String?
+  timestamp    DateTime @default(now())
+
+  @@index([shop, timestamp])
+}

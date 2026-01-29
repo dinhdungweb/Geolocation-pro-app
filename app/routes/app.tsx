@@ -27,6 +27,7 @@ export default function App() {
         <Link to="/app/rules">Geolocation Rules</Link>
         <Link to="/app/ip-rules">IP Rules</Link>
         <Link to="/app/settings">Settings</Link>
+        <Link to="/app/logs">Visitor Logs</Link>
         <Link to="/app/pricing">Pricing</Link>
       </NavMenu>
       <Outlet />
