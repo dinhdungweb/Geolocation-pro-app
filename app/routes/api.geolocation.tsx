@@ -1,13 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import { getCountryFromIP } from "../utils/maxmind.server";
 
-/**
- * Public API endpoint to get geolocation config for a shop
- * This is called by the Theme App Extension (storefront)
- * 
- * Example: GET /api/geolocation?shop=myshop.myshopify.com
- */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
@@ -17,6 +12,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const visitorIP = request.headers.get("x-shopify-client-ip") ||
         request.headers.get("x-forwarded-for")?.split(',')[0] ||
         "0.0.0.0";
+
+    // Detect country from IP
+    const detectedCountry = await getCountryFromIP(visitorIP);
 
     // CORS headers for cross-origin requests from storefront
     const headers = {
@@ -139,6 +137,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 cookieDuration: settings.cookieDuration,
                 rules: rules,
                 ipRules: ipRules,
+                detectedCountry,
             },
             { headers }
         );
