@@ -21,7 +21,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const limit = 20;
     const skip = (page - 1) * limit;
 
-    const [logs, totalLogs] = await Promise.all([
+    const maxLogs = 250;
+
+    let [logs, dbCount] = await Promise.all([
         (prisma as any).visitorLog.findMany({
             where: { shop: session.shop },
             orderBy: { timestamp: "desc" },
@@ -32,6 +34,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             where: { shop: session.shop },
         }),
     ]);
+
+    const totalLogs = Math.min(dbCount, maxLogs);
+
+    // Enforce the hard limit of 250 items displayed
+    if (skip + logs.length > maxLogs) {
+        logs = logs.slice(0, Math.max(0, maxLogs - skip));
+    }
 
     return json({
         logs,
