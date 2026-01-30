@@ -210,7 +210,9 @@ export default function IPRulesPage() {
         formData.append("intent", editingRule ? "update" : "create");
         if (editingRule) formData.append("id", editingRule.id);
         formData.append("name", formName);
-        formData.append("ipAddresses", formIPAddresses);
+        // Normalize IP addresses: replace newlines with commas, remove extra spaces
+        const normalizedIPs = formIPAddresses.split(/[\n,]+/).map(ip => ip.trim()).filter(Boolean).join(",");
+        formData.append("ipAddresses", normalizedIPs);
         formData.append("targetUrl", formTargetUrl);
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
@@ -264,11 +266,11 @@ export default function IPRulesPage() {
             </IndexTable.Cell>
             <IndexTable.Cell>
                 <InlineStack gap="100" wrap={false}>
-                    {rule.ipAddresses.split(",").slice(0, 3).map(ip => (
+                    {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).slice(0, 3).map(ip => (
                         <Badge key={ip} tone="info">{ip.trim()}</Badge>
                     ))}
-                    {rule.ipAddresses.split(",").length > 3 && (
-                        <Badge>{`+${rule.ipAddresses.split(",").length - 3}`}</Badge>
+                    {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length > 3 && (
+                        <Badge>{`+${rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length - 3}`}</Badge>
                     )}
                 </InlineStack>
             </IndexTable.Cell>

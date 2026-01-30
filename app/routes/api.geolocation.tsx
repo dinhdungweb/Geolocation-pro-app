@@ -111,7 +111,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 ruleId: rule.id,
                 name: rule.name,
                 ruleType: rule.ruleType,
-                ips: rule.ipAddresses.split(",").map((ip) => ip.trim()),
+                ips: rule.ipAddresses.split(/[\n,]+/).map((ip) => ip.trim()).filter(Boolean),
                 targetUrl: rule.targetUrl,
                 priority: rule.priority,
             }));
