@@ -348,7 +348,7 @@ export default function Index() {
         <CalloutCard
           title={`Visitors: ${stats.totalRedirected} redirected, ${stats.totalBlocked} blocked`}
           illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
-          primaryAction={{ content: 'Rate Us', url: '#' }}
+          primaryAction={{ content: 'Rate Us', url: 'https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal' }}
         >
           <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
         </CalloutCard>
