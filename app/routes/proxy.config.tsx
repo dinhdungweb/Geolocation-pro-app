@@ -155,32 +155,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
             const timezone = rule.timezone || "UTC";
             try {
-                // Get current time in filter timezone
                 const now = new Date();
-                const options: Intl.DateTimeFormatOptions = { timeZone: timezone, hour12: false, hour: '2-digit', minute: '2-digit', weekday: 'short' };
-                const formatter = new Intl.DateTimeFormat('en-US', options);
 
-                // Hacky way to get parts because toLocaleString format varies
-                const parts = formatter.formatToParts(now);
-                const hour = parts.find(p => p.type === 'hour')?.value;
-                const minute = parts.find(p => p.type === 'minute')?.value;
-                const currentTime = `${hour}:${minute}`;
+                // Get current time parts in the target timezone using Intl.DateTimeFormat
+                // Use numeric types to avoid string parsing issues (e.g. "24" vs "00")
+                const parts = new Intl.DateTimeFormat('en-US', {
+                    timeZone: timezone,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    weekday: 'short',
+                    hour12: false,
+                }).formatToParts(now);
 
-                // Reliable way: Create a date object string in the target timezone
+                const hourStr = parts.find(p => p.type === 'hour')?.value ?? '0';
+                const minuteStr = parts.find(p => p.type === 'minute')?.value ?? '0';
+                // Normalize "24" → "00" (some systems return 24 for midnight)
+                const currentHour = parseInt(hourStr, 10) % 24;
+                const currentMinute = parseInt(minuteStr, 10);
+                // Convert to minutes-from-midnight for reliable numeric comparison
+                const currentMinutes = currentHour * 60 + currentMinute;
+
+                // Get day of week in target timezone (0=Sun, 1=Mon…6=Sat)
                 const targetTimeStr = now.toLocaleString("en-US", { timeZone: timezone });
                 const targetDate = new Date(targetTimeStr);
                 const currentDay = targetDate.getDay().toString();
 
-                // Check Day
+                // Check Day of week
                 if (rule.daysOfWeek && !rule.daysOfWeek.split(",").includes(currentDay)) {
+                    console.log(`[Proxy] Rule "${rule.name}" skipped: day ${currentDay} not in [${rule.daysOfWeek}]`);
                     return false;
                 }
 
-                // Check Time
+                // Check Time window
                 if (rule.startTime && rule.endTime) {
-                    // Simple string comparison works for HH:mm format (09:00 < 17:00)
-                    if (currentTime < rule.startTime || currentTime > rule.endTime) {
-                        return false;
+                    const [startH, startM] = rule.startTime.split(":").map(Number);
+                    const [endH, endM] = rule.endTime.split(":").map(Number);
+                    const startMinutes = startH * 60 + startM;
+                    const endMinutes = endH * 60 + endM;
+
+                    if (startMinutes <= endMinutes) {
+                        // Normal range: e.g. 09:00–17:00
+                        if (currentMinutes < startMinutes || currentMinutes > endMinutes) {
+                            console.log(`[Proxy] Rule "${rule.name}" skipped: time ${currentHour}:${currentMinute} not in ${rule.startTime}–${rule.endTime}`);
+                            return false;
+                        }
+                    } else {
+                        // Overnight range: e.g. 22:00–06:00
+                        if (currentMinutes < startMinutes && currentMinutes > endMinutes) {
+                            console.log(`[Proxy] Rule "${rule.name}" skipped: time ${currentHour}:${currentMinute} not in overnight ${rule.startTime}–${rule.endTime}`);
+                            return false;
+                        }
                     }
                 }
 
