@@ -27,10 +27,10 @@ export default function Support() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <InlineStack gap="200" align="start" blockAlign="center">
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <Icon source={EmailIcon} tone="info" />
                                 <Text as="h2" variant="headingMd">Contact Support</Text>
-                            </InlineStack>
+                            </div>
                             <Text as="p" variant="bodyMd" tone="subdued">
                                 Have a question or issue? Our support team is ready to help you. We typically respond within 24 hours.
                             </Text>
@@ -39,6 +39,7 @@ export default function Support() {
                                 <Text as="p" variant="bodyMd">Email us at:</Text>
                                 <Button
                                     url="mailto:support@bluepeaks.top"
+                                    target="_blank"
                                     icon={EmailIcon}
                                     variant="primary"
                                 >
@@ -53,10 +54,10 @@ export default function Support() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <InlineStack gap="200" align="start" blockAlign="center">
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <Icon source={QuestionCircleIcon} tone="info" />
                                 <Text as="h2" variant="headingMd">Frequently Asked Questions</Text>
-                            </InlineStack>
+                            </div>
                             <Text as="p" variant="bodyMd" tone="subdued">
                                 Find answers to common questions about our app.
                             </Text>
