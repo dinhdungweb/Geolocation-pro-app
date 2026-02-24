@@ -63,7 +63,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [rulesCount, activeRulesCount, settings] = await Promise.all([
     prisma.redirectRule.count({ where: { shop } }),
     prisma.redirectRule.count({ where: { shop, isActive: true } }),
-    prisma.settings.findUnique({ where: { shop } }),
+    prisma.settings.upsert({
+      where: { shop },
+      update: {},
+      create: { shop },
+    }),
   ]);
 
   // Check for active subscription

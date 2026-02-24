@@ -215,24 +215,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
         });
 
-        // If no settings found, return default config
-        if (!settings) {
-            return json(
-                {
-                    enabled: false,
-                    mode: "disabled",
-                    rules: [],
-                    ipRules: [],
-                    visitorIP,
-                    message: "No settings configured for this shop"
-                },
-                { headers }
-            );
-        }
+        // If no settings found, auto-create default settings so app works immediately
+        const effectiveSettings = settings ?? await prisma.settings.create({
+            data: { shop },
+            select: {
+                mode: true,
+                popupTitle: true, popupMessage: true,
+                confirmBtnText: true, cancelBtnText: true,
+                popupBgColor: true, popupTextColor: true, popupBtnColor: true,
+                excludeBots: true, excludedIPs: true, cookieDuration: true,
+                blockedTitle: true, blockedMessage: true, template: true,
+            },
+        });
+        console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
 
         // Check if visitor IP is in excluded list
-        const excludedIPsList = settings.excludedIPs
-            ? settings.excludedIPs.split(",").map(ip => ip.trim())
+        const excludedIPsList = effectiveSettings.excludedIPs
+            ? effectiveSettings.excludedIPs.split(",").map(ip => ip.trim())
             : [];
         const isIPExcluded = excludedIPsList.includes(visitorIP);
 
@@ -257,26 +256,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }));
 
         const response = {
-            enabled: settings.mode !== "disabled",
-            mode: settings.mode,
+            enabled: effectiveSettings.mode !== "disabled",
+            mode: effectiveSettings.mode,
             visitorIP, // Send visitor IP to frontend
             detectedCountry, // Country detected from IP (bypasses CDN cache)
             isIPExcluded, // Whether this IP is in the exclusion list
             popup: {
-                title: settings.popupTitle,
-                message: settings.popupMessage,
-                confirmBtn: settings.confirmBtnText,
-                cancelBtn: settings.cancelBtnText,
-                bgColor: settings.popupBgColor,
-                textColor: settings.popupTextColor,
-                btnColor: settings.popupBtnColor,
-                template: settings.template || "modal",
+                title: effectiveSettings.popupTitle,
+                message: effectiveSettings.popupMessage,
+                confirmBtn: effectiveSettings.confirmBtnText,
+                cancelBtn: effectiveSettings.cancelBtnText,
+                bgColor: effectiveSettings.popupBgColor,
+                textColor: effectiveSettings.popupTextColor,
+                btnColor: effectiveSettings.popupBtnColor,
+                template: effectiveSettings.template || "modal",
             },
-            excludeBots: settings.excludeBots,
-            cookieDuration: settings.cookieDuration,
+            excludeBots: effectiveSettings.excludeBots,
+            cookieDuration: effectiveSettings.cookieDuration,
             blocked: {
-                title: settings.blockedTitle,
-                message: settings.blockedMessage,
+                title: effectiveSettings.blockedTitle,
+                message: effectiveSettings.blockedMessage,
             },
             rules: transformedCountryRules, // Country rules
             ipRules: transformedIPRules, // IP rules
