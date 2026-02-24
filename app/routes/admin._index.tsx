@@ -10,7 +10,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    // Aggregate: get all unique shops from Settings
+    // Get ALL unique shops from Session table (every shop that installed the app)
+    const allSessions = await prisma.session.findMany({
+        select: { shop: true },
+        distinct: ["shop"],
+    });
+    const allShopDomains = allSessions.map((s: any) => s.shop);
+
     const [
         allSettings,
         rulesAgg,
@@ -18,21 +24,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         totalRules,
     ] = await Promise.all([
         prisma.settings.findMany({
-            orderBy: { createdAt: "desc" },
-            select: {
-                shop: true,
-                mode: true,
-                createdAt: true,
-                updatedAt: true,
-            },
+            where: { shop: { in: allShopDomains } },
+            select: { shop: true, mode: true, createdAt: true, updatedAt: true },
         }),
-        // Rules count per shop
         prisma.redirectRule.groupBy({
             by: ["shop"],
             _count: { id: true },
             where: { isActive: true },
         }),
-        // Monthly usage per shop — current month
         (prisma as any).monthlyUsage.findMany({
             where: { yearMonth },
             select: { shop: true, totalVisitors: true, redirected: true, blocked: true },
@@ -41,30 +40,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ]);
 
     // Build lookup maps
-    const rulesMap = new Map<string, number>(
-        rulesAgg.map((r: any) => [r.shop, r._count.id])
-    );
-    const usageMap = new Map<string, any>(
-        monthlyAgg.map((u: any) => [u.shop, u])
-    );
+    const settingsMap = new Map<string, any>(allSettings.map((s: any) => [s.shop, s]));
+    const rulesMap = new Map<string, number>(rulesAgg.map((r: any) => [r.shop, r._count.id]));
+    const usageMap = new Map<string, any>(monthlyAgg.map((u: any) => [u.shop, u]));
 
-    const shops = allSettings.map((s) => ({
-        shop: s.shop,
-        mode: s.mode,
-        activeRules: rulesMap.get(s.shop) ?? 0,
-        visitors: usageMap.get(s.shop)?.totalVisitors ?? 0,
-        redirected: usageMap.get(s.shop)?.redirected ?? 0,
-        blocked: usageMap.get(s.shop)?.blocked ?? 0,
-        installedAt: s.createdAt.toISOString(),
-        lastActive: s.updatedAt.toISOString(),
-    }));
+    // Merge: all sessions + settings (LEFT JOIN)
+    const shops = allShopDomains.map((shop) => {
+        const s = settingsMap.get(shop);
+        return {
+            shop,
+            mode: s?.mode ?? "not_configured",
+            hasSettings: !!s,
+            activeRules: rulesMap.get(shop) ?? 0,
+            visitors: usageMap.get(shop)?.totalVisitors ?? 0,
+            redirected: usageMap.get(shop)?.redirected ?? 0,
+            blocked: usageMap.get(shop)?.blocked ?? 0,
+            installedAt: s?.createdAt?.toISOString() ?? null,
+            lastActive: s?.updatedAt?.toISOString() ?? null,
+        };
+    }).sort((a, b) => {
+        // Sort: shops with settings first, then by lastActive desc
+        if (a.hasSettings && !b.hasSettings) return -1;
+        if (!a.hasSettings && b.hasSettings) return 1;
+        if (a.lastActive && b.lastActive) return b.lastActive.localeCompare(a.lastActive);
+        return 0;
+    });
 
     const totalShops = shops.length;
-    const activeShops = shops.filter((s) => s.mode !== "disabled").length;
+    const activeShops = shops.filter((s) => s.mode !== "disabled" && s.mode !== "not_configured").length;
     const totalVisitors = shops.reduce((sum, s) => sum + s.visitors, 0);
 
     return json({ shops, totalShops, activeShops, totalVisitors, totalRules, yearMonth });
 };
+
 
 export default function AdminDashboard() {
     const { shops, totalShops, activeShops, totalVisitors, totalRules, yearMonth } = useLoaderData<typeof loader>();
@@ -72,10 +80,13 @@ export default function AdminDashboard() {
     const modeColor = (mode: string) => {
         if (mode === "popup") return "#22d3ee";
         if (mode === "auto_redirect") return "#a78bfa";
+        if (mode === "not_configured") return "#f59e0b";
         return "#64748b";
     };
-    const formatDate = (iso: string) =>
-        new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const formatDate = (iso: string | null) => {
+        if (!iso) return "—";
+        return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    };
 
     return (
         <html lang="en">
