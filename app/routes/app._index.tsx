@@ -260,9 +260,9 @@ export default function Index() {
   const getModeLabel = (mode: string) => {
     switch (mode) {
       case "popup":
-        return { label: "Popup Mode", tone: "info" as const, description: "App is configured to display a popup." };
+        return { label: "Popup", tone: "success" as const, description: "App is configured to display a popup." };
       case "auto_redirect":
-        return { label: "Auto Redirect Mode", tone: "info" as const, description: "App is configured to automatically redirect visitors." };
+        return { label: "Auto Redirect", tone: "success" as const, description: "App is configured to automatically redirect visitors." };
       default:
         return { label: "Disabled", tone: "critical" as const, description: "App configuration is disabled." };
     }
@@ -440,7 +440,7 @@ export default function Index() {
                       <Text as="p">To enable/disable, verify App Embed status.</Text>
                       <BlockStack gap="300">
                         <div>
-                          <Badge tone={modeInfo.tone}>{modeInfo.label === "Disabled" ? "Configuration: Disabled" : `Configuration: ${modeInfo.label}`}</Badge>
+                          <Badge tone={modeInfo.tone}>{`Mode: ${modeInfo.label}`}</Badge>
                         </div>
                         <Button variant="primary" onClick={handleOpenThemeEditor} fullWidth>Open Theme Editor</Button>
                       </BlockStack>
