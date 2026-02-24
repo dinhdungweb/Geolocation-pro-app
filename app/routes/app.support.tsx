@@ -27,7 +27,7 @@ export default function Support() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", justifyContent: "flex-start" }}>
                                 <Icon source={EmailIcon} tone="info" />
                                 <Text as="h2" variant="headingMd">Contact Support</Text>
                             </div>
@@ -54,7 +54,7 @@ export default function Support() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", justifyContent: "flex-start" }}>
                                 <Icon source={QuestionCircleIcon} tone="info" />
                                 <Text as="h2" variant="headingMd">Frequently Asked Questions</Text>
                             </div>
