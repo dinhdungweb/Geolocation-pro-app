@@ -8,11 +8,9 @@ import {
     Button,
     Divider,
     Box,
-    Icon,
 } from "@shopify/polaris";
 import {
     EmailIcon,
-    QuestionCircleIcon,
     ExternalIcon,
 } from "@shopify/polaris-icons";
 
@@ -27,10 +25,7 @@ export default function Support() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", justifyContent: "flex-start" }}>
-                                <Icon source={EmailIcon} tone="info" />
-                                <Text as="h2" variant="headingMd">Contact Support</Text>
-                            </div>
+                            <Text as="h2" variant="headingMd">Contact Support</Text>
                             <Text as="p" variant="bodyMd" tone="subdued">
                                 Have a question or issue? Our support team is ready to help you. We typically respond within 24 hours.
                             </Text>
@@ -54,10 +49,7 @@ export default function Support() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", justifyContent: "flex-start" }}>
-                                <Icon source={QuestionCircleIcon} tone="info" />
-                                <Text as="h2" variant="headingMd">Frequently Asked Questions</Text>
-                            </div>
+                            <Text as="h2" variant="headingMd">Frequently Asked Questions</Text>
                             <Text as="p" variant="bodyMd" tone="subdued">
                                 Find answers to common questions about our app.
                             </Text>
