@@ -83,6 +83,21 @@ export default function AdminShopDetail() {
         return m[action] ?? "#64748b";
     };
 
+    const renderTruncatedList = (listStr: string | null, limit = 5) => {
+        if (!listStr) return "—";
+        const items = listStr.split(",").map(i => i.trim());
+        if (items.length <= limit) return listStr;
+
+        const visible = items.slice(0, limit).join(", ");
+        const remaining = items.length - limit;
+        return (
+            <>
+                {visible}
+                <span className="more-badge">+{remaining} more</span>
+            </>
+        );
+    };
+
     return (
         <html lang="en">
             <head>
@@ -164,6 +179,17 @@ export default function AdminShopDetail() {
                         background: rgba(255,255,255,0.03);
                         position: relative;
                         z-index: 10;
+                    }
+                    .more-badge {
+                        display: inline-flex;
+                        align-items: center;
+                        background: rgba(129,140,248,0.15);
+                        color: #818cf8;
+                        padding: 1px 6px;
+                        border-radius: 4px;
+                        font-size: 10px;
+                        font-weight: 700;
+                        margin-left: 4px;
                     }
                 `}</style>
             </head>
@@ -316,7 +342,7 @@ export default function AdminShopDetail() {
                                             {r.scheduleEnabled ? "⏰ Enabled" : "—"}
                                         </td>
                                         <td className="truncate-cell" title={r.countryCodes || ""}>
-                                            {r.countryCodes || "—"}
+                                            {renderTruncatedList(r.countryCodes)}
                                         </td>
                                         <td style={{ color: "#475569" }}>{r.priority}</td>
                                         <td style={{ color: "#475569" }}>{formatDateShort(r.createdAt)}</td>
