@@ -212,7 +212,7 @@ export default function AdminDashboard() {
                     }
                     .btn-logout:hover { background: rgba(239,68,68,0.2); }
                     /* MAIN */
-                    .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+                    .main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
                     h2 { font-size: 22px; font-weight: 700; color: #f1f5f9; margin-bottom: 24px; }
                     /* CARDS */
                     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
@@ -243,16 +243,18 @@ export default function AdminDashboard() {
                     table { width: 100%; border-collapse: collapse; }
                     th {
                         text-align: left;
-                        padding: 12px 20px;
-                        font-size: 11px;
+                        padding: 10px 14px;
+                        font-size: 10px;
                         font-weight: 600;
                         color: #64748b;
                         text-transform: uppercase;
                         letter-spacing: 0.5px;
                         border-bottom: 1px solid #1e1e2e;
                         background: #0f0f16;
+                        white-space: nowrap;
                     }
-                    td { padding: 14px 20px; font-size: 13px; border-bottom: 1px solid #0f0f16; }
+                    td { padding: 11px 14px; font-size: 12px; border-bottom: 1px solid #0f0f16; white-space: nowrap; }
+                    td.shop-cell { white-space: normal; min-width: 180px; }
                     tr:last-child td { border-bottom: none; }
                     tr:hover td { background: rgba(255,255,255,0.02); }
                     .shop-link { color: #818cf8; text-decoration: none; font-weight: 500; }
@@ -343,7 +345,7 @@ export default function AdminDashboard() {
                             <tbody>
                                 {shops.map((s) => (
                                     <tr key={s.shop}>
-                                        <td>
+                                        <td className="shop-cell">
                                             <Link to={`/admin/shops/${encodeURIComponent(s.shop)}`} className="shop-link">
                                                 {s.shop}
                                             </Link>
