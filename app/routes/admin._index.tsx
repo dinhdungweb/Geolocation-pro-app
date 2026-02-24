@@ -10,12 +10,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    // Get ALL unique shops from Session table (every shop that installed the app)
+    // Get ALL unique shops + their latest access token from Session table
     const allSessions = await prisma.session.findMany({
-        select: { shop: true },
+        select: { shop: true, accessToken: true },
+        // Get one representative session per shop (latest non-online session for API calls)
+        where: { isOnline: false, accessToken: { not: "" } },
         distinct: ["shop"],
     });
-    const allShopDomains = allSessions.map((s: any) => s.shop);
+    // Fallback: also grab online sessions for shops without offline token
+    const allShopDomains = [...new Set(allSessions.map((s: any) => s.shop))];
+    const tokenMap = new Map<string, string>(allSessions.map((s: any) => [s.shop, s.accessToken]));
 
     const [
         allSettings,
@@ -39,6 +43,62 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         prisma.redirectRule.count({ where: { isActive: true } }),
     ]);
 
+    // Fetch plan info from Shopify API for each shop (parallel, 3s timeout each)
+    const SHOPIFY_API_VERSION = "2024-10";
+    const BILLING_QUERY = `{
+        currentAppInstallation {
+            activeSubscriptions {
+                name
+                status
+                lineItems {
+                    plan {
+                        pricingDetails {
+                            ... on AppRecurringPricing {
+                                price { amount currencyCode }
+                                interval
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }`;
+
+    const fetchShopPlan = async (shop: string): Promise<{ plan: string; price: string }> => {
+        const token = tokenMap.get(shop);
+        if (!token) return { plan: "unknown", price: "" };
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Shopify-Access-Token": token,
+                },
+                body: JSON.stringify({ query: BILLING_QUERY }),
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+            if (!res.ok) return { plan: "unknown", price: "" };
+            const data = await res.json();
+            const subs = data?.data?.currentAppInstallation?.activeSubscriptions ?? [];
+            if (subs.length === 0) return { plan: "free", price: "$0" };
+            const sub = subs[0];
+            const pricing = sub.lineItems?.[0]?.plan?.pricingDetails;
+            const price = pricing?.price ? `$${parseFloat(pricing.price.amount).toFixed(0)}` : "";
+            return { plan: sub.name ?? "paid", price };
+        } catch {
+            return { plan: "unknown", price: "" };
+        }
+    };
+
+    // Fetch all plans in parallel
+    const planResults = await Promise.all(allShopDomains.map(fetchShopPlan));
+    const planMap = new Map<string, { plan: string; price: string }>(
+        allShopDomains.map((shop, i) => [shop, planResults[i]])
+    );
+
     // Build lookup maps
     const settingsMap = new Map<string, any>(allSettings.map((s: any) => [s.shop, s]));
     const rulesMap = new Map<string, number>(rulesAgg.map((r: any) => [r.shop, r._count.id]));
@@ -47,10 +107,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Merge: all sessions + settings (LEFT JOIN)
     const shops = allShopDomains.map((shop) => {
         const s = settingsMap.get(shop);
+        const p = planMap.get(shop) ?? { plan: "unknown", price: "" };
         return {
             shop,
             mode: s?.mode ?? "not_configured",
             hasSettings: !!s,
+            plan: p.plan,
+            price: p.price,
             activeRules: rulesMap.get(shop) ?? 0,
             visitors: usageMap.get(shop)?.totalVisitors ?? 0,
             redirected: usageMap.get(shop)?.redirected ?? 0,
@@ -59,7 +122,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             lastActive: s?.updatedAt?.toISOString() ?? null,
         };
     }).sort((a, b) => {
-        // Sort: shops with settings first, then by lastActive desc
         if (a.hasSettings && !b.hasSettings) return -1;
         if (!a.hasSettings && b.hasSettings) return 1;
         if (a.lastActive && b.lastActive) return b.lastActive.localeCompare(a.lastActive);
@@ -74,6 +136,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 
+
 export default function AdminDashboard() {
     const { shops, totalShops, activeShops, totalVisitors, totalRules, yearMonth } = useLoaderData<typeof loader>();
 
@@ -82,6 +145,12 @@ export default function AdminDashboard() {
         if (mode === "auto_redirect") return "#a78bfa";
         if (mode === "not_configured") return "#f59e0b";
         return "#64748b";
+    };
+    const planColor = (plan: string) => {
+        if (plan === "free" || plan === "$0") return { bg: "rgba(100,116,139,0.15)", border: "rgba(100,116,139,0.3)", color: "#94a3b8" };
+        if (plan === "unknown") return { bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.2)", color: "#f87171" };
+        // Paid plan
+        return { bg: "rgba(74,222,128,0.1)", border: "rgba(74,222,128,0.25)", color: "#4ade80" };
     };
     const formatDate = (iso: string | null) => {
         if (!iso) return "—";
@@ -202,6 +271,12 @@ export default function AdminDashboard() {
                     .dot { width: 6px; height: 6px; border-radius: 50%; }
                     .num { font-weight: 600; }
                     .text-sub { color: #475569; font-size: 12px; }
+                    .plan-badge {
+                        display: inline-flex; align-items: center; gap: 4px;
+                        padding: 2px 8px; border-radius: 4px;
+                        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+                    }
+                    .plan-price { font-size: 10px; opacity: 0.8; }
                 `}</style>
             </head>
             <body>
@@ -254,6 +329,7 @@ export default function AdminDashboard() {
                             <thead>
                                 <tr>
                                     <th>Shop</th>
+                                    <th>Plan</th>
                                     <th>Mode</th>
                                     <th>Rules</th>
                                     <th>Visitors</th>
@@ -271,6 +347,16 @@ export default function AdminDashboard() {
                                             <Link to={`/admin/shops/${encodeURIComponent(s.shop)}`} className="shop-link">
                                                 {s.shop}
                                             </Link>
+                                        </td>
+                                        <td>
+                                            {(() => {
+                                                const pc = planColor(s.plan); return (
+                                                    <span className="plan-badge" style={{ background: pc.bg, border: `1px solid ${pc.border}`, color: pc.color }}>
+                                                        {s.plan === "free" ? "Free" : s.plan}
+                                                        {s.price && <span className="plan-price"> {s.price}</span>}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td>
                                             <span className="mode-badge" style={{
@@ -302,7 +388,7 @@ export default function AdminDashboard() {
                                 ))}
                                 {shops.length === 0 && (
                                     <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", color: "#475569", padding: "48px" }}>
+                                        <td colSpan={10} style={{ textAlign: "center", color: "#475569", padding: "48px" }}>
                                             No shops installed yet.
                                         </td>
                                     </tr>
