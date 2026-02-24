@@ -149,6 +149,22 @@ export default function AdminShopDetail() {
                     .action-chip { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
                     .type-chip { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
                     .empty { text-align: center; color: #475569; padding: 32px; }
+                    .truncate-cell {
+                        max-width: 220px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        cursor: help;
+                        transition: max-width 0.2s ease-in-out;
+                    }
+                    .truncate-cell:hover {
+                        max-width: 600px;
+                        white-space: normal;
+                        word-break: break-all;
+                        background: rgba(255,255,255,0.03);
+                        position: relative;
+                        z-index: 10;
+                    }
                 `}</style>
             </head>
             <body>
@@ -299,7 +315,7 @@ export default function AdminShopDetail() {
                                         <td style={{ color: r.scheduleEnabled ? "#f59e0b" : "#475569" }}>
                                             {r.scheduleEnabled ? "⏰ Enabled" : "—"}
                                         </td>
-                                        <td style={{ color: "#94a3b8", maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                        <td className="truncate-cell" title={r.countryCodes || ""}>
                                             {r.countryCodes || "—"}
                                         </td>
                                         <td style={{ color: "#475569" }}>{r.priority}</td>
@@ -341,7 +357,7 @@ export default function AdminShopDetail() {
                                             }}>{l.action}</span>
                                         </td>
                                         <td style={{ color: "#94a3b8" }}>{l.ruleName || "—"}</td>
-                                        <td style={{ color: "#475569", fontSize: "11px", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                        <td className="truncate-cell" title={l.targetUrl || ""} style={{ color: "#475569", fontSize: "11px" }}>
                                             {l.targetUrl || "—"}
                                         </td>
                                     </tr>
