@@ -5,13 +5,6 @@ import { getCountryFromIP } from "../utils/maxmind.server";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    // Verify App Proxy Signature
-    try {
-        await authenticate.public.appProxy(request);
-    } catch (error) {
-        return json({ error: "Unauthorized: Invalid signature" }, { status: 401 });
-    }
-
     const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
 

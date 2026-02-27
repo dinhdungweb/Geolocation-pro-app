@@ -4,15 +4,20 @@ import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    // 1. Verify App Proxy Signature
-    try {
-        await authenticate.public.appProxy(request);
-    } catch (error) {
-        return json({ error: "Unauthorized: Invalid signature" }, { status: 401 });
+    // CORS headers for storefront requests
+    const corsHeaders = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    // Handle OPTIONS preflight
+    if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     if (request.method !== "POST") {
-        return json({ error: "Method not allowed" }, { status: 405 });
+        return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
     }
 
     try {
@@ -36,7 +41,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const { type, countryCode, ruleId, ruleName, visitorIP } = data;
 
         if (!shop || !type) {
-            return json({ error: "Missing required fields" }, { status: 400 });
+            console.log(`[Analytics] Missing required fields: shop=${shop}, type=${type}`);
+            return json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
         }
 
         // Validate event type against whitelist
