@@ -2,8 +2,13 @@ import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
+import { cleanupOldLogs } from "../utils/cleanup.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    // Lazy cleanup: ensure old logs are deleted even if admin doesn't visit the app
+    // This runs at most once per day due to internal logic in cleanupOldLogs
+    cleanupOldLogs().catch(() => { });
+
     // CORS headers for storefront requests
     const corsHeaders = {
         "Access-Control-Allow-Origin": "*",
