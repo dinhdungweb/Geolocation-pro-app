@@ -13,7 +13,7 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
-  const isTest = true;
+  const isTest = false;
 
   // Check and charge overage on every admin page load
   await checkAndChargeOverage(session.shop, billing, isTest);

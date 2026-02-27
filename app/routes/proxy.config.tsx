@@ -233,8 +233,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
 
         // === PLAN LIMIT CHECK ===
-        const currentPlan = (effectiveSettings as any).currentPlan || FREE_PLAN;
-        const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+        // Only enforce limits when plan is explicitly "free"
+        // If currentPlan is null/empty (not yet synced), allow traffic through
+        const currentPlan = (effectiveSettings as any).currentPlan || null;
+        const planLimit = currentPlan ? (PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN]) : PLAN_LIMITS[FREE_PLAN];
 
         const now = new Date();
         const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
