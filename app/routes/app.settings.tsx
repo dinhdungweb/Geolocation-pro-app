@@ -64,7 +64,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const billingCheck = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: true,
+        isTest: false,
     });
 
     // Explicitly check for active subscription, default to FREE_PLAN if none

@@ -25,7 +25,7 @@ import {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing } = await authenticate.admin(request);
-    const isTest = true;
+    const isTest = false;
 
     // Restore billing check
     const billingCheck = await billing.check({
@@ -44,7 +44,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { billing, session } = await authenticate.admin(request);
     const shop = session.shop;
-    const isTest = true;
+    const isTest = false;
     const formData = await request.formData();
     const selectedPlan = formData.get("plan") as string;
     const currentPlan = formData.get("currentPlan") as string;

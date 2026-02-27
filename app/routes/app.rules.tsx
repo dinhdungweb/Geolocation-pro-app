@@ -103,7 +103,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Check for active subscription
     const billingConfig = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: true,
+        isTest: false,
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 
