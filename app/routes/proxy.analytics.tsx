@@ -45,6 +45,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
         }
 
+        // Verify shop exists to prevent DB pollution
+        const settings = await prisma.settings.findUnique({
+            where: { shop },
+            select: { id: true }
+        });
+
+        if (!settings) {
+            console.log(`[Analytics] Unauthorized: Shop ${shop} is not registered.`);
+            return json({ error: "Unauthorized: Invalid shop" }, { status: 401, headers: corsHeaders });
+        }
+
         // Validate event type against whitelist
         const VALID_TYPES = ['visit', 'popup_shown', 'redirected', 'auto_redirected', 'blocked', 'ip_redirected', 'ip_blocked', 'clicked_no', 'dismissed'];
         if (!VALID_TYPES.includes(type)) {
