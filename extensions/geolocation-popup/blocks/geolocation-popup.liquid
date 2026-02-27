@@ -16,7 +16,7 @@
     shop: '{{ shop.permanent_domain }}',
     // App Proxy URL - Shopify routes /apps/geolocation/* to our app
     proxyUrl: '/apps/geolocation/config',
-    analyticsUrl: '/apps/geolocation/analytics',
+    analyticsUrl: '/apps/geolocation/analytics?shop={{ shop.permanent_domain }}',
     // Country code detected by Shopify (official API, always available)
     visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
   };
