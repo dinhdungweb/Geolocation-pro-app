@@ -85,6 +85,8 @@ model Settings {
   excludeBots     Boolean  @default(true)
   // Loại trừ IP
   excludedIPs     String   @default("") // Danh sách IP được loại trừ
+  // Current billing plan
+  currentPlan     String   @default("free")  // "free" | "premium" | "plus"
   // Cookie duration (days)
   cookieDuration  Int      @default(7)
   createdAt       DateTime @default(now())

@@ -2,13 +2,20 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
+import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    // Verify App Proxy Signature
+    try {
+        await authenticate.public.appProxy(request);
+    } catch (error) {
+        return json({ error: "Unauthorized: Invalid signature" }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
 
     // Get Visitor IP
-    // Shopify passes the real client IP in this header for App Proxy requests
     const visitorIP = request.headers.get("x-shopify-client-ip") ||
         request.headers.get("x-forwarded-for")?.split(',')[0] ||
         "0.0.0.0";
@@ -118,7 +125,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             {
                 enabled: settings.mode !== "disabled",
                 mode: settings.mode,
-                visitorIP,
                 isIPExcluded,
                 popup: {
                     title: settings.popupTitle,

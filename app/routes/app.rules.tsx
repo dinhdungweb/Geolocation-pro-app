@@ -89,22 +89,21 @@ interface RedirectRule {
 
 // Loader: Fetch all rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
     const rules = await prisma.redirectRule.findMany({
         where: {
             shop,
-            matchType: "country", // Only show country rules, not IP rules
+            matchType: "country",
         },
         orderBy: { priority: "desc" },
     });
 
     // Check for active subscription
-    const { billing } = await authenticate.admin(request);
     const billingConfig = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: true,
+        isTest: process.env.NODE_ENV !== "production",
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 
@@ -119,10 +118,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const intent = formData.get("intent") as string;
 
     try {
+        // Validate targetUrl to prevent XSS
+        const validateUrl = (url: string) => {
+            if (!url) return true; // Empty is OK (for block rules)
+            const dangerous = /^(javascript|data|vbscript):/i;
+            if (dangerous.test(url.trim())) return false;
+            return true;
+        };
+
         if (intent === "create") {
             const name = formData.get("name") as string;
             const countryCodes = formData.get("countryCodes") as string;
             const targetUrl = formData.get("targetUrl") as string;
+            if (!validateUrl(targetUrl)) {
+                return json({ success: false, message: "Invalid URL format" }, { status: 400 });
+            }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "redirect";
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
@@ -156,6 +166,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const name = formData.get("name") as string;
             const countryCodes = formData.get("countryCodes") as string;
             const targetUrl = formData.get("targetUrl") as string;
+            if (!validateUrl(targetUrl)) {
+                return json({ success: false, message: "Invalid URL format" }, { status: 400 });
+            }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "redirect";
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
@@ -165,7 +178,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const timezone = formData.get("timezone") as string;
 
             await prisma.redirectRule.update({
-                where: { id },
+                where: { id, shop },
                 data: {
                     name,
                     countryCodes,
@@ -187,7 +200,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const isActive = formData.get("isActive") === "true";
 
             await prisma.redirectRule.update({
-                where: { id },
+                where: { id, shop },
                 data: { isActive: !isActive },
             });
             return json({ success: true, message: "Rule toggled successfully" });
@@ -196,7 +209,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "delete") {
             const ids = (formData.get("ids") as string).split(",");
             await prisma.redirectRule.deleteMany({
-                where: { id: { in: ids } },
+                where: { id: { in: ids }, shop },
             });
             return json({ success: true, message: "Rule(s) deleted successfully" });
         }

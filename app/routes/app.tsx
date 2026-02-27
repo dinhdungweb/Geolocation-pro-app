@@ -6,11 +6,20 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
+import { checkAndChargeOverage } from "../utils/billing.server";
+import { cleanupOldLogs } from "../utils/cleanup.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
+  const isTest = process.env.NODE_ENV !== "production";
+
+  // Check and charge overage on every admin page load
+  await checkAndChargeOverage(session.shop, billing, isTest);
+
+  // Lazy cleanup: delete old visitor logs (fire-and-forget, max 1x/day)
+  cleanupOldLogs().catch(() => { });
 
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };

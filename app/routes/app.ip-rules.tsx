@@ -40,24 +40,22 @@ interface IPRule {
 
 // Loader: Fetch all IP rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
     const rules = await prisma.redirectRule.findMany({
         where: {
             shop,
-            matchType: "ip", // Only fetch IP rules
+            matchType: "ip",
         },
         orderBy: { priority: "desc" },
     });
 
     // Check for active subscription (IP Rules is a Pro feature)
-    const { billing } = await authenticate.admin(request);
     const billingConfig = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: true,
+        isTest: process.env.NODE_ENV !== "production",
     });
-    // Fallback: Sometimes hasActivePayment is false in test mode even if subscription exists
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 
     // Free plan: Allow 1 IP rule max
@@ -74,10 +72,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const intent = formData.get("intent") as string;
 
     try {
+        // Validate targetUrl to prevent XSS
+        const validateUrl = (url: string) => {
+            if (!url) return true;
+            const dangerous = /^(javascript|data|vbscript):/i;
+            if (dangerous.test(url.trim())) return false;
+            return true;
+        };
+
         if (intent === "create") {
             const name = formData.get("name") as string;
             const ipAddresses = formData.get("ipAddresses") as string;
             const targetUrl = formData.get("targetUrl") as string || "";
+            if (!validateUrl(targetUrl)) {
+                return json({ success: false, message: "Invalid URL format" }, { status: 400 });
+            }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "block";
 
@@ -86,8 +95,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     shop,
                     name,
                     ipAddresses,
-                    matchType: "ip", // Mark as IP rule
-                    countryCodes: "", // Empty for IP rules
+                    matchType: "ip",
+                    countryCodes: "",
                     targetUrl,
                     priority,
                     isActive: true,
@@ -102,11 +111,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const name = formData.get("name") as string;
             const ipAddresses = formData.get("ipAddresses") as string;
             const targetUrl = formData.get("targetUrl") as string || "";
+            if (!validateUrl(targetUrl)) {
+                return json({ success: false, message: "Invalid URL format" }, { status: 400 });
+            }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "block";
 
             await prisma.redirectRule.update({
-                where: { id },
+                where: { id, shop },
                 data: {
                     name,
                     ipAddresses,
@@ -123,7 +135,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const isActive = formData.get("isActive") === "true";
 
             await prisma.redirectRule.update({
-                where: { id },
+                where: { id, shop },
                 data: { isActive: !isActive },
             });
             return json({ success: true, message: "IP Rule toggled successfully" });
@@ -132,7 +144,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "delete") {
             const ids = (formData.get("ids") as string).split(",");
             await prisma.redirectRule.deleteMany({
-                where: { id: { in: ids } },
+                where: { id: { in: ids }, shop },
             });
             return json({ success: true, message: "IP Rule(s) deleted successfully" });
         }

@@ -39,6 +39,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        // Validate event type against whitelist
+        const VALID_TYPES = ['visit', 'popup_shown', 'redirected', 'auto_redirected', 'blocked', 'ip_redirected', 'ip_blocked', 'clicked_no', 'dismissed'];
+        if (!VALID_TYPES.includes(type)) {
+            return json({ error: "Invalid event type" }, { status: 400 });
+        }
+
         // 0. Save Detailed Visitor Log
         if (visitorIP) {
             const userAgent = request.headers.get("user-agent") || "Unknown";

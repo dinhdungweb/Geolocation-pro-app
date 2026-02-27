@@ -13,12 +13,14 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 import {
     FREE_PLAN,
     PREMIUM_PLAN,
     PLUS_PLAN,
     ALL_PAID_PLANS,
     PLAN_LIMITS,
+    OVERAGE_RATE,
 } from "../billing.config";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -40,7 +42,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { billing } = await authenticate.admin(request);
+    const { billing, session } = await authenticate.admin(request);
+    const shop = session.shop;
     const isTest = process.env.NODE_ENV !== "production";
     const formData = await request.formData();
     const selectedPlan = formData.get("plan") as string;
@@ -57,17 +60,71 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             const subscription = billingCheck.appSubscriptions[0];
             if (subscription) {
+                // Bug #1 fix: Charge remaining overage BEFORE cancelling subscription
+                const activePlan = subscription.name || currentPlan;
+                const planLimit = PLAN_LIMITS[activePlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+                const now = new Date();
+                const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+                    where: { shop_yearMonth: { shop, yearMonth } },
+                });
+
+                if (monthlyUsage) {
+                    const overageVisitors = monthlyUsage.totalVisitors - planLimit - monthlyUsage.chargedVisitors;
+                    if (overageVisitors > 0) {
+                        const chargeAmount = overageVisitors * OVERAGE_RATE;
+                        try {
+                            await billing.createUsageRecord({
+                                description: `Final overage before downgrade: ${overageVisitors} visitors beyond ${planLimit} limit`,
+                                price: { amount: chargeAmount, currencyCode: "USD" },
+                                isTest,
+                            });
+                            await (prisma as any).monthlyUsage.update({
+                                where: { shop_yearMonth: { shop, yearMonth } },
+                                data: { chargedVisitors: { increment: overageVisitors } },
+                            });
+                            console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
+                        } catch (error) {
+                            console.error("[Billing] Failed to charge final overage:", error);
+                        }
+                    }
+                }
+
+                // Now cancel the subscription
                 await billing.cancel({
                     subscriptionId: subscription.id,
                     isTest,
                     prorate: true,
                 });
             }
+
+            // Sync currentPlan to Settings for proxy limit check
+            try {
+                await (prisma as any).settings.upsert({
+                    where: { shop },
+                    update: { currentPlan: FREE_PLAN },
+                    create: { shop, currentPlan: FREE_PLAN },
+                });
+            } catch (err) {
+                console.error("[Settings] Failed to sync currentPlan:", err);
+            }
+
             return null;
         }
 
         // Handling Paid Plans
         if (ALL_PAID_PLANS.includes(selectedPlan)) {
+            // Sync currentPlan to Settings for proxy limit check
+            try {
+                await (prisma as any).settings.upsert({
+                    where: { shop },
+                    update: { currentPlan: selectedPlan },
+                    create: { shop, currentPlan: selectedPlan },
+                });
+            } catch (err) {
+                console.error("[Settings] Failed to sync currentPlan:", err);
+            }
+
             await billing.require({
                 plans: [selectedPlan] as any,
                 isTest,

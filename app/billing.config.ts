@@ -15,7 +15,5 @@ export const PLAN_LIMITS = {
 
 // Overage pricing: $100 per 50,000 visitors = $0.002 per visitor
 export const OVERAGE_RATE = 100 / 50000; // $0.002 per visitor
-export const OVERAGE_BLOCK_SIZE = 1000; // Charge per 1000 visitors block  
-export const OVERAGE_BLOCK_PRICE = OVERAGE_RATE * OVERAGE_BLOCK_SIZE; // ~$1.67 per 1000 visitors
 
 export type PlanName = typeof ALL_PLANS[number];

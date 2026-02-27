@@ -3,6 +3,7 @@ import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
+import { PLAN_LIMITS, FREE_PLAN } from "../billing.config";
 
 /**
  * App Proxy endpoint for geolocation config
@@ -88,7 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     try {
         // Fetch settings for the shop
-        const settings = await prisma.settings.findUnique({
+        const settings = await (prisma as any).settings.findUnique({
             where: { shop },
             select: {
                 mode: true,
@@ -105,6 +106,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 blockedTitle: true,
                 blockedMessage: true,
                 template: true,
+                currentPlan: true,
             },
         });
 
@@ -216,7 +218,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
 
         // If no settings found, auto-create default settings so app works immediately
-        const effectiveSettings = settings ?? await prisma.settings.create({
+        const effectiveSettings = settings ?? await (prisma as any).settings.create({
             data: { shop },
             select: {
                 mode: true,
@@ -225,13 +227,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 popupBgColor: true, popupTextColor: true, popupBtnColor: true,
                 excludeBots: true, excludedIPs: true, cookieDuration: true,
                 blockedTitle: true, blockedMessage: true, template: true,
+                currentPlan: true,
             },
         });
         console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
 
+        // === PLAN LIMIT CHECK ===
+        const currentPlan = (effectiveSettings as any).currentPlan || FREE_PLAN;
+        const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+
+        const now = new Date();
+        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+            where: {
+                shop_yearMonth: { shop, yearMonth },
+            },
+        });
+        const currentUsage = monthlyUsage?.totalVisitors || 0;
+
+        if (currentPlan === FREE_PLAN && currentUsage >= planLimit) {
+            console.log(`[Proxy] Free plan limit exceeded for ${shop}: ${currentUsage}/${planLimit}`);
+            return json({
+                enabled: false,
+                limitExceeded: true,
+                currentUsage,
+                planLimit,
+                currentPlan,
+                message: `Monthly usage limit reached (${currentUsage}/${planLimit}). Please upgrade your plan.`,
+            }, { headers });
+        }
+
         // Check if visitor IP is in excluded list
         const excludedIPsList = effectiveSettings.excludedIPs
-            ? effectiveSettings.excludedIPs.split(",").map(ip => ip.trim())
+            ? effectiveSettings.excludedIPs.split(",").map((ip: string) => ip.trim())
             : [];
         const isIPExcluded = excludedIPsList.includes(visitorIP);
 
@@ -281,7 +309,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ipRules: transformedIPRules, // IP rules
         };
 
-        console.log(`[Proxy] Config for ${shop}, visitorIP: ${visitorIP}:`, response);
+        console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);
 
         return json(response, { headers });
     } catch (error) {

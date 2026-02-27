@@ -26,6 +26,13 @@
   const DEBUG = urlParams.get('debug') === 'true';
   const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
 
+  // Escape HTML to prevent XSS
+  const escapeHtml = (str) => {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  };
+
   // Cookie utilities
   const CookieManager = {
     set(name, value, days) {
@@ -239,12 +246,12 @@
     log('Showing popup for', countryName, '->', targetName, 'Template:', template);
 
     // Default values
-    const title = popup.title || 'Redirect Available';
-    const message = (popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
+    const title = escapeHtml(popup.title || 'Redirect Available');
+    const message = escapeHtml((popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
       .replace('{country}', countryName)
-      .replace('{target}', targetName);
-    const confirmBtn = popup.confirmBtn || 'Go now';
-    const cancelBtn = popup.cancelBtn || 'Stay here';
+      .replace('{target}', targetName));
+    const confirmBtn = escapeHtml(popup.confirmBtn || 'Go now');
+    const cancelBtn = escapeHtml(popup.cancelBtn || 'Stay here');
     const bgColor = popup.bgColor || '#ffffff';
     const textColor = popup.textColor || '#333333';
     const btnColor = popup.btnColor || '#007bff';
@@ -366,8 +373,8 @@
   // Create and show Block Screen
   const showBlockScreen = (config, rule, countryCode) => {
     const blockedSettings = config.blocked || {};
-    const title = blockedSettings.title || 'Access Denied';
-    const message = blockedSettings.message || 'We do not offer services in your country/region.';
+    const title = escapeHtml(blockedSettings.title || 'Access Denied');
+    const message = escapeHtml(blockedSettings.message || 'We do not offer services in your country/region.');
 
     // Create blocking overlay
     const overlay = document.createElement('div');

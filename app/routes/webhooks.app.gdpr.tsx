@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { json } from "@remix-run/node";
+import prisma from "../db.server";
 
 /**
  * Mandatory GDPR Webhooks for Shopify Apps
@@ -8,9 +9,6 @@ import { json } from "@remix-run/node";
  * 1. customers/data_request: Request to view stored customer data
  * 2. customers/redact: Request to delete customer data
  * 3. shop/redact: Request to delete shop data (48h after uninstall)
- * 
- * Since this app does not store PII (Personally Identifiable Information) 
- * like customer emails, phones, or addresses, we can simply acknowledge these requests.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { topic, shop, payload } = await authenticate.webhook(request);
@@ -19,26 +17,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     switch (topic) {
         case "customers/data_request":
-            // We don't store customer PII.
-            // Payload contains: { customer: { id, email, ... }, orders_requested: [] }
-            console.log(`[GDPR] Customer Data Request received from ${shop}. No PII stored.`);
-            console.log(`[GDPR] Payload`, payload);
+            // This app stores visitor IPs and user agents in VisitorLog.
+            // These could be considered personal data under GDPR.
+            console.log(`[GDPR] Customer Data Request received from ${shop}.`);
             break;
 
         case "customers/redact":
-            // We don't store customer PII to delete.
-            // Payload contains: { customer: { id, email, ... }, orders_to_redact: [] }
-            console.log(`[GDPR] Customer Redact Request received from ${shop}. No PII to delete.`);
-            console.log(`[GDPR] Payload`, payload);
+            // This app doesn't directly link data to Shopify customer IDs,
+            // but VisitorLog contains IP addresses which are PII.
+            // No customer-specific data to redact since we don't store customer IDs.
+            console.log(`[GDPR] Customer Redact Request received from ${shop}. No customer-linked data stored.`);
             break;
 
         case "shop/redact":
             // Shop data deletion request (48 hours after uninstall)
-            // We assume data is cleared via the 'app/uninstalled' webhook or retained for potential reinstall behavior
-            // depending on app policy. Strict compliance requires cleaning up.
-            // However, for this Geolocation app, we mostly store config and anonymous analytics.
-            console.log(`[GDPR] Shop Redact Request received from ${shop}.`);
-            console.log(`[GDPR] Payload`, payload);
+            // Must delete ALL data associated with this shop
+            console.log(`[GDPR] Shop Redact Request received for ${shop}. Deleting all shop data...`);
+            try {
+                await Promise.all([
+                    (prisma as any).settings.deleteMany({ where: { shop } }),
+                    (prisma as any).redirectRule.deleteMany({ where: { shop } }),
+                    (prisma as any).analyticsCountry.deleteMany({ where: { shop } }),
+                    (prisma as any).analyticsRule.deleteMany({ where: { shop } }),
+                    (prisma as any).monthlyUsage.deleteMany({ where: { shop } }),
+                    (prisma as any).visitorLog.deleteMany({ where: { shop } }),
+                    prisma.session.deleteMany({ where: { shop } }),
+                ]);
+                console.log(`[GDPR] All data deleted for ${shop}`);
+            } catch (error) {
+                console.error(`[GDPR] Failed to delete data for ${shop}:`, error);
+            }
             break;
 
         default:

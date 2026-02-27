@@ -20,7 +20,8 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN, OVERAGE_RATE } from "../billing.config";
+import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN } from "../billing.config";
+import { checkAndChargeOverage } from "../utils/billing.server";
 import prisma from "../db.server";
 import { COUNTRY_MAP, getCountryFlag } from "../utils/countries";
 
@@ -56,7 +57,7 @@ interface BannersDataItem {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
 
   // Basic stats that are always available
@@ -71,14 +72,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   ]);
 
   // Check for active subscription
-  const { billing } = await authenticate.admin(request);
+  const isTest = process.env.NODE_ENV !== "production";
   const billingConfig = await billing.check({
     plans: ALL_PAID_PLANS as any,
-    isTest: true,
+    isTest,
   });
   const hasProPlan = billingConfig.hasActivePayment;
   const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
   const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+
+  // Sync currentPlan to Settings (ensure proxy.config can check plan limits)
+  try {
+    await (prisma as any).settings.upsert({
+      where: { shop },
+      update: { currentPlan },
+      create: { shop, currentPlan },
+    });
+  } catch (error) {
+    console.error("[Settings] Failed to sync currentPlan:", error);
+  }
 
   // Get current month usage
   const now = new Date();
@@ -95,51 +107,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
   // Calculate and charge overage if applicable (only for paid plans)
-  if (hasProPlan && currentUsage > planLimit) {
-    // DOUBLE CHECK: Fetch latest usage from DB to ensure no race condition
-    const latestUsageResult = await (prisma as any).monthlyUsage.findUnique({
-      where: { shop_yearMonth: { shop, yearMonth } },
-    });
+  await checkAndChargeOverage(shop, billing, isTest);
 
-    // Use latest data or fallback to current (if findUnique fails which is unlikely)
-    const latestTotal = latestUsageResult?.totalVisitors || currentUsage;
-    const latestCharged = latestUsageResult?.chargedVisitors || chargedVisitors;
-    const overageVisitors = latestTotal - planLimit - latestCharged;
-
-    if (overageVisitors > 0) {
-      // Calculate charge amount ($0.002 per visitor)
-      const chargeAmount = overageVisitors * OVERAGE_RATE;
-
-      try {
-        // Create usage record in Shopify
-        await billing.createUsageRecord({
-          description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
-          price: {
-            amount: chargeAmount,
-            currencyCode: "USD",
-          },
-          isTest: true,
-        });
-
-        // Update chargedVisitors to prevent double charging
-        await (prisma as any).monthlyUsage.update({
-          where: {
-            shop_yearMonth: {
-              shop,
-              yearMonth,
-            },
-          },
-          data: {
-            chargedVisitors: { increment: overageVisitors },
-          },
-        });
-
-        console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
-      } catch (error) {
-        console.error("[Billing] Failed to create usage record:", error);
-      }
-    }
-  }
 
 
 
