@@ -72,7 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   ]);
 
   // Check for active subscription
-  const isTest = process.env.NODE_ENV !== "production";
+  const isTest = true;
   const billingConfig = await billing.check({
     plans: ALL_PAID_PLANS as any,
     isTest,
