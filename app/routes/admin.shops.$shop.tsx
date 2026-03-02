@@ -36,14 +36,26 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }),
     ]);
 
+    const currentPlan = settings?.currentPlan || "FREE_PLAN";
+    const hasProPlan = currentPlan !== "FREE_PLAN";
+
     const totalVisitors = monthlyUsage.reduce((s: number, u: any) => s + u.totalVisitors, 0);
     const totalRedirected = monthlyUsage.reduce((s: number, u: any) => s + u.redirected, 0);
     const totalBlocked = monthlyUsage.reduce((s: number, u: any) => s + u.blocked, 0);
-    const activeRules = rules.filter((r: any) => r.isActive).length;
+
+    const effectiveActiveRules = rules.filter((r: any) => {
+        if (!r.isActive) return false;
+        if (!hasProPlan) {
+            if (r.matchType === "ip") return false;
+            if (r.ruleType === "block") return false;
+        }
+        return true;
+    }).length;
 
     return json({
         shop,
         hasSettings: !!settings,
+        hasProPlan,
         settings: settings ? {
             mode: settings.mode,
             template: settings.template,
@@ -55,12 +67,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         rules: rules.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
         logs: logs.map((l: any) => ({ ...l, timestamp: l.timestamp.toISOString() })),
         monthlyUsage,
-        stats: { totalVisitors, totalRedirected, totalBlocked, activeRules, totalRules: rules.length },
+        stats: { totalVisitors, totalRedirected, totalBlocked, activeRules: effectiveActiveRules, totalRules: rules.length },
     });
 };
 
 export default function AdminShopDetail() {
-    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats } = useLoaderData<typeof loader>();
+    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan } = useLoaderData<typeof loader>();
 
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString("en-GB", {
@@ -334,9 +346,15 @@ export default function AdminShopDetail() {
                                             }}>{r.ruleType}</span>
                                         </td>
                                         <td>
-                                            <span style={{ color: r.isActive ? "#4ade80" : "#475569", fontSize: "12px" }}>
-                                                {r.isActive ? "● Active" : "○ Inactive"}
-                                            </span>
+                                            {r.isActive && !hasProPlan && (r.matchType === "ip" || r.ruleType === "block") ? (
+                                                <span style={{ color: "#f59e0b", fontSize: "12px" }}>
+                                                    ⚠ Disabled (Free Plan)
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: r.isActive ? "#4ade80" : "#475569", fontSize: "12px" }}>
+                                                    {r.isActive ? "● Active" : "○ Inactive"}
+                                                </span>
+                                            )}
                                         </td>
                                         <td style={{ color: r.scheduleEnabled ? "#f59e0b" : "#475569" }}>
                                             {r.scheduleEnabled ? "⏰ Enabled" : "—"}
