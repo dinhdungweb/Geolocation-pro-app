@@ -265,8 +265,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             : [];
         const isIPExcluded = excludedIPsList.includes(visitorIP);
 
+        // Filter country rules based on plan (Block Access is Pro)
+        const countryRulesToServe = (currentPlan === FREE_PLAN)
+            ? activeCountryRules.filter(r => r.ruleType !== 'block')
+            : activeCountryRules;
+
+        // Filter IP rules based on plan (IP Rules is Pro)
+        const ipRulesToServe = (currentPlan === FREE_PLAN)
+            ? [] // No IP rules for free plan
+            : ipRulesRaw;
+
         // Transform country rules to a simpler format for frontend
-        const transformedCountryRules = activeCountryRules.map((rule) => ({
+        const transformedCountryRules = countryRulesToServe.map((rule) => ({
             ruleId: rule.id,
             name: rule.name,
             countries: rule.countryCodes.split(",").map((c) => c.trim().toUpperCase()),
@@ -276,7 +286,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }));
 
         // Transform IP rules for frontend
-        const transformedIPRules = ipRulesRaw.map((rule) => ({
+        const transformedIPRules = ipRulesToServe.map((rule) => ({
             ruleId: rule.id,
             name: rule.name,
             ips: rule.ipAddresses.split(",").map((ip) => ip.trim()),

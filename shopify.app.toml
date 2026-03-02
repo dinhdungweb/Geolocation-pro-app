@@ -20,6 +20,10 @@ api_version = "2026-04"
   uri = "https://geopro.bluepeaks.top/webhooks/app/uninstalled"
 
   [[webhooks.subscriptions]]
+  topics = [ "app/subscriptions_update" ]
+  uri = "https://geopro.bluepeaks.top/webhooks/app/subscriptions.update"
+
+  [[webhooks.subscriptions]]
   compliance_topics = [ "customers/data_request" ]
   uri = "https://geopro.bluepeaks.top/webhooks/app/gdpr"
 
