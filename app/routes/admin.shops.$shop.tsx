@@ -43,6 +43,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const totalVisitors = monthlyUsage.reduce((s: number, u: any) => s + u.totalVisitors, 0);
     const totalRedirected = monthlyUsage.reduce((s: number, u: any) => s + u.redirected, 0);
     const totalBlocked = monthlyUsage.reduce((s: number, u: any) => s + u.blocked, 0);
+    const totalPopups = monthlyUsage.reduce((s: number, u: any) => s + (u.popupShown || 0), 0);
 
     const effectiveActiveRules = rules.filter((r: any) => {
         if (!r.isActive) return false;
@@ -68,7 +69,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         rules: rules.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
         logs: logs.map((l: any) => ({ ...l, timestamp: l.timestamp.toISOString() })),
         monthlyUsage,
-        stats: { totalVisitors, totalRedirected, totalBlocked, activeRules: effectiveActiveRules, totalRules: rules.length },
+        stats: { totalVisitors, totalRedirected, totalBlocked, totalPopups, activeRules: effectiveActiveRules, totalRules: rules.length },
     });
 };
 
@@ -306,6 +307,7 @@ export default function AdminShopDetail() {
                                             <div key={u.yearMonth} className="month-card">
                                                 <div className="month-label">{u.yearMonth}</div>
                                                 <div className="month-val">{u.totalVisitors.toLocaleString()}</div>
+                                                <div className="month-sub">✨ {u.popupShown?.toLocaleString() || 0} popups</div>
                                                 <div className="month-sub">↗ {u.redirected.toLocaleString()} redirected</div>
                                                 <div className="month-sub">🚫 {u.blocked.toLocaleString()} blocked</div>
                                             </div>

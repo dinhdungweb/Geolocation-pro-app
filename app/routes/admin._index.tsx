@@ -38,7 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }),
         (prisma as any).monthlyUsage.findMany({
             where: { yearMonth },
-            select: { shop: true, totalVisitors: true, redirected: true, blocked: true },
+            select: { shop: true, totalVisitors: true, redirected: true, blocked: true, popupShown: true },
         }),
         prisma.redirectRule.count({ where: { isActive: true } }),
     ]);
@@ -116,6 +116,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             price: p.price,
             activeRules: rulesMap.get(shop) ?? 0,
             visitors: usageMap.get(shop)?.totalVisitors ?? 0,
+            popups: usageMap.get(shop)?.popupShown ?? 0,
             redirected: usageMap.get(shop)?.redirected ?? 0,
             blocked: usageMap.get(shop)?.blocked ?? 0,
             installedAt: s?.createdAt?.toISOString() ?? null,
@@ -335,6 +336,7 @@ export default function AdminDashboard() {
                                     <th>Mode</th>
                                     <th>Rules</th>
                                     <th>Visitors</th>
+                                    <th>Popups</th>
                                     <th>Redirected</th>
                                     <th>Blocked</th>
                                     <th>Installed</th>
@@ -372,6 +374,7 @@ export default function AdminDashboard() {
                                         </td>
                                         <td><span className="num">{s.activeRules}</span></td>
                                         <td><span className="num">{s.visitors.toLocaleString()}</span></td>
+                                        <td><span className="num" style={{ color: "#22d3ee" }}>{s.popups.toLocaleString()}</span></td>
                                         <td><span className="num" style={{ color: "#a78bfa" }}>{s.redirected.toLocaleString()}</span></td>
                                         <td><span className="num" style={{ color: "#f87171" }}>{s.blocked.toLocaleString()}</span></td>
                                         <td><span className="text-sub">{formatDate(s.installedAt)}</span></td>

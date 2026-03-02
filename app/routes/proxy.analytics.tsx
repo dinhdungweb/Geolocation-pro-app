@@ -172,9 +172,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         }
 
-        // 3. Update Monthly Usage (for billing - only count redirected + blocked)
+        // 3. Update Monthly Usage (for billing - count redirected + blocked + popup_shown)
         if (type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
-            type === 'ip_redirected' || type === 'ip_blocked') {
+            type === 'ip_redirected' || type === 'ip_blocked' || type === 'popup_shown') {
             const now = new Date();
             const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -187,6 +187,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             if (type === 'blocked' || type === 'ip_blocked') {
                 usageUpdateData.blocked = { increment: 1 };
+            }
+            if (type === 'popup_shown') {
+                usageUpdateData.popupShown = { increment: 1 };
             }
 
             await (prisma as any).monthlyUsage.upsert({
@@ -203,6 +206,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     totalVisitors: 1,
                     redirected: (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
                     blocked: (type === 'blocked' || type === 'ip_blocked') ? 1 : 0,
+                    popupShown: type === 'popup_shown' ? 1 : 0,
                 },
             });
         }

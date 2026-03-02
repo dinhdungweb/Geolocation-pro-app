@@ -135,9 +135,10 @@ model MonthlyUsage {
   id              String   @id @default(uuid())
   shop            String
   yearMonth       String   // "2026-01" format
-  totalVisitors   Int      @default(0)  // Total affected = redirected + blocked
+  totalVisitors   Int      @default(0)  // Total affected = redirected + blocked + popupShown
   redirected      Int      @default(0)  // Visitors redirected
   blocked         Int      @default(0)  // Visitors blocked
+  popupShown      Int      @default(0)  // Visitors seen popup
   chargedVisitors Int      @default(0)  // Visitors already charged for overage
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

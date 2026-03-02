@@ -338,7 +338,7 @@ export default function Index() {
             <BlockStack gap="200">
               <InlineStack align="space-between">
                 <Text as="p" variant="bodySm">
-                  <strong>{currentUsage.toLocaleString()}</strong> / {planLimit.toLocaleString()} visitors
+                  <strong>{currentUsage.toLocaleString()}</strong> / {planLimit.toLocaleString()} visitors (includes redirects, blocks & popups)
                 </Text>
                 <Text as="p" variant="bodySm" tone={isOverLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
                   {usagePercent}%
