@@ -1,14 +1,16 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-async function listShops() {
-    const settings = await prisma.settings.findMany({
-        select: { shop: true, currentPlan: true }
-    });
-    console.log("All shops in settings table:");
-    settings.forEach(s => {
-        console.log(`- Shop: ${s.shop}, Plan: ${s.currentPlan}`);
-    });
+async function checkUsage() {
+    console.log("Checking MonthlyUsage table...");
+    try {
+        const usage = await (prisma as any).monthlyUsage.findMany({
+            take: 1
+        });
+        console.log("MonthlyUsage data:", JSON.stringify(usage, null, 2));
+    } catch (error: any) {
+        console.error("Error querying MonthlyUsage:", error.message);
+    }
 }
 
-listShops().finally(() => prisma.$disconnect());
+checkUsage().finally(() => prisma.$disconnect());

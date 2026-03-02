@@ -172,15 +172,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         }
 
-        // 3. Update Monthly Usage (for billing - count redirected + blocked + popup_shown)
+        // 3. Update Monthly Usage (for billing and statistics)
         if (type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
             type === 'ip_redirected' || type === 'ip_blocked' || type === 'popup_shown') {
             const now = new Date();
             const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-            const usageUpdateData: any = {
-                totalVisitors: { increment: 1 },
-            };
+            const usageUpdateData: any = {};
+
+            // Deduplication: 'redirected' (click) is preceded by 'popup_shown', so we don't count it as a NEW billable visitor
+            if (type !== 'redirected') {
+                usageUpdateData.totalVisitors = { increment: 1 };
+            }
 
             if (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') {
                 usageUpdateData.redirected = { increment: 1 };
@@ -203,7 +206,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 create: {
                     shop,
                     yearMonth,
-                    totalVisitors: 1,
+                    totalVisitors: (type !== 'redirected') ? 1 : 0,
                     redirected: (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
                     blocked: (type === 'blocked' || type === 'ip_blocked') ? 1 : 0,
                     popupShown: type === 'popup_shown' ? 1 : 0,
