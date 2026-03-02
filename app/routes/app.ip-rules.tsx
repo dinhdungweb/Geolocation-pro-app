@@ -314,9 +314,24 @@ export default function IPRulesPage() {
                         <Button size="slim" onClick={() => handleOpenModal(rule)}>
                             Edit
                         </Button>
-                        <Button size="slim" onClick={() => handleToggle(rule)}>
-                            {rule.isActive ? "Disable" : "Enable"}
-                        </Button>
+                        {rule.isActive ? (
+                            <Button size="slim" onClick={() => handleToggle(rule)}>
+                                Disable
+                            </Button>
+                        ) : (
+                            <Button
+                                size="slim"
+                                onClick={() => {
+                                    if (!hasProPlan) {
+                                        setShowUpgradeModal(true);
+                                    } else {
+                                        handleToggle(rule);
+                                    }
+                                }}
+                            >
+                                Enable
+                            </Button>
+                        )}
                     </InlineStack>
                 </div>
             </IndexTable.Cell>

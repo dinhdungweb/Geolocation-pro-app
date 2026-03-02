@@ -463,9 +463,25 @@ export default function RulesPage() {
                         <Button size="slim" onClick={() => handleOpenModal(rule)}>
                             Edit
                         </Button>
-                        <Button size="slim" onClick={() => handleToggle(rule)}>
-                            {rule.isActive ? "Disable" : "Enable"}
-                        </Button>
+                        {rule.isActive ? (
+                            <Button size="slim" onClick={() => handleToggle(rule)}>
+                                Disable
+                            </Button>
+                        ) : (
+                            <Button
+                                size="slim"
+                                onClick={() => {
+                                    if (rule.ruleType === "block" && !hasProPlan) {
+                                        // Show upgrade modal instead of enabling
+                                        setShowUpgradeModal(true);
+                                    } else {
+                                        handleToggle(rule);
+                                    }
+                                }}
+                            >
+                                Enable
+                            </Button>
+                        )}
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
