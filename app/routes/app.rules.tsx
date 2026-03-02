@@ -448,9 +448,13 @@ export default function RulesPage() {
                 </Text>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <Badge tone={rule.isActive ? "success" : "critical"}>
-                    {rule.isActive ? "Active" : "Inactive"}
-                </Badge>
+                {rule.isActive && rule.ruleType === "block" && !hasProPlan ? (
+                    <Badge tone="warning">Disabled (Free Plan)</Badge>
+                ) : (
+                    <Badge tone={rule.isActive ? "success" : "critical"}>
+                        {rule.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                )}
             </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
             <IndexTable.Cell>
