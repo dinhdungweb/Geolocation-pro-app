@@ -1,13 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -33,132 +27,112 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
-// Geolocation App: Luật chuyển hướng theo quốc gia hoặc IP
 model RedirectRule {
-  id           String   @id @default(uuid())
-  shop         String   // Shop domain
-  name         String   // Tên rule (ví dụ: "Vietnam Redirect" hoặc "Block Spam IPs")
-  countryCodes String   @default("") // Mã quốc gia, phân tách bằng dấu phẩy (VN,TH,SG)
-  ipAddresses  String   @default("") // Danh sách IP hoặc CIDR, phân tách bằng dấu phẩy (1.2.3.4, 10.0.0.0/24)
-  matchType    String   @default("country") // "country" | "ip" - loại điều kiện match
-  targetUrl    String   @default("") // URL để chuyển hướng (để trống nếu block)
-  isActive     Boolean  @default(true)
-  priority     Int      @default(0) // Priority cao hơn = ưu tiên hơn
-  ruleType     String   @default("redirect") // "redirect" or "block"
-  
-  // Scheduling
-  scheduleEnabled Boolean @default(false)
-  startTime      String?  // "09:00"
-  endTime        String?  // "17:00"
-  daysOfWeek     String?  // "1,2,3,4,5" (Mon-Fri)
-  timezone       String?  // "Asia/Ho_Chi_Minh" (default to shop timezone if null)
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
+  id              String   @id @default(uuid())
+  shop            String
+  name            String
+  countryCodes    String   @default("")
+  targetUrl       String   @default("")
+  isActive        Boolean  @default(true)
+  priority        Int      @default(0)
+  ruleType        String   @default("redirect")
+  scheduleEnabled Boolean  @default(false)
+  startTime       String?
+  endTime         String?
+  daysOfWeek      String?
+  timezone        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  ipAddresses     String   @default("")
+  matchType       String   @default("country")
 
   @@index([shop])
   @@index([shop, matchType])
 }
 
-// Geolocation App: Cấu hình chung
 model Settings {
-  id              String   @id @default(uuid())
-  shop            String   @unique // Mỗi shop có 1 bản settings
-  // Chế độ hoạt động
-  mode            String   @default("popup") // "popup" | "auto_redirect" | "disabled"
-  template        String   @default("modal") // "modal" | "top_bar" | "bottom_bar"
-  // Cấu hình popup
-  popupTitle      String   @default("Would you like to switch to a local version?")
-  popupMessage    String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
-  confirmBtnText  String   @default("Go now")
-  cancelBtnText   String   @default("Stay here")
-  popupBgColor    String   @default("#ffffff")
-  popupTextColor  String   @default("#333333")
-  popupBtnColor   String   @default("#007bff")
-  
-  // Blocking Settings
-  blockedTitle    String   @default("Access Denied")
-  blockedMessage  String   @default("We do not offer services in your country/region.")
-
-  // SEO: Bot Exclusion
-  excludeBots     Boolean  @default(true)
-  // Loại trừ IP
-  excludedIPs     String   @default("") // Danh sách IP được loại trừ
-  // Current billing plan
-  currentPlan     String   @default("free")  // "free" | "premium" | "plus"
-  // Cookie duration (days)
-  cookieDuration  Int      @default(7)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  shop           String   @unique
+  mode           String   @default("popup")
+  template       String   @default("modal")
+  popupTitle     String   @default("Would you like to switch to a local version?")
+  popupMessage   String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
+  confirmBtnText String   @default("Go now")
+  cancelBtnText  String   @default("Stay here")
+  popupBgColor   String   @default("#ffffff")
+  popupTextColor String   @default("#333333")
+  popupBtnColor  String   @default("#007bff")
+  blockedTitle   String   @default("Access Denied")
+  blockedMessage String   @default("We do not offer services in your country/region.")
+  excludeBots    Boolean  @default(true)
+  excludedIPs    String   @default("")
+  cookieDuration Int      @default(7)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  currentPlan    String   @default("free")
 }
 
-
-// Analytics: Thống kê theo quốc gia (hàng ngày)
 model AnalyticsCountry {
-  id           String   @id @default(uuid())
-  shop         String
-  date         DateTime // Ngày ghi nhận số liệu (đã bỏ phần time)
-  countryCode  String
-  visitors     Int      @default(0)
-  popupShown   Int      @default(0)
-  redirected   Int      @default(0)
-  blocked      Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  shop        String
+  date        DateTime
+  countryCode String
+  visitors    Int      @default(0)
+  popupShown  Int      @default(0)
+  redirected  Int      @default(0)
+  blocked     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([shop, date, countryCode])
   @@index([shop, date])
 }
 
-// Analytics: Thống kê theo Rule (hàng ngày)
 model AnalyticsRule {
-  id           String   @id @default(uuid())
-  shop         String
-  date         DateTime
-  ruleId       String
-  ruleName     String   // Lưu lại tên rule tại thời điểm đó
+  id             String   @id @default(uuid())
+  shop           String
+  date           DateTime
+  ruleId         String
+  ruleName       String
   seen           Int      @default(0)
   clickedYes     Int      @default(0)
   clickedNo      Int      @default(0)
   dismissed      Int      @default(0)
   autoRedirected Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([shop, date, ruleId])
   @@index([shop, date])
 }
 
-// Monthly Usage: Track total visitors per month for billing
 model MonthlyUsage {
   id              String   @id @default(uuid())
   shop            String
-  yearMonth       String   // "2026-01" format
-  totalVisitors   Int      @default(0)  // Total affected = redirected + blocked + popupShown
-  redirected      Int      @default(0)  // Visitors redirected
-  blocked         Int      @default(0)  // Visitors blocked
-  popupShown      Int      @default(0)  // Visitors seen popup
-  chargedVisitors Int      @default(0)  // Visitors already charged for overage
+  yearMonth       String
+  totalVisitors   Int      @default(0) // Total affected = redirected + blocked + popupShown
+  redirected      Int      @default(0)
+  blocked         Int      @default(0)
+  popupShown      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+  chargedVisitors Int      @default(0)
+
   @@unique([shop, yearMonth])
   @@index([shop])
 }
 
-// Logs: Chi tiết từng khách truy cập
 model VisitorLog {
-  id           String   @id @default(uuid())
-  shop         String
-  ipAddress    String
-  countryCode  String?
-  city         String?  // Optional: nếu sau này muốn mở rộng
-  action       String   // "visit", "redirected", "blocked", "auto_redirect", "ip_block", "ip_redirect"
-  ruleName     String?  // Tên rule đã trigger (nếu có)
-  targetUrl    String?  // URL chuyển hướng (nếu có)
-  userAgent    String?
-  timestamp    DateTime @default(now())
+  id          String   @id @default(uuid())
+  shop        String
+  ipAddress   String
+  countryCode String?
+  city        String?
+  action      String
+  ruleName    String?
+  targetUrl   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
 
   @@index([shop, timestamp])
 }
