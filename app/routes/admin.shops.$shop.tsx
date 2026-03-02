@@ -3,6 +3,7 @@ import { json, redirect } from "@remix-run/node";
 import { Form, Link, useLoaderData } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
+import { FREE_PLAN } from "../billing.config";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
@@ -36,8 +37,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }),
     ]);
 
-    const currentPlan = settings?.currentPlan || "FREE_PLAN";
-    const hasProPlan = currentPlan !== "FREE_PLAN";
+    const currentPlan = settings?.currentPlan || FREE_PLAN;
+    const hasProPlan = currentPlan !== FREE_PLAN;
 
     const totalVisitors = monthlyUsage.reduce((s: number, u: any) => s + u.totalVisitors, 0);
     const totalRedirected = monthlyUsage.reduce((s: number, u: any) => s + u.redirected, 0);
