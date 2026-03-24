@@ -78,5 +78,6 @@
     "minimatch": "9.0.5",
     "vite": "^6.2.2"
   },
-  "author": "admin"
+  "author": "admin",
+  "description": "Geo Redirect & Country Blocker with 401 VPS fix"
 }
