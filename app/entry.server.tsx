@@ -79,7 +79,8 @@ export function handleError(error: unknown, { request }: { request: Request }) {
       ".json",
       "tsconfig",
       "webpack",
-      "angular"
+      "angular",
+      "subscriptions.update"
     ];
 
     const url = request.url.toLowerCase();
