@@ -21,7 +21,7 @@ api_version = "2026-04"
 
   [[webhooks.subscriptions]]
   topics = [ "app_subscriptions/update" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/subscriptions.update"
+  uri = "https://geopro.bluepeaks.top/webhooks/app/subscriptions/update"
 
   [[webhooks.subscriptions]]
   compliance_topics = [ "customers/data_request" ]
