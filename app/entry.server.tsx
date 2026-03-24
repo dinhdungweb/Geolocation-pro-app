@@ -84,6 +84,11 @@ export function handleError(error: unknown, { request }: { request: Request }) {
     if (isJunk && error.message.includes("No route matches URL")) {
       return;
     }
+
+    // Lọc bỏ lỗi AbortError (do người dùng hủy request hoặc timeout)
+    if (error.name === "AbortError" || error.message.includes("operation was aborted")) {
+      return;
+    }
   }
 
   // Vẫn log các lỗi thực tế khác của hệ thống
