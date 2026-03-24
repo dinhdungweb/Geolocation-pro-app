@@ -1,3 +1,4 @@
+import "dotenv/config";
 import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
@@ -9,6 +10,10 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 
 import { PREMIUM_PLAN, PLUS_PLAN } from "./billing.config";
+
+if (process.env.HOST && !process.env.SHOPIFY_APP_URL) {
+  process.env.SHOPIFY_APP_URL = process.env.HOST;
+}
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
