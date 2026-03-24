@@ -4,6 +4,7 @@ import {
   ApiVersion,
   AppDistribution,
   BillingInterval,
+  LogSeverity,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
@@ -12,8 +13,14 @@ import prisma from "./db.server";
 import { PREMIUM_PLAN, PLUS_PLAN } from "./billing.config";
 
 if (process.env.HOST && !process.env.SHOPIFY_APP_URL) {
-  process.env.SHOPIFY_APP_URL = process.env.HOST;
+  process.env.SHOPIFY_APP_URL = `https://${process.env.HOST}`;
 }
+
+console.log("--- DIAGNOSTIC CHECK ---");
+console.log("SHOPIFY_API_KEY exists:", !!process.env.SHOPIFY_API_KEY);
+console.log("SHOPIFY_API_SECRET exists:", !!process.env.SHOPIFY_API_SECRET);
+console.log("SHOPIFY_APP_URL:", process.env.SHOPIFY_APP_URL);
+console.log("------------------------");
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -60,6 +67,9 @@ const shopify = shopifyApp({
   },
   future: {
     unstable_newEmbeddedAuthStrategy: true,
+  },
+  logger: {
+    level: LogSeverity.Debug,
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
