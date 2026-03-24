@@ -57,3 +57,35 @@ export default async function handleRequest(
     setTimeout(abort, streamTimeout + 1000);
   });
 }
+
+/**
+ * Hàm lọc log: Loại bỏ các dòng log rác từ bot quét (cgi-bin, php, admin...)
+ */
+export function handleError(error: unknown, { request }: { request: Request }) {
+  if (error instanceof Error) {
+    const junkPaths = [
+      "/cgi-bin/",
+      ".php",
+      ".env",
+      "wp-admin",
+      "/admin",
+      "wlwmanifest.xml",
+      "xmlrpc.php",
+      "/.well-known/",
+      "/javascript",
+      "/scripts",
+      "/styles",
+      "/wk/"
+    ];
+
+    const isJunk = junkPaths.some((path) => request.url.toLowerCase().includes(path.toLowerCase()));
+    
+    // Nếu là lỗi 404 do bot quét đường dẫn rác thì không log ra terminal
+    if (isJunk && error.message.includes("No route matches URL")) {
+      return;
+    }
+  }
+
+  // Vẫn log các lỗi thực tế khác của hệ thống
+  console.error(error);
+}
