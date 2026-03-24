@@ -75,13 +75,18 @@ export function handleError(error: unknown, { request }: { request: Request }) {
       "/javascript",
       "/scripts",
       "/styles",
-      "/wk/"
+      "/wk/",
+      ".json",
+      "tsconfig",
+      "webpack",
+      "angular"
     ];
 
-    const isJunk = junkPaths.some((path) => request.url.toLowerCase().includes(path.toLowerCase()));
+    const url = request.url.toLowerCase();
+    const isJunk = junkPaths.some((path) => url.includes(path.toLowerCase()));
     
     // Nếu là lỗi 404 do bot quét đường dẫn rác thì không log ra terminal
-    if (isJunk && error.message.includes("No route matches URL")) {
+    if (isJunk && (error.message?.includes("No route matches") || (error as any).status === 404)) {
       return;
     }
 
