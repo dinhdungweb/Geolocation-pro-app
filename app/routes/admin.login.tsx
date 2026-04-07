@@ -72,82 +72,97 @@ export default function AdminLogin() {
                 <title>Admin Login — Geo App</title>
                 <style>{`
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
                     body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                        background: #0a0a0f;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+                        background: #f8fafc;
                         min-height: 100vh;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         padding: 20px;
+                        color: #1e293b;
                     }
                     .card {
-                        background: #13131a;
-                        border: 1px solid #1e1e2e;
-                        border-radius: 16px;
+                        background: #ffffff;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 20px;
                         padding: 40px;
                         width: 100%;
-                        max-width: 400px;
-                        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+                        max-width: 420px;
+                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
                     }
                     .logo {
                         display: flex;
+                        flex-direction: column;
                         align-items: center;
-                        gap: 12px;
+                        text-align: center;
+                        gap: 16px;
                         margin-bottom: 32px;
                     }
                     .logo-icon {
-                        width: 44px; height: 44px;
+                        width: 56px; height: 56px;
                         background: linear-gradient(135deg, #6366f1, #8b5cf6);
-                        border-radius: 10px;
+                        border-radius: 14px;
                         display: flex; align-items: center; justify-content: center;
-                        font-size: 22px;
+                        font-size: 28px;
+                        color: white;
+                        box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
                     }
-                    .logo h1 { font-size: 18px; color: #e2e8f0; font-weight: 600; }
-                    .logo p { font-size: 12px; color: #64748b; margin-top: 2px; }
+                    .logo h1 { font-size: 22px; color: #1e293b; font-weight: 800; letter-spacing: -0.02em; }
+                    .logo p { font-size: 14px; color: #64748b; margin-top: 4px; }
+                    
+                    .form-group { margin-bottom: 20px; }
                     label {
                         display: block;
-                        font-size: 13px;
-                        font-weight: 500;
-                        color: #94a3b8;
-                        margin-bottom: 6px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #475569;
+                        margin-bottom: 8px;
                     }
                     input {
                         width: 100%;
-                        padding: 10px 14px;
-                        background: #0a0a0f;
-                        border: 1px solid #1e1e2e;
-                        border-radius: 8px;
-                        color: #e2e8f0;
-                        font-size: 14px;
+                        padding: 12px 16px;
+                        background: #ffffff;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 10px;
+                        color: #1e293b;
+                        font-size: 15px;
                         outline: none;
-                        transition: border-color 0.2s;
-                        margin-bottom: 16px;
+                        transition: all 0.2s;
                     }
-                    input:focus { border-color: #6366f1; }
+                    input:focus { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
+                    
                     button[type="submit"] {
                         width: 100%;
-                        padding: 12px;
-                        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                        padding: 14px;
+                        background: #6366f1;
                         border: none;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         color: white;
-                        font-size: 14px;
-                        font-weight: 600;
+                        font-size: 15px;
+                        font-weight: 700;
                         cursor: pointer;
-                        margin-top: 8px;
-                        transition: opacity 0.2s;
+                        margin-top: 12px;
+                        transition: all 0.2s;
+                        box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
                     }
-                    button[type="submit"]:hover { opacity: 0.9; }
-                    button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
+                    button[type="submit"]:hover { background: #4f46e5; transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3); }
+                    button[type="submit"]:active { transform: translateY(0); }
+                    button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+                    
                     .error {
-                        background: rgba(239,68,68,0.1);
-                        border: 1px solid rgba(239,68,68,0.3);
-                        border-radius: 8px;
-                        padding: 10px 14px;
-                        color: #f87171;
-                        font-size: 13px;
-                        margin-bottom: 16px;
+                        background: #fef2f2;
+                        border: 1px solid #fee2e2;
+                        border-radius: 10px;
+                        padding: 12px 16px;
+                        color: #ef4444;
+                        font-size: 14px;
+                        font-weight: 500;
+                        margin-bottom: 24px;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
                     }
                 `}</style>
             </head>

@@ -73,6 +73,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
 };
 
+
 export default function AdminShopDetail() {
     const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan } = useLoaderData<typeof loader>();
 
@@ -85,337 +86,208 @@ export default function AdminShopDetail() {
         new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
     const modeColor = (mode: string) => {
-        if (mode === "popup") return "#22d3ee";
-        if (mode === "auto_redirect") return "#a78bfa";
+        if (mode === "popup") return "#6366f1";
+        if (mode === "auto_redirect") return "#10b981";
         return "#64748b";
     };
+
     const actionColor = (action: string) => {
         const m: Record<string, string> = {
-            visit: "#64748b", redirected: "#818cf8", blocked: "#f87171",
-            auto_redirect: "#a78bfa", ip_blocked: "#ef4444", ip_redirected: "#f59e0b",
+            visit: "#64748b", redirected: "#6366f1", blocked: "#ef4444",
+            auto_redirect: "#10b981", popup_show: "#6366f1",
         };
         return m[action] ?? "#64748b";
     };
 
-    const renderTruncatedList = (listStr: string | null, limit = 5) => {
-        if (!listStr) return "—";
-        const items = listStr.split(",").map(i => i.trim());
-        if (items.length <= limit) return listStr;
-
-        const visible = items.slice(0, limit).join(", ");
-        const remaining = items.length - limit;
-        return (
-            <>
-                {visible}
-                <span className="more-badge">+{remaining} more</span>
-            </>
-        );
-    };
-
     return (
-        <html lang="en">
-            <head>
-                <meta charSet="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>{shop} — Admin</title>
-                <style>{`
-                    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; color: #e2e8f0; min-height: 100vh; }
+        <div className="shop-detail-view">
+            <style>{`
+                .back-bar { margin-bottom: 24px; }
+                .back-btn { 
+                    display: inline-flex; align-items: center; gap: 8px; 
+                    text-decoration: none; color: var(--text-muted); font-size: 14px; font-weight: 500;
+                    transition: color 0.2s;
+                }
+                .back-btn:hover { color: var(--primary); }
 
-                    /* NAV */
-                    .nav { background: #13131a; border-bottom: 1px solid #1e1e2e; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
-                    .nav-left { display: flex; align-items: center; gap: 10px; }
-                    .back-link { color: #818cf8; text-decoration: none; font-size: 13px; display: flex; align-items: center; gap: 4px; }
-                    .back-link:hover { color: #a5b4fc; }
-                    .breadcrumb-sep { color: #1e1e2e; }
-                    .nav-shop { font-size: 14px; font-weight: 600; color: #e2e8f0; }
-                    .btn-logout { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #f87171; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+                .shop-header { margin-bottom: 32px; display: flex; align-items: flex-end; gap: 12px; }
+                .shop-header h1 { font-size: 28px; font-weight: 700; color: var(--text); }
+                .shop-header .domain { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
 
-                    /* LAYOUT */
-                    .main { max-width: 1400px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 20px; }
+                .stats-grid-small { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+                
+                .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+                
+                .card-v3 {
+                    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; 
+                    display: flex; flex-direction: column; overflow: hidden;
+                }
+                .card-v3-header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: #f8fafc; font-weight: 600; font-size: 14px; }
+                .card-v3-body { padding: 20px; flex: 1; }
 
-                    /* STAT MINI CARDS */
-                    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-                    .stat-mini { background: #13131a; border: 1px solid #1e1e2e; border-radius: 10px; padding: 16px 20px; }
-                    .stat-mini-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
-                    .stat-mini-value { font-size: 28px; font-weight: 700; color: #f1f5f9; }
-                    .stat-mini-sub { font-size: 11px; color: #475569; margin-top: 3px; }
+                .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+                .info-item:last-child { border-bottom: none; }
+                .info-item .label { color: var(--text-muted); font-size: 13px; }
+                .info-item .value { font-weight: 600; font-size: 13px; }
 
-                    /* TWO COL */
-                    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+                .monthly-list { display: flex; flex-direction: column; gap: 12px; }
+                .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 10px; }
+                .month-name { font-weight: 700; font-size: 14px; color: var(--primary); }
+                .month-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); }
 
-                    /* CARD */
-                    .card { background: #13131a; border: 1px solid #1e1e2e; border-radius: 12px; }
-                    .card-head { padding: 14px 20px; border-bottom: 1px solid #1e1e2e; display: flex; align-items: center; justify-content: space-between; }
-                    .card-title { font-size: 13px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
-                    .card-count { font-size: 12px; color: #475569; }
-                    .card-body { padding: 16px 20px; }
+                table { width: 100%; border-collapse: collapse; }
+                th { text-align: left; padding: 12px 20px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); background: #f8fafc; }
+                td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
+                .badge-v3 { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+            `}</style>
 
-                    /* INFO ROWS */
-                    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #0f0f16; }
-                    .info-row:last-child { border-bottom: none; }
-                    .info-label { font-size: 12px; color: #64748b; }
-                    .info-value { font-size: 12px; color: #cbd5e1; font-weight: 500; }
+            <div className="back-bar">
+                <Link to="/admin" className="back-btn">← Back to Dashboard</Link>
+            </div>
 
-                    /* BADGE */
-                    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-                    .dot { width: 5px; height: 5px; border-radius: 50%; }
+            <div className="shop-header">
+                <div style={{ flex: 1 }}>
+                    <div className="domain">Managed Shop</div>
+                    <h1>{shop}</h1>
+                </div>
+                <div style={{ padding: '8px 16px', background: hasProPlan ? '#ecfdf5' : '#f1f5f9', color: hasProPlan ? '#10b981' : '#64748b', borderRadius: '10px', fontSize: '12px', fontWeight: 700 }}>
+                    {hasProPlan ? 'PRO PLAN' : 'FREE PLAN'}
+                </div>
+            </div>
 
-                    /* MONTHLY GRID */
-                    .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-                    .month-card { background: #0f0f16; border: 1px solid #1e1e2e; border-radius: 8px; padding: 10px 14px; }
-                    .month-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 6px; }
-                    .month-val { font-size: 18px; font-weight: 700; color: #818cf8; }
-                    .month-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+            <div className="stats-grid-small">
+                <div className="flat-card">
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Views</div>
+                    <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.totalVisitors.toLocaleString()}</div>
+                </div>
+                <div className="flat-card">
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Redirects</div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)' }}>{stats.totalRedirected.toLocaleString()}</div>
+                </div>
+                <div className="flat-card">
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Blocked</div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#ef4444' }}>{stats.totalBlocked.toLocaleString()}</div>
+                </div>
+                <div className="flat-card">
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Active Rules</div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>{stats.activeRules}</div>
+                </div>
+            </div>
 
-                    /* TABLE */
-                    .table-wrap { background: #13131a; border: 1px solid #1e1e2e; border-radius: 12px; overflow: hidden; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th { text-align: left; padding: 9px 14px; font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #1e1e2e; background: #0f0f16; white-space: nowrap; }
-                    td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid #0f0f16; white-space: nowrap; }
-                    tr:last-child td { border-bottom: none; }
-                    tr:hover td { background: rgba(255,255,255,0.015); }
-                    .action-chip { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-                    .type-chip { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-                    .empty { text-align: center; color: #475569; padding: 32px; }
-                    .truncate-cell {
-                        max-width: 220px;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                        cursor: help;
-                        transition: max-width 0.2s ease-in-out;
-                    }
-                    .truncate-cell:hover {
-                        max-width: 600px;
-                        white-space: normal;
-                        word-break: break-all;
-                        background: rgba(255,255,255,0.03);
-                        position: relative;
-                        z-index: 10;
-                    }
-                    .more-badge {
-                        display: inline-flex;
-                        align-items: center;
-                        background: rgba(129,140,248,0.15);
-                        color: #818cf8;
-                        padding: 1px 6px;
-                        border-radius: 4px;
-                        font-size: 10px;
-                        font-weight: 700;
-                        margin-left: 4px;
-                    }
-                `}</style>
-            </head>
-            <body>
-                {/* NAV */}
-                <nav className="nav">
-                    <div className="nav-left">
-                        <Link to="/admin" className="back-link">← Dashboard</Link>
-                        <span className="breadcrumb-sep">/</span>
-                        <span className="nav-shop">{shop}</span>
+            <div className="section-grid">
+                <div className="card-v3">
+                    <div className="card-v3-header">App Configurations</div>
+                    <div className="card-v3-body">
+                        {!hasSettings ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#f59e0b' }}>No settings found.</div>
+                        ) : (
+                            <>
+                                <div className="info-item">
+                                    <span className="label">Operation Mode</span>
+                                    <span className="value" style={{ color: modeColor(settings!.mode) }}>{settings!.mode.toUpperCase()}</span>
+                                </div>
+                                <div className="info-item">
+                                    <span className="label">Popup Template</span>
+                                    <span className="value">{settings!.template}</span>
+                                </div>
+                                <div className="info-item">
+                                    <span className="label">Exclude Bots</span>
+                                    <span className="value">{settings!.excludeBots ? 'YES' : 'NO'}</span>
+                                </div>
+                                <div className="info-item">
+                                    <span className="label">Cookie TTL</span>
+                                    <span className="value">{settings!.cookieDuration} Days</span>
+                                </div>
+                                <div className="info-item">
+                                    <span className="label">Installed On</span>
+                                    <span className="value">{formatDateShort(settings!.createdAt)}</span>
+                                </div>
+                            </>
+                        )}
                     </div>
-                    <Form method="post" action="/admin/logout">
-                        <button type="submit" className="btn-logout">Logout</button>
-                    </Form>
-                </nav>
+                </div>
 
-                <main className="main">
-
-                    {/* 1. OVERVIEW STATS */}
-                    <div className="stats-row">
-                        <div className="stat-mini">
-                            <div className="stat-mini-label">Total Visitors (all time)</div>
-                            <div className="stat-mini-value" style={{ color: "#818cf8" }}>{stats.totalVisitors.toLocaleString()}</div>
-                        </div>
-                        <div className="stat-mini">
-                            <div className="stat-mini-label">Redirected</div>
-                            <div className="stat-mini-value" style={{ color: "#a78bfa" }}>{stats.totalRedirected.toLocaleString()}</div>
-                        </div>
-                        <div className="stat-mini">
-                            <div className="stat-mini-label">Blocked</div>
-                            <div className="stat-mini-value" style={{ color: "#f87171" }}>{stats.totalBlocked.toLocaleString()}</div>
-                        </div>
-                        <div className="stat-mini">
-                            <div className="stat-mini-label">Active Rules</div>
-                            <div className="stat-mini-value" style={{ color: "#4ade80" }}>{stats.activeRules}</div>
-                            <div className="stat-mini-sub">{stats.totalRules} total rules</div>
-                        </div>
-                    </div>
-
-                    {/* 2. SETTINGS + MONTHLY USAGE side by side */}
-                    <div className="two-col">
-                        {/* Settings */}
-                        <div className="card">
-                            <div className="card-head">
-                                <span className="card-title">Settings</span>
-                                {settings && (
-                                    <span style={{ fontSize: "11px", color: "#475569" }}>
-                                        Updated {formatDateShort(settings.updatedAt)}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="card-body">
-                                {!hasSettings ? (
-                                    <p style={{ color: "#f59e0b", fontSize: "13px" }}>⚠️ This shop has not configured the app yet.</p>
-                                ) : (
-                                    <>
-                                        <div className="info-row">
-                                            <span className="info-label">Mode</span>
-                                            <span className="badge" style={{
-                                                background: `${modeColor(settings!.mode)}15`,
-                                                border: `1px solid ${modeColor(settings!.mode)}35`,
-                                                color: modeColor(settings!.mode),
-                                            }}>
-                                                <span className="dot" style={{ background: modeColor(settings!.mode) }} />
-                                                {settings!.mode.replace("_", " ")}
-                                            </span>
+                <div className="card-v3">
+                    <div className="card-v3-header">Monthly Usage History</div>
+                    <div className="card-v3-body">
+                        <div className="monthly-list">
+                            {monthlyUsage.length === 0 ? (
+                                <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No usage data recorded.</div>
+                            ) : (
+                                monthlyUsage.map((u: any) => (
+                                    <div className="month-row" key={u.yearMonth}>
+                                        <div className="month-name">{u.yearMonth}</div>
+                                        <div className="month-stats">
+                                            <span><b>{u.totalVisitors.toLocaleString()}</b> views</span>
+                                            <span><b>{u.redirected}</b> redirs</span>
                                         </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Template</span>
-                                            <span className="info-value">{settings!.template}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Exclude Bots</span>
-                                            <span className="info-value">{settings!.excludeBots ? "✅ Yes" : "❌ No"}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Cookie Duration</span>
-                                            <span className="info-value">{settings!.cookieDuration} days</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Installed</span>
-                                            <span className="info-value">{formatDateShort(settings!.createdAt)}</span>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Monthly Usage */}
-                        <div className="card">
-                            <div className="card-head">
-                                <span className="card-title">Monthly Usage</span>
-                                <span className="card-count">Last 6 months</span>
-                            </div>
-                            <div className="card-body">
-                                {monthlyUsage.length === 0 ? (
-                                    <p style={{ color: "#475569", fontSize: "12px" }}>No usage data yet.</p>
-                                ) : (
-                                    <div className="month-grid">
-                                        {monthlyUsage.map((u: any) => (
-                                            <div key={u.yearMonth} className="month-card">
-                                                <div className="month-label">{u.yearMonth}</div>
-                                                <div className="month-val">{u.totalVisitors.toLocaleString()}</div>
-                                                <div className="month-sub">✨ {u.popupShown?.toLocaleString() || 0} popups</div>
-                                                <div className="month-sub">↗ {u.redirected.toLocaleString()} redirected</div>
-                                                <div className="month-sub">🚫 {u.blocked.toLocaleString()} blocked</div>
-                                            </div>
-                                        ))}
                                     </div>
-                                )}
-                            </div>
+                                ))
+                            )}
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    {/* 3. RULES TABLE */}
-                    <div className="table-wrap">
-                        <div className="card-head">
-                            <span className="card-title">Rules</span>
-                            <span className="card-count">{rules.length} total · {stats.activeRules} active</span>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Match Type</th>
-                                    <th>Action</th>
-                                    <th>Status</th>
-                                    <th>Schedule</th>
-                                    <th>Countries / IPs</th>
-                                    <th>Priority</th>
-                                    <th>Created</th>
+            <div className="card-v3" style={{ marginBottom: '32px' }}>
+                <div className="card-v3-header">Redirect & Block Rules</div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rule Name</th>
+                                <th>Match</th>
+                                <th>Action</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rules.map((r: any) => (
+                                <tr key={r.id}>
+                                    <td><strong>{r.name}</strong></td>
+                                    <td><span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.matchType.toUpperCase()} ({r.countryCodes || 'All'})</span></td>
+                                    <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : '#eef2ff', color: r.ruleType === 'block' ? '#ef4444' : '#6366f1' }}>{r.ruleType.toUpperCase()}</span></td>
+                                    <td>{r.isActive ? <span style={{ color: '#10b981' }}>● Active</span> : <span style={{ color: '#94a3b8' }}>○ Inactive</span>}</td>
+                                    <td>{r.priority}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {rules.map((r: any) => (
-                                    <tr key={r.id}>
-                                        <td style={{ fontWeight: 600, color: "#e2e8f0" }}>{r.name}</td>
-                                        <td style={{ color: "#94a3b8" }}>{r.matchType}</td>
-                                        <td>
-                                            <span className="type-chip" style={{
-                                                background: r.ruleType === "block" ? "rgba(239,68,68,0.12)" : "rgba(129,140,248,0.12)",
-                                                color: r.ruleType === "block" ? "#f87171" : "#818cf8",
-                                            }}>{r.ruleType}</span>
-                                        </td>
-                                        <td>
-                                            {r.isActive && !hasProPlan && (r.matchType === "ip" || r.ruleType === "block") ? (
-                                                <span style={{ color: "#f59e0b", fontSize: "12px" }}>
-                                                    ⚠ Disabled (Free Plan)
-                                                </span>
-                                            ) : (
-                                                <span style={{ color: r.isActive ? "#4ade80" : "#475569", fontSize: "12px" }}>
-                                                    {r.isActive ? "● Active" : "○ Inactive"}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td style={{ color: r.scheduleEnabled ? "#f59e0b" : "#475569" }}>
-                                            {r.scheduleEnabled ? "⏰ Enabled" : "—"}
-                                        </td>
-                                        <td className="truncate-cell" title={r.countryCodes || ""}>
-                                            {renderTruncatedList(r.countryCodes)}
-                                        </td>
-                                        <td style={{ color: "#475569" }}>{r.priority}</td>
-                                        <td style={{ color: "#475569" }}>{formatDateShort(r.createdAt)}</td>
-                                    </tr>
-                                ))}
-                                {rules.length === 0 && <tr><td colSpan={8} className="empty">No rules.</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-                    {/* 4. VISITOR LOGS */}
-                    <div className="table-wrap">
-                        <div className="card-head">
-                            <span className="card-title">Visitor Logs</span>
-                            <span className="card-count">Last 100 entries</span>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>IP Address</th>
-                                    <th>Country</th>
-                                    <th>Action</th>
-                                    <th>Rule Triggered</th>
-                                    <th>Target URL</th>
+            <div className="card-v3">
+                <div className="card-v3-header">Live Interaction Logs</div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Visitor IP</th>
+                                <th>Action</th>
+                                <th>Rule</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {logs.map((l: any) => (
+                                <tr key={l.id}>
+                                    <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(l.timestamp)}</td>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            {l.countryCode && <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />}
+                                            <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
+                                        </div>
+                                    </td>
+                                    <td><span className="badge-v3" style={{ background: `${actionColor(l.action)}15`, color: actionColor(l.action) }}>{l.action.toUpperCase()}</span></td>
+                                    <td style={{ color: 'var(--text-muted)' }}>{l.ruleName || '—'}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {logs.map((l: any) => (
-                                    <tr key={l.id}>
-                                        <td style={{ color: "#475569" }}>{formatDate(l.timestamp)}</td>
-                                        <td style={{ fontFamily: "monospace", fontSize: "11px", color: "#94a3b8" }}>{l.ipAddress}</td>
-                                        <td style={{ color: "#e2e8f0", fontWeight: 500 }}>{l.countryCode || "—"}</td>
-                                        <td>
-                                            <span className="action-chip" style={{
-                                                background: `${actionColor(l.action)}18`,
-                                                color: actionColor(l.action),
-                                            }}>{l.action}</span>
-                                        </td>
-                                        <td style={{ color: "#94a3b8" }}>{l.ruleName || "—"}</td>
-                                        <td className="truncate-cell" title={l.targetUrl || ""} style={{ color: "#475569", fontSize: "11px" }}>
-                                            {l.targetUrl || "—"}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {logs.length === 0 && <tr><td colSpan={6} className="empty">No logs yet.</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-
-                </main>
-            </body>
-        </html>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     );
 }
+

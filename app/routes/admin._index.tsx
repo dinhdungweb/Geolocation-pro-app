@@ -138,271 +138,179 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 
+
 export default function AdminDashboard() {
     const { shops, totalShops, activeShops, totalVisitors, totalRules, yearMonth } = useLoaderData<typeof loader>();
 
     const modeColor = (mode: string) => {
-        if (mode === "popup") return "#22d3ee";
-        if (mode === "auto_redirect") return "#a78bfa";
+        if (mode === "popup") return "#6366f1";
+        if (mode === "auto_redirect") return "#10b981";
         if (mode === "not_configured") return "#f59e0b";
         return "#64748b";
     };
+
     const planColor = (plan: string) => {
-        if (plan === "free" || plan === "$0") return { bg: "rgba(100,116,139,0.15)", border: "rgba(100,116,139,0.3)", color: "#94a3b8" };
-        if (plan === "unknown") return { bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.2)", color: "#f87171" };
-        // Paid plan
-        return { bg: "rgba(74,222,128,0.1)", border: "rgba(74,222,128,0.25)", color: "#4ade80" };
+        if (plan === "free" || plan === "$0") return { bg: "#f1f5f9", text: "#64748b" };
+        if (plan === "unknown") return { bg: "#fef2f2", text: "#ef4444" };
+        return { bg: "#ecfdf5", text: "#10b981" };
     };
+
     const formatDate = (iso: string | null) => {
         if (!iso) return "—";
         return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     };
 
     return (
-        <html lang="en">
-            <head>
-                <meta charSet="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>Admin Dashboard — Geo App</title>
-                <style>{`
-                    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                        background: #0a0a0f;
-                        color: #e2e8f0;
-                        min-height: 100vh;
-                    }
-                    /* NAV */
-                    .nav {
-                        background: #13131a;
-                        border-bottom: 1px solid #1e1e2e;
-                        padding: 0 28px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        height: 60px;
-                        position: sticky; top: 0; z-index: 100;
-                    }
-                    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
-                    .nav-brand span { 
-                        width: 32px; height: 32px;
-                        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-                        border-radius: 8px;
-                        display: flex; align-items: center; justify-content: center;
-                        font-size: 16px;
-                    }
-                    .nav-right { display: flex; align-items: center; gap: 16px; }
-                    .badge-month {
-                        background: rgba(99,102,241,0.15);
-                        border: 1px solid rgba(99,102,241,0.3);
-                        color: #818cf8;
-                        padding: 4px 12px;
-                        border-radius: 20px;
-                        font-size: 12px;
-                        font-weight: 500;
-                    }
-                    .btn-logout {
-                        background: rgba(239,68,68,0.1);
-                        border: 1px solid rgba(239,68,68,0.2);
-                        color: #f87171;
-                        padding: 6px 14px;
-                        border-radius: 6px;
-                        font-size: 13px;
-                        cursor: pointer;
-                        transition: background 0.2s;
-                    }
-                    .btn-logout:hover { background: rgba(239,68,68,0.2); }
-                    /* MAIN */
-                    .main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
-                    h2 { font-size: 22px; font-weight: 700; color: #f1f5f9; margin-bottom: 24px; }
-                    /* CARDS */
-                    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
-                    .stat-card {
-                        background: #13131a;
-                        border: 1px solid #1e1e2e;
-                        border-radius: 12px;
-                        padding: 20px 24px;
-                    }
-                    .stat-label { font-size: 12px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-                    .stat-value { font-size: 32px; font-weight: 700; color: #f1f5f9; }
-                    .stat-sub { font-size: 12px; color: #475569; margin-top: 4px; }
-                    /* TABLE */
-                    .table-wrap {
-                        background: #13131a;
-                        border: 1px solid #1e1e2e;
-                        border-radius: 12px;
-                        overflow: hidden;
-                    }
-                    .table-header {
-                        padding: 16px 24px;
-                        border-bottom: 1px solid #1e1e2e;
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                    }
-                    .table-header h3 { font-size: 15px; font-weight: 600; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th {
-                        text-align: left;
-                        padding: 10px 14px;
-                        font-size: 10px;
-                        font-weight: 600;
-                        color: #64748b;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                        border-bottom: 1px solid #1e1e2e;
-                        background: #0f0f16;
-                        white-space: nowrap;
-                    }
-                    td { padding: 11px 14px; font-size: 12px; border-bottom: 1px solid #0f0f16; white-space: nowrap; }
-                    td.shop-cell { white-space: normal; min-width: 180px; }
-                    tr:last-child td { border-bottom: none; }
-                    tr:hover td { background: rgba(255,255,255,0.02); }
-                    .shop-link { color: #818cf8; text-decoration: none; font-weight: 500; }
-                    .shop-link:hover { color: #a5b4fc; }
-                    .mode-badge {
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 5px;
-                        padding: 3px 10px;
-                        border-radius: 20px;
-                        font-size: 11px;
-                        font-weight: 600;
-                        text-transform: uppercase;
-                        letter-spacing: 0.3px;
-                    }
-                    .dot { width: 6px; height: 6px; border-radius: 50%; }
-                    .num { font-weight: 600; }
-                    .text-sub { color: #475569; font-size: 12px; }
-                    .plan-badge {
-                        display: inline-flex; align-items: center; gap: 4px;
-                        padding: 2px 8px; border-radius: 4px;
-                        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
-                    }
-                    .plan-price { font-size: 10px; opacity: 0.8; }
-                `}</style>
-            </head>
-            <body>
-                <nav className="nav">
-                    <div className="nav-brand">
-                        <span>🌍</span>
-                        Geo App Admin
-                    </div>
-                    <div className="nav-right">
-                        <span className="badge-month">📅 {yearMonth}</span>
-                        <Form method="post" action="/admin/logout">
-                            <button type="submit" className="btn-logout">Logout</button>
-                        </Form>
-                    </div>
-                </nav>
+        <div className="dashboard-view">
+            <style>{`
+                .stats-grid { 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
+                    gap: 24px; 
+                    margin-bottom: 32px; 
+                }
+                .stat-card {
+                    background: var(--surface);
+                    border: 1px solid var(--border);
+                    border-radius: 16px;
+                    padding: 24px;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+                .stat-value { font-size: 32px; font-weight: 700; color: var(--text); }
+                .stat-sub { font-size: 13px; margin-top: 8px; font-weight: 500; }
 
-                <main className="main">
-                    <h2>Dashboard Overview</h2>
+                .content-section {
+                    background: var(--surface);
+                    border: 1px solid var(--border);
+                    border-radius: 16px;
+                    overflow: hidden;
+                }
+                .section-header {
+                    padding: 20px 24px;
+                    border-bottom: 1px solid var(--border);
+                    display: flex; align-items: center; justify-content: space-between;
+                }
+                .section-header h3 { font-size: 16px; font-weight: 600; }
 
-                    {/* Stats Cards */}
-                    <div className="stats-grid">
-                        <div className="stat-card">
-                            <div className="stat-label">Total Shops</div>
-                            <div className="stat-value">{totalShops}</div>
-                            <div className="stat-sub">{activeShops} active</div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-label">Active Shops</div>
-                            <div className="stat-value" style={{ color: "#4ade80" }}>{activeShops}</div>
-                            <div className="stat-sub">{totalShops - activeShops} disabled</div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-label">Visitors This Month</div>
-                            <div className="stat-value" style={{ color: "#818cf8" }}>{totalVisitors.toLocaleString()}</div>
-                            <div className="stat-sub">across all shops</div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-label">Active Rules</div>
-                            <div className="stat-value" style={{ color: "#f59e0b" }}>{totalRules}</div>
-                            <div className="stat-sub">all shops combined</div>
-                        </div>
+                table { width: 100%; border-collapse: collapse; }
+                th {
+                    text-align: left; padding: 12px 24px;
+                    font-size: 11px; font-weight: 600; color: var(--text-muted);
+                    background: #f8fafc; border-bottom: 1px solid var(--border);
+                    text-transform: uppercase; letter-spacing: 0.05em;
+                }
+                td { padding: 14px 24px; font-size: 14px; border-bottom: 1px solid var(--border); }
+                tr:last-child td { border-bottom: none; }
+                tr:hover td { background: #f9fafb; }
+
+                .shop-link { color: var(--primary); text-decoration: none; font-weight: 600; }
+                .shop-link:hover { text-decoration: underline; }
+
+                .badge-flat {
+                    padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+                    display: inline-flex; align-items: center; gap: 6px;
+                }
+                .dot { width: 6px; height: 6px; border-radius: 50%; }
+                
+                .btn-view {
+                    padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);
+                    color: var(--text); text-decoration: none; font-size: 13px; font-weight: 500;
+                    transition: all 0.2s;
+                }
+                .btn-view:hover { background: #f1f5f9; border-color: #cbd5e1; }
+            `}</style>
+
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <div className="stat-label">Total Installations</div>
+                    <div className="stat-value">{totalShops}</div>
+                    <div className="stat-sub" style={{ color: '#10b981' }}>{activeShops} active now</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-label">Monthly Visitors</div>
+                    <div className="stat-value">{totalVisitors.toLocaleString()}</div>
+                    <div className="stat-sub" style={{ color: 'var(--primary)' }}>Across all partners</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-label">Active Rules</div>
+                    <div className="stat-value">{totalRules}</div>
+                    <div className="stat-sub" style={{ color: '#f59e0b' }}>Redirects & Popups</div>
+                </div>
+            </div>
+
+            <div className="content-section">
+                <div className="section-header">
+                    <h3>Managed Shops</h3>
+                    <div className="badge-flat" style={{ background: '#f1f5f9', color: '#64748b' }}>
+                        {yearMonth}
                     </div>
-
-                    {/* Table */}
-                    <div className="table-wrap">
-                        <div className="table-header">
-                            <h3>All Installed Shops ({totalShops})</h3>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Shop</th>
-                                    <th>Plan</th>
-                                    <th>Mode</th>
-                                    <th>Rules</th>
-                                    <th>Visitors</th>
-                                    <th>Popups</th>
-                                    <th>Redirected</th>
-                                    <th>Blocked</th>
-                                    <th>Installed</th>
-                                    <th>Last Active</th>
-                                    <th>Actions</th>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Shop Domain</th>
+                                <th>Plan</th>
+                                <th>App Mode</th>
+                                <th>Rules</th>
+                                <th>Traffic</th>
+                                <th>Installed</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {shops.map((s) => (
+                                <tr key={s.shop}>
+                                    <td>
+                                        <Link to={`/admin/shops/${encodeURIComponent(s.shop)}`} className="shop-link">
+                                            {s.shop}
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        {(() => {
+                                            const pc = planColor(s.plan);
+                                            return (
+                                                <span className="badge-flat" style={{ background: pc.bg, color: pc.text }}>
+                                                    {s.plan.toUpperCase()} {s.price}
+                                                </span>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td>
+                                        <span className="badge-flat" style={{ background: `${modeColor(s.mode)}15`, color: modeColor(s.mode) }}>
+                                            <span className="dot" style={{ background: modeColor(s.mode) }} />
+                                            {s.mode.replace("_", " ").toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td><strong>{s.activeRules}</strong></td>
+                                    <td>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <span style={{ fontWeight: 600 }}>{s.visitors.toLocaleString()}</span>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{s.redirected} redirs</span>
+                                        </div>
+                                    </td>
+                                    <td><span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{formatDate(s.installedAt)}</span></td>
+                                    <td>
+                                        <Link to={`/admin/shops/${encodeURIComponent(s.shop)}`} className="btn-view">
+                                            Manage →
+                                        </Link>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {shops.map((s) => (
-                                    <tr key={s.shop}>
-                                        <td className="shop-cell">
-                                            <Link to={`/admin/shops/${encodeURIComponent(s.shop)}`} className="shop-link">
-                                                {s.shop}
-                                            </Link>
-                                        </td>
-                                        <td>
-                                            {(() => {
-                                                const pc = planColor(s.plan); return (
-                                                    <span className="plan-badge" style={{ background: pc.bg, border: `1px solid ${pc.border}`, color: pc.color }}>
-                                                        {s.plan === "free" ? "Free" : s.plan}
-                                                        {s.price && <span className="plan-price"> {s.price}</span>}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td>
-                                            <span className="mode-badge" style={{
-                                                background: `${modeColor(s.mode)}15`,
-                                                border: `1px solid ${modeColor(s.mode)}40`,
-                                                color: modeColor(s.mode),
-                                            }}>
-                                                <span className="dot" style={{ background: modeColor(s.mode) }} />
-                                                {s.mode.replace("_", " ")}
-                                            </span>
-                                        </td>
-                                        <td><span className="num">{s.activeRules}</span></td>
-                                        <td><span className="num">{s.visitors.toLocaleString()}</span></td>
-                                        <td><span className="num" style={{ color: "#22d3ee" }}>{s.popups.toLocaleString()}</span></td>
-                                        <td><span className="num" style={{ color: "#a78bfa" }}>{s.redirected.toLocaleString()}</span></td>
-                                        <td><span className="num" style={{ color: "#f87171" }}>{s.blocked.toLocaleString()}</span></td>
-                                        <td><span className="text-sub">{formatDate(s.installedAt)}</span></td>
-                                        <td><span className="text-sub">{formatDate(s.lastActive)}</span></td>
-                                        <td>
-                                            <Link to={`/admin/shops/${encodeURIComponent(s.shop)}`} style={{
-                                                color: "#818cf8", fontSize: "12px", textDecoration: "none",
-                                                padding: "4px 10px",
-                                                border: "1px solid rgba(129,140,248,0.3)",
-                                                borderRadius: "6px",
-                                            }}>
-                                                View →
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {shops.length === 0 && (
-                                    <tr>
-                                        <td colSpan={10} style={{ textAlign: "center", color: "#475569", padding: "48px" }}>
-                                            No shops installed yet.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </main>
-            </body>
-        </html>
+                            ))}
+                            {shops.length === 0 && (
+                                <tr>
+                                    <td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)", padding: "64px" }}>
+                                        No shops registered yet.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     );
 }
+
