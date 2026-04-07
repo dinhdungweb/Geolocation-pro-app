@@ -20,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
     // Count sends from AdminEmailLog
-    const logs = await prisma.adminEmailLog.groupBy({
+    const logs = await (prisma as any).adminEmailLog.groupBy({
         by: ['type'],
         _count: { _all: true },
         _max: { createdAt: true }
@@ -62,7 +62,7 @@ export default function AdminEmailAutomations() {
             accent: '#fef3c7',
             stats: stats['limit_80'] || { count: 0, lastSent: null },
             template: getLimit80EmailHtml('demo-store.myshopify.com', 8000, 10000),
-            subject: 'Usage Warning: Your shop has reached 80% of its limit'
+            subject: 'demo-store.myshopify.com: Usage Warning (80%) - Geo: Redirect & Country Block'
         },
         {
             id: 'limit_100',
@@ -73,7 +73,7 @@ export default function AdminEmailAutomations() {
             accent: '#fee2e2',
             stats: stats['limit_100'] || { count: 0, lastSent: null },
             template: getLimit100EmailHtml('demo-store.myshopify.com', 10000, 10000),
-            subject: 'ACTION REQUIRED: Your shop has reached 100% of its limit'
+            subject: 'ACTION REQUIRED: demo-store.myshopify.com reached 100% limit - Geo: Redirect & Country Block'
         }
     ];
 

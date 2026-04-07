@@ -135,11 +135,11 @@ export default function EmailComposer() {
     useEffect(() => {
         switch(selectedTemplate) {
             case 'welcome':
-                setSubject("Welcome to GeoPro Geolocation Redirect!");
+                setSubject("Welcome to Geo: Redirect & Country Block!");
                 setBody(getWelcomeEmailHtml('example.myshopify.com'));
                 break;
             case 'limit80':
-                setSubject("Usage Warning: Approaching Plan Limits");
+                setSubject("Usage Warning: Geo: Redirect & Country Block");
                 setBody(getLimit80EmailHtml('example.myshopify.com', 8000, 10000));
                 break;
             case 'promo':
