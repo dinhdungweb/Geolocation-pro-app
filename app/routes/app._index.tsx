@@ -120,7 +120,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await sendAdminEmail({
       shop,
       type: 'welcome',
-      subject: 'Welcome to GeoPro Geolocation Redirect!',
+      subject: 'Welcome to Geo: Redirect & Country Block!',
       html: getWelcomeEmailHtml(shop)
     });
   }
@@ -337,7 +337,7 @@ export default function Index() {
 
   return (
     <Page>
-      <TitleBar title="Geolocation Redirect Pro" />
+      <TitleBar title="Geo: Redirect & Country Block" />
       <style>
         {`
           @media (min-width: 48em) {

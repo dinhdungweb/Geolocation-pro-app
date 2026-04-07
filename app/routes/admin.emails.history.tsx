@@ -19,24 +19,44 @@ export default function EmailHistory() {
     const { logs } = useLoaderData<typeof loader>();
 
     return (
-        <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+        <div className="history-container">
             <style>{`
-                .history-card {
+                .history-container {
+                    padding: 40px;
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }
+                
+                .modern-card {
                     background: white;
-                    border: 1px solid var(--border);
-                    border-radius: 12px;
+                    border-radius: 24px;
+                    border: 1px solid rgba(0,0,0,0.05);
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
                     overflow: hidden;
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                    animation: slideUp 0.5s ease-out;
+                }
+
+                @keyframes slideUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
                 
                 .history-header {
-                    padding: 24px;
-                    border-bottom: 1px solid var(--border);
+                    padding: 32px 40px;
+                    background: #f8fafc;
+                    border-bottom: 1px solid rgba(0,0,0,0.05);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                 }
-                .history-header h2 { font-size: 18px; font-weight: 700; color: var(--text); }
-                .history-header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+                .history-header h2 { 
+                    font-size: 20px; 
+                    font-weight: 800; 
+                    color: #0f172a;
+                    letter-spacing: -0.02em;
+                }
                 
-                .table-responsive {
+                .table-shell {
                     width: 100%;
                     overflow-x: auto;
                 }
@@ -44,98 +64,138 @@ export default function EmailHistory() {
                 .history-table {
                     width: 100%;
                     border-collapse: collapse;
-                    min-width: 800px;
+                    min-width: 900px;
                 }
                 
                 .history-table th {
                     text-align: left;
-                    padding: 16px 24px;
-                    background: #f8fafc;
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: var(--text-muted);
+                    padding: 20px 40px;
+                    background: #ffffff;
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: #94a3b8;
                     text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    border-bottom: 1px solid var(--border);
+                    letter-spacing: 0.1em;
+                    border-bottom: 1px solid #f1f5f9;
                 }
                 
                 .history-table td {
-                    padding: 16px 24px;
-                    border-bottom: 1px solid var(--border);
+                    padding: 20px 40px;
+                    border-bottom: 1px solid #f1f5f9;
                     font-size: 14px;
-                    vertical-align: top;
+                    color: #475569;
+                    vertical-align: middle;
                 }
                 
-                .history-table tr:hover td {
-                    background: #f8fafc;
+                .history-table tr:last-child td { border-bottom: none; }
+                .history-table tr:hover td { background: #f8fafc; }
+                
+                .shop-cell {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
                 }
                 
-                .status-badge {
-                    display: inline-block;
-                    padding: 4px 10px;
-                    border-radius: 20px;
+                .shop-avatar {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 10px;
+                    background: #6366f1;
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                     font-size: 12px;
-                    font-weight: 700;
+                    font-weight: 800;
+                    flex-shrink: 0;
+                    box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
+                }
+
+                .badge-modern {
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    font-size: 11px;
+                    font-weight: 800;
                     text-transform: uppercase;
+                    letter-spacing: 0.05em;
                 }
-                .status-sent { background: #dcfce7; color: #16a34a; }
-                .status-simulated { background: #e0e7ff; color: #4f46e5; }
-                .status-failed { background: #fee2e2; color: #dc2626; }
+                .badge-sent { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+                .badge-simulated { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+                .badge-failed { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
                 
-                .empty-state {
-                    padding: 60px 20px;
-                    text-align: center;
-                    color: var(--text-muted);
+                .type-pill {
+                    font-size: 11px;
+                    font-weight: 700;
+                    background: #f1f5f9;
+                    color: #64748b;
+                    padding: 4px 10px;
+                    border-radius: 6px;
                 }
+
+                .empty-state {
+                    padding: 100px 40px;
+                    text-align: center;
+                    background: white;
+                }
+                .empty-state h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 16px 0 8px; }
+                .empty-state p { color: #94a3b8; font-size: 14px; }
             `}</style>
             
-            <div className="history-card">
+            <div className="modern-card">
                 <div className="history-header">
-                    <h2>Send Logs</h2>
-                    <p>Track the delivery status of all automated and manual emails sent from GeoPro.</p>
+                    <div>
+                        <h2>Transmission Logs</h2>
+                        <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px', fontWeight: 500 }}>Comprehensive history of all dispatch operations.</p>
+                    </div>
                 </div>
                 
                 {logs.length > 0 ? (
-                    <div className="table-responsive">
+                    <div className="table-shell">
                         <table className="history-table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Shop</th>
-                                    <th>Type</th>
+                                    <th>Recipient Shop</th>
                                     <th>Subject</th>
-                                    <th>Status</th>
+                                    <th>Type</th>
+                                    <th>Transmission Status</th>
+                                    <th>Executed On</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {logs.map((log: any) => (
                                     <tr key={log.id}>
-                                        <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '13px' }}>
-                                            {new Date(log.createdAt).toLocaleString()}
-                                        </td>
-                                        <td style={{ fontWeight: 500 }}>{log.shop}</td>
                                         <td>
-                                            <span style={{ 
-                                                fontSize: '12px', 
-                                                color: '#64748b', 
-                                                background: '#f1f5f9', 
-                                                padding: '2px 8px', 
-                                                borderRadius: '4px' 
-                                            }}>
-                                                {log.type}
-                                            </span>
+                                            <div className="shop-cell">
+                                                <div className="shop-avatar" style={{ background: log.status === 'failed' ? '#ef4444' : '#6366f1' }}>
+                                                    {log.shop.slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 700, color: '#1e293b' }}>{log.shop}</div>
+                                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Session Active</div>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td>{log.subject || '-'}</td>
+                                        <td style={{ maxWidth: '300px' }}>
+                                            <div style={{ fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {log.subject || '—'}
+                                            </div>
+                                        </td>
                                         <td>
-                                            <span className={`status-badge status-${log.status === 'failed' ? 'failed' : 
+                                            <span className="type-pill">{log.type}</span>
+                                        </td>
+                                        <td>
+                                            <span className={`badge-modern badge-${log.status === 'failed' ? 'failed' : 
                                                                     log.status === 'simulated' ? 'simulated' : 'sent'}`}>
-                                                {log.status}
+                                                ● {log.status}
                                             </span>
                                             {log.error && (
-                                                <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px', maxWidth: '300px', wordBreak: 'break-word' }}>
+                                                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px', maxWidth: '250px' }}>
                                                     {log.error}
                                                 </div>
                                             )}
+                                        </td>
+                                        <td style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>
+                                            {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </td>
                                     </tr>
                                 ))}
@@ -144,11 +204,11 @@ export default function EmailHistory() {
                     </div>
                 ) : (
                     <div className="empty-state">
-                        <div style={{ marginBottom: '16px' }}>
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <div style={{ opacity: 0.2 }}>
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         </div>
-                        <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>No logs found</h3>
-                        <p>Emails sent via the system will appear here.</p>
+                        <h3>No activity detected</h3>
+                        <p>Detailed logs will occupy this space once campaigns begin.</p>
                     </div>
                 )}
             </div>

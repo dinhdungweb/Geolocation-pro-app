@@ -1,11 +1,23 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useFetcher, useNavigation } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import { useState, useMemo, useEffect } from "react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { sendAdminEmail } from "../utils/email.server";
 import { unauthenticated } from "../shopify.server";
+import { 
+    Search, 
+    Mail, 
+    Layers, 
+    Check, 
+    Send, 
+    Monitor, 
+    Smartphone, 
+    Layout,
+    AlertCircle,
+    Info
+} from "lucide-react";
 
 // Sample templates
 import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
@@ -16,12 +28,12 @@ const PROMO_TEMPLATE = `<div style="font-family: sans-serif; max-width: 600px; m
     </div>
     <div style="padding: 30px; line-height: 1.6; color: #333;">
         <p>Hi there,</p>
-        <p>Unlock new features and boost your international sales with GeoPro Plus.</p>
+        <p>Unlock new features and boost your international sales with Geo: Redirect & Country Block.</p>
         <p>For a limited time, upgrade your plan and enjoy premium benefits.</p>
         <div style="text-align: center; margin: 30px 0;">
             <a href="#" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Upgrade Now</a>
         </div>
-        <p>Best regards,<br>The GeoPro Team</p>
+        <p>Best regards,<br>The Geo Support Team</p>
     </div>
 </div>`;
 
@@ -94,20 +106,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function EmailComposer() {
     const { shops } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
-    const navigation = useNavigation();
     
-    const [filterPlan, setFilterPlan] = useState("all"); // 'all', 'free', 'premium', 'plus'
+    const [filterPlan, setFilterPlan] = useState("all");
+    const [searchTerm, setSearchTerm] = useState("");
     const [selectedShops, setSelectedShops] = useState<string[]>([]);
     
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
     const [selectedTemplate, setSelectedTemplate] = useState("custom");
+    const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
 
-    // Filter logic
+    // Filter & Search logic
     const displayedShops = useMemo(() => {
-        if (filterPlan === "all") return shops;
-        return shops.filter(s => s.plan.toLowerCase() === filterPlan.toLowerCase());
-    }, [shops, filterPlan]);
+        let filtered = shops;
+        if (filterPlan !== "all") {
+            filtered = filtered.filter(s => s.plan.toLowerCase() === filterPlan.toLowerCase());
+        }
+        if (searchTerm) {
+            filtered = filtered.filter(s => 
+                s.shop.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (s.email && s.email.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+        }
+        return filtered;
+    }, [shops, filterPlan, searchTerm]);
 
     // Handle template selection
     useEffect(() => {
@@ -154,323 +176,474 @@ export default function EmailComposer() {
     const isSending = fetcher.state === "submitting" || fetcher.state === "loading";
     const allDisplayedSelected = displayedShops.length > 0 && displayedShops.every(s => selectedShops.includes(s.shop));
 
+    const fetcherData = fetcher.data as { success?: boolean; message?: string; error?: string } | undefined;
+
     return (
-        <div className="composer-wrapper">
+        <div className="composer-container">
             <style>{`
-                .composer-wrapper {
+                .composer-container {
                     display: grid;
-                    grid-template-columns: 480px 1fr;
-                    height: 100%;
-                    background: var(--bg);
+                    grid-template-columns: 460px 1fr;
+                    height: calc(100vh - 180px);
+                    background: #f8fafc;
                 }
                 
-                /* Editor Panel (Left) */
-                .editor-panel {
-                    border-right: 1px solid var(--border);
+                .editor-sidebar {
                     background: white;
+                    border-right: 1px solid rgba(0,0,0,0.06);
                     display: flex;
                     flex-direction: column;
-                    height: calc(100vh - 160px);
+                    overflow: hidden;
+                    box-shadow: 10px 0 30px rgba(0,0,0,0.02);
                 }
                 
-                .editor-scroll-area {
+                .editor-content {
                     flex: 1;
                     overflow-y: auto;
-                    padding: 24px;
+                    padding: 32px;
                 }
                 
-                .form-section {
-                    margin-bottom: 24px;
-                }
-                
-                .form-section h3 {
-                    font-size: 14px;
-                    font-weight: 700;
-                    margin-bottom: 12px;
-                    color: var(--text);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-                
-                .audience-filters {
-                    display: flex;
-                    gap: 8px;
-                    margin-bottom: 12px;
-                    flex-wrap: wrap;
-                }
-                
-                .filter-btn {
-                    padding: 6px 12px;
-                    border: 1px solid var(--border);
-                    background: white;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    color: var(--text-muted);
-                    transition: all 0.2s;
-                }
-                .filter-btn.active {
-                    background: #f0f7ff;
-                    border-color: var(--primary);
-                    color: var(--primary);
-                }
-                
-                .shop-list-container {
-                    border: 1px solid var(--border);
-                    border-radius: 8px;
-                    max-height: 200px;
-                    overflow-y: auto;
-                }
-                
-                .shop-row {
+                .section-label {
                     display: flex;
                     align-items: center;
-                    padding: 10px 14px;
-                    border-bottom: 1px solid #f1f5f9;
-                    cursor: pointer;
-                    gap: 12px;
+                    gap: 8px;
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: #94a3b8;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    margin-bottom: 20px;
                 }
-                .shop-row:hover { background: #f8fafc; }
-                .shop-row:last-child { border-bottom: none; }
-                .shop-info-text { flex: 1; min-width: 0; }
-                .shop-name { font-weight: 600; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .shop-email { font-size: 11px; color: var(--text-muted); }
-                .plan-badge { padding: 2px 6px; background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; border-radius: 4px; text-transform: uppercase; }
                 
-                .field-group { margin-bottom: 16px; }
-                .field-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-                .field-group input, .field-group select { 
-                    width: 100%; padding: 10px 12px; border: 1px solid var(--border); 
-                    border-radius: 8px; font-size: 14px; font-family: inherit; 
-                    outline: none; transition: border-color 0.2s;
+                .search-pill {
+                    display: flex;
+                    align-items: center;
+                    background: #f1f5f9;
+                    border-radius: 12px;
+                    padding: 8px 16px;
+                    margin-bottom: 16px;
+                    border: 1px solid transparent;
+                    transition: all 0.2s;
                 }
-                .field-group input:focus, .field-group select:focus { border-color: var(--primary); }
-                
-                .code-editor {
-                    width: 100%;
-                    height: 300px;
-                    padding: 16px;
-                    background: #1e1e1e;
-                    color: #d4d4d4;
-                    font-family: 'Consolas', 'Monaco', monospace;
-                    font-size: 13px;
-                    border-radius: 8px;
+                .search-pill:focus-within {
+                    background: white;
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+                }
+                .search-pill input {
+                    background: transparent;
                     border: none;
-                    resize: vertical;
+                    outline: none;
+                    width: 100%;
+                    font-size: 14px;
+                    margin-left: 10px;
+                    color: #1e293b;
+                }
+                
+                .plan-filters {
+                    display: flex;
+                    gap: 6px;
+                    margin-bottom: 20px;
+                    overflow-x: auto;
+                    padding-bottom: 4px;
+                }
+                .plan-filters::-webkit-scrollbar { display: none; }
+                
+                .plan-chip {
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    transition: all 0.2s;
+                    background: #f1f5f9;
+                    color: #64748b;
+                    border: 1px solid transparent;
+                }
+                .plan-chip.active {
+                    background: #f0f7ff;
+                    color: var(--primary);
+                    border-color: rgba(99, 102, 241, 0.2);
+                }
+                
+                .audience-list {
+                    background: #f8fafc;
+                    border-radius: 16px;
+                    border: 1px solid rgba(0,0,0,0.05);
+                    max-height: 280px;
+                    overflow-y: auto;
+                    margin-bottom: 32px;
+                }
+                
+                .audience-item {
+                    display: flex;
+                    align-items: center;
+                    padding: 12px 16px;
+                    gap: 12px;
+                    border-bottom: 1px solid rgba(0,0,0,0.03);
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                .audience-item:hover { background: white; }
+                .audience-item:last-child { border-bottom: none; }
+                
+                .shop-avatar {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    font-weight: 800;
+                    flex-shrink: 0;
+                }
+                
+                .audience-info { flex: 1; min-width: 0; }
+                .audience-name { font-size: 13px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .audience-sub { font-size: 11px; color: #94a3b8; }
+                
+                .audience-check {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 6px;
+                    border: 2px solid #e2e8f0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                }
+                .audience-item.active .audience-check {
+                    background: var(--primary);
+                    border-color: var(--primary);
+                    color: white;
+                }
+                
+                .form-control-group { margin-bottom: 24px; }
+                .form-control-group label {
+                    display: block;
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: #475569;
+                    margin-bottom: 8px;
+                }
+                .form-control-group input, 
+                .form-control-group select,
+                .form-control-group textarea {
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 1.5px solid #e2e8f0;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    color: #1e293b;
+                    transition: all 0.2s;
+                    background: #f8fafc;
+                }
+                .form-control-group input:focus, 
+                .form-control-group select:focus,
+                .form-control-group textarea:focus {
+                    border-color: var(--primary);
+                    background: white;
                     outline: none;
                 }
                 
-                .action-footer {
-                    padding: 20px 24px;
-                    border-top: 1px solid var(--border);
-                    background: #f8fafc;
+                .modern-editor {
+                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                    font-size: 13px;
+                    min-height: 250px;
+                    background: #0f172a !important;
+                    color: #94a3b8 !important;
+                    line-height: 1.6;
+                    border: none !important;
+                }
+                
+                .footer-actions {
+                    padding: 24px 32px;
+                    background: white;
+                    border-top: 1px solid rgba(0,0,0,0.06);
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                 }
                 
-                .btn-primary {
-                    background: var(--primary);
-                    color: white;
-                    border: none;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    font-size: 14px;
-                    cursor: pointer;
-                    transition: opacity 0.2s;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .btn-primary:hover { opacity: 0.9; }
-                .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
-                
-                /* Preview Panel (Right) */
-                .preview-panel {
-                    padding: 40px;
+                /* Preview Panel */
+                .preview-viewport {
+                    padding: 60px;
+                    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     overflow-y: auto;
-                    height: calc(100vh - 160px);
                 }
                 
-                .device-frame {
-                    width: 100%;
-                    max-width: 600px;
-                    background: white;
-                    border-radius: 12px;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-                    border: 1px solid var(--border);
-                    overflow: hidden;
+                .preview-controls {
                     display: flex;
-                    flex-direction: column;
-                    transition: all 0.3s ease;
-                }
-                
-                .device-header {
-                    background: #f8fafc;
-                    border-bottom: 1px solid var(--border);
-                    padding: 16px 20px;
-                }
-                
-                .subject-preview { font-weight: 700; font-size: 16px; color: var(--text); margin-bottom: 4px; }
-                .sender-preview { font-size: 13px; color: var(--text-muted); }
-                
-                .preview-content {
-                    padding: 30px;
+                    gap: 8px;
                     background: white;
-                    min-height: 400px;
+                    padding: 6px;
+                    border-radius: 12px;
+                    margin-bottom: 40px;
+                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
                 }
                 
-                .notice-box {
-                    padding: 16px;
+                .control-btn {
+                    padding: 8px 16px;
                     border-radius: 8px;
-                    background: #e6fcf5;
-                    color: #0ca678;
-                    border: 1px solid #b2f2bb;
-                    margin-bottom: 24px;
-                    font-size: 14px;
+                    border: none;
+                    background: transparent;
+                    color: #64748b;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 13px;
+                    font-weight: 700;
+                    transition: all 0.2s;
+                }
+                .control-btn.active {
+                    background: #f1f5f9;
+                    color: #0f172a;
+                }
+                
+                .mac-window {
+                    width: 100%;
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
+                    overflow: hidden;
+                    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                
+                .mac-titlebar {
+                    background: #f8fafc;
+                    height: 48px;
+                    display: flex;
+                    align-items: center;
+                    padding: 0 20px;
+                    border-bottom: 1px solid rgba(0,0,0,0.05);
+                }
+                
+                .mac-dots { display: flex; gap: 8px; }
+                .mac-dot { width: 12px; height: 12px; border-radius: 50%; }
+                .dot-red { background: #ff5f56; }
+                .dot-yellow { background: #ffbd2e; }
+                .dot-green { background: #27c93f; }
+                
+                .mac-url {
+                    flex: 1;
+                    text-align: center;
+                    font-size: 12px;
                     font-weight: 600;
+                    color: #94a3b8;
+                    margin-left: -50px;
+                }
+                
+                .preview-frame-content {
+                    padding: 0;
+                    min-height: 500px;
+                    background: white;
+                }
+                
+                .preview-email-header {
+                    padding: 30px 40px;
+                    border-bottom: 1px dashed #e2e8f0;
+                }
+                .preview-subj { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+                .preview-from { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #64748b; }
+                
+                .btn-submit-premium {
+                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                    color: white;
+                    border: none;
+                    padding: 14px 32px;
+                    border-radius: 14px;
+                    font-weight: 700;
+                    font-size: 15px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+                    transition: all 0.3s;
+                }
+                .btn-submit-premium:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 20px 25px -5px rgba(79, 70, 229, 0.4);
+                }
+                .btn-submit-premium:disabled {
+                    background: #cbd5e1;
+                    box-shadow: none;
+                    cursor: not-allowed;
+                    transform: none;
                 }
 
                 @media (max-width: 1024px) {
-                    .composer-wrapper { grid-template-columns: 400px 1fr; }
-                }
-
-                @media (max-width: 850px) {
-                    .composer-wrapper { grid-template-columns: 1fr; }
-                    .editor-panel { height: auto; border-right: none; }
-                    .preview-panel { height: auto; padding: 20px; }
+                    .composer-container { grid-template-columns: 1fr; height: auto; }
+                    .editor-sidebar { border-right: none; }
                 }
             `}</style>
 
-            {/* Left: Settings & Editor */}
-            <div className="editor-panel">
-                <div className="editor-scroll-area">
-                    {(fetcher.data as any)?.message || (fetcher.data as any)?.error ? (
-                        <div className="notice-box" style={{ background: (fetcher.data as any).success ? '#e6fcf5' : '#fff5f5', color: (fetcher.data as any).success ? '#0ca678' : '#fa5252', borderColor: (fetcher.data as any).success ? '#b2f2bb' : '#ffa8a8' }}>
-                            {(fetcher.data as any).message || (fetcher.data as any).error}
+            <div className="editor-sidebar">
+                <div className="editor-content">
+                    {fetcherData?.message || fetcherData?.error ? (
+                        <div style={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            background: fetcherData.success ? '#f0fdf4' : '#fef2f2', 
+                            color: fetcherData.success ? '#16a34a' : '#dc2626',
+                            border: '1px solid',
+                            borderColor: fetcherData.success ? '#bbf7d0' : '#fecaca',
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            marginBottom: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                        }}>
+                            <Info size={18} />
+                            <span>{fetcherData.message || fetcherData.error}</span>
                         </div>
                     ) : null}
 
                     <fetcher.Form id="email-form" method="post">
-                        <div className="form-section">
-                            <h3>1. Select Audience</h3>
-                            <div className="audience-filters">
-                                <button type="button" className={`filter-btn ${filterPlan === 'all' ? 'active' : ''}`} onClick={() => setFilterPlan('all')}>All Shops</button>
-                                <button type="button" className={`filter-btn ${filterPlan === 'free' ? 'active' : ''}`} onClick={() => setFilterPlan('free')}>Free Plan</button>
-                                <button type="button" className={`filter-btn ${filterPlan === 'premium' ? 'active' : ''}`} onClick={() => setFilterPlan('premium')}>Premium</button>
-                                <button type="button" className={`filter-btn ${filterPlan === 'plus' ? 'active' : ''}`} onClick={() => setFilterPlan('plus')}>Plus</button>
-                            </div>
-                            
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '0 4px' }}>
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Found {displayedShops.length} shops</span>
-                                <label style={{ fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={allDisplayedSelected}
-                                        onChange={(e) => handleSelectAll(e.target.checked)}
-                                    /> Select All Displayed
-                                </label>
-                            </div>
-                            
-                            <div className="shop-list-container">
-                                {displayedShops.length > 0 ? displayedShops.map(s => (
-                                    <label key={s.shop} className="shop-row">
-                                        <input 
-                                            type="checkbox" 
-                                            name="selectedShops" 
-                                            value={s.shop}
-                                            checked={selectedShops.includes(s.shop)} 
-                                            onChange={() => toggleShop(s.shop)}
-                                        />
-                                        <div className="shop-info-text">
-                                            <div className="shop-name">{s.shop}</div>
-                                            <div className="shop-email">{s.email || <span style={{ color: '#ef4444' }}>No email found</span>}</div>
-                                        </div>
-                                        <div className="plan-badge">{s.plan}</div>
-                                    </label>
-                                )) : (
-                                    <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                                        No shops match this filter.
-                                    </div>
-                                )}
-                            </div>
+                        <div className="section-label"><Layers size={14} /> 1. Selected Audience</div>
+                        
+                        <div className="search-pill">
+                            <Search size={16} color="#94a3b8" />
+                            <input 
+                                type="text" 
+                                placeholder="Search by shop URL or email..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
                         </div>
 
-                        <div className="form-section">
-                            <h3>2. Compose Details</h3>
-                            <div className="field-group">
-                                <label>Template Preset</label>
-                                <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-                                    <option value="custom">Custom HTML</option>
-                                    <option value="welcome">Welcome Onboarding</option>
-                                    <option value="promo">Promotional Offer</option>
-                                    <option value="limit80">Usage Warning (80%)</option>
-                                </select>
-                            </div>
+                        <div className="plan-filters">
+                            <div className={`plan-chip ${filterPlan === 'all' ? 'active' : ''}`} onClick={() => setFilterPlan('all')}>All Shops</div>
+                            <div className={`plan-chip ${filterPlan === 'free' ? 'active' : ''}`} onClick={() => setFilterPlan('free')}>Free</div>
+                            <div className={`plan-chip ${filterPlan === 'premium' ? 'active' : ''}`} onClick={() => setFilterPlan('premium')}>Premium</div>
+                            <div className={`plan-chip ${filterPlan === 'plus' ? 'active' : ''}`} onClick={() => setFilterPlan('plus')}>Plus</div>
+                        </div>
 
-                            <div className="field-group">
-                                <label>Subject Line</label>
-                                <input 
-                                    type="text" 
-                                    name="subject" 
-                                    value={subject} 
-                                    onChange={(e) => setSubject(e.target.value)}
-                                    placeholder="Enter eye-catching subject..." 
-                                    required 
-                                />
-                            </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px 12px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>{displayedShops.length} Found</span>
+                            <label style={{ fontSize: '12px', fontWeight: 800, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <input type="checkbox" checked={allDisplayedSelected} onChange={(e) => handleSelectAll(e.target.checked)} />
+                                Select Displayed
+                            </label>
+                        </div>
 
-                            <div className="field-group" style={{ marginBottom: 0 }}>
-                                <label>HTML Body</label>
-                                <textarea
-                                    className="code-editor"
-                                    name="body"
-                                    value={body}
-                                    onChange={(e) => setBody(e.target.value)}
-                                    placeholder="<h1>Hello World</h1><p>Start coding...</p>"
-                                    required
-                                />
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'right' }}>
-                                    Standard HTML markup is fully supported.
+                        <div className="audience-list">
+                            {displayedShops.map(s => (
+                                <div key={s.shop} className={`audience-item ${selectedShops.includes(s.shop) ? 'active' : ''}`} onClick={() => toggleShop(s.shop)}>
+                                    <div className="shop-avatar">{s.shop.slice(0, 2).toUpperCase()}</div>
+                                    <div className="audience-info">
+                                        <div className="audience-name">{s.shop}</div>
+                                        <div className="audience-sub">{s.email || "No direct email"}</div>
+                                    </div>
+                                    <div className="audience-check">
+                                        {selectedShops.includes(s.shop) && <Check size={14} />}
+                                    </div>
+                                    <input type="hidden" name="selectedShops" value={s.shop} disabled={!selectedShops.includes(s.shop)} />
                                 </div>
-                            </div>
+                            ))}
+                        </div>
+
+                        <div className="section-label"><Mail size={14} /> 2. Campaign Content</div>
+
+                        <div className="form-control-group">
+                            <label>Design Template</label>
+                            <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+                                <option value="custom">Blank Canvas (Custom HTML)</option>
+                                <option value="welcome">Onboarding Welcome Email</option>
+                                <option value="promo">Feature Upgrade Promotion</option>
+                                <option value="limit80">System Alert: 80% Usage</option>
+                            </select>
+                        </div>
+
+                        <div className="form-control-group">
+                            <label>Subject Line</label>
+                            <input 
+                                type="text" 
+                                name="subject" 
+                                value={subject} 
+                                onChange={(e) => setSubject(e.target.value)}
+                                placeholder="What will they see in their inbox?" 
+                                required 
+                            />
+                        </div>
+
+                        <div className="form-control-group" style={{ marginBottom: 0 }}>
+                            <label>Markup Content (HTML)</label>
+                            <textarea
+                                className="modern-editor"
+                                name="body"
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                placeholder="Paste your HTML build here..."
+                                required
+                            />
                         </div>
                     </fetcher.Form>
                 </div>
-                
-                <div className="action-footer">
-                    <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600 }}>{selectedShops.length} selected</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Ready to launch</div>
+
+                <div className="footer-actions">
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#1e293b' }}>{selectedShops.length} Recipients</div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Queued for delivery</div>
                     </div>
                     <button 
                         type="submit" 
                         form="email-form" 
-                        className="btn-primary"
+                        className="btn-submit-premium"
                         disabled={isSending || selectedShops.length === 0 || !subject || !body}
                     >
-                        {isSending ? "Sending..." : "Send Campaign"}
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        {isSending ? "Processing..." : "Launch Campaign"}
+                        <Send size={18} />
                     </button>
                 </div>
             </div>
 
-            {/* Right: Live Preview */}
-            <div className="preview-panel">
-                <div className="device-frame">
-                    <div className="device-header">
-                        <div className="subject-preview">{subject || "No Subject provided"}</div>
-                        <div className="sender-preview">From: GeoPro Admin &lt;send@geopro.bluepeaks.top&gt;</div>
+            <div className="preview-viewport">
+                <div className="preview-controls">
+                    <button className={`control-btn ${previewMode === 'desktop' ? 'active' : ''}`} onClick={() => setPreviewMode('desktop')}>
+                        <Monitor size={16} /> Desktop
+                    </button>
+                    <button className={`control-btn ${previewMode === 'mobile' ? 'active' : ''}`} onClick={() => setPreviewMode('mobile')}>
+                        <Smartphone size={16} /> Mobile
+                    </button>
+                </div>
+
+                <div className="mac-window" style={{ maxWidth: previewMode === 'mobile' ? '375px' : '700px' }}>
+                    <div className="mac-titlebar">
+                        <div className="mac-dots">
+                            <div className="mac-dot dot-red"></div>
+                            <div className="mac-dot dot-yellow"></div>
+                            <div className="mac-dot dot-green"></div>
+                        </div>
+                        <div className="mac-url">Draft Campaign Preview</div>
                     </div>
-                    <div 
-                        className="preview-content"
-                        dangerouslySetInnerHTML={{ __html: body || "<div style='color: #94a3b8; font-style: italic; text-align: center; padding-top: 40px;'>Email preview will appear here...</div>" }}
-                    />
+                    <div className="preview-frame-content">
+                        <div className="preview-email-header">
+                            <div className="preview-subj">{subject || "Add a subject line..."}</div>
+                            <div className="preview-from">
+                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 800 }}>G</div>
+                                <span><strong>Geo: Redirect & Country Block</strong> &lt;send@geopro.bluepeaks.top&gt;</span>
+                            </div>
+                        </div>
+                        <div 
+                            style={{ padding: previewMode === 'mobile' ? '20px' : '40px' }}
+                            dangerouslySetInnerHTML={{ __html: body || "<div style='color: #94a3b8; font-style: italic; text-align: center; padding: 100px 0;'>Select a template or start writing HTML to see a preview.</div>" }}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '40px', display: 'flex', gap: '32px', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Layout size={16} /> Fully Responsive</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><AlertCircle size={16} /> Verified Markup</div>
                 </div>
             </div>
         </div>

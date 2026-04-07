@@ -53,7 +53,7 @@ export async function sendAdminEmail({
         }
 
         const { data, error } = await resend.emails.send({
-            from: `GeoPro Admin <${SENDER}>`,
+            from: `Geo: Redirect & Country Block <${SENDER}>`,
             to: [recipient],
             subject: subject,
             html: html,

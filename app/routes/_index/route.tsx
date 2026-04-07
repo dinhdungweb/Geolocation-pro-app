@@ -76,7 +76,7 @@ export default function App() {
                       </svg>
                     </div>
                     <Text variant="headingXl" as="h1" alignment="center">
-                      GeoPro
+                      Geo: Redirect & Country Block
                     </Text>
                     <Text variant="bodyMd" as="p" alignment="center" tone="subdued">
                       Advanced Geolocation Redirects & Blocking to protect your store.
