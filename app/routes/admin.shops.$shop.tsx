@@ -142,7 +142,7 @@ export default function AdminShopDetail() {
             `}</style>
 
             <div className="back-bar">
-                <Link to="/admin" className="back-btn">← Back to Dashboard</Link>
+                <Link to="/admin/shops" className="back-btn">← Back to Shops List</Link>
             </div>
 
             <div className="shop-header">

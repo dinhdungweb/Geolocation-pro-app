@@ -110,7 +110,7 @@ export default function AdminShops() {
                 .action-btn {
                     padding: 8px 16px;
                     background: white;
-                    border: 1px solid var(--border);
+                    border: 1px solid #e2e8f0;
                     border-radius: 10px;
                     text-decoration: none;
                     color: var(--text);
@@ -118,8 +118,10 @@ export default function AdminShops() {
                     font-weight: 600;
                     transition: all 0.2s;
                     display: flex; align-items: center; gap: 8px;
+                    width: fit-content;
+                    white-space: nowrap;
                 }
-                .action-btn:hover { border-color: var(--primary); color: var(--primary); }
+                .action-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1); }
             `}</style>
 
             <div className="shops-header">
