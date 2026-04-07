@@ -70,4 +70,7 @@ export default defineConfig({
   optimizeDeps: {
     include: ["@shopify/app-bridge-react", "@shopify/polaris"],
   },
+  ssr: {
+    noExternal: ["lucide-react"],
+  },
 }) satisfies UserConfig;
