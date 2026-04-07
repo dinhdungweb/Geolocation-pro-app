@@ -53,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 };
 
-export default function AdminMarketing() {
+export default function AdminCampaigns() {
     const { campaigns, reach } = useLoaderData<typeof loader>();
 
     return (

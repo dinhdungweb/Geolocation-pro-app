@@ -8,6 +8,7 @@ import {
     Store, 
     Users, 
     Rocket, 
+    Mail,
     Globe, 
     Search, 
     LogOut, 
@@ -45,7 +46,8 @@ export default function AdminLayout() {
         { label: "Dashboard", to: "/admin", icon: <Home size={18} />, end: true },
         { label: "Shops", to: "/admin/shops", icon: <Store size={18} /> },
         { label: "CRM (Customers)", to: "/admin/crm", icon: <Users size={18} /> },
-        { label: "Marketing", to: "/admin/marketing", icon: <Rocket size={18} /> },
+        { label: "Campaigns", to: "/admin/campaigns", icon: <Rocket size={18} /> },
+        { label: "Email Marketing", to: "/admin/emails", icon: <Mail size={18} /> },
     ];
 
     return (
