@@ -25,7 +25,7 @@ import { checkAndChargeOverage } from "../utils/billing.server";
 import prisma from "../db.server";
 import { COUNTRY_MAP, getCountryFlag } from "../utils/countries";
 import { sendAdminEmail, hasSentEmail } from "../utils/email.server";
-import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates.server";
+import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>

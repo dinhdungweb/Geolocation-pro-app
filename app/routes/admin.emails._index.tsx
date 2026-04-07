@@ -8,7 +8,7 @@ import { sendAdminEmail } from "../utils/email.server";
 import { unauthenticated } from "../shopify.server";
 
 // Sample templates
-import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates.server";
+import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
 
 const PROMO_TEMPLATE = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e1e1e1; border-radius: 8px; overflow: hidden;">
     <div style="background-color: #6366f1; padding: 20px; text-align: center;">
