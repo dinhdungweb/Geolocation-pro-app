@@ -414,6 +414,9 @@ export default function EmailComposer() {
                     border-radius: 16px;
                     box-shadow: 0 50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
                     overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    max-height: 75vh;
                     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
                 }
                 
@@ -443,8 +446,10 @@ export default function EmailComposer() {
                 
                 .preview-frame-content {
                     padding: 0;
-                    min-height: 500px;
+                    flex: 1;
+                    overflow-y: auto;
                     background: white;
+                    min-height: 400px;
                 }
                 
                 .preview-email-header {

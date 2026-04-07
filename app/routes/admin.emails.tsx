@@ -119,6 +119,12 @@ export default function AdminEmailsLayout() {
                     >
                         <span>Send History</span>
                     </NavLink>
+                    <NavLink 
+                        to="/admin/emails/automations" 
+                        className={({ isActive }) => `emails-nav-item ${isActive ? 'active' : ''}`}
+                    >
+                        <span>Automations</span>
+                    </NavLink>
                 </div>
             </div>
 
