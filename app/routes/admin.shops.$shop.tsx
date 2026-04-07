@@ -246,7 +246,19 @@ export default function AdminShopDetail() {
                             {rules.map((r: any) => (
                                 <tr key={r.id}>
                                     <td><strong>{r.name}</strong></td>
-                                    <td><span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.matchType.toUpperCase()} ({r.countryCodes || 'All'})</span></td>
+                                    <td>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                                            <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>{r.matchType.toUpperCase()}</div>
+                                            <div style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.countryCodes || 'All'}>
+                                                {(() => {
+                                                    if (!r.countryCodes || r.countryCodes === '*') return 'All Countries';
+                                                    const codes = r.countryCodes.split(',');
+                                                    if (codes.length <= 3) return r.countryCodes;
+                                                    return `${codes.slice(0, 3).join(', ')} ... +${codes.length - 3} more`;
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : '#eef2ff', color: r.ruleType === 'block' ? '#ef4444' : '#6366f1' }}>{r.ruleType.toUpperCase()}</span></td>
                                     <td>{r.isActive ? <span style={{ color: '#10b981' }}>● Active</span> : <span style={{ color: '#94a3b8' }}>○ Inactive</span>}</td>
                                     <td>{r.priority}</td>
