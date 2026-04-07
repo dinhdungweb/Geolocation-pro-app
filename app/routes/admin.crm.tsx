@@ -58,7 +58,12 @@ export default function AdminCRM() {
     return (
         <div className="crm-view">
             <style>{`
-                .stats-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 32px; }
+                .stats-bar { 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); 
+                    gap: 24px; 
+                    margin-bottom: 32px; 
+                }
                 .crm-table-container {
                     background: var(--surface);
                     border: 1px solid var(--border);
@@ -66,7 +71,8 @@ export default function AdminCRM() {
                     overflow: hidden;
                 }
                 .table-header { padding: 24px; border-bottom: 1px solid var(--border); }
-                table { width: 100%; border-collapse: collapse; }
+                .table-scroll { overflow-x: auto; width: 100%; }
+                table { width: 100%; border-collapse: collapse; min-width: 800px; }
                 th { 
                     text-align: left; padding: 12px 24px; background: #f8fafc;
                     font-size: 11px; text-transform: uppercase; color: var(--text-muted);
@@ -78,6 +84,13 @@ export default function AdminCRM() {
                 .flag { width: 20px; border-radius: 2px; }
                 .time { color: var(--text-muted); font-size: 12px; }
                 .ip-text { font-family: monospace; color: var(--text-muted); font-size: 13px; }
+
+                @media (max-width: 768px) {
+                    .stats-bar { gap: 16px; }
+                    .table-header { padding: 16px; }
+                    td, th { padding: 12px 16px; }
+                    .stats-bar .flat-card div:nth-child(2) { font-size: 22px !important; }
+                }
             `}</style>
 
             <div className="stats-bar">
@@ -97,6 +110,7 @@ export default function AdminCRM() {
                     <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>Real-time monitoring of how customers interact with your geolocation rules.</p>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
+                <div className="table-scroll">
                     <table>
                         <thead>
                             <tr>
@@ -141,6 +155,7 @@ export default function AdminCRM() {
                             ))}
                         </tbody>
                     </table>
+                </div>
                 </div>
             </div>
         </div>

@@ -46,6 +46,7 @@ export default function AdminShops() {
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 32px;
+                    gap: 16px;
                 }
                 .search-box {
                     background: white;
@@ -73,7 +74,8 @@ export default function AdminShops() {
                     box-shadow: 0 4px 20px rgba(0,0,0,0.03);
                 }
                 
-                table { width: 100%; border-collapse: collapse; }
+                .table-container { width: 100%; overflow-x: auto; }
+                table { width: 100%; border-collapse: collapse; min-width: 900px; }
                 th { 
                     text-align: left; padding: 18px 24px; background: #f8fafc;
                     font-size: 12px; font-weight: 700; color: var(--text-muted);
@@ -83,7 +85,7 @@ export default function AdminShops() {
                 td { padding: 20px 24px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
                 tr:last-child td { border-bottom: none; }
                 tr:hover td { background: #f9fafb; }
-
+ 
                 .shop-link { color: var(--primary); text-decoration: none; font-weight: 600; }
                 .shop-link:hover { text-decoration: underline; }
 
@@ -122,6 +124,13 @@ export default function AdminShops() {
                     white-space: nowrap;
                 }
                 .action-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1); }
+
+                @media (max-width: 768px) {
+                    .shops-header { flex-direction: column; align-items: stretch; margin-bottom: 24px; }
+                    .search-box { width: 100%; }
+                    .shops-table-card { border-radius: 16px; }
+                    td, th { padding: 16px; }
+                }
             `}</style>
 
             <div className="shops-header">
@@ -135,54 +144,56 @@ export default function AdminShops() {
             </div>
 
             <div className="shops-table-card">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Shop Domain</th>
-                            <th>Plan</th>
-                            <th>Active Mode</th>
-                            <th>Rules</th>
-                            <th>Traffic (Last Month)</th>
-                            <th>Installed</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {shops.map(shop => (
-                            <tr key={shop.id}>
-                                <td>
-                                    <Link to={`/admin/shops/${shop.shop}`} className="shop-link">
-                                        {shop.shop}
-                                    </Link>
-                                </td>
-                                <td>
-                                    <span className={`plan-badge ${shop.currentPlan === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
-                                        {shop.currentPlan}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div className="mode-tag">
-                                        <div className="mode-dot" style={{ background: shop.mode === 'auto_redirect' ? '#10b981' : '#6366f1' }} />
-                                        {shop.mode.replace('_', ' ').toUpperCase()}
-                                    </div>
-                                </td>
-                                <td><b>{shop.ruleCount}</b> active</td>
-                                <td>
-                                    <div style={{ fontWeight: 600 }}>{shop.latestUsage?.totalVisitors?.toLocaleString() || 0}</div>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{shop.latestUsage?.redirected || 0} actions</div>
-                                </td>
-                                <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                                    {new Date(shop.createdAt).toLocaleDateString('en-GB')}
-                                </td>
-                                <td>
-                                    <Link to={`/admin/shops/${shop.shop}`} className="action-btn">
-                                        Manage <ExternalLink size={14} />
-                                    </Link>
-                                </td>
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Shop Domain</th>
+                                <th>Plan</th>
+                                <th>Active Mode</th>
+                                <th>Rules</th>
+                                <th>Traffic (Last Month)</th>
+                                <th>Installed</th>
+                                <th>Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {shops.map(shop => (
+                                <tr key={shop.id}>
+                                    <td>
+                                        <Link to={`/admin/shops/${shop.shop}`} className="shop-link">
+                                            {shop.shop}
+                                        </Link>
+                                    </td>
+                                    <td>
+                                        <span className={`plan-badge ${shop.currentPlan === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
+                                            {shop.currentPlan}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="mode-tag">
+                                            <div className="mode-dot" style={{ background: shop.mode === 'auto_redirect' ? '#10b981' : '#6366f1' }} />
+                                            {shop.mode.replace('_', ' ').toUpperCase()}
+                                        </div>
+                                    </td>
+                                    <td><b>{shop.ruleCount}</b> active</td>
+                                    <td>
+                                        <div style={{ fontWeight: 600 }}>{shop.latestUsage?.totalVisitors?.toLocaleString() || 0}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{shop.latestUsage?.redirected || 0} actions</div>
+                                    </td>
+                                    <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                        {new Date(shop.createdAt).toLocaleDateString('en-GB')}
+                                    </td>
+                                    <td>
+                                        <Link to={`/admin/shops/${shop.shop}`} className="action-btn">
+                                            Manage <ExternalLink size={14} />
+                                        </Link>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

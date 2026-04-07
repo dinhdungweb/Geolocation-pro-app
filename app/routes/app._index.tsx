@@ -24,6 +24,8 @@ import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN } from 
 import { checkAndChargeOverage } from "../utils/billing.server";
 import prisma from "../db.server";
 import { COUNTRY_MAP, getCountryFlag } from "../utils/countries";
+import { sendAdminEmail, hasSentEmail } from "../utils/email.server";
+import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates.server";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -108,6 +110,47 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Calculate and charge overage if applicable (only for paid plans)
   await checkAndChargeOverage(shop, billing, isTest);
+
+  // --- Automated Email Triggers ---
+  const usagePercentRaw = Math.round((currentUsage / planLimit) * 100);
+  
+  // 1. Welcome Email (First time visiting dashboard after install)
+  const welcomed = await hasSentEmail(shop, 'welcome');
+  if (!welcomed) {
+    await sendAdminEmail({
+      shop,
+      type: 'welcome',
+      subject: 'Welcome to GeoPro Geolocation Redirect!',
+      html: getWelcomeEmailHtml(shop)
+    });
+  }
+
+  // 2. 80% Usage Limit Warning
+  if (usagePercentRaw >= 80 && usagePercentRaw < 100) {
+    const sent80 = await hasSentEmail(shop, 'limit_80');
+    if (!sent80) {
+      await sendAdminEmail({
+        shop,
+        type: 'limit_80',
+        subject: `Usage Warning: ${shop} has reached 80% of its limit`,
+        html: getLimit80EmailHtml(shop, currentUsage, planLimit)
+      });
+    }
+  }
+
+  // 3. 100% Usage Limit Warning
+  if (usagePercentRaw >= 100) {
+    const sent100 = await hasSentEmail(shop, 'limit_100');
+    if (!sent100) {
+      await sendAdminEmail({
+        shop,
+        type: 'limit_100',
+        subject: `ACTION REQUIRED: ${shop} has reached 100% of its limit`,
+        html: getLimit100EmailHtml(shop, currentUsage, planLimit)
+      });
+    }
+  }
+  // --------------------------------
 
 
 

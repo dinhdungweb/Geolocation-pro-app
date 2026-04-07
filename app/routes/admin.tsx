@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Outlet, useLoaderData, NavLink, Form, useLocation } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
     Home, 
@@ -10,7 +11,9 @@ import {
     Globe, 
     Search, 
     LogOut, 
-    Activity 
+    Activity,
+    Menu,
+    X
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -25,8 +28,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminLayout() {
     const { username } = useLoaderData<typeof loader>();
     const location = useLocation();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const isLoginPage = location.pathname === "/admin/login";
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setIsSidebarOpen(false);
+    }, [location.pathname]);
 
     if (isLoginPage) {
         return <Outlet />;
@@ -77,7 +86,8 @@ export default function AdminLayout() {
                     flex-direction: column;
                     position: fixed;
                     height: 100vh;
-                    z-index: 100;
+                    z-index: 1000;
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     box-shadow: 10px 0 30px rgba(0,0,0,0.1);
                 }
                 
@@ -85,9 +95,11 @@ export default function AdminLayout() {
                     padding: 32px 24px;
                     display: flex;
                     align-items: center;
-                    gap: 16px;
+                    justify-content: space-between;
                 }
                 
+                .logo-box-wrap { display: flex; align-items: center; gap: 16px; }
+
                 .logo-box {
                     width: 42px; height: 42px;
                     background: var(--primary-gradient);
@@ -102,9 +114,16 @@ export default function AdminLayout() {
                     letter-spacing: -0.02em;
                 }
                 
+                .btn-close-sidebar {
+                    display: none;
+                    background: none; border: none; color: white; cursor: pointer;
+                    padding: 8px; border-radius: 8px;
+                }
+
                 .sidebar-nav {
                     padding: 10px 16px;
                     flex: 1;
+                    overflow-y: auto;
                 }
                 
                 .nav-link {
@@ -158,7 +177,7 @@ export default function AdminLayout() {
                     font-size: 16px; font-weight: 700; color: white;
                 }
                 
-                .username { font-size: 14px; font-weight: 600; color: white; }
+                .username { font-size: 14px; font-weight: 600; color: white; overflow: hidden; text-overflow: ellipsis; }
 
                 .btn-logout-alt {
                     width: 100%;
@@ -179,6 +198,8 @@ export default function AdminLayout() {
                     flex: 1;
                     margin-left: var(--sidebar-width);
                     background: var(--bg);
+                    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    min-width: 0;
                 }
                 
                 .topbar {
@@ -189,10 +210,18 @@ export default function AdminLayout() {
                     align-items: center;
                     justify-content: space-between;
                     padding: 0 40px;
-                    position: sticky; top: 0; z-index: 90;
+                    position: sticky; top: 0; z-index: 900;
+                    border-bottom: 1px solid var(--border);
                 }
                 
-                .topbar h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+                .topbar-left { display: flex; align-items: center; gap: 16px; flex: 1; }
+                .btn-menu-toggle {
+                    display: none;
+                    background: white; border: 1px solid var(--border); border-radius: 10px;
+                    padding: 10px; cursor: pointer; color: var(--text);
+                }
+
+                .topbar h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); white-space: nowrap; }
 
                 .page-content {
                     padding: 40px;
@@ -207,16 +236,59 @@ export default function AdminLayout() {
                     width: 300px;
                 }
                 .global-search input { border: none; outline: none; width: 100%; font-size: 13px; font-family: inherit; }
+                
+                .topbar-right { display: flex; align-items: center; gap: 20px; }
+                
                 .status-badge {
                     background: #ecfdf5; color: #10b981; padding: 4px 10px; border-radius: 20px;
                     font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px;
                 }
+
+                .sidebar-overlay {
+                    display: none;
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0,0,0,0.5); z-index: 950;
+                    backdrop-filter: blur(4px);
+                }
+
+                /* Responsive Breakpoints */
+                @media (max-width: 1024px) {
+                    .global-search { width: 40px; padding: 10px; overflow: hidden; border-radius: 50%; }
+                    .global-search input { display: none; }
+                }
+
+                @media (max-width: 768px) {
+                    .sidebar { transform: translateX(-100%); }
+                    .sidebar.open { transform: translateX(0); }
+                    .sidebar-overlay.visible { display: block; }
+                    .btn-close-sidebar { display: block; }
+
+                    .main-container { margin-left: 0; }
+                    .topbar { padding: 0 20px; height: 70px; }
+                    .btn-menu-toggle { display: flex; }
+                    .page-content { padding: 20px; }
+                    .topbar h2 { font-size: 16px; }
+                    .status-badge span { display: none; }
+                    .topbar-right { gap: 12px; }
+                }
+
+                @media (max-width: 480px) {
+                    .topbar-actions .topbar-date { display: none; }
+                    .topbar-left { gap: 8px; }
+                }
             `}</style>
             
-            <aside className="sidebar">
+            <div className={`sidebar-overlay ${isSidebarOpen ? 'visible' : ''}`} onClick={() => setIsSidebarOpen(false)} />
+
+            <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <div className="logo-box"><Globe size={24} /></div>
-                    <span className="brand-name">GeoAdmin</span>
+                    <div className="logo-box-wrap">
+                        <div className="logo-box"><Globe size={24} /></div>
+                        <span className="brand-name">GeoAdmin</span>
+                    </div>
+                    <button className="btn-close-sidebar" onClick={() => setIsSidebarOpen(false)}>
+                        <X size={24} />
+                    </button>
                 </div>
                 <nav className="sidebar-nav">
                     {menuItems.map(item => (
@@ -247,20 +319,23 @@ export default function AdminLayout() {
 
             <div className="main-container">
                 <header className="topbar">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '40px', flex: 1 }}>
+                    <div className="topbar-left">
+                        <button className="btn-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
+                            <Menu size={20} />
+                        </button>
                         <h2>{location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.toUpperCase()}</h2>
                         <div className="global-search">
                             <Search size={16} color="var(--text-muted)" />
-                            <input type="text" placeholder="Search systems, shops, or logs..." />
+                            <input type="text" placeholder="Search systems, shops..." />
                         </div>
                     </div>
                     
-                    <div className="topbar-actions">
+                    <div className="topbar-right">
                         <div className="status-badge">
                             <Activity size={12} strokeWidth={3} />
-                            System Live
+                            <span>System Live</span>
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <div className="topbar-date" style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
                             {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                         </div>
                     </div>

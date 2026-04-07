@@ -110,13 +110,29 @@ export default function AdminShopDetail() {
                 }
                 .back-btn:hover { color: var(--primary); }
 
-                .shop-header { margin-bottom: 32px; display: flex; align-items: flex-end; gap: 12px; }
-                .shop-header h1 { font-size: 28px; font-weight: 700; color: var(--text); }
+                .shop-header { 
+                    margin-bottom: 32px; 
+                    display: flex; 
+                    align-items: flex-end; 
+                    justify-content: space-between;
+                    gap: 16px; 
+                }
+                .shop-header h1 { font-size: 28px; font-weight: 700; color: var(--text); word-break: break-all; }
                 .shop-header .domain { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
 
-                .stats-grid-small { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+                .stats-grid-small { 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+                    gap: 16px; 
+                    margin-bottom: 32px; 
+                }
                 
-                .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+                .section-grid { 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); 
+                    gap: 24px; 
+                    margin-bottom: 32px; 
+                }
                 
                 .card-v3 {
                     background: var(--surface); border: 1px solid var(--border); border-radius: 16px; 
@@ -128,17 +144,33 @@ export default function AdminShopDetail() {
                 .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
                 .info-item:last-child { border-bottom: none; }
                 .info-item .label { color: var(--text-muted); font-size: 13px; }
-                .info-item .value { font-weight: 600; font-size: 13px; }
+                .info-item .value { font-weight: 600; font-size: 13px; text-align: right; }
 
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
                 .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 10px; }
                 .month-name { font-weight: 700; font-size: 14px; color: var(--primary); }
                 .month-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); }
 
-                table { width: 100%; border-collapse: collapse; }
+                .table-container { width: 100%; overflow-x: auto; }
+                table { width: 100%; border-collapse: collapse; min-width: 600px; }
                 th { text-align: left; padding: 12px 20px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); background: #f8fafc; }
                 td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
                 .badge-v3 { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+
+                @media (max-width: 768px) {
+                    .shop-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+                    .shop-header h1 { font-size: 24px; }
+                    .stats-grid-small { grid-template-columns: 1fr 1fr; gap: 12px; }
+                    .stats-grid-small .flat-card div:last-child { font-size: 20px !important; }
+                    .section-grid { grid-template-columns: 1fr; gap: 16px; }
+                    .card-v3-header { padding: 12px 16px; }
+                    .card-v3-body { padding: 16px; }
+                    .month-stats { flex-direction: column; gap: 4px; align-items: flex-end; }
+                }
+
+                @media (max-width: 480px) {
+                    .stats-grid-small { grid-template-columns: 1fr; }
+                }
             `}</style>
 
             <div className="back-bar">
@@ -231,7 +263,7 @@ export default function AdminShopDetail() {
 
             <div className="card-v3" style={{ marginBottom: '32px' }}>
                 <div className="card-v3-header">Redirect & Block Rules</div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-container">
                     <table>
                         <thead>
                             <tr>
@@ -271,7 +303,7 @@ export default function AdminShopDetail() {
 
             <div className="card-v3">
                 <div className="card-v3-header">Live Interaction Logs</div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-container">
                     <table>
                         <thead>
                             <tr>

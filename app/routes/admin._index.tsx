@@ -79,8 +79,17 @@ export default function AdminDashboard() {
     return (
         <div className="dashboard-v2">
             <style>{`
-                .grid-main { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; }
-                .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 32px; }
+                .grid-main { 
+                    display: grid; 
+                    grid-template-columns: 2fr 1fr; 
+                    gap: 32px; 
+                }
+                .grid-stats { 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+                    gap: 24px; 
+                    margin-bottom: 32px; 
+                }
                 
                 .premium-card {
                     background: white; border-radius: 30px; border: 1px solid var(--border);
@@ -110,6 +119,17 @@ export default function AdminDashboard() {
                 .plan-tag {
                     padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
                     background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;
+                }
+
+                @media (max-width: 1200px) {
+                    .grid-main { grid-template-columns: 1fr; }
+                }
+
+                @media (max-width: 768px) {
+                    .grid-stats { grid-template-columns: 1fr; gap: 16px; }
+                    .premium-card { padding: 24px; border-radius: 20px; }
+                    .stat-icon { width: 40px; height: 40px; font-size: 20px; margin-bottom: 16px; }
+                    .grid-stats .premium-card div:nth-child(3) { font-size: 28px !important; }
                 }
             `}</style>
 
