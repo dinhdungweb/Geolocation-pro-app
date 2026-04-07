@@ -21,127 +21,170 @@ export default function AdminLayout() {
     }
 
     const menuItems = [
-        { label: "Dashboard", to: "/admin", icon: "📊" },
+        { label: "Dashboard", to: "/admin", icon: "🏠", end: true },
+        { label: "Shops", to: "/admin/shops", icon: "🏪" },
         { label: "CRM (Customers)", to: "/admin/crm", icon: "👥" },
         { label: "Marketing", to: "/admin/marketing", icon: "🚀" },
-        { label: "Shops", to: "/admin", icon: "🏪", end: true }, // Reuse dashboard for shop list or create separate
     ];
 
     return (
         <div className="admin-shell">
             <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+                
                 :root {
                     --primary: #6366f1;
-                    --primary-hover: #4f46e5;
-                    --bg: #f8fafc;
+                    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                    --bg: #f1f5f9;
+                    --sidebar-bg: #0f172a;
                     --surface: #ffffff;
-                    --text: #1e293b;
+                    --text: #0f172a;
                     --text-muted: #64748b;
                     --border: #e2e8f0;
-                    --sidebar-width: 260px;
+                    --sidebar-width: 280px;
                 }
+                
                 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+                
                 body {
-                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    font-family: 'Outfit', sans-serif;
                     background: var(--bg);
                     color: var(--text);
+                    -webkit-font-smoothing: antialiased;
                 }
+                
                 .admin-shell {
                     display: flex;
                     min-height: 100vh;
                 }
-                /* SIDEBAR */
+                
+                /* SIDEBAR - PREMIUM GLASS/DARK */
                 .sidebar {
                     width: var(--sidebar-width);
-                    background: var(--surface);
-                    border-right: 1px solid var(--border);
+                    background: var(--sidebar-bg);
                     display: flex;
                     flex-direction: column;
                     position: fixed;
                     height: 100vh;
-                    z-index: 50;
+                    z-index: 100;
+                    box-shadow: 10px 0 30px rgba(0,0,0,0.1);
                 }
+                
                 .sidebar-header {
-                    padding: 24px;
+                    padding: 32px 24px;
                     display: flex;
                     align-items: center;
-                    gap: 12px;
-                    border-bottom: 1px solid var(--border);
+                    gap: 16px;
                 }
+                
                 .logo-box {
-                    width: 36px; height: 36px;
-                    background: linear-gradient(135deg, var(--primary), #8b5cf6);
-                    border-radius: 8px;
+                    width: 42px; height: 42px;
+                    background: var(--primary-gradient);
+                    border-radius: 12px;
                     display: flex; align-items: center; justify-content: center;
-                    color: white; font-size: 20px;
+                    color: white; font-size: 24px;
+                    box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
                 }
-                .brand-name { font-weight: 700; font-size: 18px; color: var(--text); }
+                
+                .brand-name { 
+                    font-weight: 700; font-size: 20px; color: white; 
+                    letter-spacing: -0.02em;
+                }
                 
                 .sidebar-nav {
-                    padding: 20px 12px;
+                    padding: 10px 16px;
                     flex: 1;
                 }
+                
                 .nav-link {
                     display: flex;
                     align-items: center;
-                    gap: 12px;
-                    padding: 12px 16px;
+                    gap: 14px;
+                    padding: 14px 20px;
                     text-decoration: none;
-                    color: var(--text-muted);
-                    font-size: 14px;
+                    color: #94a3b8;
+                    font-size: 15px;
                     font-weight: 500;
-                    border-radius: 10px;
-                    transition: all 0.2s;
-                    margin-bottom: 4px;
+                    border-radius: 14px;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    margin-bottom: 8px;
                 }
+                
                 .nav-link:hover {
-                    background: #f1f5f9;
-                    color: var(--text);
+                    color: white;
+                    background: rgba(255,255,255,0.05);
                 }
+                
                 .nav-link.active {
-                    background: #eef2ff;
-                    color: var(--primary);
+                    background: var(--primary-gradient);
+                    color: white;
+                    box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
                 }
+                
+                .nav-link span { font-size: 18px; }
+
                 .sidebar-footer {
-                    padding: 16px;
-                    border-top: 1px solid var(--border);
+                    padding: 24px;
+                    margin: 16px;
+                    background: rgba(255,255,255,0.03);
+                    border-radius: 20px;
+                    border: 1px solid rgba(255,255,255,0.05);
                 }
+                
                 .user-info {
                     display: flex;
                     align-items: center;
-                    gap: 10px;
-                    padding: 8px;
-                    margin-bottom: 12px;
+                    gap: 12px;
+                    margin-bottom: 16px;
                 }
+                
                 .avatar {
-                    width: 32px; height: 32px;
-                    background: #e2e8f0;
-                    border-radius: 50%;
+                    width: 40px; height: 40px;
+                    background: linear-gradient(135deg, #f472b6, #fb7185);
+                    border-radius: 12px;
                     display: flex; align-items: center; justify-content: center;
-                    font-size: 14px; font-weight: 600; color: var(--text-muted);
+                    font-size: 16px; font-weight: 700; color: white;
                 }
-                .username { font-size: 13px; font-weight: 600; color: var(--text); }
+                
+                .username { font-size: 14px; font-weight: 600; color: white; }
+
+                .btn-logout-alt {
+                    width: 100%;
+                    background: rgba(239, 68, 68, 1);
+                    border: none;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 10px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                .btn-logout-alt:hover { opacity: 0.9; transform: translateY(-1px); }
 
                 /* MAIN */
                 .main-container {
                     flex: 1;
                     margin-left: var(--sidebar-width);
-                    display: flex;
-                    flex-direction: column;
+                    background: var(--bg);
                 }
+                
                 .topbar {
-                    height: 64px;
-                    background: var(--surface);
-                    border-bottom: 1px solid var(--border);
+                    height: 80px;
+                    background: rgba(241, 245, 249, 0.8);
+                    backdrop-filter: blur(12px);
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 0 32px;
-                    position: sticky; top: 0; z-index: 40;
+                    padding: 0 40px;
+                    position: sticky; top: 0; z-index: 90;
                 }
+                
+                .topbar h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+
                 .page-content {
-                    padding: 32px;
-                    max-width: 1400px;
+                    padding: 40px;
+                    max-width: 1600px;
                     width: 100%;
                     margin: 0 auto;
                 }
@@ -205,14 +248,36 @@ export default function AdminLayout() {
 
             <div className="main-container">
                 <header className="topbar">
-                    <h2 style={{ fontSize: '16px', fontWeight: 600 }}>{location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.toUpperCase()}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '40px', flex: 1 }}>
+                        <h2>{location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.toUpperCase()}</h2>
+                        <div className="global-search">
+                            <span>🔍</span>
+                            <input type="text" placeholder="Search systems, shops, or logs..." />
+                        </div>
+                    </div>
+                    
                     <div className="topbar-actions">
-                        {/* Placeholder for notifications/search */}
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        <div className="status-badge">
+                            <div className="dot" style={{ background: '#10b981' }} />
+                            System Live
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                         </div>
                     </div>
                 </header>
+            <style>{`
+                .global-search {
+                    background: white; border: 1px solid var(--border);
+                    border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+                    width: 300px;
+                }
+                .global-search input { border: none; outline: none; width: 100%; font-size: 13px; font-family: inherit; }
+                .status-badge {
+                    background: #ecfdf5; color: #10b981; padding: 4px 10px; border-radius: 20px;
+                    font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px;
+                }
+            `}</style>
                 <main className="page-content">
                     <Outlet />
                 </main>
