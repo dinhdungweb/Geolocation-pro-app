@@ -20,6 +20,7 @@ import {
     ChevronRightIcon,
 } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
+import { CheckCircle2 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
@@ -265,15 +266,24 @@ export default function SetupGuide() {
                                 <Text as="h2" variant="headingMd">Tips</Text>
                                 <Divider />
                                 <BlockStack gap="200">
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                        ✅ Always clear your browser cookies when testing rules.
-                                    </Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                        ✅ Try Incognito mode for a fresh visitor experience.
-                                    </Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                        ✅ Use Visitor Logs to confirm the app is detecting countries correctly.
-                                    </Text>
+                                    <InlineStack gap="200" wrap={false} blockAlign="center">
+                                        <CheckCircle2 size={16} color="#008060" />
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Always clear your browser cookies when testing rules.
+                                        </Text>
+                                    </InlineStack>
+                                    <InlineStack gap="200" wrap={false} blockAlign="center">
+                                        <CheckCircle2 size={16} color="#008060" />
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Try Incognito mode for a fresh visitor experience.
+                                        </Text>
+                                    </InlineStack>
+                                    <InlineStack gap="200" wrap={false} blockAlign="center">
+                                        <CheckCircle2 size={16} color="#008060" />
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Use Visitor Logs to confirm the app is detecting countries correctly.
+                                        </Text>
+                                    </InlineStack>
                                 </BlockStack>
                             </BlockStack>
                         </Card>

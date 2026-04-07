@@ -4,6 +4,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
+import { Store, TrendingUp, Gem } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
@@ -114,19 +115,19 @@ export default function AdminDashboard() {
 
             <div className="grid-stats">
                 <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#eef2ff', color: '#6366f1' }}>🏪</div>
+                    <div className="stat-icon" style={{ background: '#eef2ff', color: '#6366f1' }}><Store size={24} /></div>
                     <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Total Installations</div>
                     <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>{stats.totalShops}</div>
                     <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontWeight: 600 }}>↑ 12% from last month</div>
                 </div>
                 <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>📈</div>
+                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}><TrendingUp size={24} /></div>
                     <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Global Traffic</div>
                     <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>{stats.totalVisitors.toLocaleString()}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Real-time aggregated</div>
                 </div>
                 <div className="premium-card" style={{ background: 'var(--primary-gradient)', color: 'white', border: 'none' }}>
-                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>💎</div>
+                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}><Gem size={24} /></div>
                     <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Est. Monthly Revenue</div>
                     <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>${stats.estMonthlyRevenue.toLocaleString()}</div>
                     <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', marginTop: '8px', fontWeight: 600 }}>Based on plan distribution</div>

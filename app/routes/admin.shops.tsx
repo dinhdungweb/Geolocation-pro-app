@@ -4,6 +4,8 @@ import { useLoaderData, Link } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 
+import { Search, ExternalLink } from "lucide-react";
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
@@ -115,13 +117,14 @@ export default function AdminShops() {
                     font-size: 13px;
                     font-weight: 600;
                     transition: all 0.2s;
+                    display: flex; align-items: center; gap: 8px;
                 }
                 .action-btn:hover { border-color: var(--primary); color: var(--primary); }
             `}</style>
 
             <div className="shops-header">
                 <div className="search-box">
-                    <span>🔍</span>
+                    <Search size={18} color="var(--text-muted)" />
                     <input type="text" placeholder="Search shops by domain..." />
                 </div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -171,7 +174,7 @@ export default function AdminShops() {
                                 </td>
                                 <td>
                                     <Link to={`/admin/shops/${shop.shop}`} className="action-btn">
-                                        Manage ↗
+                                        Manage <ExternalLink size={14} />
                                     </Link>
                                 </td>
                             </tr>

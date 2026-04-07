@@ -2,6 +2,16 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Outlet, useLoaderData, NavLink, Form, useLocation } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { 
+    Home, 
+    Store, 
+    Users, 
+    Rocket, 
+    Globe, 
+    Search, 
+    LogOut, 
+    Activity 
+} from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const session = await requireAdminAuth(request);
@@ -12,8 +22,6 @@ export default function AdminLayout() {
     const { username } = useLoaderData<typeof loader>();
     const location = useLocation();
 
-    // Don't show layout on login page (though login is likely separate if matching v2 routing rules, 
-    // but better be safe or handle it via route naming)
     const isLoginPage = location.pathname === "/admin/login";
 
     if (isLoginPage) {
@@ -21,10 +29,10 @@ export default function AdminLayout() {
     }
 
     const menuItems = [
-        { label: "Dashboard", to: "/admin", icon: "🏠", end: true },
-        { label: "Shops", to: "/admin/shops", icon: "🏪" },
-        { label: "CRM (Customers)", to: "/admin/crm", icon: "👥" },
-        { label: "Marketing", to: "/admin/marketing", icon: "🚀" },
+        { label: "Dashboard", to: "/admin", icon: <Home size={18} />, end: true },
+        { label: "Shops", to: "/admin/shops", icon: <Store size={18} /> },
+        { label: "CRM (Customers)", to: "/admin/crm", icon: <Users size={18} /> },
+        { label: "Marketing", to: "/admin/marketing", icon: <Rocket size={18} /> },
     ];
 
     return (
@@ -58,7 +66,6 @@ export default function AdminLayout() {
                     min-height: 100vh;
                 }
                 
-                /* SIDEBAR - PREMIUM GLASS/DARK */
                 .sidebar {
                     width: var(--sidebar-width);
                     background: var(--sidebar-bg);
@@ -121,7 +128,8 @@ export default function AdminLayout() {
                     box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
                 }
                 
-                .nav-link span { font-size: 18px; }
+                .nav-link .icon-wrap { display: flex; align-items: center; justify-content: center; opacity: 0.8; }
+                .nav-link.active .icon-wrap { opacity: 1; }
 
                 .sidebar-footer {
                     padding: 24px;
@@ -150,19 +158,19 @@ export default function AdminLayout() {
 
                 .btn-logout-alt {
                     width: 100%;
-                    background: rgba(239, 68, 68, 1);
-                    border: none;
-                    color: white;
+                    background: rgba(239, 68, 68, 0.1);
+                    border: 1px solid rgba(239, 68, 68, 0.2);
+                    color: #f87171;
                     padding: 10px;
                     border-radius: 10px;
                     font-size: 13px;
                     font-weight: 600;
                     cursor: pointer;
                     transition: all 0.2s;
+                    display: flex; align-items: center; justify-content: center; gap: 8px;
                 }
-                .btn-logout-alt:hover { opacity: 0.9; transform: translateY(-1px); }
+                .btn-logout-alt:hover { background: rgba(239, 68, 68, 1); color: white; transform: translateY(-1px); }
 
-                /* MAIN */
                 .main-container {
                     flex: 1;
                     margin-left: var(--sidebar-width);
@@ -188,85 +196,7 @@ export default function AdminLayout() {
                     width: 100%;
                     margin: 0 auto;
                 }
-                .btn-logout-alt {
-                    background: none; border: 1px solid #fee2e2; color: #ef4444;
-                    padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
-                    cursor: pointer; transition: all 0.2s;
-                }
-                .btn-logout-alt:hover { background: #fef2f2; border-color: #fca5a5; }
 
-                /* DASHBOARD GRID & CARDS (Common) */
-                .flat-card {
-                    background: var(--surface);
-                    border: 1px solid var(--border);
-                    border-radius: 16px;
-                    padding: 24px;
-                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);
-                }
-                .badge {
-                    display: inline-flex;
-                    align-items: center;
-                    padding: 2px 10px;
-                    border-radius: 20px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    text-transform: uppercase;
-                }
-                .badge-success { background: #ecfdf5; color: #10b981; }
-                .badge-primary { background: #eef2ff; color: #6366f1; }
-                .badge-warning { background: #fffbeb; color: #f59e0b; }
-            `}</style>
-            
-            <aside className="sidebar">
-                <div className="sidebar-header">
-                    <div className="logo-box">🌍</div>
-                    <span className="brand-name">GeoAdmin</span>
-                </div>
-                <nav className="sidebar-nav">
-                    {menuItems.map(item => (
-                        <NavLink 
-                            key={item.to} 
-                            to={item.to} 
-                            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                            end={item.end}
-                        >
-                            <span>{item.icon}</span>
-                            {item.label}
-                        </NavLink>
-                    ))}
-                </nav>
-                <div className="sidebar-footer">
-                    <div className="user-info">
-                        <div className="avatar">{(username?.[0] || 'A').toUpperCase()}</div>
-                        <div className="username">{username}</div>
-                    </div>
-                    <Form method="post" action="/admin/logout">
-                        <button type="submit" className="btn-logout-alt">Sign Out</button>
-                    </Form>
-                </div>
-            </aside>
-
-            <div className="main-container">
-                <header className="topbar">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '40px', flex: 1 }}>
-                        <h2>{location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.toUpperCase()}</h2>
-                        <div className="global-search">
-                            <span>🔍</span>
-                            <input type="text" placeholder="Search systems, shops, or logs..." />
-                        </div>
-                    </div>
-                    
-                    <div className="topbar-actions">
-                        <div className="status-badge">
-                            <div className="dot" style={{ background: '#10b981' }} />
-                            System Live
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                        </div>
-                    </div>
-                </header>
-            <style>{`
                 .global-search {
                     background: white; border: 1px solid var(--border);
                     border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 10px;
@@ -278,6 +208,59 @@ export default function AdminLayout() {
                     font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px;
                 }
             `}</style>
+            
+            <aside className="sidebar">
+                <div className="sidebar-header">
+                    <div className="logo-box"><Globe size={24} /></div>
+                    <span className="brand-name">GeoAdmin</span>
+                </div>
+                <nav className="sidebar-nav">
+                    {menuItems.map(item => (
+                        <NavLink 
+                            key={item.to} 
+                            to={item.to} 
+                            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                            end={item.end}
+                        >
+                            <span className="icon-wrap">{item.icon}</span>
+                            {item.label}
+                        </NavLink>
+                    ))}
+                </nav>
+                <div className="sidebar-footer">
+                    <div className="user-info">
+                        <div className="avatar">{(username?.[0] || 'A').toUpperCase()}</div>
+                        <div className="username">{username}</div>
+                    </div>
+                    <Form method="post" action="/admin/logout">
+                        <button type="submit" className="btn-logout-alt">
+                            <LogOut size={16} />
+                            Sign Out
+                        </button>
+                    </Form>
+                </div>
+            </aside>
+
+            <div className="main-container">
+                <header className="topbar">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '40px', flex: 1 }}>
+                        <h2>{location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.toUpperCase()}</h2>
+                        <div className="global-search">
+                            <Search size={16} color="var(--text-muted)" />
+                            <input type="text" placeholder="Search systems, shops, or logs..." />
+                        </div>
+                    </div>
+                    
+                    <div className="topbar-actions">
+                        <div className="status-badge">
+                            <Activity size={12} strokeWidth={3} />
+                            System Live
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        </div>
+                    </div>
+                </header>
                 <main className="page-content">
                     <Outlet />
                 </main>

@@ -1,6 +1,8 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import { Globe, AlertCircle, Lock, User, Loader2 } from "lucide-react";
 import {
     adminSessionStorage,
     checkRateLimit,
@@ -63,145 +65,164 @@ export default function AdminLogin() {
     const actionData = useActionData<typeof action>();
     const navigation = useNavigation();
     const isLoading = navigation.state === "submitting";
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    useEffect(() => {
+        setIsLoaded(true);
+    }, []);
 
     return (
-        <html lang="en">
-            <head>
-                <meta charSet="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>Admin Login — Geo App</title>
-                <style>{`
-                    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        <div className="login-screen">
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+                
+                :root {
+                    --primary: #6366f1;
+                    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                    --bg: #f8fafc;
+                    --surface: #ffffff;
+                    --text: #0f172a;
+                    --text-muted: #64748b;
+                    --border: #e2e8f0;
+                }
+                
+                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+                
+                body {
+                    font-family: 'Outfit', sans-serif;
+                    background: var(--bg);
+                    color: var(--text);
+                    overflow: hidden;
+                }
 
-                    body {
-                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                        background: #f8fafc;
-                        min-height: 100vh;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        padding: 20px;
-                        color: #1e293b;
-                    }
-                    .card {
-                        background: #ffffff;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 20px;
-                        padding: 40px;
-                        width: 100%;
-                        max-width: 420px;
-                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-                    }
-                    .logo {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        text-align: center;
-                        gap: 16px;
-                        margin-bottom: 32px;
-                    }
-                    .logo-icon {
-                        width: 56px; height: 56px;
-                        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-                        border-radius: 14px;
-                        display: flex; align-items: center; justify-content: center;
-                        font-size: 28px;
-                        color: white;
-                        box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
-                    }
-                    .logo h1 { font-size: 22px; color: #1e293b; font-weight: 800; letter-spacing: -0.02em; }
-                    .logo p { font-size: 14px; color: #64748b; margin-top: 4px; }
-                    
-                    .form-group { margin-bottom: 20px; }
-                    label {
-                        display: block;
-                        font-size: 14px;
-                        font-weight: 600;
-                        color: #475569;
-                        margin-bottom: 8px;
-                    }
-                    input {
-                        width: 100%;
-                        padding: 12px 16px;
-                        background: #ffffff;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 10px;
-                        color: #1e293b;
-                        font-size: 15px;
-                        outline: none;
-                        transition: all 0.2s;
-                    }
-                    input:focus { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
-                    
-                    button[type="submit"] {
-                        width: 100%;
-                        padding: 14px;
-                        background: #6366f1;
-                        border: none;
-                        border-radius: 12px;
-                        color: white;
-                        font-size: 15px;
-                        font-weight: 700;
-                        cursor: pointer;
-                        margin-top: 12px;
-                        transition: all 0.2s;
-                        box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
-                    }
-                    button[type="submit"]:hover { background: #4f46e5; transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3); }
-                    button[type="submit"]:active { transform: translateY(0); }
-                    button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-                    
-                    .error {
-                        background: #fef2f2;
-                        border: 1px solid #fee2e2;
-                        border-radius: 10px;
-                        padding: 12px 16px;
-                        color: #ef4444;
-                        font-size: 14px;
-                        font-weight: 500;
-                        margin-bottom: 24px;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                    }
-                `}</style>
-            </head>
-            <body>
-                <div className="card">
-                    <div className="logo">
-                        <div className="logo-icon">🌍</div>
-                        <div>
-                            <h1>Geo App Admin</h1>
-                            <p>bluepeaks.top</p>
-                        </div>
+                .login-screen {
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: radial-gradient(circle at top right, #e0e7ff 0%, #f8fafc 50%);
+                    position: relative;
+                }
+
+                .login-card {
+                    width: 100%;
+                    max-width: 420px;
+                    background: var(--surface);
+                    border-radius: 32px;
+                    padding: 48px;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+                    border: 1px solid var(--border);
+                    z-index: 10;
+                    transform: translateY(${isLoaded ? '0' : '20px'});
+                    opacity: ${isLoaded ? '1' : '0'};
+                    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+
+                .logo-icon {
+                    width: 56px; height: 56px;
+                    background: var(--primary-gradient);
+                    border-radius: 16px;
+                    display: flex; align-items: center; justify-content: center;
+                    color: white; font-size: 28px;
+                    margin: 0 auto 24px;
+                    box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+                }
+
+                h1 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 8px; letter-spacing: -0.02em; }
+                p.subtitle { color: var(--text-muted); font-size: 14px; text-align: center; margin-bottom: 32px; }
+
+                .input-group { margin-bottom: 20px; position: relative; }
+                .input-group span { position: absolute; left: 16px; top: 16px; color: #94a3b8; }
+                input {
+                    width: 100%;
+                    padding: 14px 16px 14px 44px;
+                    background: #f8fafc;
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    font-size: 14px;
+                    font-family: inherit;
+                    color: var(--text);
+                    transition: all 0.2s;
+                    outline: none;
+                }
+                input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
+
+                .btn-login {
+                    width: 100%;
+                    padding: 14px;
+                    background: var(--primary-gradient);
+                    color: white;
+                    border: none;
+                    border-radius: 12px;
+                    font-size: 15px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    margin-top: 8px;
+                    box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+                    display: flex; align-items: center; justify-content: center; gap: 8px;
+                }
+                .btn-login:hover { transform: translateY(-1px); box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.3); }
+                .btn-login:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+                .error {
+                    background: #fef2f2;
+                    color: #ef4444;
+                    padding: 12px 16px;
+                    border-radius: 10px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 24px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    border: 1px solid #fee2e2;
+                }
+
+                .decorative-circle {
+                    position: absolute;
+                    width: 600px; height: 600px;
+                    background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+                    top: -300px; right: -300px;
+                    z-index: 1;
+                }
+
+                .spin { animation: spin 1s linear infinite; }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            `}</style>
+
+            <div className="decorative-circle" />
+
+            <div className="login-card">
+                <div className="logo-icon"><Globe size={32} /></div>
+                <h1>Welcome Back</h1>
+                <p className="subtitle">Administrator control panel access</p>
+
+                {actionData?.error && (
+                    <div className="error">
+                        <AlertCircle size={18} />
+                        <span>{actionData.error}</span>
                     </div>
-                    {actionData?.error && (
-                        <div className="error">⚠ {actionData.error}</div>
-                    )}
-                    <Form method="post">
-                        <label htmlFor="username">Username</label>
-                        <input
-                            id="username"
-                            name="username"
-                            type="text"
-                            required
-                            autoComplete="username"
-                            autoFocus
-                        />
-                        <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            name="password"
-                            type="password"
-                            required
-                            autoComplete="current-password"
-                        />
-                        <button type="submit" disabled={isLoading}>
-                            {isLoading ? "Signing in..." : "Sign In →"}
-                        </button>
-                    </Form>
+                )}
+
+                <Form method="post">
+                    <div className="input-group">
+                        <span><User size={18} /></span>
+                        <input type="text" name="username" placeholder="Username" required autoFocus autoComplete="username" disabled={isLoading} />
+                    </div>
+                    <div className="input-group">
+                        <span><Lock size={18} /></span>
+                        <input type="password" name="password" placeholder="Password" required autoComplete="current-password" disabled={isLoading} />
+                    </div>
+                    <button type="submit" className="btn-login" disabled={isLoading}>
+                        {isLoading ? <Loader2 className="spin" size={20} /> : "Sign In to Dashboard"}
+                    </button>
+                </Form>
+                
+                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    &copy; 2024 GeoAdmin. All rights reserved.
                 </div>
-            </body>
-        </html>
+            </div>
+        </div>
     );
 }

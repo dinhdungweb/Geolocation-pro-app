@@ -17,6 +17,7 @@ import {
 } from "@shopify/polaris";
 import polarisTranslations from "@shopify/polaris/locales/en.json";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+import { Globe, ShieldCheck } from "lucide-react";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -104,14 +105,14 @@ export default function App() {
                 <Box paddingBlockStart="400" borderBlockStartWidth="050" borderColor="border-secondary">
                   <BlockStack gap="300">
                     <InlineStack gap="300" wrap={false}>
-                      <Text as="span" variant="bodyLg">🌍</Text>
+                      <Globe size={24} color="#008060" />
                       <BlockStack gap="050">
                         <Text variant="bodySm" fontWeight="bold" as="p">Smart Redirects</Text>
                         <Text variant="bodyXs" tone="subdued" as="p">Auto-route visitors to their local store.</Text>
                       </BlockStack>
                     </InlineStack>
                     <InlineStack gap="300" wrap={false}>
-                      <Text as="span" variant="bodyLg">🛡️</Text>
+                      <ShieldCheck size={24} color="#008060" />
                       <BlockStack gap="050">
                         <Text variant="bodySm" fontWeight="bold" as="p">IP Protection</Text>
                         <Text variant="bodyXs" tone="subdued" as="p">Block unwanted traffic and bots instantly.</Text>

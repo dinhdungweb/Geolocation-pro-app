@@ -22,6 +22,7 @@ import {
     PLAN_LIMITS,
     OVERAGE_RATE,
 } from "../billing.config";
+import { Check } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing } = await authenticate.admin(request);
@@ -168,8 +169,8 @@ function PlanCard({ name, price, visitorLimit, features, isCurrentPlan, isFree, 
                     <Text as="p" fontWeight="bold">Features:</Text>
                     <BlockStack gap="100">
                         {features.map((feature, index) => (
-                            <InlineStack key={index} gap="200" align="start">
-                                <Text as="span" tone="success">✓</Text>
+                            <InlineStack key={index} gap="200" align="start" wrap={false}>
+                                <div style={{ marginTop: '2px' }}><Check size={16} color="#008060" strokeWidth={3} /></div>
                                 <Text as="span" variant="bodyMd">{feature}</Text>
                             </InlineStack>
                         ))}
@@ -269,9 +270,18 @@ export default function PricingPage() {
                     <BlockStack gap="600">
                         <Divider />
                         <InlineStack align="center" gap="800">
-                            <Text as="span" variant="bodyMd" tone="subdued">✓ 7-day free trial</Text>
-                            <Text as="span" variant="bodyMd" tone="subdued">✓ Cancel anytime</Text>
-                            <Text as="span" variant="bodyMd" tone="subdued">✓ Secure payments via Shopify</Text>
+                            <InlineStack gap="200" align="center" wrap={false}>
+                                <Check size={14} color="#008060" />
+                                <Text as="span" variant="bodyMd" tone="subdued">7-day free trial</Text>
+                            </InlineStack>
+                            <InlineStack gap="200" align="center" wrap={false}>
+                                <Check size={14} color="#008060" />
+                                <Text as="span" variant="bodyMd" tone="subdued">Cancel anytime</Text>
+                            </InlineStack>
+                            <InlineStack gap="200" align="center" wrap={false}>
+                                <Check size={14} color="#008060" />
+                                <Text as="span" variant="bodyMd" tone="subdued">Secure payments via Shopify</Text>
+                            </InlineStack>
                         </InlineStack>
 
                         <Box paddingBlockStart="400">
