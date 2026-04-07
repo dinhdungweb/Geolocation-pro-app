@@ -14,6 +14,10 @@ import {
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const url = new URL(request.url);
+    if (url.pathname === "/admin/login") {
+        return json({ username: null });
+    }
     const session = await requireAdminAuth(request);
     return json({ username: session.get("admin_username") });
 };
