@@ -115,6 +115,7 @@ export default function AdminEmailAutomations() {
     const [editSubject, setEditSubject] = useState("");
     const [editBlocks, setEditBlocks] = useState<EmailBlock[]>([]);
     const [editIsActive, setEditIsActive] = useState(true);
+    const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
 
     const automations = [
         {
@@ -247,16 +248,20 @@ export default function AdminEmailAutomations() {
                 .block-item:hover { border-color: #6366f1; background: #f5f7ff; }
                 
                 .canvas-content { width: 600px; min-height: 800px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-                .canvas-block { position: relative; border: 2px solid transparent; transition: all 0.2s; }
-                .canvas-block:hover { border-color: #6366f1; }
-                .block-actions { position: absolute; right: -50px; top: 0; display: none; flex-direction: column; gap: 4px; }
-                .canvas-block:hover .block-actions { display: flex; }
-                .action-icon { width: 32px; height: 32px; border-radius: 8px; background: white; border: 1px solid #e2e8f0; display: flex; alignItems: center; justify-content: center; cursor: pointer; color: #64748b; }
-                .action-icon:hover { color: #dc2626; border-color: #fca5a5; }
+                .canvas-block { position: relative; border: 2px solid transparent; transition: all 0.2s; margin: 4px 0; border-radius: 8px; cursor: pointer; }
+                .canvas-block:hover { border-color: rgba(99, 102, 241, 0.3); }
+                .canvas-block.selected { border-color: #6366f1; background: rgba(99, 102, 241, 0.02); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
+                .block-actions { position: absolute; left: calc(100% + 12px); top: 0; display: none; flex-direction: column; gap: 6px; z-index: 10; }
+                .canvas-block.selected .block-actions { display: flex; }
+                .action-icon { width: 34px; height: 34px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: all 0.2s; }
+                .action-icon:hover { color: #6366f1; border-color: #6366f1; transform: scale(1.1); }
+                .action-icon.delete:hover { color: #ef4444; border-color: #fca5a5; }
 
-                .prop-group { margin-bottom: 24px; }
-                .prop-label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; }
-                .prop-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; font-weight: 500; }
+                .prop-group { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9; }
+                .prop-label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; }
+                .prop-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+                .prop-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+                .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
                 
                 .var-tag { background: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; }
                 
@@ -376,12 +381,16 @@ export default function AdminEmailAutomations() {
                             
                             <div style={{ padding: '0' }}>
                                 {editBlocks.map((block, idx) => (
-                                    <div key={block.id} className="canvas-block">
+                                    <div 
+                                        key={block.id} 
+                                        className={`canvas-block ${selectedBlockId === block.id ? 'selected' : ''}`}
+                                        onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}
+                                    >
                                         <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
                                         <div className="block-actions">
-                                            <button className="action-icon" onClick={() => moveBlock(idx, 'up')} disabled={idx === 0}><ArrowUp size={14} /></button>
-                                            <button className="action-icon" onClick={() => moveBlock(idx, 'down')} disabled={idx === editBlocks.length - 1}><ArrowDown size={14} /></button>
-                                            <button className="action-icon" style={{ color: '#ef4444' }} onClick={() => removeBlock(block.id)}><Trash2 size={14} /></button>
+                                            <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'up'); }} disabled={idx === 0} title="Move Up"><ArrowUp size={14} /></button>
+                                            <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'down'); }} disabled={idx === editBlocks.length - 1} title="Move Down"><ArrowDown size={14} /></button>
+                                            <button className="action-icon delete" onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} title="Delete Block"><Trash2 size={14} /></button>
                                         </div>
                                     </div>
                                 ))}
@@ -395,31 +404,130 @@ export default function AdminEmailAutomations() {
                         </div>
                     </div>
 
-                    <div className="editor-props">
-                        <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '20px' }}>Settings</h3>
-                        <div className="prop-group">
-                            <div className="prop-label">Automation Status</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={editIsActive} onChange={e => setEditIsActive(e.target.checked)} /> Enable this email flow
-                                </label>
+                    <div className="editor-props" onClick={e => e.stopPropagation()}>
+                        <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Square size={16} fill="#6366f1" color="#6366f1" /> Layout Settings
+                        </h3>
+
+                        {selectedBlockId ? (
+                            (() => {
+                                const block = editBlocks.find(b => b.id === selectedBlockId);
+                                if (!block) return null;
+                                return (
+                                    <div className="block-settings-form">
+                                        <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Editing</span>
+                                            <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '14px', textTransform: 'capitalize' }}>{block.type} Block</div>
+                                        </div>
+
+                                        {/* Content Settings */}
+                                        {block.type === 'heading' || block.type === 'text' ? (
+                                            <div className="prop-group">
+                                                <div className="prop-label">Content Text</div>
+                                                <textarea 
+                                                    className="prop-input" 
+                                                    rows={4} 
+                                                    value={block.content.text} 
+                                                    onChange={e => updateBlockContent(block.id, { text: e.target.value })} 
+                                                />
+                                            </div>
+                                        ) : null}
+
+                                        {block.type === 'button' ? (
+                                            <>
+                                                <div className="prop-group">
+                                                    <div className="prop-label">Button Label</div>
+                                                    <input className="prop-input" value={block.content.label} onChange={e => updateBlockContent(block.id, { label: e.target.value })} />
+                                                </div>
+                                                <div className="prop-group">
+                                                    <div className="prop-label">Destination URL</div>
+                                                    <input className="prop-input" value={block.content.url} onChange={e => updateBlockContent(block.id, { url: e.target.value })} />
+                                                </div>
+                                            </>
+                                        ) : null}
+
+                                        {block.type === 'header' ? (
+                                            <div className="prop-group">
+                                                <div className="prop-label">Logo Text</div>
+                                                <input className="prop-input" value={block.content.logoText} onChange={e => updateBlockContent(block.id, { logoText: e.target.value })} />
+                                            </div>
+                                        ) : null}
+
+                                        {block.type === 'coupon' ? (
+                                            <div className="prop-group">
+                                                <div className="prop-label">Coupon Code</div>
+                                                <input className="prop-input" value={block.content.code} onChange={e => updateBlockContent(block.id, { code: e.target.value })} />
+                                            </div>
+                                        ) : null}
+
+                                        {/* Style Settings */}
+                                        <div className="prop-group">
+                                            <div className="prop-label">Alignment</div>
+                                            <div className="prop-grid">
+                                                {['left', 'center', 'right'].map(align => (
+                                                    <button 
+                                                        key={align}
+                                                        className={`action-btn ${block.style?.textAlign === align ? 'btn-primary' : ''}`}
+                                                        style={{ height: '36px', justifyContent: 'center' }}
+                                                        onClick={() => updateBlockStyle(block.id, { textAlign: align })}
+                                                    >
+                                                        {align === 'center' ? <Layout size={14} /> : align === 'left' ? <ArrowUp size={14} style={{ transform: 'rotate(-90deg)' }} /> : <ArrowUp size={14} style={{ transform: 'rotate(90deg)' }} />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {(block.type === 'button' || block.type === 'header' || block.type === 'heading') && (
+                                            <div className="prop-group">
+                                                <div className="prop-label">Theme Color <span>{block.style?.themeColor || block.style?.buttonColor || block.style?.color}</span></div>
+                                                <input 
+                                                    type="color" 
+                                                    className="prop-input" 
+                                                    style={{ height: '44px', padding: '4px' }}
+                                                    value={(block.style?.themeColor || block.style?.buttonColor || block.style?.color || '#6366f1')} 
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        if(block.type === 'header') updateBlockStyle(block.id, { themeColor: val });
+                                                        else if(block.type === 'button') updateBlockStyle(block.id, { buttonColor: val });
+                                                        else updateBlockStyle(block.id, { color: val });
+                                                    }} 
+                                                />
+                                            </div>
+                                        )}
+
+                                        <button className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }} onClick={() => setSelectedBlockId(null)}>
+                                            <CheckCircle2 size={14} /> Finish Editing Block
+                                        </button>
+                                    </div>
+                                )
+                            })()
+                        ) : (
+                            <div className="global-settings">
+                                <div className="prop-group">
+                                    <div className="prop-label">Automation Status</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                            <input type="checkbox" checked={editIsActive} onChange={e => setEditIsActive(e.target.checked)} /> Enable this email flow
+                                        </label>
+                                    </div>
+                                </div>
+                                <hr style={{ border: '0', borderTop: '1px solid #f1f5f9', margin: '20px 0' }} />
+                                <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #dcfce7' }}>
+                                    <div style={{ display: 'flex', gap: '8px', color: '#166534' }}>
+                                        <CheckCircle2 size={16} />
+                                        <div style={{ fontSize: '12px', fontWeight: 600 }}>Active Variables</div>
+                                    </div>
+                                    <p style={{ fontSize: '11px', color: '#166534', marginTop: '6px' }}>You can use these in any text block:</p>
+                                    <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        <span className="var-tag">{`{shop}`}</span>
+                                        <span className="var-tag">{`{shop_name}`}</span>
+                                        <span className="var-tag">{`{usage}`}</span>
+                                        <span className="var-tag">{`{limit}`}</span>
+                                        <span className="var-tag">{`{year}`}</span>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <hr style={{ border: '0', borderTop: '1px solid #f1f5f9', margin: '20px 0' }} />
-                        <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #dcfce7' }}>
-                            <div style={{ display: 'flex', gap: '8px', color: '#166534' }}>
-                                <CheckCircle2 size={16} />
-                                <div style={{ fontSize: '12px', fontWeight: 600 }}>Active Variables</div>
-                            </div>
-                            <p style={{ fontSize: '11px', color: '#166534', marginTop: '6px' }}>You can use these in any text block:</p>
-                            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                <span className="var-tag">{`{shop}`}</span>
-                                <span className="var-tag">{`{shop_name}`}</span>
-                                <span className="var-tag">{`{usage}`}</span>
-                                <span className="var-tag">{`{limit}`}</span>
-                                <span className="var-tag">{`{year}`}</span>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
