@@ -16,72 +16,115 @@ import {
     Search
 } from "lucide-react";
 
+import prisma from "../db.server";
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    // In a real app, we'd fetch real stats and history here
+    
+    // Fetch logs (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const logs = await (prisma as any).adminEmailLog.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        orderBy: { createdAt: 'desc' }
+    });
+
+    const totalSent = logs.filter((l: any) => l.status === 'sent').length;
+
+    // Mapping for calendar
+    const activityDays = logs.map((l: any) => {
+        const d = new Date(l.createdAt);
+        return `${d.getMonth()+1}/${d.getDate()}`;
+    });
+
     return json({
         stats: {
-            email: { sent: "95,770", sentChange: 37, open: "3.13%", openChange: 12, conv: "0%", convChange: 100, sales: "₫0", salesChange: 100 },
+            email: { 
+                sent: totalSent.toLocaleString(), 
+                sentChange: 0, 
+                open: "0%", 
+                openChange: 0, 
+                conv: "0%", 
+                convChange: 0, 
+                sales: "₫0", 
+                salesChange: 0 
+            },
             sms: { sent: 0, click: "0%", conv: "0%", sales: "₫0" }
         },
-        activities: [
-            { id: 1, subject: "CẢM ƠN VÌ ĐÃ LÀ MỘT PHẦN CỦA HELIOS LÊ THANH NGHỊ", channel: "Email", status: "Sent", date: "Apr 1, 2026 at 5:34 pm", open: "1.77%", click: "0.01%", conv: "-", sales: "-" },
-            { id: 2, subject: "Nơi chế tác mang tính thần của người đàn ông trưởng thành", channel: "Email", status: "Sent", date: "Mar 26, 2026 at 9:29 pm", open: "5.09%", click: "0.1%", conv: "-", sales: "-" },
-            { id: 3, subject: "Untitled activity", channel: "Email", status: "Draft", date: "-", open: "-", click: "-", conv: "-", sales: "-" },
-            { id: 4, subject: "Untitled activity", channel: "Email", status: "Draft", date: "-", open: "-", click: "-", conv: "-", sales: "-" }
-        ]
+        activities: logs.map((l: any) => ({
+            id: l.id,
+            subject: l.subject || `Campaign: ${l.type}`,
+            channel: "Email",
+            status: l.status === 'sent' ? 'Sent' : 'Draft',
+            date: new Date(l.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            open: "-",
+            click: "-",
+            conv: "-",
+            sales: "-"
+        })),
+        activityDays
     });
 };
 
 export default function MessagingDashboard() {
-    const { stats, activities } = useLoaderData<typeof loader>();
+    const { stats, activities, activityDays } = useLoaderData<typeof loader>();
     const [activeTab, setActiveTab] = useState("All");
 
     return (
-        <div className="dashboard-container">
+        <div className="messaging-dashboard">
             <style>{`
-                .dashboard-container { padding: 40px; background: #f6f6f7; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+                .messaging-dashboard { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
                 
                 .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
-                .title-area { display: flex; align-items: center; gap: 12px; }
-                .title-area h1 { font-size: 20px; font-weight: 700; color: #1a1c1d; }
-                .btn-group { display: flex; gap: 8px; }
+                .title-area { display: flex; align-items: center; gap: 14px; }
+                .title-area h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
                 
-                .btn-secondary { background: #fff; border: 1px solid #dcdfe3; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-                .btn-primary { background: #303030; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+                .btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); transition: all 0.2s; }
+                .btn-secondary:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
+                .btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); transition: all 0.2s; }
+                .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4); }
                 
-                .date-filters { display: flex; gap: 8px; margin-bottom: 24px; }
+                .metrics-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; margin-bottom: 32px; }
+                .metric-card { background: var(--surface); border-radius: 20px; padding: 24px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .card-header-icon { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; }
                 
-                .metrics-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-bottom: 24px; }
-                .metric-card { background: #fff; border-radius: 12px; border: 1px solid #ebebeb; padding: 24px; }
-                .metric-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; color: #616161; font-weight: 600; }
+                .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+                .stat-item .label { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; display: block; border-bottom: 1px dotted var(--border); width: fit-content; }
+                .stat-item .val { font-size: 22px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+                .stat-item .change { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
+                .change.up { color: #10b981; }
+                .change.down { color: #ef4444; }
                 
-                .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-                .metric-item-label { font-size: 12px; color: #616161; margin-bottom: 4px; border-bottom: 1px dotted #ccc; display: inline-block; }
-                .metric-item-val { font-size: 16px; font-weight: 700; color: #1a1c1d; display: flex; align-items: center; gap: 4px; }
-                .metric-change { font-size: 12px; color: #616161; font-weight: 400; display: flex; align-items: center; gap: 2px; }
+                .section-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); margin-bottom: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .card-padding { padding: 24px; }
                 
-                .calendar-section { background: #fff; border-radius: 12px; border: 1px solid #ebebeb; padding: 24px; margin-bottom: 24px; }
-                .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-                .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid #f1f1f1; }
-                .calendar-day { padding: 12px; border-right: 1px solid #f1f1f1; min-height: 180px; }
+                .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+                .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--border); }
+                .calendar-day { padding: 16px; border-right: 1px solid var(--border); min-height: 180px; }
                 .calendar-day:last-child { border-right: none; }
-                .day-label { font-size: 12px; color: #616161; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-                .day-label.today .day-num { background: #303030; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+                .day-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; }
+                .day-num { color: var(--text); }
+                .day-label.today .day-num { background: var(--primary); color: #fff; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
                 
-                .table-section { background: #fff; border-radius: 12px; border: 1px solid #ebebeb; overflow: hidden; }
-                .table-tabs { display: flex; padding: 8px 16px; border-bottom: 1px solid #f1f1f1; gap: 4px; }
-                .tab-btn { padding: 6px 12px; border-radius: 6px; border: none; background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; color: #616161; }
-                .tab-btn.active { background: #f1f1f1; color: #1a1c1d; }
+                .activity-tag { padding: 6px 10px; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981; fontSize: 11px; color: #047857; font-weight: 700; text-align: center; }
                 
-                .table-header-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 40px; padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #f1f1f1; font-size: 12px; font-weight: 600; color: #616161; }
-                .table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 40px; padding: 12px 16px; border-bottom: 1px solid #f1f1f1; align-items: center; cursor: pointer; transition: background 0.2s; }
-                .table-row:hover { background: #fafafa; }
-                .subject-cell { display: flex; align-items: center; gap: 12px; }
-                .thumb-placeholder { width: 40px; height: 40px; background: #000; border-radius: 4px; flex-shrink: 0; }
-                .status-pill { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; width: fit-content; }
-                .status-sent { background: #e3f9e5; color: #007f5f; }
-                .status-draft { background: #f1f1f1; color: #616161; }
+                .tabs { display: flex; padding: 0 24px; border-bottom: 1px solid var(--border); gap: 32px; }
+                .tab { padding: 18px 0; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+                .tab:hover { color: var(--text); }
+                .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+                
+                .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 40px; padding: 14px 24px; background: #fafafa; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+                .table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 40px; padding: 18px 24px; border-bottom: 1px solid var(--border); transition: all 0.2s; align-items: center; }
+                .table-row:hover { background: #f8fafc; }
+                
+                .subject-cell { display: flex; align-items: center; gap: 14px; font-weight: 600; font-size: 15px; color: var(--text); }
+                .thumb-placeholder { width: 44px; height: 44px; background: var(--sidebar-bg); border-radius: 10px; flex-shrink: 0; }
+                .activity-cell { font-size: 13px; color: var(--text); }
+                
+                .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+                .status-sent { background: #ecfdf5; color: #10b981; }
+                .status-draft { background: #f1f5f9; color: var(--text-muted); }
             `}</style>
 
             <div className="header-row">
@@ -168,14 +211,25 @@ export default function MessagingDashboard() {
                     <button className="btn-secondary">Today</button>
                 </div>
                 <div className="calendar-grid">
-                    {['Mon 6', 'Tue 7', 'Wed 8', 'Thu 9', 'Fri 10', 'Sat 11', 'Sun 12'].map(day => (
-                        <div key={day} className="calendar-day">
-                            <div className={`day-label ${day.includes('Wed 8') ? 'today' : ''}`}>
-                                <span>{day.split(' ')[0]}</span>
-                                <span className="day-num">{day.split(' ')[1]}</span>
+                    {['Mon 6', 'Tue 7', 'Wed 8', 'Thu 9', 'Fri 10', 'Sat 11', 'Sun 12'].map(day => {
+                        const dayNum = day.split(' ')[1];
+                        const monthNum = 4; // Mocking April for now as per the date range
+                        const hasActivity = activityDays.includes(`${monthNum}/${dayNum}`);
+                        
+                        return (
+                            <div key={day} className="calendar-day">
+                                <div className={`day-label ${day.includes('Wed 8') ? 'today' : ''}`}>
+                                    <span>{day.split(' ')[0]}</span>
+                                    <span className="day-num">{dayNum}</span>
+                                </div>
+                                {hasActivity && (
+                                    <div style={{ padding: '4px', background: '#ecfdf5', borderRadius: '4px', border: '1px solid #10b981', fontSize: '10px', color: '#047857', fontWeight: 700, textAlign: 'center' }}>
+                                        Email Sent
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
@@ -205,7 +259,7 @@ export default function MessagingDashboard() {
                     <div></div>
                 </div>
 
-                {activities.map(act => (
+                {activities.map((act: any) => (
                     <div key={act.id} className="table-row">
                         <div className="subject-cell">
                             <div className="thumb-placeholder"></div>

@@ -27,27 +27,27 @@ export default function TemplatesGallery() {
     const { templates } = useLoaderData<typeof loader>();
 
     return (
-        <div className="templates-container">
+        <div className="templates-dashboard">
             <style>{`
-                .templates-container { padding: 40px; background: #f6f6f7; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-                .title-area h1 { font-size: 20px; font-weight: 700; color: #1a1c1d; }
+                .templates-dashboard { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
+                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+                .title-area h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
                 
-                .btn-secondary { background: #fff; border: 1px solid #dcdfe3; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-                .btn-primary { background: #303030; color: #fff; border: none; padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+                .btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); transition: all 0.2s; }
+                .btn-secondary:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
+                .btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
                 
-                .table-card { background: #fff; border-radius: 12px; border: 1px solid #ebebeb; overflow: hidden; max-width: 1000px; margin: 0 auto; }
-                .table-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f1f1; background: #fafafa; }
+                .table-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .table-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--border); background: #fafafa; }
                 
-                .tab-row { display: flex; border-bottom: 1px solid #f1f1f1; padding: 0 16px; gap: 20px; }
-                .tab-item { padding: 12px 0; border-bottom: 2px solid transparent; font-size: 13px; font-weight: 600; color: #616161; cursor: pointer; }
-                .tab-item.active { border-bottom-color: #303030; color: #1a1c1d; }
+                .tab-row { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; gap: 32px; }
+                .tab-item { padding: 18px 0; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+                .tab-item.active { border-bottom-color: var(--primary); color: var(--primary); }
                 
-                .grid-header { display: grid; grid-template-columns: 40px 100px 1fr 1fr 40px; padding: 10px 16px; font-size: 12px; font-weight: 600; color: #616161; border-bottom: 1px solid #f1f1f1; }
-                .grid-row { display: grid; grid-template-columns: 40px 100px 1fr 1fr 40px; padding: 12px 16px; border-bottom: 1px solid #f1f1f1; align-items: center; cursor: pointer; transition: background 0.1s; }
-                .grid-row:hover { background: #fafafa; }
+                .grid-row { display: grid; grid-template-columns: 40px 100px 1fr 1fr 40px; padding: 20px 24px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; transition: all 0.2s; }
+                .grid-row:hover { background: #f8fafc; }
                 
-                .template-thumb { width: 60px; height: 80px; background: #eee; border-radius: 4px; overflow: hidden; border: 1px solid #eee; }
+                .template-thumb { width: 64px; height: 84px; background: var(--sidebar-bg); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
                 .template-thumb img { width: 100%; height: 100%; object-fit: cover; }
             `}</style>
 

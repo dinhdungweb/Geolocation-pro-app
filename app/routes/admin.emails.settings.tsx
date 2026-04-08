@@ -16,23 +16,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function EmailSettings() {
     return (
-        <div className="settings-container">
+        <div className="settings-page">
             <style>{`
-                .settings-container { padding: 40px; background: #f6f6f7; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+                .settings-page { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
                 .header-row { margin-bottom: 32px; }
-                .header-row h1 { font-size: 20px; font-weight: 700; color: #1a1c1d; }
+                .header-row h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
                 
-                .settings-grid { display: grid; grid-template-columns: 250px 1fr; gap: 40px; max-width: 1000px; }
-                .settings-nav { display: flex; flex-direction: column; gap: 4px; }
-                .nav-item { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #616161; cursor: pointer; display: flex; align-items: center; gap: 10px; }
-                .nav-item.active { background: #fff; color: #1a1c1d; border: 1px solid #dcdfe3; }
+                .settings-grid { display: grid; grid-template-columns: 280px 1fr; gap: 40px; }
+                .settings-nav { display: flex; flex-direction: column; gap: 8px; }
+                .nav-item { padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; }
+                .nav-item:hover { color: var(--text); background: var(--surface); }
+                .nav-item.active { background: var(--surface); color: var(--primary); border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
                 
-                .settings-card { background: #fff; border-radius: 12px; border: 1px solid #ebebeb; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-                .card-title { font-size: 15px; font-weight: 700; color: #1a1c1d; margin-bottom: 20px; }
+                .settings-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 24px; }
                 
-                .form-group { margin-bottom: 20px; }
-                .form-group label { display: block; font-size: 13px; font-weight: 600; color: #616161; margin-bottom: 8px; }
-                .form-input { width: 100%; padding: 8px 12px; border: 1px solid #dcdfe3; border-radius: 8px; font-size: 13px; }
+                .form-group { margin-bottom: 24px; }
+                .form-group label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; }
+                .form-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; font-family: inherit; transition: all 0.2s; }
+                .form-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
             `}</style>
 
             <div className="header-row">

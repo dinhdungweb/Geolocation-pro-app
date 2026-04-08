@@ -20,64 +20,81 @@ import {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
+    // Fetch real automations
     const automations = await (prisma as any).automation.findMany({
         where: { shop: 'GLOBAL' }
     });
+
+    // Fetch sent counts from log
+    const logs = await (prisma as any).adminEmailLog.groupBy({
+        by: ['type'],
+        _count: { _all: true }
+    });
+
+    const sentMap = logs.reduce((acc: any, curr: any) => {
+        acc[curr.type] = curr._count._all;
+        return acc;
+    }, {});
+
+    const totalSentCount = logs.reduce((sum: number, curr: any) => sum + curr._count._all, 0);
 
     return json({
         automations: automations.map((a: any) => ({
             id: a.id,
             name: a.type === 'welcome' ? 'Welcome new subscribers with a discount email' : 
                   a.type === 'limit80' ? '80% Usage limit notification' : 
-                  a.type === 'limit100' ? '100% Usage limit notification' : 'Custom automation',
+                  a.type === 'limit100' ? '100% Usage limit notification' : 
+                  a.type === 'limit_80' ? '80% Usage limit notification' :
+                  a.type === 'limit_100' ? '100% Usage limit notification' :
+                  'Custom automation',
             type: a.type,
-            status: 'Active',
-            sent: 1212,
-            click: '5%',
+            status: a.isActive ? 'Active' : 'Inactive',
+            sent: sentMap[a.type] || 0,
+            click: '-',
             orders: 0,
-            conv: '0.1%',
+            conv: '-',
             sales: '₫0'
-        })).concat([
-            { id: 'm1', name: 'Celebrate customer birthday', type: 'birthday', status: 'Inactive', sent: 0, click: '0%', orders: 0, conv: '0%', sales: '₫0' },
-            { id: 'm2', name: 'Giữ chân khách hàng', type: 'retention', status: 'Inactive', sent: 0, click: '0%', orders: 0, conv: '0%', sales: '₫0' }
-        ])
+        })),
+        totalSentCount
     });
 };
 
 export default function AutomationsList() {
-    const { automations } = useLoaderData<typeof loader>();
+    const { automations, totalSentCount } = useLoaderData<typeof loader>();
 
     return (
-        <div className="automations-container">
+        <div className="automations-dashboard">
             <style>{`
-                .automations-container { padding: 40px; background: #f6f6f7; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+                .automations-dashboard { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
                 
-                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-                .title-area h1 { font-size: 20px; font-weight: 700; color: #1a1c1d; }
+                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+                .title-area h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
                 
-                .btn-secondary { background: #fff; border: 1px solid #dcdfe3; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-                .btn-primary { background: #303030; color: #fff; border: none; padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+                .btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); transition: all 0.2s; }
+                .btn-secondary:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
+                .btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
                 
-                .banner-msg { background: #e0f2fe; padding: 12px 16px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border: 1px solid #bae6fd; font-size: 13px; color: #075985; }
+                .banner-msg { background: #e0f2fe; padding: 16px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; border: 1px solid #bae6fd; font-size: 14px; color: #075985; font-weight: 500; }
                 
-                .metrics-row { background: #fff; border: 1px solid #ebebeb; border-radius: 12px; display: grid; grid-template-columns: repeat(6, 1fr); margin-bottom: 24px; padding: 16px; }
-                .metric-item { padding: 0 16px; border-right: 1px solid #f1f1f1; }
+                .metrics-row { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; display: grid; grid-template-columns: repeat(6, 1fr); margin-bottom: 32px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .metric-item { padding: 0 20px; border-right: 1px solid var(--border); }
                 .metric-item:last-child { border-right: none; }
-                .metric-label { font-size: 11px; color: #616161; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dotted #ccc; width: fit-content; }
-                .metric-val { font-size: 15px; font-weight: 700; color: #1a1c1d; margin-bottom: 4px; }
-                .metric-change { font-size: 11px; color: #616161; display: flex; align-items: center; gap: 2px; }
+                .metric-label { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dotted var(--border); width: fit-content; }
+                .metric-val { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+                .metric-change { font-size: 12px; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 4px; }
                 
-                .table-card { background: #fff; border-radius: 12px; border: 1px solid #ebebeb; overflow: hidden; }
-                .tab-row { display: flex; padding: 8px 16px; border-bottom: 1px solid #f1f1f1; gap: 4px; }
-                .tab-btn { padding: 6px 12px; border-radius: 6px; border: none; background: #f1f1f1; font-size: 13px; font-weight: 600; cursor: pointer; color: #1a1c1d; }
+                .table-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .tab-row { display: flex; padding: 0 24px; border-bottom: 1px solid var(--border); gap: 32px; }
+                .tab-btn { padding: 18px 0; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; background: none; border: none; }
+                .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
                 
-                .table-header-row { display: grid; grid-template-columns: 2fr 100px 100px 100px 100px 100px 100px 40px; padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #f1f1f1; font-size: 12px; font-weight: 500; color: #616161; }
-                .table-row { display: grid; grid-template-columns: 2fr 100px 100px 100px 100px 100px 100px 40px; padding: 16px; border-bottom: 1px solid #f1f1f1; align-items: center; cursor: pointer; transition: background 0.1s; text-decoration: none; }
-                .table-row:hover { background: #fafafa; }
+                .table-header-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 14px 24px; background: #fafafa; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+                .table-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 20px 24px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: var(--text); }
+                .table-row:hover { background: #f8fafc; }
                 
-                .status-badge { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; width: fit-content; }
-                .status-active { background: #dcfce7; color: #166534; }
-                .status-inactive { background: #f1f1f1; color: #616161; }
+                .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; width: fit-content; }
+                .status-active { background: #ecfdf5; color: #10b981; }
+                .status-inactive { background: #f1f5f9; color: var(--text-muted); }
             `}</style>
 
             <div className="header-row">
@@ -109,8 +126,8 @@ export default function AutomationsList() {
             <div className="metrics-row">
                 <div className="metric-item">
                     <div className="metric-label">Sent</div>
-                    <div className="metric-val">1,421</div>
-                    <div className="metric-change"><ArrowUpRight size={12} /> 37%</div>
+                    <div className="metric-val">{totalSentCount.toLocaleString()}</div>
+                    <div className="metric-change"><ArrowUpRight size={12} /> 0%</div>
                 </div>
                 <div className="metric-item">
                     <div className="metric-label">Click rate</div>
