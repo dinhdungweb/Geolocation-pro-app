@@ -240,12 +240,34 @@ export default function AdminEmailAutomations() {
 
                 /* Editor Layout */
                 .editor-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); z-index: 1100; display: flex; }
-                .editor-sidebar { width: 300px; background: white; border-right: 1px solid #f1f5f9; display: flex; flex-direction: column; }
-                .editor-canvas { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 60px; background: #f1f5f9; }
-                .editor-props { width: 320px; background: white; border-left: 1px solid #f1f5f9; overflow-y: auto; padding: 24px; }
+                .editor-sidebar { width: 320px; background: white; border-right: 1px solid #f1f5f9; display: flex; flex-direction: column; }
+                .editor-canvas { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 60px; background: #f8fafc; }
+                .editor-props { width: 340px; background: white; border-left: 1px solid #f1f5f9; overflow-y: auto; padding: 24px; }
                 
-                .block-item { background: #f8fafc; border: 1.5px dashed #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: grab; transition: all 0.2s; }
-                .block-item:hover { border-color: #6366f1; background: #f5f7ff; }
+                .blocks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px; }
+                .block-item { 
+                    background: white; 
+                    border: 1.5px solid #f1f5f9; 
+                    border-radius: 12px; 
+                    padding: 16px 12px; 
+                    cursor: pointer; 
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    outline: none;
+                }
+                .block-item:hover { 
+                    border-color: #6366f1; 
+                    background: #f5f7ff; 
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+                }
+                .block-item svg { color: #64748b; transition: color 0.2s; }
+                .block-item:hover svg { color: #6366f1; }
+                .block-item strong { font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.02em; }
                 
                 .canvas-content { width: 600px; min-height: 800px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
                 .canvas-block { position: relative; border: 2px solid transparent; transition: all 0.2s; margin: 4px 0; border-radius: 8px; cursor: pointer; }
@@ -328,43 +350,55 @@ export default function AdminEmailAutomations() {
                 <div className="editor-overlay">
                     <div className="editor-sidebar">
                         <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9' }}>
-                            <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>Email Blocks</h3>
-                            <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Click to add element to email</p>
+                            <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Elements</h3>
+                            <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Click to add into canvas</p>
                         </div>
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                        
+                        <div className="blocks-grid">
                             <button className="block-item" onClick={() => addBlock('header')}>
-                                <Layout size={18} /> <strong>Header</strong>
+                                <Layout size={22} />
+                                <strong>Header</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('heading')}>
-                                <Type size={18} /> <strong>Heading</strong>
+                                <Type size={22} />
+                                <strong>Heading</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('text')}>
-                                <Edit3 size={18} /> <strong>Paragraph</strong>
+                                <Edit3 size={22} />
+                                <strong>Text</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('button')}>
-                                <Square size={18} /> <strong>Call to Action</strong>
+                                <Square size={22} />
+                                <strong>Button</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('hero')}>
-                                <ImageIcon size={18} /> <strong>Hero Banner</strong>
+                                <ImageIcon size={22} />
+                                <strong>Banner</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('coupon')}>
-                                <Zap size={18} /> <strong>Coupon Card</strong>
+                                <Zap size={22} />
+                                <strong>Coupon</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('divider')}>
-                                <Minus size={18} /> <strong>Divider</strong>
+                                <div style={{ height: '2px', width: '22px', background: '#94a3b8' }}></div>
+                                <strong>Divider</strong>
                             </button>
                             <button className="block-item" onClick={() => addBlock('footer')}>
-                                <Share2 size={18} /> <strong>Footer</strong>
+                                <Share2 size={22} />
+                                <strong>Footer</strong>
                             </button>
                         </div>
-                        <div style={{ padding: '24px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button className="action-btn" style={{ background: '#fef2f2', color: '#ef4444', borderColor: '#fee2e2' }} onClick={() => {
+
+                        <div style={{ flex: 1 }}></div>
+
+                        <div style={{ padding: '24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <button className="action-btn" style={{ width: '100%', height: '44px', justifyContent: 'center', background: 'transparent' }} onClick={() => {
                                 if(confirm("Discard all changes?")) setEditingType(null);
                             }}>
                                 <X size={14} /> Discard Changes
                             </button>
-                            <button className="action-btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleSave}>
-                                <Save size={14} /> Save Automation
+                            <button className="action-btn btn-primary" style={{ width: '100%', height: '48px', justifyContent: 'center', fontSize: '13px', borderRadius: '12px' }} onClick={handleSave}>
+                                <Save size={16} /> Save Template
                             </button>
                         </div>
                     </div>
