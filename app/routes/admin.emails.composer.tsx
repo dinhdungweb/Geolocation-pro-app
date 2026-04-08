@@ -73,7 +73,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         };
     }));
 
-    return json({ shops: shopMap });
+    const templates = await (prisma as any).emailTemplate.findMany({ select: { id: true, name: true, subject: true, html: true } });
+
+    return json({ shops: shopMap, templates });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -89,6 +91,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const results = [];
+    // Create campaign record
+    const campaign = await (prisma as any).campaign.create({
+        data: {
+            shop: 'GLOBAL',
+            name: formData.get("campaignName") as string || "Manual Broadcast",
+            subject,
+            html,
+            status: 'sending'
+        }
+    });
+
     for (const shop of selectedShops) {
         const res = await sendAdminEmail({
             shop,
@@ -100,6 +113,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const successCount = results.filter(r => r.success).length;
+    
+    // Update campaign record
+    await (prisma as any).campaign.update({
+        where: { id: campaign.id },
+        data: { 
+            status: 'sent', 
+            sentCount: successCount,
+            sentAt: new Date()
+        }
+    });
+
     return json({ success: true, message: `Successfully sent to ${successCount} out of ${selectedShops.length} shops.` });
 };
 
@@ -133,6 +157,19 @@ export default function EmailComposer() {
 
     // Handle template selection
     useEffect(() => {
+        if (selectedTemplate === "custom") {
+            setBody("");
+            setSubject("");
+            return;
+        }
+
+        const customTemplate = (useLoaderData<typeof loader>().templates as any[]).find(t => t.id === selectedTemplate);
+        if (customTemplate) {
+            setSubject(customTemplate.subject || "");
+            setBody(customTemplate.html || "");
+            return;
+        }
+
         switch(selectedTemplate) {
             case 'welcome':
                 setSubject("Welcome to Geo: Redirect & Country Block!");
@@ -145,12 +182,6 @@ export default function EmailComposer() {
             case 'promo':
                 setSubject("Special Offer inside!");
                 setBody(PROMO_TEMPLATE);
-                break;
-            case 'custom':
-                if(body === getWelcomeEmailHtml('example.myshopify.com') || body === PROMO_TEMPLATE || body.includes("Usage Warning")) {
-                    setBody("");
-                    setSubject("");
-                }
                 break;
         }
     }, [selectedTemplate]);
@@ -560,12 +591,24 @@ export default function EmailComposer() {
                         <div className="section-label"><Mail size={14} /> 2. Campaign Content</div>
 
                         <div className="form-control-group">
+                            <label>Campaign Management Name (Internal)</label>
+                            <input type="text" name="campaignName" placeholder="e.g. Winter Flash Sale 2024" />
+                        </div>
+
+                        <div className="form-control-group">
                             <label>Design Template</label>
                             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
                                 <option value="custom">Blank Canvas (Custom HTML)</option>
-                                <option value="welcome">Onboarding Welcome Email</option>
-                                <option value="promo">Feature Upgrade Promotion</option>
-                                <option value="limit80">System Alert: 80% Usage</option>
+                                <optgroup label="Custom Templates">
+                                    {(useLoaderData<typeof loader>().templates as any[]).map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="System Presets">
+                                    <option value="welcome">Onboarding Welcome Email</option>
+                                    <option value="promo">Feature Upgrade Promotion</option>
+                                    <option value="limit80">System Alert: 80% Usage</option>
+                                </optgroup>
                             </select>
                         </div>
 

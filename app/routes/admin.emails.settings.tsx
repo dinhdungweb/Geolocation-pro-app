@@ -29,17 +29,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const name = formData.get("senderName") as string;
     const email = formData.get("senderEmail") as string;
+    const smtpHost = formData.get("smtpHost") as string;
+    const smtpPort = parseInt(formData.get("smtpPort") as string) || 587;
+    const smtpUser = formData.get("smtpUser") as string;
+    const smtpPass = formData.get("smtpPass") as string;
+    const smtpSecure = formData.get("smtpSecure") === "true";
 
-    await prisma.settings.upsert({
+    await (prisma as any).settings.upsert({
         where: { shop: 'GLOBAL' },
         update: { 
             emailSenderName: name,
-            emailSenderEmail: email
+            emailSenderEmail: email,
+            smtpHost,
+            smtpPort,
+            smtpUser,
+            smtpPass,
+            smtpSecure
         },
         create: {
             shop: 'GLOBAL',
             emailSenderName: name,
-            emailSenderEmail: email
+            emailSenderEmail: email,
+            smtpHost,
+            smtpPort,
+            smtpUser,
+            smtpPass,
+            smtpSecure
         }
     });
 
@@ -184,13 +199,44 @@ export default function EmailSettings() {
                     <div className="title">Sender profile</div>
                     <div className="form-group-v2">
                         <label>Display name</label>
-                        <input name="senderName" className="input-premium" defaultValue={settings?.emailSenderName || "Geo Admin"} placeholder="Enter sender name" />
+                        <input name="senderName" className="input-premium" defaultValue={(settings as any)?.emailSenderName || "Geo Admin"} placeholder="Enter sender name" />
                     </div>
                     <div className="form-group-v2">
                         <label>Sender email</label>
-                        <input name="senderEmail" className="input-premium" defaultValue={settings?.emailSenderEmail || "noreply@geopro.bluepeaks.top"} placeholder="Enter sender email" />
+                        <input name="senderEmail" className="input-premium" defaultValue={(settings as any)?.emailSenderEmail || "noreply@geopro.bluepeaks.top"} placeholder="Enter sender email" />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+
+                    <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #f1f5f9' }}>
+                        <div className="title" style={{ marginBottom: '16px' }}>SMTP Credentials</div>
+                        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>Configure your own email server for better deliverability and custom domain support.</p>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '20px' }}>
+                            <div className="form-group-v2">
+                                <label>SMTP Host</label>
+                                <input type="text" name="smtpHost" className="input-premium" defaultValue={(settings as any)?.smtpHost || ""} placeholder="e.g. smtp.gmail.com" />
+                            </div>
+                            <div className="form-group-v2">
+                                <label>Port</label>
+                                <input type="number" name="smtpPort" className="input-premium" defaultValue={(settings as any)?.smtpPort || 587} />
+                            </div>
+                        </div>
+                        
+                        <div className="form-group-v2">
+                            <label>SMTP Username</label>
+                            <input type="text" name="smtpUser" className="input-premium" defaultValue={(settings as any)?.smtpUser || ""} />
+                        </div>
+                        <div className="form-group-v2">
+                            <label>SMTP Password</label>
+                            <input type="password" name="smtpPass" className="input-premium" defaultValue={(settings as any)?.smtpPass || ""} />
+                        </div>
+                        
+                        <div className="form-group-v2" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
+                            <input type="checkbox" name="smtpSecure" value="true" defaultChecked={(settings as any)?.smtpSecure} style={{ width: '20px', height: '20px' }} />
+                            <label style={{ marginBottom: 0 }}>Use Secure Connection (SSL/TLS)</label>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
                         <button type="submit" className="btn-premium-solid">Save Changes</button>
                     </div>
                 </Form>

@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import prisma from '../db.server';
 import { replaceEmailVariables } from './email-parser';
 
@@ -6,7 +7,7 @@ const resend = process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_
     ? new Resend(process.env.RESEND_API_KEY) 
     : null;
 
-const SENDER = process.env.SENDER_EMAIL || 'send@geopro.bluepeaks.top';
+const DEFAULT_SENDER = process.env.SENDER_EMAIL || 'send@geopro.bluepeaks.top';
 
 export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'manual';
 
@@ -22,6 +23,11 @@ export async function sendAdminEmail({
     html: string 
 }) {
     console.log(`[Email Service] Preparing to send ${type} email to ${shop}`);
+
+    // Fetch settings for SMTP and sender info
+    const settings = await (prisma as any).settings.findUnique({
+        where: { shop: 'GLOBAL' }
+    });
 
     // Check for custom automation template (Specific Shop then GLOBAL)
     let customAuto = await (prisma as any).automation.findUnique({
@@ -49,7 +55,6 @@ export async function sendAdminEmail({
         finalSubject = replaceEmailVariables(customAuto.subject, { shop });
         finalHtml = replaceEmailVariables(customAuto.html, { shop });
     } else {
-        // Still replace variables in default if they exist (standardizing)
         finalSubject = replaceEmailVariables(subject, { shop });
         finalHtml = replaceEmailVariables(html, { shop });
     }
@@ -61,50 +66,75 @@ export async function sendAdminEmail({
     });
 
     const recipient = session?.email;
-
     if (!recipient) {
         console.error(`[Email Service] No email found for shop ${shop}`);
         return { success: false, error: 'No recipient email' };
     }
 
+    const senderName = settings?.emailSenderName || "Geo Admin";
+    const senderEmail = settings?.emailSenderEmail || DEFAULT_SENDER;
+
     try {
-        if (!resend) {
-            console.log(`[Email Simulation]
-                TO: ${recipient}
-                SUBJECT: ${subject}
-                TYPE: ${type}
-                BODY: (HTML content hidden)
-            `);
-            
-            // Still log to DB so we don't repeat automated emails
-            await (prisma as any).adminEmailLog.create({
-                data: { shop, type, subject, status: 'simulated' }
+        // Option 1: SMTP Transporter
+        if (settings?.smtpHost && settings?.smtpUser) {
+            console.log(`[Email Service] Attempting SMTP delivery via ${settings.smtpHost}`);
+            const transporter = nodemailer.createTransport({
+                host: settings.smtpHost,
+                port: settings.smtpPort || 587,
+                secure: settings.smtpSecure,
+                auth: {
+                    user: settings.smtpUser,
+                    pass: settings.smtpPass,
+                },
             });
-            
-            return { success: true, simulated: true };
+
+            await transporter.sendMail({
+                from: `"${senderName}" <${senderEmail}>`,
+                to: recipient,
+                subject: finalSubject,
+                html: finalHtml,
+            });
+
+            await (prisma as any).adminEmailLog.create({
+                data: { shop, type, subject: finalSubject, html: finalHtml, status: 'sent' }
+            });
+            return { success: true };
         }
 
-        const { data, error } = await resend.emails.send({
-            from: `Geo: Redirect & Country Block <${SENDER}>`,
-            to: [recipient],
-            subject: finalSubject,
-            html: finalHtml,
-        });
-
-        if (error) {
-            await (prisma as any).adminEmailLog.create({
-                data: { shop, type, subject: subject || type, status: 'failed', error: JSON.stringify(error) }
+        // Option 2: Resend API
+        if (resend) {
+            const { data, error } = await resend.emails.send({
+                from: `${senderName} <${senderEmail}>`,
+                to: [recipient],
+                subject: finalSubject,
+                html: finalHtml,
             });
-            return { success: false, error };
+
+            if (error) {
+                await (prisma as any).adminEmailLog.create({
+                    data: { shop, type, subject: finalSubject, html: finalHtml, status: 'failed', error: JSON.stringify(error) }
+                });
+                return { success: false, error };
+            }
+
+            await (prisma as any).adminEmailLog.create({
+                data: { shop, type, subject: finalSubject, html: finalHtml, status: 'sent' }
+            });
+            return { success: true, data };
         }
 
+        // Fallback: Simulation
+        console.log(`[Email Simulation] TO: ${recipient} | SUBJECT: ${finalSubject}`);
         await (prisma as any).adminEmailLog.create({
-            data: { shop, type, subject: subject || type, status: 'sent' }
+            data: { shop, type, subject: finalSubject, html: finalHtml, status: 'simulated' }
         });
-
-        return { success: true, data };
+        
+        return { success: true, simulated: true };
     } catch (err: any) {
         console.error(`[Email Service] Error:`, err);
+        await (prisma as any).adminEmailLog.create({
+            data: { shop, type, subject: finalSubject, html: finalHtml, status: 'failed', error: err.message }
+        });
         return { success: false, error: err.message };
     }
 }

@@ -163,7 +163,7 @@ export default function TemplatesGallery() {
                     </div>
                 ) : (
                     templates.map((tmp: any) => (
-                        <div key={tmp.id} className="template-card-premium">
+                        <Link key={tmp.id} to={`/admin/emails/templates/${tmp.id}`} className="template-card-premium" style={{ textDecoration: 'none' }}>
                             <div className="template-preview-v2">
                                 {tmp.thumb ? <img src={tmp.thumb} alt={tmp.name} /> : <Mail size={40} color="#cbd5e1" />}
                             </div>
@@ -174,7 +174,7 @@ export default function TemplatesGallery() {
                                     <MoreHorizontal size={16} color="#94a3b8" />
                                 </div>
                             </div>
-                        </div>
+                        </Link>
                     ))
                 )}
             </div>

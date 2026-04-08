@@ -72,6 +72,11 @@ model Settings {
   currentPlan    String   @default("free")
   emailSenderName  String?  @default("Geo Admin")
   emailSenderEmail String?  @default("noreply@geopro.bluepeaks.top")
+  smtpHost         String?
+  smtpPort         Int?
+  smtpUser         String?
+  smtpPass         String?
+  smtpSecure       Boolean  @default(true)
 }
 
 model AnalyticsCountry {
@@ -146,6 +151,7 @@ model AdminEmailLog {
   subject   String?
   status    String   @default("sent") // 'sent', 'failed'
   error     String?
+  html      String?  @db.Text
   createdAt DateTime @default(now())
 
   @@index([shop, type])

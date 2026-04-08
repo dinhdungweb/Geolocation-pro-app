@@ -265,7 +265,7 @@ export default function MessagingDashboard() {
                     <Link to="/admin/emails/automations" className="btn-premium-outline" style={{ textDecoration: 'none' }}>
                         <Zap size={16} /> Automations
                     </Link>
-                    <Link to="/admin/emails/templates" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
+                    <Link to="/admin/emails/composer" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
                         <Rocket size={16} /> Create Campaign
                     </Link>
                     <button className="btn-premium-outline">
@@ -353,10 +353,10 @@ export default function MessagingDashboard() {
 
             <div className="table-premium">
                 <div className="table-tabs-v2">
-                    <div className={`tab-v2 ${activeTab === 'All' ? 'active' : ''}`} onClick={() => setActiveTab('All')}>All campaigns</div>
-                    <div className="tab-v2">Automations</div>
-                    <div className="tab-v2">Sent</div>
-                    <div className="tab-v2">Draft</div>
+                    <div className={`tab-v2 ${activeTab === 'All' ? 'active' : ''}`} onClick={() => setActiveTab('All')}>All history</div>
+                    <Link to="/admin/emails/automations" className="tab-v2" style={{ textDecoration: 'none' }}>Automations</Link>
+                    <Link to="/admin/emails/campaigns" className="tab-v2" style={{ textDecoration: 'none' }}>Campaigns</Link>
+                    <div className="tab-v2">Settings</div>
                 </div>
                 
                 <div className="t-header-v2">

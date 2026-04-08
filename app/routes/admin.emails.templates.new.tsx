@@ -7,17 +7,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
     try {
-        await (prisma as any).emailTemplate.create({
+        const template = await (prisma as any).emailTemplate.create({
             data: {
                 shop: 'GLOBAL',
                 name: "Untitled Template",
                 subject: "New Campaign",
-                config: "[]"
+                config: "[]",
+                html: ""
             }
         });
+        return redirect(`/admin/emails/templates/${template.id}`);
     } catch (e) {
         console.error("Prisma error in Template New loader:", e);
+        return redirect(`/admin/emails/templates`);
     }
-
-    return redirect(`/admin/emails/templates`);
 };
