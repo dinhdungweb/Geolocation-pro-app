@@ -173,7 +173,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // 3. Update Monthly Usage (for billing and statistics)
-        if (type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
+        if (type === 'visit' || type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
             type === 'ip_redirected' || type === 'ip_blocked' || type === 'popup_shown') {
             const now = new Date();
             const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

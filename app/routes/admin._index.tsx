@@ -46,10 +46,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const revenueMap: Record<string, number> = {
         'PLUS': 8,
         'PREMIUM': 5,
-        'FREE': 0,
-        'unknown': 0
+        'FREE': 0
     };
-    const totalRevenue = settings.reduce((sum, s) => sum + (revenueMap[s.currentPlan] || 0), 0);
+    
+    // Normalize currentPlan to uppercase to match revenueMap keys regardless of DB storage case
+    const totalRevenue = settings.reduce((sum, s) => {
+        const planKey = (s.currentPlan || 'FREE').toUpperCase();
+        return sum + (revenueMap[planKey] || 0);
+    }, 0);
 
     const modes = settings.reduce((acc: any, s) => {
         acc[s.mode] = (acc[s.mode] || 0) + 1;
