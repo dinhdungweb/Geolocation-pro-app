@@ -148,3 +148,18 @@ model AdminEmailLog {
 
   @@index([shop, type])
 }
+
+model Automation {
+  id        String   @id @default(uuid())
+  shop      String
+  type      String   // 'welcome', 'limit_80', 'limit_100'
+  subject   String
+  config    String   @default("[]") // Stores JSON blocks for the editor
+  html      String   @default("")   // Stores the final generated HTML
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shop, type])
+  @@index([shop])
+}
