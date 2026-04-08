@@ -236,9 +236,8 @@ export default function TemplateEditor() {
 
                 .block-tools {
                     position: absolute;
-                    left: 100%;
-                    top: 0;
-                    margin-left: 10px;
+                    right: 10px;
+                    top: 10px;
                     display: none;
                     flex-direction: column;
                     gap: 4px;
