@@ -88,7 +88,7 @@ export default function AdminLayout() {
                 :root {
                     --primary: #6366f1;
                     --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-                    --bg: #f1f5f9;
+                    --bg: #ffffff;
                     --sidebar-bg: #0f172a;
                     --surface: #ffffff;
                     --text: #0f172a;
