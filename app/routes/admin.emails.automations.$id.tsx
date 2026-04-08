@@ -32,9 +32,10 @@ import { useState, useEffect } from "react";
 import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
 import { generateEmailHtml, type EmailBlock, type EmailBlockType } from "../utils/email-generator";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     const shop = "GLOBAL";
+    const { id } = params;
     
     try {
         // Fetch stats
@@ -62,10 +63,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return acc;
         }, {});
 
-        return json({ stats: statsMap, customMap, shop });
+        // If specific ID is requested, fetch it
+        let currentAutomation = null;
+        if (id && id !== 'new') {
+            currentAutomation = await (prisma as any).automation.findUnique({
+                where: { id }
+            });
+        }
+
+        return json({ stats: statsMap, customMap, shop, currentAutomation, requestedId: id });
     } catch (error) {
         console.error("Prisma error in Automation Editor loader:", error);
-        return json({ stats: {}, customMap: {}, shop });
+        return json({ stats: {}, customMap: {}, shop, currentAutomation: null, requestedId: id });
     }
 };
 
@@ -111,7 +120,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function AdminEmailAutomations() {
-    const { stats, customMap, shop } = useLoaderData<typeof loader>();
+    const { stats, customMap, shop, currentAutomation, requestedId } = useLoaderData<typeof loader>();
     const fetcher = useFetcher();
     const [previewType, setPreviewType] = useState<string | null>(null);
     const [editingType, setEditingType] = useState<string | null>(null);
@@ -119,6 +128,19 @@ export default function AdminEmailAutomations() {
     const [editBlocks, setEditBlocks] = useState<EmailBlock[]>([]);
     const [editIsActive, setEditIsActive] = useState(true);
     const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+
+    // Effect to enter edit mode if ID is provided in URL
+    useEffect(() => {
+        if (currentAutomation) {
+            setEditingType(currentAutomation.type);
+            setEditIsActive(currentAutomation.isActive);
+            setEditSubject(currentAutomation.subject);
+            setEditBlocks(JSON.parse(currentAutomation.config));
+        } else if (requestedId && ['welcome', 'limit_80', 'limit_100'].includes(requestedId)) {
+            const auto = automations.find(a => a.id === requestedId);
+            if (auto) startEditing(auto);
+        }
+    }, [currentAutomation, requestedId]);
 
     const automations = [
         {
