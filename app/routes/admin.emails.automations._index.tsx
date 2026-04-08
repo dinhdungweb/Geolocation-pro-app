@@ -210,12 +210,11 @@ export default function AutomationsList() {
                 
                 <div className="t-header-row">
                     <span>Automation name</span>
+                    <span>Trigger</span>
                     <span>Status</span>
                     <span>Sent</span>
                     <span>Open rate</span>
                     <span>Click rate</span>
-                    <span>Orders</span>
-                    <span>Sales</span>
                     <span></span>
                 </div>
 
@@ -224,26 +223,31 @@ export default function AutomationsList() {
                          <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                             <Zap size={32} color="#94a3b8" />
                         </div>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No automations yet</h3>
-                        <p style={{ color: '#64748b', marginBottom: '24px' }}>Automate your emails to save time and boost conversions.</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No automation flows yet</h3>
+                        <p style={{ color: '#64748b', marginBottom: '24px' }}>Create your first automated flow to engage customers based on their actions.</p>
                         <Link to="/admin/emails/automations/new" className="btn-premium-solid" style={{ margin: '0 auto', textDecoration: 'none' }}>
-                           Create your first automation
+                           Setup first flow
                         </Link>
                     </div>
                 ) : (
                     automations.map((a: any) => (
                         <Link key={a.id} to={`/admin/emails/automations/${a.id}`} className="t-row">
                             <div className="auto-name">{a.name}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6366f1', fontWeight: 600, fontSize: '13px' }}>
+                                <Zap size={14} /> 
+                                {a.type === 'welcome' && 'App Installation'}
+                                {a.type === 'limit_80' && '80% Usage'}
+                                {a.type === 'limit_100' && '100% Usage'}
+                                {a.type === 'manual' && 'Manual'}
+                            </div>
                             <div>
                                 <span className={`tag-status ${a.status === 'Active' ? 'tag-active' : 'tag-inactive'}`}>
                                     {a.status}
                                 </span>
                             </div>
                             <div style={{ fontWeight: 700 }}>{a.sent === 0 ? '-' : a.sent.toLocaleString()}</div>
-                            <div style={{ fontWeight: 600 }}>{a.open || '-'}</div>
-                            <div style={{ fontWeight: 600 }}>{a.click === '0%' ? '-' : a.click}</div>
-                            <div style={{ fontWeight: 600 }}>{a.orders === 0 ? '-' : a.orders}</div>
-                            <div style={{ fontWeight: 700 }}>{a.sales === '₫0' ? '-' : a.sales}</div>
+                            <div style={{ fontWeight: 600 }}>-</div>
+                            <div style={{ fontWeight: 600 }}>-</div>
                             <div><MoreHorizontal size={18} color="#94a3b8" /></div>
                         </Link>
                     ))

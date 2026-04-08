@@ -102,6 +102,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function AdminEmailAutomations() {
     const { shop, currentAutomation, requestedId } = useLoaderData<typeof loader>();
     const fetcher = useFetcher();
+    const [view, setView] = useState<'flow' | 'designer'>('flow');
+    const [triggerType, setTriggerType] = useState<string>(currentAutomation?.type || requestedId || 'welcome');
     const [editSubject, setEditSubject] = useState("");
     const [editBlocks, setEditBlocks] = useState<EmailBlock[]>([]);
     const [editIsActive, setEditIsActive] = useState(true);
@@ -159,7 +161,7 @@ export default function AdminEmailAutomations() {
         const html = generateEmailHtml(editBlocks, shop);
         fetcher.submit({
             action: "save",
-            type: currentAutomation?.type || requestedId!,
+            type: triggerType,
             subject: editSubject,
             config: JSON.stringify(editBlocks),
             html,
@@ -294,159 +296,317 @@ export default function AdminEmailAutomations() {
                         border: none;
                     }
                     .btn-primary:hover { background: #4f46e5; }
+
+                    /* Flow View Styles */
+                    .flow-container {
+                        flex: 1;
+                        background: #f8fafc;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        padding: 60px;
+                        overflow-y: auto;
+                    }
+                    .flow-header {
+                        width: 100%;
+                        max-width: 800px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 40px;
+                    }
+                    .flow-node {
+                        width: 400px;
+                        background: white;
+                        border-radius: 16px;
+                        border: 1px solid #e2e8f0;
+                        padding: 24px;
+                        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+                        position: relative;
+                        transition: all 0.2s;
+                    }
+                    .flow-node:hover { border-color: #6366f1; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                    .flow-node.trigger { border-left: 4px solid #6366f1; }
+                    .flow-node.action { border-left: 4px solid #10b981; }
+                    
+                    .flow-connector {
+                        width: 2px;
+                        height: 40px;
+                        background: #e2e8f0;
+                        position: relative;
+                    }
+                    .flow-connector::after {
+                        content: '';
+                        position: absolute;
+                        bottom: -5px;
+                        left: -4px;
+                        border-left: 5px solid transparent;
+                        border-right: 5px solid transparent;
+                        border-top: 5px solid #e2e8f0;
+                    }
+
+                    .node-icon {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 10px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-bottom: 16px;
+                    }
+                    .trigger .node-icon { background: #f5f3ff; color: #6366f1; }
+                    .action .node-icon { background: #ecfdf5; color: #10b981; }
+                    
+                    .view-tabs {
+                        display: flex;
+                        background: #f1f5f9;
+                        padding: 4px;
+                        border-radius: 10px;
+                        gap: 4px;
+                    }
+                    .tab-btn {
+                        padding: 6px 16px;
+                        border-radius: 8px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        border: none;
+                        background: transparent;
+                        color: #64748b;
+                        transition: all 0.2s;
+                    }
+                    .tab-btn.active {
+                        background: white;
+                        color: #6366f1;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    }
                 `}</style>
 
-                <div className="editor-sidebar">
-                    <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9' }}>
-                        <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Elements</h3>
-                        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Build your automated flow</p>
-                    </div>
-                    
-                    <div className="blocks-grid">
-                        <button className="block-item" onClick={() => addBlock('header')}>
-                            <Layout size={22} />
-                            <strong>Header</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('heading')}>
-                            <Type size={22} />
-                            <strong>Heading</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('text')}>
-                            <Edit3 size={22} />
-                            <strong>Text</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('button')}>
-                            <Square size={22} />
-                            <strong>Button</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('hero')}>
-                            <ImageIcon size={22} />
-                            <strong>Banner</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('coupon')}>
-                            <Zap size={22} />
-                            <strong>Coupon</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('divider')}>
-                            <div style={{ height: '2px', width: '22px', background: '#94a3b8' }}></div>
-                            <strong>Divider</strong>
-                        </button>
-                        <button className="block-item" onClick={() => addBlock('footer')}>
-                            <Share2 size={22} />
-                            <strong>Footer</strong>
-                        </button>
-                    </div>
-
-                    <div style={{ flex: 1 }}></div>
-
-                    <div style={{ padding: '24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <button className="action-btn" style={{ width: '100%', height: '44px', justifyContent: 'center', background: 'transparent' }} onClick={() => {
-                            window.location.href = "/admin/emails/automations";
-                        }}>
-                            <X size={14} /> Back to List
-                        </button>
-                        <button className="action-btn btn-primary" style={{ width: '100%', height: '48px', justifyContent: 'center', fontSize: '13px', borderRadius: '12px' }} onClick={handleSave}>
-                            {fetcher.state === 'submitting' ? 'Saving...' : <><Save size={16} /> Save Changes</>}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="editor-canvas">
-                    <div className="canvas-content">
-                        {(fetcher.data as any)?.success && (
-                            <div style={{ padding: '12px 24px', background: '#ecfdf5', borderBottom: '1px solid #10b981', color: '#059669', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <CheckCircle2 size={16} /> Saved successfully!
-                            </div>
-                        )}
-                        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                            <div className="prop-label">Email Subject</div>
-                            <input className="prop-input" value={editSubject} onChange={e => setEditSubject(e.target.value)} />
-                        </div>
-                        
-                        <div style={{ padding: '0' }}>
-                            {editBlocks.map((block, idx) => (
-                                <div 
-                                    key={block.id} 
-                                    className={`canvas-block ${selectedBlockId === block.id ? 'selected' : ''}`}
-                                    onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}
-                                >
-                                    <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
-                                    <div className="block-actions">
-                                        <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'up'); }} disabled={idx === 0} title="Move Up"><ArrowUp size={14} /></button>
-                                        <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'down'); }} disabled={idx === editBlocks.length - 1} title="Move Down"><ArrowDown size={14} /></button>
-                                        <button className="action-icon delete" onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} title="Delete Block"><Trash2 size={14} /></button>
-                                    </div>
+                {view === 'designer' ? (
+                    <>
+                        <div className="editor-sidebar">
+                            <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                    <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Designer</h3>
+                                    <button className="tab-btn active" onClick={() => setView('flow')} style={{ padding: '4px 8px', fontSize: '11px' }}>Back to Flow</button>
                                 </div>
-                            ))}
-                            {editBlocks.length === 0 && (
-                                <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-                                    <Info size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
-                                    <p>No blocks added yet. Use the sidebar to start building.</p>
+                                <p style={{ fontSize: '11px', color: '#64748b' }}>Build your email content</p>
+                            </div>
+                            
+                            <div className="blocks-grid">
+                                <button className="block-item" onClick={() => addBlock('header')}>
+                                    <Layout size={22} />
+                                    <strong>Header</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('heading')}>
+                                    <Type size={22} />
+                                    <strong>Heading</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('text')}>
+                                    <Edit3 size={22} />
+                                    <strong>Text</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('button')}>
+                                    <Square size={22} />
+                                    <strong>Button</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('hero')}>
+                                    <ImageIcon size={22} />
+                                    <strong>Banner</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('coupon')}>
+                                    <Zap size={22} />
+                                    <strong>Coupon</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('divider')}>
+                                    <div style={{ height: '2px', width: '22px', background: '#94a3b8' }}></div>
+                                    <strong>Divider</strong>
+                                </button>
+                                <button className="block-item" onClick={() => addBlock('footer')}>
+                                    <Share2 size={22} />
+                                    <strong>Footer</strong>
+                                </button>
+                            </div>
+
+                            <div style={{ flex: 1 }}></div>
+
+                            <div style={{ padding: '24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <button className="action-btn btn-primary" style={{ width: '100%', height: '48px', justifyContent: 'center', fontSize: '13px', borderRadius: '12px' }} onClick={() => setView('flow')}>
+                                    <CheckCircle2 size={16} /> Save & Return to Flow
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="editor-canvas">
+                            <div className="canvas-content">
+                                {(fetcher.data as any)?.success && (
+                                    <div style={{ padding: '12px 24px', background: '#ecfdf5', borderBottom: '1px solid #10b981', color: '#059669', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <CheckCircle2 size={16} /> Saved successfully!
+                                    </div>
+                                )}
+                                <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                    <div className="prop-label">Email Subject</div>
+                                    <input className="prop-input" value={editSubject} onChange={e => setEditSubject(e.target.value)} />
+                                </div>
+                                
+                                <div style={{ padding: '0' }}>
+                                    {editBlocks.map((block, idx) => (
+                                        <div 
+                                            key={block.id} 
+                                            className={`canvas-block ${selectedBlockId === block.id ? 'selected' : ''}`}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}
+                                        >
+                                            <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
+                                            <div className="block-actions">
+                                                <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'up'); }} disabled={idx === 0} title="Move Up"><ArrowUp size={14} /></button>
+                                                <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'down'); }} disabled={idx === editBlocks.length - 1} title="Move Down"><ArrowDown size={14} /></button>
+                                                <button className="action-icon delete" onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} title="Delete Block"><Trash2 size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {editBlocks.length === 0 && (
+                                        <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                                            <Info size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
+                                            <p>No blocks added yet. Use the sidebar to start building.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="editor-props" onClick={e => e.stopPropagation()}>
+                            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Type size={16} fill="#6366f1" color="#6366f1" /> Properties
+                            </h3>
+
+                            {selectedBlockId ? (
+                                (() => {
+                                    const block = editBlocks.find(b => b.id === selectedBlockId);
+                                    if (!block) return null;
+                                    return (
+                                        <div className="block-settings-form">
+                                            <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Editing</span>
+                                                <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '14px', textTransform: 'capitalize' }}>{block.type} Block</div>
+                                            </div>
+
+                                            {block.type === 'heading' || block.type === 'text' ? (
+                                                <div className="prop-group">
+                                                    <div className="prop-label">Content Text</div>
+                                                    <textarea 
+                                                        className="prop-input" 
+                                                        rows={4} 
+                                                        value={block.content.text} 
+                                                        onChange={e => updateBlockContent(block.id, { text: e.target.value })} 
+                                                    />
+                                                </div>
+                                            ) : null}
+
+                                            {block.type === 'button' ? (
+                                                <>
+                                                    <div className="prop-group">
+                                                        <div className="prop-label">Button Label</div>
+                                                        <input className="prop-input" value={block.content.label} onChange={e => updateBlockContent(block.id, { label: e.target.value })} />
+                                                    </div>
+                                                    <div className="prop-group">
+                                                        <div className="prop-label">Destination URL</div>
+                                                        <input className="prop-input" value={block.content.url} onChange={e => updateBlockContent(block.id, { url: e.target.value })} />
+                                                    </div>
+                                                </>
+                                            ) : null}
+
+                                            <button className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }} onClick={() => setSelectedBlockId(null)}>
+                                                <CheckCircle2 size={14} /> Done
+                                            </button>
+                                        </div>
+                                    )
+                                })()
+                            ) : (
+                                <div className="global-settings">
+                                    <div className="prop-group">
+                                        <div className="prop-label">Activation</div>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                            <input type="checkbox" checked={editIsActive} onChange={e => setEditIsActive(e.target.checked)} /> 
+                                            Enable this automation
+                                        </label>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    </div>
-                </div>
-
-                <div className="editor-props" onClick={e => e.stopPropagation()}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Type size={16} fill="#6366f1" color="#6366f1" /> Properties
-                    </h3>
-
-                    {selectedBlockId ? (
-                        (() => {
-                            const block = editBlocks.find(b => b.id === selectedBlockId);
-                            if (!block) return null;
-                            return (
-                                <div className="block-settings-form">
-                                    <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Editing</span>
-                                        <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '14px', textTransform: 'capitalize' }}>{block.type} Block</div>
-                                    </div>
-
-                                    {block.type === 'heading' || block.type === 'text' ? (
-                                        <div className="prop-group">
-                                            <div className="prop-label">Content Text</div>
-                                            <textarea 
-                                                className="prop-input" 
-                                                rows={4} 
-                                                value={block.content.text} 
-                                                onChange={e => updateBlockContent(block.id, { text: e.target.value })} 
-                                            />
-                                        </div>
-                                    ) : null}
-
-                                    {block.type === 'button' ? (
-                                        <>
-                                            <div className="prop-group">
-                                                <div className="prop-label">Button Label</div>
-                                                <input className="prop-input" value={block.content.label} onChange={e => updateBlockContent(block.id, { label: e.target.value })} />
-                                            </div>
-                                            <div className="prop-group">
-                                                <div className="prop-label">Destination URL</div>
-                                                <input className="prop-input" value={block.content.url} onChange={e => updateBlockContent(block.id, { url: e.target.value })} />
-                                            </div>
-                                        </>
-                                    ) : null}
-
-                                    <button className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }} onClick={() => setSelectedBlockId(null)}>
-                                        <CheckCircle2 size={14} /> Done
-                                    </button>
-                                </div>
-                            )
-                        })()
-                    ) : (
-                        <div className="global-settings">
-                            <div className="prop-group">
-                                <div className="prop-label">Activation</div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={editIsActive} onChange={e => setEditIsActive(e.target.checked)} /> 
-                                    Enable this automation
-                                </label>
+                    </>
+                ) : (
+                    /* FLOW VIEW */
+                    <div className="flow-container">
+                        <div className="flow-header">
+                            <div>
+                                <h2 style={{ fontSize: '24px', fontWeight: 800 }}>Automation Flow</h2>
+                                <p style={{ color: '#64748b' }}>Configure your triggers and actions</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button className="action-btn" onClick={() => window.location.href = "/admin/emails/automations"}>
+                                    <X size={14} /> Close
+                                </button>
+                                <button className="action-btn btn-primary" onClick={handleSave}>
+                                    <Save size={16} /> {fetcher.state === 'submitting' ? 'Saving...' : 'Save Flow'}
+                                </button>
                             </div>
                         </div>
-                    )}
-                </div>
+
+                        <div className="flow-node trigger">
+                            <div className="node-icon">
+                                <Zap size={20} />
+                            </div>
+                            <div style={{ fontWeight: 800, fontSize: '14px', textTransform: 'uppercase', color: '#6366f1', marginBottom: '4px' }}>Trigger</div>
+                            <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: '12px' }}>
+                                {triggerType === 'welcome' && "New Installation"}
+                                {triggerType === 'limit_80' && "80% Usage Reached"}
+                                {triggerType === 'limit_100' && "100% Limit Reached"}
+                                {triggerType === 'manual' && "Manual Trigger"}
+                            </div>
+                            <div className="prop-group">
+                                <div className="prop-label">Change Trigger Event</div>
+                                <select 
+                                    className="prop-input" 
+                                    value={triggerType} 
+                                    onChange={e => setTriggerType(e.target.value)}
+                                >
+                                    <option value="welcome">On App Installation</option>
+                                    <option value="limit_80">On 80% Monthly Usage</option>
+                                    <option value="limit_100">On 100% Monthly Usage</option>
+                                    <option value="manual">Manual / API Trigger</option>
+                                </select>
+                            </div>
+                            <p style={{ color: '#64748b', fontSize: '13px', marginTop: '12px' }}>
+                                This automation will fire immediately when the selected event occurs for a shop.
+                            </p>
+                        </div>
+
+                        <div className="flow-connector"></div>
+
+                        <div className="flow-node action">
+                            <div className="node-icon">
+                                <MessageSquare size={20} />
+                            </div>
+                            <div style={{ fontWeight: 800, fontSize: '14px', textTransform: 'uppercase', color: '#10b981', marginBottom: '4px' }}>Action</div>
+                            <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: '16px' }}>Send Automated Email</div>
+                            
+                            <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                                <div className="prop-label">Email Subject</div>
+                                <div style={{ fontSize: '14px', fontWeight: 600 }}>{editSubject || "(No subject set)"}</div>
+                            </div>
+                            
+                            <button className="action-btn" style={{ width: '100%', justifyContent: 'center', background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }} onClick={() => setView('designer')}>
+                                <Edit3 size={14} /> Customize Email Content
+                            </button>
+                        </div>
+
+                        <div className="flow-connector"></div>
+
+                        <div style={{ padding: '12px 24px', background: '#f1f5f9', borderRadius: '30px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            End of Flow
+                        </div>
+                    </div>
+                )}
             </div>
     );
 }
