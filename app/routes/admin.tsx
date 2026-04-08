@@ -16,7 +16,8 @@ import {
     Menu,
     X,
     History,
-    Zap
+    Zap,
+    ChevronDown
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -49,10 +50,34 @@ export default function AdminLayout() {
         { label: "Shops", to: "/admin/shops", icon: <Store size={18} /> },
         { label: "CRM (Customers)", to: "/admin/crm", icon: <Users size={18} /> },
         { label: "Campaigns", to: "/admin/campaigns", icon: <Rocket size={18} /> },
-        { label: "Email Composer", to: "/admin/emails", icon: <Mail size={18} />, end: true },
-        { label: "Send History", to: "/admin/emails/history", icon: <History size={18} /> },
-        { label: "Automations", to: "/admin/emails/automations", icon: <Zap size={18} /> },
+        { 
+            label: "Email Marketing", 
+            icon: <Mail size={18} />,
+            children: [
+                { label: "Composer", to: "/admin/emails", end: true },
+                { label: "Send History", to: "/admin/emails/history" },
+                { label: "Automations", to: "/admin/emails/automations" },
+            ]
+        },
     ];
+
+    const [openMenus, setOpenMenus] = useState<string[]>([]);
+
+    useEffect(() => {
+        // Auto-expand menu if a child is active
+        const activeParent = menuItems.find(item => 
+            item.children?.some(child => location.pathname === child.to)
+        );
+        if (activeParent && !openMenus.includes(activeParent.label)) {
+            setOpenMenus(prev => [...prev, activeParent.label]);
+        }
+    }, [location.pathname]);
+
+    const toggleMenu = (label: string) => {
+        setOpenMenus(prev => 
+            prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+        );
+    };
 
     return (
         <div className="admin-shell">
@@ -157,8 +182,36 @@ export default function AdminLayout() {
                     box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
                 }
                 
-                .nav-link .icon-wrap { display: flex; align-items: center; justify-content: center; opacity: 0.8; }
                 .nav-link.active .icon-wrap { opacity: 1; }
+
+                .nav-toggle-btn {
+                    width: 100%;
+                    background: none; border: none;
+                    display: flex; align-items: center; justify-content: space-between;
+                    gap: 14px; padding: 14px 20px;
+                    color: #94a3b8; font-size: 15px; font-weight: 500;
+                    border-radius: 14px; cursor: pointer; transition: all 0.3s;
+                    margin-bottom: 4px;
+                }
+                .nav-toggle-btn:hover { color: white; background: rgba(255,255,255,0.05); }
+                .nav-toggle-btn .chevron { transition: transform 0.3s; }
+                .nav-toggle-btn.open .chevron { transform: rotate(180deg); color: var(--primary); }
+
+                .sub-nav {
+                    margin-left: 32px;
+                    padding-left: 16px;
+                    border-left: 1px solid rgba(255,255,255,0.05);
+                    margin-bottom: 12px;
+                    display: flex; flex-direction: column; gap: 4px;
+                }
+                .sub-nav-link {
+                    padding: 10px 16px;
+                    text-decoration: none;
+                    color: #64748b; font-size: 14px; font-weight: 500;
+                    border-radius: 10px; transition: all 0.2s;
+                }
+                .sub-nav-link:hover { color: white; background: rgba(255,255,255,0.05); }
+                .sub-nav-link.active { color: white; font-weight: 600; background: rgba(99, 102, 241, 0.1); }
 
                 .sidebar-footer {
                     padding: 24px;
@@ -297,17 +350,55 @@ export default function AdminLayout() {
                     </button>
                 </div>
                 <nav className="sidebar-nav">
-                    {menuItems.map(item => (
-                        <NavLink 
-                            key={item.to} 
-                            to={item.to} 
-                            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                            end={item.end}
-                        >
-                            <span className="icon-wrap">{item.icon}</span>
-                            {item.label}
-                        </NavLink>
-                    ))}
+                    {menuItems.map(item => {
+                        if (item.children) {
+                            const isOpen = openMenus.includes(item.label);
+                            const hasActiveChild = item.children.some(child => 
+                                child.to === location.pathname || (child.end === false && location.pathname.startsWith(child.to))
+                            );
+                            
+                            return (
+                                <div key={item.label} className="nav-group">
+                                    <button 
+                                        className={`nav-toggle-btn ${isOpen ? 'open' : ''} ${hasActiveChild && !isOpen ? 'has-active' : ''}`}
+                                        onClick={() => toggleMenu(item.label)}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                            <span className="icon-wrap">{item.icon}</span>
+                                            {item.label}
+                                        </div>
+                                        <ChevronDown size={14} className="chevron" />
+                                    </button>
+                                    {isOpen && (
+                                        <div className="sub-nav">
+                                            {item.children.map(child => (
+                                                <NavLink 
+                                                    key={child.to} 
+                                                    to={child.to} 
+                                                    className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}
+                                                    end={child.end}
+                                                >
+                                                    {child.label}
+                                                </NavLink>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <NavLink 
+                                key={item.to} 
+                                to={item.to} 
+                                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                                end={item.end}
+                            >
+                                <span className="icon-wrap">{item.icon}</span>
+                                {item.label}
+                            </NavLink>
+                        );
+                    })}
                 </nav>
                 <div className="sidebar-footer">
                     <div className="user-info">
