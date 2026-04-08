@@ -159,9 +159,9 @@ export default function AutomationsList() {
                     <h1>Automations</h1>
                     <p>Build and manage automated messaging flows to engage your customers.</p>
                 </div>
-                <button className="btn-premium-solid">
+                <Link to="/admin/emails/automations/new" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
                     <Zap size={16} /> Create automation
-                </button>
+                </Link>
             </div>
 
             <div className="banner-premium">
@@ -214,22 +214,35 @@ export default function AutomationsList() {
                     <span></span>
                 </div>
 
-                {automations.map((a: any) => (
-                    <Link key={a.id} to={`/admin/emails/automations/${a.id}`} className="t-row">
-                        <div className="auto-name">{a.name}</div>
-                        <div>
-                            <span className={`tag-status ${a.status === 'Active' ? 'tag-active' : 'tag-inactive'}`}>
-                                {a.status}
-                            </span>
+                {automations.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '80px 0', background: 'white', borderTop: '1px solid #f1f5f9' }}>
+                         <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                            <Zap size={32} color="#94a3b8" />
                         </div>
-                        <div style={{ fontWeight: 700 }}>{a.sent === 0 ? '-' : a.sent.toLocaleString()}</div>
-                        <div style={{ fontWeight: 600 }}>{a.open || '-'}</div>
-                        <div style={{ fontWeight: 600 }}>{a.click === '0%' ? '-' : a.click}</div>
-                        <div style={{ fontWeight: 600 }}>{a.orders === 0 ? '-' : a.orders}</div>
-                        <div style={{ fontWeight: 700 }}>{a.sales === '₫0' ? '-' : a.sales}</div>
-                        <div><MoreHorizontal size={18} color="#94a3b8" /></div>
-                    </Link>
-                ))}
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No automations yet</h3>
+                        <p style={{ color: '#64748b', marginBottom: '24px' }}>Automate your emails to save time and boost conversions.</p>
+                        <Link to="/admin/emails/automations/new" className="btn-premium-solid" style={{ margin: '0 auto', textDecoration: 'none' }}>
+                           Create your first automation
+                        </Link>
+                    </div>
+                ) : (
+                    automations.map((a: any) => (
+                        <Link key={a.id} to={`/admin/emails/automations/${a.id}`} className="t-row">
+                            <div className="auto-name">{a.name}</div>
+                            <div>
+                                <span className={`tag-status ${a.status === 'Active' ? 'tag-active' : 'tag-inactive'}`}>
+                                    {a.status}
+                                </span>
+                            </div>
+                            <div style={{ fontWeight: 700 }}>{a.sent === 0 ? '-' : a.sent.toLocaleString()}</div>
+                            <div style={{ fontWeight: 600 }}>{a.open || '-'}</div>
+                            <div style={{ fontWeight: 600 }}>{a.click === '0%' ? '-' : a.click}</div>
+                            <div style={{ fontWeight: 600 }}>{a.orders === 0 ? '-' : a.orders}</div>
+                            <div style={{ fontWeight: 700 }}>{a.sales === '₫0' ? '-' : a.sales}</div>
+                            <div><MoreHorizontal size={18} color="#94a3b8" /></div>
+                        </Link>
+                    ))
+                )}
             </div>
         </div>
     );

@@ -67,7 +67,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             conv: "-",
             sales: "-"
         })),
-        activityDays
+        activityDays,
+        campaigns: await (prisma as any).campaign.findMany({
+            where: { shop: 'GLOBAL' },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+        })
     });
 };
 
@@ -250,12 +255,12 @@ export default function MessagingDashboard() {
                     <p>Track your campaign performance and customer engagement in real-time.</p>
                 </div>
                 <div className="actions-group">
-                    <button className="btn-premium-outline">
+                    <Link to="/admin/emails/automations" className="btn-premium-outline" style={{ textDecoration: 'none' }}>
                         <Zap size={16} /> Automations
-                    </button>
-                    <button className="btn-premium-solid">
+                    </Link>
+                    <Link to="/admin/emails/templates" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
                         <Rocket size={16} /> Create Campaign
-                    </button>
+                    </Link>
                     <button className="btn-premium-outline">
                         <MoreHorizontal size={18} />
                     </button>

@@ -1,26 +1,26 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, Link } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
     Search, 
     ArrowUpDown,
     MoreHorizontal,
-    Plus
+    Plus,
+    Mail
 } from "lucide-react";
+
+import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    return json({
-        templates: [
-            { id: 1, name: "Angelic-1", edited: "Feb 6, 2026 at 3:25 pm", thumb: "https://via.placeholder.com/60x80/000/fff?text=A1" },
-            { id: 2, name: "Copy of Đức tin của bạn là gì", edited: "Dec 6, 2025 at 5:49 pm", thumb: "https://via.placeholder.com/60x80/222/ddd?text=DE" },
-            { id: 3, name: "BLACK DIAMOND", edited: "Dec 5, 2025 at 6:12 pm", thumb: "https://via.placeholder.com/60x80/111/eee?text=BD" },
-            { id: 4, name: "DIAMOND", edited: "Dec 5, 2025 at 6:11 pm", thumb: "https://via.placeholder.com/60x80/333/ccc?text=DI" },
-            { id: 5, name: "PLATINUM", edited: "Dec 5, 2025 at 6:10 pm", thumb: "https://via.placeholder.com/60x80/444/bbb?text=PL" },
-            { id: 6, name: "GOLD", edited: "Dec 5, 2025 at 6:09 pm", thumb: "https://via.placeholder.com/60x80/555/aaa?text=GO" }
-        ]
+    
+    const templates = await (prisma as any).emailTemplate.findMany({
+        where: { shop: 'GLOBAL' },
+        orderBy: { updatedAt: 'desc' }
     });
+
+    return json({ templates });
 };
 
 export default function TemplatesGallery() {
@@ -138,27 +138,40 @@ export default function TemplatesGallery() {
                 </div>
                 <div className="actions-group">
                     <button className="btn-premium-outline">Manage colors</button>
-                    <button className="btn-premium-solid">
+                    <Link to="/admin/emails/templates/new" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
                         <Plus size={16} /> Create template
-                    </button>
+                    </Link>
                 </div>
             </div>
 
             <div className="templates-grid-premium">
-                {templates.map(tmp => (
-                    <div key={tmp.id} className="template-card-premium">
-                        <div className="template-preview-v2">
-                            <img src={tmp.thumb} alt={tmp.name} />
+                {templates.length === 0 ? (
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px 0', background: 'white', borderRadius: '24px', border: '1px dashed #e2e8f0' }}>
+                        <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                            <Plus size={32} color="#94a3b8" />
                         </div>
-                        <div className="template-info-v2">
-                            <span className="name">{tmp.name}</span>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="edited">Edited {tmp.edited}</span>
-                                <MoreHorizontal size={16} color="#94a3b8" />
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No templates yet</h3>
+                        <p style={{ color: '#64748b', marginBottom: '24px' }}>Build your first reusable email template to start sending campaigns.</p>
+                        <Link to="/admin/emails/templates/new" className="btn-premium-solid" style={{ margin: '0 auto', textDecoration: 'none' }}>
+                             Create your first template
+                        </Link>
+                    </div>
+                ) : (
+                    templates.map((tmp: any) => (
+                        <div key={tmp.id} className="template-card-premium">
+                            <div className="template-preview-v2">
+                                {tmp.thumb ? <img src={tmp.thumb} alt={tmp.name} /> : <Mail size={40} color="#cbd5e1" />}
+                            </div>
+                            <div className="template-info-v2">
+                                <span className="name">{tmp.name}</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span className="edited">Edited {new Date(tmp.updatedAt).toLocaleDateString()}</span>
+                                    <MoreHorizontal size={16} color="#94a3b8" />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
         </div>
     );

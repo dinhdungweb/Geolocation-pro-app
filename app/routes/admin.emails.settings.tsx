@@ -1,20 +1,50 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, Form, useActionData } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import prisma from "../db.server";
 import { 
     Settings as SettingsIcon,
     Mail,
     Shield,
-    Bell
+    Bell,
+    CheckCircle
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    return json({});
+    const settings = await prisma.settings.findUnique({
+        where: { shop: 'GLOBAL' }
+    });
+    return json({ settings });
+};
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+    await requireAdminAuth(request);
+    const formData = await request.formData();
+    const name = formData.get("senderName") as string;
+    const email = formData.get("senderEmail") as string;
+
+    await prisma.settings.upsert({
+        where: { shop: 'GLOBAL' },
+        update: { 
+            emailSenderName: name,
+            emailSenderEmail: email
+        },
+        create: {
+            shop: 'GLOBAL',
+            emailSenderName: name,
+            emailSenderEmail: email
+        }
+    });
+
+    return json({ success: true });
 };
 
 export default function EmailSettings() {
+    const { settings } = useLoaderData<typeof loader>();
+    const actionData = useActionData<typeof action>();
+
     return (
         <div className="settings-dashboard-v2">
             <style>{`
@@ -24,7 +54,10 @@ export default function EmailSettings() {
                     padding: 0; 
                     font-family: 'Outfit', sans-serif; 
                     color: #0f172a;
+                    animation: fadeIn 0.5s ease-out;
                 }
+                
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
                 
                 .glass-header {
                     margin-bottom: 40px;
@@ -94,6 +127,33 @@ export default function EmailSettings() {
                     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); 
                 }
                 .input-premium[readonly] { color: #64748b; cursor: not-allowed; }
+
+                .btn-premium-solid {
+                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 32px;
+                    border-radius: 16px;
+                    font-size: 15px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+                }
+                .btn-premium-solid:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3); }
+
+                .success-banner {
+                    background: #ecfdf5;
+                    border: 1px solid #10b981;
+                    padding: 16px;
+                    border-radius: 16px;
+                    color: #059669;
+                    font-weight: 600;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    margin-bottom: 24px;
+                }
             `}</style>
 
             <div className="glass-header">
@@ -110,20 +170,25 @@ export default function EmailSettings() {
                     <div className="nav-link-v2"><Bell size={18} /> Notifications</div>
                 </div>
                 
-                <div className="card-premium-v2">
+                <Form method="post" className="card-premium-v2">
+                    {actionData?.success && (
+                        <div className="success-banner">
+                            <CheckCircle size={20} /> Settings saved successfully!
+                        </div>
+                    )}
                     <div className="title">Sender profile</div>
                     <div className="form-group-v2">
                         <label>Display name</label>
-                        <input className="input-premium" defaultValue="Geo: Redirect & Country Block" />
+                        <input name="senderName" className="input-premium" defaultValue={settings?.emailSenderName || "Geo Admin"} placeholder="Enter sender name" />
                     </div>
                     <div className="form-group-v2">
                         <label>Sender email</label>
-                        <input className="input-premium" defaultValue="send@geopro.bluepeaks.top" readOnly />
+                        <input name="senderEmail" className="input-premium" defaultValue={settings?.emailSenderEmail || "noreply@geopro.bluepeaks.top"} placeholder="Enter sender email" />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-                        <button className="btn-premium-solid" style={{ padding: '12px 32px', borderRadius: '16px' }}>Save Changes</button>
+                        <button type="submit" className="btn-premium-solid">Save Changes</button>
                     </div>
-                </div>
+                </Form>
             </div>
         </div>
     );
