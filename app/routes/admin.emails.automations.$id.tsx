@@ -202,6 +202,38 @@ export default function AdminEmailAutomations() {
         setShowDesigner(nodeId);
     };
 
+    const addDesignBlock = (type: EmailBlockType) => {
+        const newBlock: EmailBlock = {
+            id: Math.random().toString(36).substr(2, 9),
+            type,
+            content: getDefaultContent(type),
+            style: getDefaultStyle(type)
+        };
+        setDesignBlocks([...designBlocks, newBlock]);
+    };
+
+    const removeDesignBlock = (id: string) => {
+        setDesignBlocks(designBlocks.filter(b => b.id !== id));
+        if (selectedBlockId === id) setSelectedBlockId(null);
+    };
+
+    const moveDesignBlock = (index: number, direction: 'up' | 'down') => {
+        const newBlocks = [...designBlocks];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex >= 0 && newIndex < newBlocks.length) {
+            [newBlocks[index], newBlocks[newIndex]] = [newBlocks[newIndex], newBlocks[index]];
+            setDesignBlocks(newBlocks);
+        }
+    };
+
+    const updateDesignBlockContent = (id: string, newContent: any) => {
+        setDesignBlocks(designBlocks.map(b => b.id === id ? { ...b, content: { ...b.content, ...newContent } } : b));
+    };
+
+    const updateDesignBlockStyle = (id: string, newStyle: any) => {
+        setDesignBlocks(designBlocks.map(b => b.id === id ? { ...b, style: { ...b.style, ...newStyle } } : b));
+    };
+
     const saveDesigner = () => {
         if(!showDesigner) return;
         const html = generateEmailHtml(designBlocks, "GLOBAL");
@@ -555,80 +587,179 @@ export default function AdminEmailAutomations() {
                 </div>
             </div>
 
-            {/* Email Designer Modal */}
+            {/* Email Designer Modal (Absolute Synchronization with Template Editor) */}
             {showDesigner && (
                 <div className="designer-overlay">
-                    <div className="designer-modal">
-                        <div className="flow-nav" style={{ borderRadius: '20px 20px 0 0' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <Mail size={20} color="#008060" />
-                                <div style={{ fontWeight: 800 }}>Customizing Email for Workflow Step</div>
+                    <style>{`
+                        .modal-designer-root { 
+                            width: 100vw; height: 100vh; background: #f1f5f9; display: flex; flex-direction: column; font-family: 'Outfit', sans-serif; 
+                        }
+                        .modal-header {
+                            height: 72px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 24px; justify-content: space-between;
+                        }
+                        .modal-editor-main { flex: 1; display: grid; grid-template-columns: 280px 1fr 340px; overflow: hidden; }
+                        .modal-sidebar-left { background: white; border-right: 1px solid #e2e8f0; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+                        .modal-canvas-area { overflow-y: auto; padding: 40px; display: flex; justify-content: center; background: #f1f5f9; }
+                        .modal-canvas-inner { width: 600px; min-height: 800px; background: white; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }
+                        .modal-sidebar-right { background: white; border-left: 1px solid #e2e8f0; padding: 24px; overflow-y: auto; }
+                        
+                        .block-button-v3 { width: 100%; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #475569; }
+                        .block-button-v3:hover { background: #f0f7ff; border-color: #6366f1; color: #6366f1; transform: translateY(-2px); }
+                        .block-button-v3 strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
+                        
+                        .canvas-block-v3 { position: relative; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+                        .canvas-block-v3:hover { border-color: #e2e8f0; }
+                        .canvas-block-v3.selected { border-color: #6366f1; background: rgba(99, 102, 241, 0.02); }
+                        
+                        .modal-block-tools { position: absolute; left: 100%; top: 0; margin-left: 10px; display: none; flex-direction: column; gap: 4px; z-index: 10; }
+                        .canvas-block-v3.selected .modal-block-tools { display: flex; }
+                        
+                        .btn-save-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 10px 24px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
+                        .btn-save-indigo:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+                    `}</style>
+                    <div className="modal-designer-root">
+                        <div className="modal-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                <div style={{ background: '#f0f7ff', padding: '10px', borderRadius: '12px' }}>
+                                    <Mail size={24} color="#6366f1" />
+                                </div>
+                                <div>
+                                    <div style={{ fontWeight: 800, fontSize: '18px' }}>Customizing Automation Email</div>
+                                    <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Syncing changes with flow...</div>
+                                </div>
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <button className="btn-shopify-secondary" onClick={() => setShowDesigner(null)}>Discard</button>
-                                <button className="btn-shopify-primary" onClick={saveDesigner}>Apply Changes</button>
+                                <button className="btn-save-indigo" onClick={saveDesigner}><CheckCircle2 size={18} /> Apply Changes</button>
                             </div>
                         </div>
-                        <div className="designer-main">
-                            {/* Left: Elements */}
-                            <div style={{ background: 'white', borderRight: '1px solid #e1e3e5', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8' }}>ELEMENTS</div>
-                                {[ 
-                                    { type: 'header', icon: <Layout size={18} />, label: 'Header' },
-                                    { type: 'heading', icon: <Type size={18} />, label: 'Heading' },
-                                    { type: 'text', icon: <Edit3 size={18} />, label: 'Text' },
-                                    { type: 'button', icon: <Square size={18} />, label: 'Button' },
-                                    { type: 'hero', icon: <ImageIcon size={18} />, label: 'Banner' }
-                                ].map(item => (
-                                    <div key={item.type} onClick={() => {
-                                        const nb = { id: Math.random().toString(36).substr(2, 9), type: item.type, content: { text: 'New ' + item.label, label: 'Click Me' }, style: {} };
-                                        setDesignBlocks([...designBlocks, nb as any]);
-                                    }} style={{ padding: '12px', border: '1px solid #e1e3e5', borderRadius: '10px', display: 'flex', gap: '12px', cursor: 'pointer' }}>
-                                        {item.icon} <span style={{ fontSize: '12px', fontWeight: 700 }}>{item.label}</span>
-                                    </div>
-                                ))}
-                            </div>
 
-                            {/* Center: Canvas */}
-                            <div style={{ overflowY: 'auto', padding: '20px' }} onClick={() => setSelectedBlockId(null)}>
-                                <div className="canvas-inner">
-                                    {designBlocks.map((block, idx) => (
-                                        <div key={block.id} className={`designer-block ${selectedBlockId === block.id ? 'selected' : ''}`} onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}>
-                                            <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
-                                            <div className="block-tools">
-                                                <div className="tool-btn" onClick={() => {
-                                                    const nb = [...designBlocks];
-                                                    if(idx > 0) [nb[idx], nb[idx-1]] = [nb[idx-1], nb[idx]];
-                                                    setDesignBlocks(nb);
-                                                }}><ArrowUp size={12} /></div>
-                                                <div className="tool-btn" onClick={() => {
-                                                    setDesignBlocks(designBlocks.filter(b => b.id !== block.id));
-                                                }}><Trash2 size={12} color="#d72c0d" /></div>
-                                            </div>
-                                        </div>
+                        <div className="modal-editor-main">
+                            {/* Left: Elements */}
+                            <div className="modal-sidebar-left">
+                                <div style={{ fontWeight: 800, fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Elements</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    {[
+                                        { type: 'header', icon: <Layout size={20} />, label: 'Header' },
+                                        { type: 'heading', icon: <Type size={20} />, label: 'Heading' },
+                                        { type: 'text', icon: <Edit3 size={20} />, label: 'Text' },
+                                        { type: 'button', icon: <Square size={20} />, label: 'Button' },
+                                        { type: 'hero', icon: <ImageIcon size={20} />, label: 'Banner' },
+                                        { type: 'divider', icon: <div style={{ height: '2px', width: '20px', background: '#94a3b8' }}></div>, label: 'Divider' },
+                                        { type: 'footer', icon: <Share2 size={20} />, label: 'Footer' },
+                                        { type: 'coupon', icon: <Zap size={20} />, label: 'Coupon' }
+                                    ].map(item => (
+                                        <button key={item.type} className="block-button-v3" onClick={() => addDesignBlock(item.type as any)}>
+                                            {item.icon}
+                                            <strong>{item.label}</strong>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
 
+                            {/* Center: Canvas */}
+                            <div className="modal-canvas-area" onClick={() => setSelectedBlockId(null)}>
+                                <div className="modal-canvas-inner">
+                                    {designBlocks.map((block, idx) => (
+                                        <div 
+                                            key={block.id} 
+                                            className={`canvas-block-v3 ${selectedBlockId === block.id ? 'selected' : ''}`}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}
+                                        >
+                                            <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
+                                            <div className="modal-block-tools">
+                                                <button className="tool-btn" onClick={(e) => { e.stopPropagation(); moveDesignBlock(idx, 'up'); }} disabled={idx === 0}><ArrowUp size={14} /></button>
+                                                <button className="tool-btn" onClick={(e) => { e.stopPropagation(); moveDesignBlock(idx, 'down'); }} disabled={idx === designBlocks.length - 1}><ArrowDown size={14} /></button>
+                                                <button className="tool-btn delete" onClick={(e) => { e.stopPropagation(); removeDesignBlock(block.id); }}><Trash2 size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {designBlocks.length === 0 && (
+                                        <div style={{ padding: '80px 40px', textAlign: 'center' }}>
+                                            <Mail size={48} style={{ margin: '0 auto 20px', color: '#cbd5e1' }} />
+                                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#94a3b8' }}>Empty Canvas</div>
+                                            <p style={{ color: '#cbd5e1', fontSize: '14px' }}>Add elements to build your email.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Right: Properties */}
-                            <div style={{ background: 'white', borderLeft: '1px solid #e1e3e5', padding: '20px' }}>
+                            <div className="modal-sidebar-right">
+                                <div style={{ fontWeight: 800, fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '20px' }}>Settings</div>
                                 {selectedBlockId ? (
                                     (() => {
                                         const block = designBlocks.find(b => b.id === selectedBlockId);
                                         if(!block) return null;
                                         return (
                                             <div>
-                                                <div style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', marginBottom: '16px' }}>SETTINGS</div>
-                                                <label className="form-label">Content</label>
-                                                {block.type === 'text' || block.type === 'heading' ? (
-                                                    <textarea className="form-input" rows={6} value={(block.content as any).text} onChange={e => setDesignBlocks(designBlocks.map(b => b.id === selectedBlockId ? {...b, content: {...b.content, text: e.target.value}} : b))} />
-                                                ) : (
-                                                    <input className="form-input" value={(block.content as any).label} onChange={e => setDesignBlocks(designBlocks.map(b => b.id === selectedBlockId ? {...b, content: {...b.content, label: e.target.value}} : b))} />
+                                                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', marginBottom: '24px' }}>
+                                                    <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>OBJECT TYPE</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#1e293b', textTransform: 'capitalize' }}>{block.type} Element</div>
+                                                </div>
+
+                                                {(block.type === 'heading' || block.type === 'text') && (
+                                                    <>
+                                                        <span className="prop-label">Text Content</span>
+                                                        <textarea className="prop-input" rows={6} value={(block.content as any).text} onChange={e => updateDesignBlockContent(block.id, { text: e.target.value })} />
+                                                    </>
                                                 )}
+
+                                                {block.type === 'button' && (
+                                                    <>
+                                                        <span className="prop-label">Label</span>
+                                                        <input className="prop-input" value={(block.content as any).label} onChange={e => updateDesignBlockContent(block.id, { label: e.target.value })} />
+                                                        <span className="prop-label">Link URL</span>
+                                                        <input className="prop-input" value={(block.content as any).url} onChange={e => updateDesignBlockContent(block.id, { url: e.target.value })} />
+                                                    </>
+                                                )}
+
+                                                {block.type === 'coupon' && (
+                                                    <>
+                                                        <span className="prop-label">Coupon Code</span>
+                                                        <input className="prop-input" value={(block.content as any).code} onChange={e => updateDesignBlockContent(block.id, { code: e.target.value })} />
+                                                    </>
+                                                )}
+
+                                                {block.type === 'header' && (
+                                                    <>
+                                                        <span className="prop-label">Logo Text</span>
+                                                        <input className="prop-input" value={(block.content as any).logoText} onChange={e => updateDesignBlockContent(block.id, { logoText: e.target.value })} />
+                                                    </>
+                                                )}
+
+                                                {block.type === 'footer' && (
+                                                    <>
+                                                        <span className="prop-label">Footer Text</span>
+                                                        <textarea className="prop-input" rows={4} value={(block.content as any).text} onChange={e => updateDesignBlockContent(block.id, { text: e.target.value })} />
+                                                    </>
+                                                )}
+
+                                                <span className="prop-label">Alignment</span>
+                                                <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                                                    {['left', 'center', 'right'].map(align => (
+                                                        <button 
+                                                            key={align} 
+                                                            className="tool-btn" 
+                                                            style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#6366f1' : '#e2e8f0', background: block.style?.textAlign === align ? '#f0f7ff' : 'white' }}
+                                                            onClick={() => updateDesignBlockStyle(block.id, { textAlign: align })}
+                                                        >
+                                                            {align[0].toUpperCase()}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                <button className="btn-save-indigo" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setSelectedBlockId(null)}>
+                                                    Done Editing
+                                                </button>
                                             </div>
                                         );
                                     })()
-                                ) : <div style={{ textAlign: 'center', opacity: 0.5, marginTop: '100px' }}>Select block to edit</div>}
+                                ) : (
+                                    <div style={{ textAlign: 'center', opacity: 0.5, marginTop: '40px' }}>
+                                        <p style={{ fontSize: '13px' }}>Select an element on the canvas to edit its properties.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -644,13 +775,43 @@ export default function AdminEmailAutomations() {
     );
 }
 
+// Helpers
+function getDefaultContent(type: EmailBlockType) {
+    switch(type) {
+        case 'header': return { logoText: 'My Brand' };
+        case 'heading': return { text: 'New Campaign' };
+        case 'text': return { text: 'Write your email content here...' };
+        case 'button': return { label: 'Click Here', url: '#' };
+        case 'coupon': return { code: 'WELCOME20' };
+        case 'footer': return { text: '&copy; 2026 My Store. All rights reserved.' };
+        default: return {};
+    }
+}
+
+function getDefaultStyle(type: EmailBlockType) {
+    if (type === 'button') return { buttonColor: '#6366f1', textAlign: 'center' };
+    if (type === 'heading') return { fontSize: '24px', textAlign: 'left', color: '#1e293b' };
+    return { textAlign: 'left' };
+}
+
 function renderBlockPreview(block: EmailBlock): string {
     const { type, content } = block;
+    const style = block.style || {};
     switch(type) {
-        case 'header': return `<div style="padding: 20px; text-align: center; border-bottom: 2px solid #008060; color: #008060; font-weight: 800;">MY BRAND</div>`;
-        case 'heading': return `<div style="padding: 20px 40px; font-size: 24px; font-weight: 800;">${(content as any).text}</div>`;
-        case 'text': return `<div style="padding: 10px 40px; font-size: 14px; line-height: 1.6; color: #6d7175;">${(content as any).text.replace(/\n/g, '<br>')}</div>`;
-        case 'button': return `<div style="padding: 20px; text-align: center;"><div style="background: #008060; color: white; padding: 10px 30px; border-radius: 8px; font-weight: 700; display: inline-block;">${(content as any).label}</div></div>`;
+        case 'header': 
+            return `<div style="padding: 24px; text-align: center; border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 900; font-size: 20px;">${(content as any).logoText || 'LOGO'}</div>`;
+        case 'heading':
+            return `<div style="padding: 24px 40px; font-size: 24px; font-weight: 800; text-align: ${style.textAlign || 'left'}; color: #1e293b;">${(content as any).text}</div>`;
+        case 'text':
+            return `<div style="padding: 10px 40px 24px; font-size: 15px; line-height: 1.6; color: #475569; text-align: ${style.textAlign || 'left'};">${(content as any).text.replace(/\n/g, '<br>')}</div>`;
+        case 'button':
+            return `<div style="padding: 24px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#6366f1'}; color: white; padding: 12px 32px; border-radius: 8px; font-weight: 700; display: inline-block;">${(content as any).label}</div></div>`;
+        case 'divider':
+            return `<div style="padding: 20px 40px;"><hr style="border: 0; border-top: 1px solid #f1f5f9;"></div>`;
+        case 'coupon':
+            return `<div style="padding: 24px 40px;"><div style="background: #fdfdfd; border: 2px dashed #6366f1; padding: 24px; text-align: center; font-size: 24px; font-weight: 900; color: #6366f1; letter-spacing: 2px;">${(content as any).code}</div></div>`;
+        case 'footer':
+            return `<div style="padding: 40px; background: #f8fafc; text-align: center; color: #94a3b8; font-size: 11px;">${(content as any).text}</div>`;
         default: return "";
     }
 }
