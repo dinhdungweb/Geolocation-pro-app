@@ -161,19 +161,30 @@ export default function AdminDashboard() {
             <div className="grid-main">
                 <div className="premium-card">
                     <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '24px' }}>Traffic Growth Trend</h3>
-                    <div style={{ height: '300px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '20px', padding: '20px 0' }}>
-                        {trends.map((t: any) => (
-                            <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ 
-                                    width: '100%', 
-                                    height: `${Math.max((t._sum.totalVisitors / (Math.max(...trends.map((x: any) => x._sum.totalVisitors)) || 1)) * 100, 10)}%`,
-                                    background: 'var(--primary-gradient)',
-                                    borderRadius: '12px 12px 4px 4px',
-                                    transition: 'height 1s ease-out'
-                                }} />
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>{t.yearMonth}</div>
-                            </div>
-                        ))}
+                    <div style={{ height: '300px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '24px', padding: '20px 0' }}>
+                        {trends.map((t: any) => {
+                            const total = t._sum?.totalVisitors || 0;
+                            const maxVal = Math.max(...trends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
+                            const heightPercentage = Math.max((total / maxVal) * 100, 5);
+                            
+                            return (
+                                <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: '12px' }}>
+                                    <div 
+                                        title={`${t.yearMonth}: ${total.toLocaleString()}`}
+                                        style={{ 
+                                            width: '100%', 
+                                            height: `${heightPercentage}%`,
+                                            background: 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)',
+                                            borderRadius: '8px 8px 4px 4px',
+                                            transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            minHeight: '4px',
+                                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                                        }} 
+                                    />
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>{t.yearMonth}</div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
