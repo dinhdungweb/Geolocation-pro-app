@@ -51,12 +51,13 @@ export default function AdminLayout() {
         { label: "CRM (Customers)", to: "/admin/crm", icon: <Users size={18} /> },
         { label: "Campaigns", to: "/admin/campaigns", icon: <Rocket size={18} /> },
         { 
-            label: "Email Marketing", 
+            label: "Messaging", 
             icon: <Mail size={18} />,
             children: [
-                { label: "Composer", to: "/admin/emails", end: true },
-                { label: "Send History", to: "/admin/emails/history" },
-                { label: "Automations", to: "/admin/emails/automations" },
+                { label: "Messaging", to: "/admin/emails", end: true },
+                { label: "Automations", to: "/admin/emails/automations", end: true },
+                { label: "Templates", to: "/admin/emails/templates" },
+                { label: "Settings", to: "/admin/emails/settings" },
             ]
         },
     ];
