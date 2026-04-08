@@ -180,28 +180,32 @@ export default function AdminDashboard() {
             <div className="grid-main">
                 <div className="premium-card">
                     <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '24px' }}>Traffic Growth Trend</h3>
-                    <div style={{ height: '240px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '8px', padding: '0 0 20px 0' }}>
+                    <div style={{ height: '260px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '0', borderBottom: '1px solid #f1f5f9' }}>
                         {fullYearTrends.map((t: any) => {
                             const total = t._sum?.totalVisitors || 0;
                             const maxVal = Math.max(...fullYearTrends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
-                            const heightPercentage = Math.max((total / maxVal) * 100, 5);
+                            const heightPercentage = total > 0 ? Math.max((total / maxVal) * 100, 4) : 0;
                             
                             return (
-                                <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', position: 'relative' }}>
+                                    {total > 0 && (
+                                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#6366f1', marginBottom: '4px' }}>
+                                            {total > 1000 ? (total / 1000).toFixed(1) + 'k' : total}
+                                        </div>
+                                    )}
                                     <div 
                                         title={`${t.yearMonth}: ${total.toLocaleString()}`}
                                         style={{ 
-                                            width: '60%', 
+                                            width: '70%', 
                                             height: `${(heightPercentage / 100) * 180}px`,
-                                            background: 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)',
+                                            background: total > 0 ? 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)' : 'transparent',
                                             borderRadius: '6px 6px 2px 2px',
                                             transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-                                            boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
-                                            position: 'relative',
-                                            minWidth: '4px'
+                                            boxShadow: total > 0 ? '0 4px 10px rgba(99, 102, 241, 0.2)' : 'none',
+                                            minHeight: total > 0 ? '4px' : '0'
                                         }} 
                                     />
-                                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>{t.yearMonth.split('-')[1]}</div>
+                                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, paddingBottom: '8px' }}>{t.yearMonth.split('-')[1]}</div>
                                 </div>
                             );
                         })}
