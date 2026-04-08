@@ -23,10 +23,16 @@ export async function sendAdminEmail({
 }) {
     console.log(`[Email Service] Preparing to send ${type} email to ${shop}`);
 
-    // Check for custom automation template
-    const customAuto = await (prisma as any).automation.findUnique({
+    // Check for custom automation template (Specific Shop then GLOBAL)
+    let customAuto = await (prisma as any).automation.findUnique({
         where: { shop_type: { shop, type } }
     });
+
+    if (!customAuto) {
+        customAuto = await (prisma as any).automation.findUnique({
+            where: { shop_type: { shop: 'GLOBAL', type } }
+        });
+    }
 
     // If disabled, skip sending
     if (customAuto && !customAuto.isActive) {

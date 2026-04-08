@@ -33,7 +33,7 @@ import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "
 import { generateEmailHtml, type EmailBlock, type EmailBlockType } from "../utils/email-generator";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { shop } = await requireAdminAuth(request) as any;
+    await requireAdminAuth(request);
 
     // Fetch stats
     const logs = await (prisma as any).adminEmailLog.groupBy({
@@ -50,6 +50,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         return acc;
     }, {});
 
+    // For Global Admin Panel, we manage 'GLOBAL' templates by default
+    const shop = "GLOBAL";
+    
     // Fetch custom automations
     const customAutomations = await (prisma as any).automation.findMany({
         where: { shop }
@@ -64,10 +67,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { shop } = await requireAdminAuth(request) as any;
+    await requireAdminAuth(request);
     const formData = await request.formData();
     const action = formData.get("action");
     const type = formData.get("type") as string;
+    const shop = "GLOBAL"; // Default for Admin Panel
 
     if (action === "save") {
         const subject = formData.get("subject") as string;
@@ -442,15 +446,23 @@ export default function AdminEmailAutomations() {
                             </div>
                         </div>
                         <div className="modal-body">
-                            <div style={{ maxWidth: '600px', margin: '0 auto 24px', background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Subject</div>
-                                <div style={{ fontWeight: 700, color: '#1e293b' }}>
-                                    {automations.find(a => a.id === previewType)?.custom?.subject || automations.find(a => a.id === previewType)?.subject}
-                                </div>
-                            </div>
-                            <div className="preview-frame" dangerouslySetInnerHTML={{ 
-                                __html: automations.find(a => a.id === previewType)?.custom?.html || automations.find(a => a.id === previewType)?.template || '' 
-                            }} />
+                            {(() => {
+                                const activeAuto = automations.find(a => a.id === previewType);
+                                if (!activeAuto) return <div>Template not found</div>;
+                                return (
+                                    <>
+                                        <div style={{ maxWidth: '600px', margin: '0 auto 24px', background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Subject</div>
+                                            <div style={{ fontWeight: 700, color: '#1e293b' }}>
+                                                {activeAuto.custom?.subject || activeAuto.subject}
+                                            </div>
+                                        </div>
+                                        <div className="preview-frame" dangerouslySetInnerHTML={{ 
+                                            __html: activeAuto.custom?.html || activeAuto.template || '' 
+                                        }} />
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
