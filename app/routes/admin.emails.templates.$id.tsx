@@ -515,6 +515,8 @@ function renderBlockPreview(block: EmailBlock): string {
             return `<div style="padding: 20px 40px;"><hr style="border: 0; border-top: 1px solid #f1f5f9;"></div>`;
         case 'coupon':
             return `<div style="padding: 24px 40px;"><div style="background: #fdfdfd; border: 2px dashed #6366f1; padding: 24px; text-align: center; font-size: 24px; font-weight: 900; color: #6366f1; letter-spacing: 2px;">${content.code}</div></div>`;
+        case 'hero':
+            return `<div style="padding: 0; text-align: center;"><img src="https://via.placeholder.com/600x300?text=Banner+Image" style="width: 100%; max-width: 600px; display: block;" /></div>`;
         case 'footer':
             return `<div style="padding: 40px; background: #f8fafc; text-align: center; color: #94a3b8; font-size: 11px;">${content.text}</div>`;
         default: return "";
