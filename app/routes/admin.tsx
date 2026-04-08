@@ -14,7 +14,9 @@ import {
     LogOut, 
     Activity,
     Menu,
-    X
+    X,
+    History,
+    Zap
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -47,7 +49,9 @@ export default function AdminLayout() {
         { label: "Shops", to: "/admin/shops", icon: <Store size={18} /> },
         { label: "CRM (Customers)", to: "/admin/crm", icon: <Users size={18} /> },
         { label: "Campaigns", to: "/admin/campaigns", icon: <Rocket size={18} /> },
-        { label: "Email Marketing", to: "/admin/emails", icon: <Mail size={18} /> },
+        { label: "Email Composer", to: "/admin/emails", icon: <Mail size={18} />, end: true },
+        { label: "Send History", to: "/admin/emails/history", icon: <History size={18} /> },
+        { label: "Automations", to: "/admin/emails/automations", icon: <Zap size={18} /> },
     ];
 
     return (
