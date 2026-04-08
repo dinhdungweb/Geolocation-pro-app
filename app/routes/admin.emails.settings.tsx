@@ -13,9 +13,14 @@ import {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    const settings = await prisma.settings.findUnique({
-        where: { shop: 'GLOBAL' }
-    });
+    let settings = null;
+    try {
+        settings = await prisma.settings.findUnique({
+            where: { shop: 'GLOBAL' }
+        });
+    } catch (e) {
+        console.error("Prisma error in Settings loader:", e);
+    }
     return json({ settings });
 };
 

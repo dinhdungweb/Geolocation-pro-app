@@ -68,11 +68,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             sales: "-"
         })),
         activityDays,
-        campaigns: await (prisma as any).campaign.findMany({
-            where: { shop: 'GLOBAL' },
-            orderBy: { createdAt: 'desc' },
-            take: 10
-        })
+        campaigns: await (async () => {
+            try {
+                return await (prisma as any).campaign.findMany({
+                    where: { shop: 'GLOBAL' },
+                    orderBy: { createdAt: 'desc' },
+                    take: 10
+                });
+            } catch (e) {
+                console.error("Prisma error in Dashboard loader:", e);
+                return [];
+            }
+        })()
     });
 };
 

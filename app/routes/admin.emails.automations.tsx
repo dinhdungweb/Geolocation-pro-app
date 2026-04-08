@@ -21,43 +21,48 @@ import {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
-    // Fetch real automations
-    const automations = await (prisma as any).automation.findMany({
-        where: { shop: 'GLOBAL' }
-    });
+    try {
+        // Fetch real automations
+        const automations = await (prisma as any).automation.findMany({
+            where: { shop: 'GLOBAL' }
+        });
 
-    // Fetch sent counts from log
-    const logs = await (prisma as any).adminEmailLog.groupBy({
-        by: ['type'],
-        _count: { _all: true }
-    });
+        // Fetch sent counts from log
+        const logs = await (prisma as any).adminEmailLog.groupBy({
+            by: ['type'],
+            _count: { _all: true }
+        });
 
-    const sentMap = logs.reduce((acc: any, curr: any) => {
-        acc[curr.type] = curr._count._all;
-        return acc;
-    }, {});
+        const sentMap = logs.reduce((acc: any, curr: any) => {
+            acc[curr.type] = curr._count._all;
+            return acc;
+        }, {});
 
-    const totalSentCount = logs.reduce((sum: number, curr: any) => sum + curr._count._all, 0);
+        const totalSentCount = logs.reduce((sum: number, curr: any) => sum + curr._count._all, 0);
 
-    return json({
-        automations: automations.map((a: any) => ({
-            id: a.id,
-            name: a.type === 'welcome' ? 'Welcome new subscribers with a discount email' : 
-                  a.type === 'limit80' ? '80% Usage limit notification' : 
-                  a.type === 'limit100' ? '100% Usage limit notification' : 
-                  a.type === 'limit_80' ? '80% Usage limit notification' :
-                  a.type === 'limit_100' ? '100% Usage limit notification' :
-                  'Custom automation',
-            type: a.type,
-            status: a.isActive ? 'Active' : 'Inactive',
-            sent: sentMap[a.type] || 0,
-            click: '-',
-            orders: 0,
-            conv: '-',
-            sales: '₫0'
-        })),
-        totalSentCount
-    });
+        return json({
+            automations: automations.map((a: any) => ({
+                id: a.id,
+                name: a.type === 'welcome' ? 'Welcome new subscribers with a discount email' : 
+                      a.type === 'limit80' ? '80% Usage limit notification' : 
+                      a.type === 'limit100' ? '100% Usage limit notification' : 
+                      a.type === 'limit_80' ? '80% Usage limit notification' :
+                      a.type === 'limit_100' ? '100% Usage limit notification' :
+                      'Custom automation',
+                type: a.type,
+                status: a.isActive ? 'Active' : 'Inactive',
+                sent: sentMap[a.type] || 0,
+                click: '-',
+                orders: 0,
+                conv: '-',
+                sales: '₫0'
+            })),
+            totalSentCount
+        });
+    } catch (e) {
+        console.error("Prisma error in Automations List loader:", e);
+        return json({ automations: [], totalSentCount: 0 });
+    }
 };
 
 export default function AutomationsList() {

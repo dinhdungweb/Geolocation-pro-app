@@ -15,10 +15,15 @@ import prisma from "../db.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
-    const templates = await (prisma as any).emailTemplate.findMany({
-        where: { shop: 'GLOBAL' },
-        orderBy: { updatedAt: 'desc' }
-    });
+    let templates = [];
+    try {
+        templates = await (prisma as any).emailTemplate.findMany({
+            where: { shop: 'GLOBAL' },
+            orderBy: { updatedAt: 'desc' }
+        });
+    } catch (e) {
+        console.error("Prisma error in Templates loader:", e);
+    }
 
     return json({ templates });
 };

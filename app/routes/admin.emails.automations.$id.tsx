@@ -34,36 +34,39 @@ import { generateEmailHtml, type EmailBlock, type EmailBlockType } from "../util
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-
-    // Fetch stats
-    const logs = await (prisma as any).adminEmailLog.groupBy({
-        by: ['type'],
-        _count: { _all: true },
-        _max: { createdAt: true }
-    });
-
-    const statsMap = logs.reduce((acc: any, curr: any) => {
-        acc[curr.type] = {
-            count: curr._count._all,
-            lastSent: curr._max.createdAt
-        };
-        return acc;
-    }, {});
-
-    // For Global Admin Panel, we manage 'GLOBAL' templates by default
     const shop = "GLOBAL";
     
-    // Fetch custom automations
-    const customAutomations = await (prisma as any).automation.findMany({
-        where: { shop }
-    });
+    try {
+        // Fetch stats
+        const logs = await (prisma as any).adminEmailLog.groupBy({
+            by: ['type'],
+            _count: { _all: true },
+            _max: { createdAt: true }
+        });
 
-    const customMap = customAutomations.reduce((acc: any, curr: any) => {
-        acc[curr.type] = curr;
-        return acc;
-    }, {});
+        const statsMap = logs.reduce((acc: any, curr: any) => {
+            acc[curr.type] = {
+                count: curr._count._all,
+                lastSent: curr._max.createdAt
+            };
+            return acc;
+        }, {});
 
-    return json({ stats: statsMap, customMap, shop });
+        // Fetch custom automations
+        const customAutomations = await (prisma as any).automation.findMany({
+            where: { shop }
+        });
+
+        const customMap = customAutomations.reduce((acc: any, curr: any) => {
+            acc[curr.type] = curr;
+            return acc;
+        }, {});
+
+        return json({ stats: statsMap, customMap, shop });
+    } catch (error) {
+        console.error("Prisma error in Automation Editor loader:", error);
+        return json({ stats: {}, customMap: {}, shop });
+    }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
