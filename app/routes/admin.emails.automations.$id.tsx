@@ -234,6 +234,7 @@ export default function AdminEmailAutomations() {
     // Recursive Node Renderer
     const renderWorkflow = (parentId: string, branch?: string) => {
         const children = nodes.filter(n => n.parentId === parentId && n.branch === branch);
+        const isActiveBranch = isAddingStep?.parentId === parentId && isAddingStep?.branch === branch;
         
         return (
             <div className="branch-container">
@@ -270,28 +271,37 @@ export default function AdminEmailAutomations() {
                                 <div className="branch branch-yes">
                                     <div className="branch-label label-yes">YES</div>
                                     {renderWorkflow(node.id, 'yes')}
-                                    <div className="branch-end">
-                                        <div className="connector"></div>
-                                        <div className="add-btn-mini" onClick={() => setIsAddingStep({ parentId: node.id, branch: 'yes' })}><Plus size={14} /></div>
-                                    </div>
                                 </div>
                                 <div className="branch branch-no">
                                     <div className="branch-label label-no">NO</div>
                                     {renderWorkflow(node.id, 'no')}
-                                    <div className="branch-end">
-                                        <div className="connector"></div>
-                                        <div className="add-btn-mini" onClick={() => setIsAddingStep({ parentId: node.id, branch: 'no' })}><Plus size={14} /></div>
-                                    </div>
                                 </div>
                             </div>
                         ) : renderWorkflow(node.id)}
                     </React.Fragment>
                 ))}
                 
-                {children.length === 0 && parentId !== 'trigger' && !branch && (
-                    <div className="branch-end">
+                {children.length === 0 && (
+                    <div className="branch-end" style={{ position: 'relative' }}>
                         <div className="connector"></div>
-                        <div className="add-btn-mini" onClick={() => setIsAddingStep({ parentId })}><Plus size={14} /></div>
+                        <div className="add-btn-mini" onClick={() => setIsAddingStep(isActiveBranch ? null : { parentId, branch })}><Plus size={14} /></div>
+                        
+                        {isActiveBranch && (
+                            <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', background: 'white', border: '1px solid #e1e3e5', padding: '12px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', display: 'flex', gap: '12px', zIndex: 100 }}>
+                                <div style={{ textAlign: 'center', cursor: 'pointer', width: '50px' }} onClick={() => addNode('action', parentId, branch)}>
+                                    <MessageSquare size={20} color="#7e22ce" />
+                                    <div style={{ fontSize: '9px', fontWeight: 700 }}>Action</div>
+                                </div>
+                                <div style={{ textAlign: 'center', cursor: 'pointer', width: '50px' }} onClick={() => addNode('wait', parentId, branch)}>
+                                    <RotateCcw size={20} color="#854d0e" />
+                                    <div style={{ fontSize: '9px', fontWeight: 700 }}>Wait</div>
+                                </div>
+                                <div style={{ textAlign: 'center', cursor: 'pointer', width: '50px' }} onClick={() => addNode('condition', parentId, branch)}>
+                                    <ShieldAlert size={20} color="#047857" />
+                                    <div style={{ fontSize: '9px', fontWeight: 700 }}>Branch</div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -422,29 +432,6 @@ export default function AdminEmailAutomations() {
 
                         {/* Rendering Tree */}
                         {renderWorkflow('trigger')}
-
-                        <div className="connector"></div>
-                        <div style={{ position: 'relative' }}>
-                            <div className="add-btn-mini" onClick={() => setIsAddingStep({ parentId: nodes[nodes.length-1]?.id || 'trigger' })}>
-                                <Plus size={16} />
-                            </div>
-                            {isAddingStep && (
-                                <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', background: 'white', border: '1px solid #e1e3e5', padding: '12px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', display: 'flex', gap: '12px', zIndex: 100 }}>
-                                    <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => addNode('action', isAddingStep.parentId, isAddingStep.branch)}>
-                                        <MessageSquare size={20} color="#7e22ce" />
-                                        <div style={{ fontSize: '10px', fontWeight: 700 }}>Action</div>
-                                    </div>
-                                    <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => addNode('wait', isAddingStep.parentId, isAddingStep.branch)}>
-                                        <RotateCcw size={20} color="#854d0e" />
-                                        <div style={{ fontSize: '10px', fontWeight: 700 }}>Wait</div>
-                                    </div>
-                                    <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => addNode('condition', isAddingStep.parentId, isAddingStep.branch)}>
-                                        <ShieldAlert size={20} color="#047857" />
-                                        <div style={{ fontSize: '10px', fontWeight: 700 }}>Branch</div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
 
@@ -648,7 +635,7 @@ export default function AdminEmailAutomations() {
                 </div>
             )}
 
-            {fetcher.data?.success && (
+            {(fetcher.data as any)?.success && (
                 <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: '#008060', color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 700, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 20000 }}>
                     <CheckCircle2 size={16} /> Saved!
                 </div>
