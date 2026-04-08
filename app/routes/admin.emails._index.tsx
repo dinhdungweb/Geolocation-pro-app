@@ -13,7 +13,8 @@ import {
     ArrowDownRight,
     Filter,
     ArrowUpDown,
-    Search
+    Search,
+    Rocket
 } from "lucide-react";
 
 import prisma from "../db.server";
@@ -45,12 +46,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 sentChange: 0, 
                 open: "0%", 
                 openChange: 0, 
+                click: "0%",
+                clickChange: 0,
                 conv: "0%", 
                 convChange: 0, 
                 sales: "₫0", 
                 salesChange: 0 
             },
-            sms: { sent: 0, click: "0%", conv: "0%", sales: "₫0" }
+            sms: { sent: 0, click: "0%", conv: "0%", sales: "₫0" },
+            sales: { total: "₫0", count: 0 }
         },
         activities: logs.map((l: any) => ({
             id: l.id,
@@ -72,158 +76,260 @@ export default function MessagingDashboard() {
     const [activeTab, setActiveTab] = useState("All");
 
     return (
-        <div className="messaging-dashboard">
+        <div className="messaging-dashboard-v2">
             <style>{`
-                .messaging-dashboard { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
                 
-                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
-                .title-area { display: flex; align-items: center; gap: 14px; }
-                .title-area h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+                .messaging-dashboard-v2 { 
+                    padding: 0; 
+                    font-family: 'Outfit', sans-serif; 
+                    color: #0f172a;
+                    background: transparent;
+                }
                 
-                .btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); transition: all 0.2s; }
-                .btn-secondary:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
-                .btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); transition: all 0.2s; }
-                .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4); }
+                /* --- Header Section --- */
+                .glass-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 40px;
+                    padding: 20px 0;
+                }
+                .title-group h1 { 
+                    font-size: 32px; 
+                    font-weight: 800; 
+                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    letter-spacing: -0.03em;
+                }
+                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
                 
-                .metrics-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; margin-bottom: 32px; }
-                .metric-card { background: var(--surface); border-radius: 20px; padding: 24px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-                .card-header-icon { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; }
+                .actions-group { display: flex; gap: 12px; }
+                .btn-premium-outline {
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    padding: 10px 20px;
+                    border-radius: 14px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #475569;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                }
+                .btn-premium-outline:hover {
+                    border-color: #6366f1;
+                    color: #6366f1;
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+                }
+                .btn-premium-solid {
+                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 14px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+                }
+                .btn-premium-solid:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 12px 20px rgba(99, 102, 241, 0.4);
+                }
+
+                /* --- Metrics Grid --- */
+                .metrics-grid-v2 {
+                    display: grid;
+                    grid-template-columns: 1.6fr 1fr;
+                    gap: 32px;
+                    margin-bottom: 40px;
+                }
+                .premium-card {
+                    background: white;
+                    border-radius: 24px;
+                    border: 1px solid rgba(0,0,0,0.04);
+                    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.03);
+                    padding: 32px;
+                    transition: all 0.3s ease;
+                }
+                .premium-card:hover { border-color: rgba(99, 102, 241, 0.1); }
                 
-                .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-                .stat-item .label { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; display: block; border-bottom: 1px dotted var(--border); width: fit-content; }
-                .stat-item .val { font-size: 22px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
-                .stat-item .change { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
-                .change.up { color: #10b981; }
-                .change.down { color: #ef4444; }
+                .card-header-v2 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+                .card-title-v2 { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 18px; color: #1e293b; }
+                .icon-circle { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #f5f3ff; color: #7c3aed; }
+
+                .stats-grid-v2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+                .stat-box-v2 .label { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 12px; }
+                .stat-box-v2 .value { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.04em; display: block; }
+                .stat-box-v2 .trend { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+                .trend.up { color: #10b981; }
+                .trend.down { color: #ef4444; }
+
+                /* --- Calendar Section --- */
+                .calendar-wrap { margin-bottom: 40px; }
+                .calendar-header-v2 { 
+                    display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; 
+                }
+                .calendar-grid-v2 {
+                    display: grid;
+                    grid-template-columns: repeat(7, 1fr);
+                    gap: 16px;
+                }
+                .day-card-v2 {
+                    background: #f8fafc;
+                    border-radius: 20px;
+                    padding: 18px;
+                    min-height: 120px;
+                    border: 1px solid transparent;
+                    transition: all 0.2s;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                }
+                .day-card-v2:hover { background: white; border-color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+                .day-header-v2 { display: flex; justify-content: space-between; align-items: center; }
+                .day-name { font-size: 12px; font-weight: 700; color: #94a3b8; }
+                .day-num-v2 { 
+                    font-size: 14px; font-weight: 800; color: #1e293b; 
+                    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+                }
+                .day-card-v2.is-today .day-num-v2 { background: #6366f1; color: white; border-radius: 50%; }
                 
-                .section-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); margin-bottom: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-                .card-padding { padding: 24px; }
+                .activity-indicator {
+                    background: #6366f1; 
+                    color: white; 
+                    padding: 4px 8px; 
+                    border-radius: 8px; 
+                    font-size: 10px; 
+                    font-weight: 700;
+                    text-align: center;
+                    animation: fadeIn 0.5s ease;
+                }
+
+                /* --- Data Table --- */
+                .table-premium { background: white; border-radius: 24px; border: 1px solid rgba(0,0,0,0.04); overflow: hidden; }
+                .table-tabs-v2 { display: flex; gap: 32px; padding: 0 32px; border-bottom: 1px solid #f1f5f9; }
+                .tab-v2 { padding: 24px 0; font-size: 15px; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+                .tab-v2:hover { color: #1e293b; }
+                .tab-v2.active { color: #6366f1; border-bottom-color: #6366f1; }
                 
-                .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-                .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--border); }
-                .calendar-day { padding: 16px; border-right: 1px solid var(--border); min-height: 180px; }
-                .calendar-day:last-child { border-right: none; }
-                .day-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; }
-                .day-num { color: var(--text); }
-                .day-label.today .day-num { background: var(--primary); color: #fff; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+                .t-header-v2 { 
+                    display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr 1fr 1fr 1fr 40px; 
+                    padding: 16px 32px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; 
+                }
+                .t-row-v2 { 
+                    display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr 1fr 1fr 1fr 40px; 
+                    padding: 24px 32px; border-bottom: 1px solid #f1f5f9; align-items: center; transition: all 0.2s; cursor: pointer;
+                }
+                .t-row-v2:hover { background: #fafaff; }
                 
-                .activity-tag { padding: 6px 10px; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981; fontSize: 11px; color: #047857; font-weight: 700; text-align: center; }
+                .subj-group { display: flex; align-items: center; gap: 16px; }
+                .subj-thumb { width: 52px; height: 52px; border-radius: 14px; background: #0f172a; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+                .subj-info .name { font-weight: 700; font-size: 15px; color: #1e293b; display: block; }
+                .subj-info .date { font-size: 12px; color: #94a3b8; font-weight: 500; }
                 
-                .tabs { display: flex; padding: 0 24px; border-bottom: 1px solid var(--border); gap: 32px; }
-                .tab { padding: 18px 0; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
-                .tab:hover { color: var(--text); }
-                .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-                
-                .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 40px; padding: 14px 24px; background: #fafafa; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-                .table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 40px; padding: 18px 24px; border-bottom: 1px solid var(--border); transition: all 0.2s; align-items: center; }
-                .table-row:hover { background: #f8fafc; }
-                
-                .subject-cell { display: flex; align-items: center; gap: 14px; font-weight: 600; font-size: 15px; color: var(--text); }
-                .thumb-placeholder { width: 44px; height: 44px; background: var(--sidebar-bg); border-radius: 10px; flex-shrink: 0; }
-                .activity-cell { font-size: 13px; color: var(--text); }
-                
-                .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-                .status-sent { background: #ecfdf5; color: #10b981; }
-                .status-draft { background: #f1f5f9; color: var(--text-muted); }
+                .tag-premium {
+                    padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+                }
+                .tag-sent { background: #ecfdf5; color: #059669; }
+                .tag-draft { background: #f1f1f1; color: #64748b; }
+
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
             `}</style>
 
-            <div className="header-row">
-                <div className="title-area">
-                    <div style={{ background: '#f5d0fe', padding: '6px', borderRadius: '6px' }}><Mail size={18} color="#a21caf" /></div>
-                    <h1>Messaging</h1>
+            <div className="glass-header">
+                <div className="title-group">
+                    <h1>Messaging Dashboard</h1>
+                    <p>Track your campaign performance and customer engagement in real-time.</p>
                 </div>
-                <div className="btn-group">
-                    <button className="btn-secondary">Create automation</button>
-                    <button className="btn-primary">Create campaign</button>
-                    <button className="btn-secondary"><MoreHorizontal size={16} /></button>
+                <div className="actions-group">
+                    <button className="btn-premium-outline">
+                        <Zap size={16} /> Automations
+                    </button>
+                    <button className="btn-premium-solid">
+                        <Rocket size={16} /> Create Campaign
+                    </button>
+                    <button className="btn-premium-outline">
+                        <MoreHorizontal size={18} />
+                    </button>
                 </div>
             </div>
 
-            <div className="date-filters">
-                <button className="btn-secondary"><Calendar size={14} /> Last 30 days</button>
-                <button className="btn-secondary">Compare to: Feb 6–Mar 8, 2026</button>
-            </div>
-
-            <div className="metrics-grid">
-                <div className="metric-card">
-                    <div className="metric-card-header"><Mail size={14} /> Email</div>
-                    <div className="metrics-row">
-                        <div>
-                            <div className="metric-item-label">Emails sent</div>
-                            <div className="metric-item-val">
-                                {stats.email.sent}
-                                <span className="metric-change"><ArrowUpRight size={12} /> {stats.email.sentChange}%</span>
-                            </div>
+            <div className="metrics-grid-v2">
+                <div className="premium-card">
+                    <div className="card-header-v2">
+                        <div className="card-title-v2">
+                            <div className="icon-circle"><Mail size={20} /></div>
+                            Email Performance
                         </div>
-                        <div>
-                            <div className="metric-item-label">Open rate</div>
-                            <div className="metric-item-val">
-                                {stats.email.open}
-                                <span className="metric-change"><ArrowDownRight size={12} /> {stats.email.openChange}%</span>
-                            </div>
+                    </div>
+                    <div className="stats-grid-v2">
+                        <div className="stat-box-v2">
+                            <span className="label">Sent</span>
+                            <span className="value">{stats.email.sent}</span>
+                            <span className="trend up"><ArrowUpRight size={14} /> {stats.email.sentChange}%</span>
                         </div>
-                        <div>
-                            <div className="metric-item-label">Conversion rate</div>
-                            <div className="metric-item-val">
-                                {stats.email.conv}
-                                <span className="metric-change"><Plus size={10} /> {stats.email.convChange}%</span>
-                            </div>
+                        <div className="stat-box-v2">
+                            <span className="label">Open rate</span>
+                            <span className="value">{stats.email.open}</span>
+                            <span className="trend down"><ArrowDownRight size={14} /> {stats.email.openChange}%</span>
                         </div>
-                        <div>
-                            <div className="metric-item-label">Sales</div>
-                            <div className="metric-item-val">
-                                {stats.email.sales}
-                                <span className="metric-change"><Plus size={10} /> {stats.email.salesChange}%</span>
-                            </div>
+                        <div className="stat-box-v2">
+                            <span className="label">Click rate</span>
+                            <span className="value">{stats.email.click}</span>
+                            <span className="trend up"><ArrowUpRight size={14} /> {stats.email.sentChange}%</span>
+                        </div>
+                        <div className="stat-box-v2">
+                            <span className="label">Conversion</span>
+                            <span className="value">{stats.email.conv}</span>
+                            <span className="trend up"><Plus size={12} /> {stats.email.convChange}%</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="metric-card">
-                    <div className="metric-card-header"><Zap size={14} /> SMS</div>
-                    <div className="metrics-row">
-                        <div>
-                            <div className="metric-item-label">SMS sent</div>
-                            <div className="metric-item-val">0 <span className="metric-change">—</span></div>
+                <div className="premium-card">
+                    <div className="card-header-v2">
+                        <div className="card-title-v2">
+                            <div className="icon-circle" style={{ background: '#ecfdf5', color: '#10b981' }}><Zap size={20} /></div>
+                            Total Sales
                         </div>
-                        <div>
-                            <div className="metric-item-label">Click rate</div>
-                            <div className="metric-item-val">0% <span className="metric-change">—</span></div>
-                        </div>
-                        <div>
-                            <div className="metric-item-label">Conversion rate</div>
-                            <div className="metric-item-val">0% <span className="metric-change">—</span></div>
-                        </div>
-                        <div>
-                            <div className="metric-item-label">Sales</div>
-                            <div className="metric-item-val">₫0 <span className="metric-change">—</span></div>
-                        </div>
+                    </div>
+                    <div className="stat-box-v2">
+                        <span className="label">Revenue generated</span>
+                        <span className="value" style={{ fontSize: '36px' }}>{stats.sales?.total ?? '₫0'}</span>
+                        <p style={{ color: '#64748b', fontSize: '13px', marginTop: '8px', fontWeight: 500 }}>
+                            From {stats.sales?.count ?? 0} attributed orders
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <div className="calendar-section">
-                <div className="calendar-header">
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <ArrowUpRight size={16} /> <ArrowDownRight size={16} />
-                        <span style={{ fontSize: '14px', fontWeight: 600 }}>Apr 6–12, 2026</span>
+            <div className="calendar-wrap">
+                <div className="calendar-header-v2">
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>Activity Calendar</h2>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn-premium-outline" style={{ padding: '6px 14px' }}>April 2026</button>
                     </div>
-                    <button className="btn-secondary">Today</button>
                 </div>
-                <div className="calendar-grid">
-                    {['Mon 6', 'Tue 7', 'Wed 8', 'Thu 9', 'Fri 10', 'Sat 11', 'Sun 12'].map(day => {
-                        const dayNum = day.split(' ')[1];
-                        const monthNum = 4; // Mocking April for now as per the date range
-                        const hasActivity = activityDays.includes(`${monthNum}/${dayNum}`);
-                        
+                <div className="calendar-grid-v2">
+                    {activityDays.slice(0, 7).concat(['4/13','4/14','4/15','4/16','4/17','4/18','4/19']).map((day: string, idx: number) => {
+                        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                        const dayNum = day.split('/')[1];
                         return (
-                            <div key={day} className="calendar-day">
-                                <div className={`day-label ${day.includes('Wed 8') ? 'today' : ''}`}>
-                                    <span>{day.split(' ')[0]}</span>
-                                    <span className="day-num">{dayNum}</span>
+                            <div key={day} className={`day-card-v2 ${day.includes('8') ? 'is-today' : ''}`}>
+                                <div className="day-header-v2">
+                                    <span className="day-name">{dayNames[idx % 7]}</span>
+                                    <span className="day-num-v2">{dayNum}</span>
                                 </div>
-                                {hasActivity && (
-                                    <div style={{ padding: '4px', background: '#ecfdf5', borderRadius: '4px', border: '1px solid #10b981', fontSize: '10px', color: '#047857', fontWeight: 700, textAlign: 'center' }}>
+                                {activityDays.includes(day) && (
+                                    <div className="activity-indicator">
                                         Email Sent
                                     </div>
                                 )}
@@ -233,48 +339,49 @@ export default function MessagingDashboard() {
                 </div>
             </div>
 
-            <div className="table-section">
-                <div className="table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px' }}>
-                    <div className="table-tabs">
-                        {['All', 'Email', 'SMS'].map(tab => (
-                            <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>{tab}</button>
-                        ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><Search size={14} /></div>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><Filter size={14} /></div>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><ArrowUpDown size={14} /></div>
-                    </div>
+            <div className="table-premium">
+                <div className="table-tabs-v2">
+                    <div className={`tab-v2 ${activeTab === 'All' ? 'active' : ''}`} onClick={() => setActiveTab('All')}>All campaigns</div>
+                    <div className="tab-v2">Automations</div>
+                    <div className="tab-v2">Sent</div>
+                    <div className="tab-v2">Draft</div>
                 </div>
-
-                <div className="table-header-row">
-                    <div>Subject</div>
-                    <div>Channel</div>
-                    <div>Status</div>
-                    <div>Scheduled date</div>
-                    <div>Open rate</div>
-                    <div>Click rate</div>
-                    <div>Conversion rate</div>
-                    <div>Sales</div>
-                    <div></div>
+                
+                <div className="t-header-v2">
+                    <span>Subject / Campaign</span>
+                    <span>Status</span>
+                    <span>Sent</span>
+                    <span>Open rate</span>
+                    <span>Click rate</span>
+                    <span>Orders</span>
+                    <span>Conv.</span>
+                    <span>Sales</span>
+                    <span></span>
                 </div>
 
                 {activities.map((act: any) => (
-                    <div key={act.id} className="table-row">
-                        <div className="subject-cell">
-                            <div className="thumb-placeholder"></div>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#202223' }}>{act.subject}</span>
+                    <div key={act.id} className="t-row-v2">
+                        <div className="subj-group">
+                            <div className="subj-thumb">
+                                <Mail size={20} color="white" />
+                            </div>
+                            <div className="subj-info">
+                                <span className="name">{act.subject}</span>
+                                <span className="date">{act.date}</span>
+                            </div>
                         </div>
-                        <div style={{ fontSize: '13px' }}>{act.channel}</div>
                         <div>
-                            <span className={`status-pill ${act.status === 'Sent' ? 'status-sent' : 'status-draft'}`}>{act.status}</span>
+                            <span className={`tag-premium ${act.status === 'Sent' ? 'tag-sent' : 'tag-draft'}`}>
+                                {act.status}
+                            </span>
                         </div>
-                        <div style={{ fontSize: '13px', color: '#616161' }}>{act.date}</div>
-                        <div style={{ fontSize: '13px' }}>{act.open}</div>
-                        <div style={{ fontSize: '13px' }}>{act.click}</div>
-                        <div style={{ fontSize: '13px' }}>{act.conv}</div>
-                        <div style={{ fontSize: '13px' }}>{act.sales}</div>
-                        <div><MoreHorizontal size={14} color="#616161" /></div>
+                        <div style={{ fontWeight: 700 }}>{act.sent?.toLocaleString() ?? 0}</div>
+                        <div style={{ fontWeight: 600 }}>{act.open}</div>
+                        <div style={{ fontWeight: 600 }}>{act.click}</div>
+                        <div style={{ fontWeight: 600 }}>{act.orders}</div>
+                        <div style={{ fontWeight: 600 }}>{act.conv}</div>
+                        <div style={{ fontWeight: 700, color: '#1e293b' }}>{act.sales}</div>
+                        <div><MoreHorizontal size={18} color="#94a3b8" /></div>
                     </div>
                 ))}
             </div>

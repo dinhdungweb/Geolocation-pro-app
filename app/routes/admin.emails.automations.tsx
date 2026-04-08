@@ -14,7 +14,8 @@ import {
     ArrowDownRight,
     Calendar,
     Info,
-    X
+    X,
+    Rocket
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -63,133 +64,170 @@ export default function AutomationsList() {
     const { automations, totalSentCount } = useLoaderData<typeof loader>();
 
     return (
-        <div className="automations-dashboard">
+        <div className="automations-dashboard-v2">
             <style>{`
-                .automations-dashboard { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
                 
-                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
-                .title-area h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+                .automations-dashboard-v2 { 
+                    padding: 0; 
+                    font-family: 'Outfit', sans-serif; 
+                    color: #0f172a;
+                }
                 
-                .btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); transition: all 0.2s; }
-                .btn-secondary:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
-                .btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+                .glass-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 40px;
+                    padding: 20px 0;
+                }
+                .title-group h1 { 
+                    font-size: 32px; 
+                    font-weight: 800; 
+                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    letter-spacing: -0.03em;
+                }
+                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
                 
-                .banner-msg { background: #e0f2fe; padding: 16px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; border: 1px solid #bae6fd; font-size: 14px; color: #075985; font-weight: 500; }
+                .btn-premium-solid {
+                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 14px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .btn-premium-solid:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 12px 20px rgba(99, 102, 241, 0.3);
+                }
+
+                .banner-premium {
+                    background: linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%);
+                    padding: 24px 32px;
+                    border-radius: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 40px;
+                    border: 1px solid rgba(186, 230, 253, 0.5);
+                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.02);
+                }
+                .banner-premium .msg { font-size: 15px; color: #075985; font-weight: 600; }
                 
-                .metrics-row { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; display: grid; grid-template-columns: repeat(6, 1fr); margin-bottom: 32px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-                .metric-item { padding: 0 20px; border-right: 1px solid var(--border); }
-                .metric-item:last-child { border-right: none; }
-                .metric-label { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dotted var(--border); width: fit-content; }
-                .metric-val { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-                .metric-change { font-size: 12px; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+                .stats-grid-premium {
+                    background: white;
+                    border: 1px solid rgba(0,0,0,0.04);
+                    border-radius: 24px;
+                    display: grid;
+                    grid-template-columns: repeat(6, 1fr);
+                    margin-bottom: 40px;
+                    padding: 32px;
+                    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.04);
+                }
+                .stat-box-premium { padding: 0 24px; border-right: 1px solid #f1f5f9; }
+                .stat-box-premium:last-child { border-right: none; }
+                .stat-box-premium .label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 12px; }
+                .stat-box-premium .value { font-size: 22px; font-weight: 800; color: #1e293b; letter-spacing: -0.02em; display: block; }
+
+                .table-premium { background: white; border-radius: 24px; border: 1px solid rgba(0,0,0,0.04); overflow: hidden; box-shadow: 0 12px 30px -10px rgba(0,0,0,0.04); }
+                .tab-header-premium { display: flex; gap: 32px; padding: 0 32px; border-bottom: 1px solid #f1f5f9; }
+                .tab-v2 { padding: 24px 0; font-size: 15px; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+                .tab-v2.active { color: #6366f1; border-bottom-color: #6366f1; }
                 
-                .table-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-                .tab-row { display: flex; padding: 0 24px; border-bottom: 1px solid var(--border); gap: 32px; }
-                .tab-btn { padding: 18px 0; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; background: none; border: none; }
-                .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+                .t-header-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 16px 32px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+                .t-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 24px 32px; border-bottom: 1px solid #f1f5f9; align-items: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: #1e293b; }
+                .t-row:hover { background: #fafaff; }
                 
-                .table-header-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 14px 24px; background: #fafafa; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-                .table-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 20px 24px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: var(--text); }
-                .table-row:hover { background: #f8fafc; }
-                
-                .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; width: fit-content; }
-                .status-active { background: #ecfdf5; color: #10b981; }
-                .status-inactive { background: #f1f5f9; color: var(--text-muted); }
+                .auto-name { font-weight: 700; font-size: 15px; }
+                .tag-status { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+                .tag-active { background: #ecfdf5; color: #059669; }
+                .tag-inactive { background: #f1f5f9; color: #94a3b8; }
             `}</style>
 
-            <div className="header-row">
-                <div className="title-area">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Zap size={18} color="#616161" />
-                        <h1>Automations</h1>
-                    </div>
+            <div className="glass-header">
+                <div className="title-group">
+                    <h1>Automations</h1>
+                    <p>Build and manage automated messaging flows to engage your customers.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn-primary">Create automation</button>
-                    <button className="btn-secondary"><MoreHorizontal size={14} /></button>
+                <button className="btn-premium-solid">
+                    <Zap size={16} /> Create automation
+                </button>
+            </div>
+
+            <div className="banner-premium">
+                <span className="msg">🚀 You've sent {totalSentCount.toLocaleString()} automated emails in the last 30 days.</span>
+                <Link to="/admin/emails/settings" style={{ fontSize: '14px', fontWeight: 700, color: '#0369a1', textDecoration: 'none' }}>Settings →</Link>
+            </div>
+
+            <div className="stats-grid-premium">
+                <div className="stat-box-premium">
+                    <span className="label">Total Sent</span>
+                    <span className="value">{totalSentCount.toLocaleString()}</span>
+                </div>
+                <div className="stat-box-premium">
+                    <span className="label">Open Rate</span>
+                    <span className="value">0.0%</span>
+                </div>
+                <div className="stat-box-premium">
+                    <span className="label">Click Rate</span>
+                    <span className="value">0.0%</span>
+                </div>
+                <div className="stat-box-premium">
+                    <span className="label">Orders</span>
+                    <span className="value">0</span>
+                </div>
+                <div className="stat-box-premium">
+                    <span className="label">Conv. Rate</span>
+                    <span className="value">0.0%</span>
+                </div>
+                <div className="stat-box-premium">
+                    <span className="label">Attr. Sales</span>
+                    <span className="value">₫0</span>
                 </div>
             </div>
 
-            <div className="banner-msg">
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <Info size={16} />
-                    <span>Marketing automations have moved into Shopify Messaging. Your other automations will continue to run without disruption in <strong>Flow</strong>.</span>
+            <div className="table-premium">
+                <div className="tab-header-premium">
+                    <div className="tab-v2 active">All automations</div>
+                    <div className="tab-v2">Active</div>
+                    <div className="tab-v2">Inactive</div>
                 </div>
-                <X size={14} style={{ cursor: 'pointer' }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <button className="btn-secondary"><Calendar size={14} /> Last 30 days</button>
-                <button className="btn-secondary">Compare to: Feb 6–Mar 8, 2026</button>
-            </div>
-
-            <div className="metrics-row">
-                <div className="metric-item">
-                    <div className="metric-label">Sent</div>
-                    <div className="metric-val">{totalSentCount.toLocaleString()}</div>
-                    <div className="metric-change"><ArrowUpRight size={12} /> 0%</div>
-                </div>
-                <div className="metric-item">
-                    <div className="metric-label">Click rate</div>
-                    <div className="metric-val">1.13%</div>
-                    <div className="metric-change"><ArrowUpRight size={12} /> 39%</div>
-                </div>
-                <div className="metric-item">
-                    <div className="metric-label">Orders</div>
-                    <div className="metric-val">0</div>
-                    <div className="metric-change"><ArrowDownRight size={12} /> 100%</div>
-                </div>
-                <div className="metric-item">
-                    <div className="metric-label">Conversion rate</div>
-                    <div className="metric-val">0%</div>
-                    <div className="metric-change"><ArrowUpRight size={12} /> 100%</div>
-                </div>
-                <div className="metric-item">
-                    <div className="metric-label">Sales</div>
-                    <div className="metric-val">₫0</div>
-                    <div className="metric-change"><ArrowUpRight size={12} /> 100%</div>
-                </div>
-                <div className="metric-item">
-                    <div className="metric-label">Average order value</div>
-                    <div className="metric-val">₫0</div>
-                    <div className="metric-change">—</div>
-                </div>
-            </div>
-
-            <div className="table-card">
-                <div className="tab-row">
-                    <button className="tab-btn">All</button>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f1f1f1' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><Search size={14} /></div>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><ArrowUpDown size={14} /></div>
-                    </div>
-                </div>
-
-                <div className="table-header-row">
-                    <div>Automation name</div>
-                    <div>Status</div>
-                    <div>Sent</div>
-                    <div>Click rate</div>
-                    <div>Orders</div>
-                    <div>Conversion rate</div>
-                    <div>Sales</div>
-                    <div></div>
+                
+                <div className="t-header-row">
+                    <span>Automation name</span>
+                    <span>Status</span>
+                    <span>Sent</span>
+                    <span>Open rate</span>
+                    <span>Click rate</span>
+                    <span>Orders</span>
+                    <span>Sales</span>
+                    <span></span>
                 </div>
 
                 {automations.map((a: any) => (
-                    <Link key={a.id} to={`/admin/emails/automations/${a.id}`} className="table-row">
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a1c1d' }}>{a.name}</div>
+                    <Link key={a.id} to={`/admin/emails/automations/${a.id}`} className="t-row">
+                        <div className="auto-name">{a.name}</div>
                         <div>
-                            <span className={`status-badge ${a.status === 'Active' ? 'status-active' : 'status-inactive'}`}>{a.status}</span>
+                            <span className={`tag-status ${a.status === 'Active' ? 'tag-active' : 'tag-inactive'}`}>
+                                {a.status}
+                            </span>
                         </div>
-                        <div style={{ fontSize: '13px', color: '#1a1c1d' }}>{a.sent === 0 ? '-' : a.sent.toLocaleString()}</div>
-                        <div style={{ fontSize: '13px', color: '#1a1c1d' }}>{a.click === '0%' ? '-' : a.click}</div>
-                        <div style={{ fontSize: '13px', color: '#1a1c1d' }}>{a.orders === 0 ? '-' : a.orders}</div>
-                        <div style={{ fontSize: '13px', color: '#1a1c1d' }}>{a.conv === '0%' ? '-' : a.conv}</div>
-                        <div style={{ fontSize: '13px', color: '#1a1c1d' }}>{a.sales === '₫0' ? '-' : a.sales}</div>
-                        <div><MoreHorizontal size={14} color="#616161" /></div>
+                        <div style={{ fontWeight: 700 }}>{a.sent === 0 ? '-' : a.sent.toLocaleString()}</div>
+                        <div style={{ fontWeight: 600 }}>{a.open || '-'}</div>
+                        <div style={{ fontWeight: 600 }}>{a.click === '0%' ? '-' : a.click}</div>
+                        <div style={{ fontWeight: 600 }}>{a.orders === 0 ? '-' : a.orders}</div>
+                        <div style={{ fontWeight: 700 }}>{a.sales === '₫0' ? '-' : a.sales}</div>
+                        <div><MoreHorizontal size={18} color="#94a3b8" /></div>
                     </Link>
                 ))}
             </div>

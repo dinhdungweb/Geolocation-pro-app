@@ -27,65 +27,136 @@ export default function TemplatesGallery() {
     const { templates } = useLoaderData<typeof loader>();
 
     return (
-        <div className="templates-dashboard">
+        <div className="templates-dashboard-v2">
             <style>{`
-                .templates-dashboard { padding: 0; font-family: 'Outfit', sans-serif; color: var(--text); }
-                .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
-                .title-area h1 { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
                 
-                .btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); transition: all 0.2s; }
-                .btn-secondary:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
-                .btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+                .templates-dashboard-v2 { 
+                    padding: 0; 
+                    font-family: 'Outfit', sans-serif; 
+                    color: #0f172a;
+                }
                 
-                .table-card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-                .table-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--border); background: #fafafa; }
+                .glass-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 40px;
+                    padding: 20px 0;
+                }
+                .title-group h1 { 
+                    font-size: 32px; 
+                    font-weight: 800; 
+                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    letter-spacing: -0.03em;
+                }
+                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
                 
-                .tab-row { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; gap: 32px; }
-                .tab-item { padding: 18px 0; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
-                .tab-item.active { border-bottom-color: var(--primary); color: var(--primary); }
-                
-                .grid-row { display: grid; grid-template-columns: 40px 100px 1fr 1fr 40px; padding: 20px 24px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; transition: all 0.2s; }
-                .grid-row:hover { background: #f8fafc; }
-                
-                .template-thumb { width: 64px; height: 84px; background: var(--sidebar-bg); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
-                .template-thumb img { width: 100%; height: 100%; object-fit: cover; }
+                .actions-group { display: flex; gap: 12px; }
+                .btn-premium-solid {
+                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 14px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .btn-premium-solid:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 12px 20px rgba(99, 102, 241, 0.3);
+                }
+                .btn-premium-outline {
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    padding: 10px 20px;
+                    border-radius: 14px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #475569;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.3s;
+                }
+                .btn-premium-outline:hover { border-color: #6366f1; color: #6366f1; transform: translateY(-1px); }
+
+                .templates-grid-premium {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 32px;
+                    margin-top: 40px;
+                }
+                .template-card-premium {
+                    background: white;
+                    border-radius: 24px;
+                    border: 1px solid rgba(0,0,0,0.04);
+                    overflow: hidden;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    cursor: pointer;
+                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.01), 0 2px 4px -1px rgba(0,0,0,0.01);
+                }
+                .template-card-premium:hover {
+                    transform: translateY(-8px);
+                    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02);
+                    border-color: rgba(99, 102, 241, 0.2);
+                }
+                .template-preview-v2 {
+                    height: 240px;
+                    background: #f8fafc;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-bottom: 1px solid #f1f5f9;
+                    position: relative;
+                }
+                .template-preview-v2 img {
+                    width: 70%;
+                    height: 80%;
+                    object-fit: cover;
+                    border-radius: 8px;
+                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+                }
+                .template-info-v2 { padding: 20px; }
+                .template-info-v2 .name { font-weight: 700; font-size: 16px; color: #1e293b; display: block; margin-bottom: 4px; }
+                .template-info-v2 .edited { font-size: 12px; color: #94a3b8; font-weight: 500; }
             `}</style>
 
-            <div className="header-row">
-                <div className="title-area">
-                    <h1>Templates</h1>
+            <div className="glass-header">
+                <div className="title-group">
+                    <h1>Email Templates</h1>
+                    <p>Select a template to build your campaign or create your own custom design.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn-secondary">Manage branding</button>
-                    <button className="btn-primary">Create template</button>
-                    <button className="btn-secondary"><MoreHorizontal size={14} /></button>
+                <div className="actions-group">
+                    <button className="btn-premium-outline">Manage colors</button>
+                    <button className="btn-premium-solid">
+                        <Plus size={16} /> Create template
+                    </button>
                 </div>
             </div>
 
-            <div className="table-card">
-                <div className="tab-row">
-                    <div className="tab-item active">All</div>
-                </div>
-                <div className="table-header">
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <input type="checkbox" style={{ marginRight: '8px' }} />
-                        <span style={{ fontSize: '13px', color: '#616161' }}>Name</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><Search size={14} /></div>
-                        <div className="btn-secondary" style={{ padding: '4px 8px' }}><ArrowUpDown size={14} /></div>
-                    </div>
-                </div>
-
+            <div className="templates-grid-premium">
                 {templates.map(tmp => (
-                    <div key={tmp.id} className="grid-row">
-                        <input type="checkbox" />
-                        <div className="template-thumb">
+                    <div key={tmp.id} className="template-card-premium">
+                        <div className="template-preview-v2">
                             <img src={tmp.thumb} alt={tmp.name} />
                         </div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a1c1d' }}>{tmp.name}</div>
-                        <div style={{ fontSize: '13px', color: '#616161' }}>{tmp.edited}</div>
-                        <div style={{ textAlign: 'right' }}><MoreHorizontal size={14} color="#616161" /></div>
+                        <div className="template-info-v2">
+                            <span className="name">{tmp.name}</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="edited">Edited {tmp.edited}</span>
+                                <MoreHorizontal size={16} color="#94a3b8" />
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>
