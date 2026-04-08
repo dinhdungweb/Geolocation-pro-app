@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             by: ['yearMonth'],
             _sum: { totalVisitors: true, redirected: true },
             orderBy: { yearMonth: 'desc' },
-            take: 6
+            take: 12
         })
     ]);
 
@@ -77,8 +77,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 };
 
+// Helper to fill all 12 months of the current year
+function getFullYearTrends(monthlyTrends: any[]) {
+    const currentYear = new Date().getFullYear();
+    const fullYear: any[] = [];
+    
+    for (let month = 1; month <= 12; month++) {
+        const yearMonth = `${currentYear}-${String(month).padStart(2, '0')}`;
+        const existing = monthlyTrends.find(t => t.yearMonth === yearMonth);
+        
+        fullYear.push(existing || {
+            yearMonth,
+            _sum: { totalVisitors: 0, redirected: 0 }
+        });
+    }
+    
+    return fullYear;
+}
+
 export default function AdminDashboard() {
     const { stats, countries, distributions, trends } = useLoaderData<typeof loader>();
+    const fullYearTrends = getFullYearTrends(trends);
 
     return (
         <div className="dashboard-v2">
@@ -161,10 +180,10 @@ export default function AdminDashboard() {
             <div className="grid-main">
                 <div className="premium-card">
                     <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '24px' }}>Traffic Growth Trend</h3>
-                    <div style={{ height: '240px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '16px', padding: '0 0 20px 0' }}>
-                        {trends.map((t: any) => {
+                    <div style={{ height: '240px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '8px', padding: '0 0 20px 0' }}>
+                        {fullYearTrends.map((t: any) => {
                             const total = t._sum?.totalVisitors || 0;
-                            const maxVal = Math.max(...trends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
+                            const maxVal = Math.max(...fullYearTrends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
                             const heightPercentage = Math.max((total / maxVal) * 100, 5);
                             
                             return (
@@ -172,16 +191,17 @@ export default function AdminDashboard() {
                                     <div 
                                         title={`${t.yearMonth}: ${total.toLocaleString()}`}
                                         style={{ 
-                                            width: '80%', 
+                                            width: '60%', 
                                             height: `${(heightPercentage / 100) * 180}px`,
                                             background: 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)',
-                                            borderRadius: '12px 12px 4px 4px',
+                                            borderRadius: '6px 6px 2px 2px',
                                             transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-                                            boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)',
-                                            position: 'relative'
+                                            boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
+                                            position: 'relative',
+                                            minWidth: '4px'
                                         }} 
                                     />
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>{t.yearMonth.split('-')[1]}/{t.yearMonth.split('-')[0]}</div>
+                                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>{t.yearMonth.split('-')[1]}</div>
                                 </div>
                             );
                         })}
