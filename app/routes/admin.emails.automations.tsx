@@ -520,16 +520,17 @@ function getDefaultStyle(type: EmailBlockType) {
 }
 
 function renderBlockPreview(block: EmailBlock): string {
-    const { type, content, style } = block;
+    const { type, content } = block;
+    const style = block.style || {};
     switch(type) {
         case 'header': 
             return `<div style="background: ${style.themeColor || '#6366f1'}; padding: 20px; text-align: center; color: white; font-weight: 800;">${content.logoText || 'Logo'}</div>`;
         case 'heading':
-            return `<div style="padding: 20px 30px; font-size: ${style.fontSize}; font-weight: 800; text-align: ${style.textAlign}; color: ${style.color}">${content.text}</div>`;
+            return `<div style="padding: 20px 30px; font-size: ${style.fontSize || '24px'}; font-weight: 800; text-align: ${style.textAlign || 'left'}; color: ${style.color || '#1e293b'}">${content.text}</div>`;
         case 'text':
-            return `<div style="padding: 10px 30px; font-size: 14px; color: ${style.color || '#64748b'}; line-height: 1.6; text-align: ${style.textAlign}">${content.text.replace(/\n/g, '<br>')}</div>`;
+            return `<div style="padding: 10px 30px; font-size: 14px; color: ${style.color || '#64748b'}; line-height: 1.6; text-align: ${style.textAlign || 'left'}">${content.text.replace(/\n/g, '<br>')}</div>`;
         case 'button':
-            return `<div style="padding: 20px; text-align: ${style.textAlign}"><div style="background: ${style.buttonColor}; color: white; display: inline-block; padding: 10px 24px; border-radius: 8px; font-weight: 700;">${content.label}</div></div>`;
+            return `<div style="padding: 20px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#6366f1'}; color: white; display: inline-block; padding: 10px 24px; border-radius: 8px; font-weight: 700;">${content.label}</div></div>`;
         case 'hero':
             return `<div style="background: #f1f5f9; padding: 40px 20px; text-align: center;"><div style="font-size: 24px; font-weight: 900;">${content.title}</div></div>`;
         case 'coupon':
