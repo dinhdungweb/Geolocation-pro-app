@@ -127,9 +127,9 @@ export default function AdminEmailAutomations() {
     const [editIsActive, setEditIsActive] = useState(true);
     const [isAddingStep, setIsAddingStep] = useState<{parentId: string, branch?: string} | null>(null);
 
-    // Email Designer Modal State
     const [showDesigner, setShowDesigner] = useState<string | null>(null); // nodeId
     const [designBlocks, setDesignBlocks] = useState<EmailBlock[]>([]);
+    const [designSubject, setDesignSubject] = useState("");
     const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
 
     // Initialize from DB
@@ -191,14 +191,19 @@ export default function AdminEmailAutomations() {
         if(!node) return;
         
         let initialBlocks = [];
+        let initialSubject = "";
+        
         if(node.data.isCustom && node.data.customConfig) {
             initialBlocks = JSON.parse(node.data.customConfig);
+            initialSubject = node.data.customSubject || "";
         } else if(node.data.templateId) {
             const tmpl = templates.find((t: any) => t.id === node.data.templateId);
             if(tmpl?.config) initialBlocks = JSON.parse(tmpl.config);
+            initialSubject = tmpl?.subject || "";
         }
         
         setDesignBlocks(initialBlocks);
+        setDesignSubject(initialSubject);
         setShowDesigner(nodeId);
     };
 
@@ -240,6 +245,7 @@ export default function AdminEmailAutomations() {
         updateNodeData(showDesigner, { 
             isCustom: true, 
             customConfig: JSON.stringify(designBlocks),
+            customSubject: designSubject,
             customHtml: html
         });
         setShowDesigner(null);
@@ -611,7 +617,15 @@ export default function AdminEmailAutomations() {
                         .canvas-block-v3:hover { border-color: #e2e8f0; }
                         .canvas-block-v3.selected { border-color: #6366f1; background: rgba(99, 102, 241, 0.02); }
                         
-                        .modal-block-tools { position: absolute; left: 100%; top: 0; margin-left: 10px; display: none; flex-direction: column; gap: 4px; z-index: 10; }
+                        .modal-block-tools { 
+                            position: absolute; 
+                            right: 10px; 
+                            top: 10px; 
+                            display: none; 
+                            flex-direction: column; 
+                            gap: 4px; 
+                            z-index: 10; 
+                        }
                         .canvas-block-v3.selected .modal-block-tools { display: flex; }
                         
                         .btn-save-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 10px 24px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
@@ -660,6 +674,17 @@ export default function AdminEmailAutomations() {
                             {/* Center: Canvas */}
                             <div className="modal-canvas-area" onClick={() => setSelectedBlockId(null)}>
                                 <div className="modal-canvas-inner">
+                                    <div style={{ padding: '20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        <span className="prop-label">Email Subject</span>
+                                        <input 
+                                            className="prop-input" 
+                                            value={designSubject} 
+                                            onChange={e => setDesignSubject(e.target.value)} 
+                                            placeholder="Subject line..." 
+                                            style={{ marginBottom: 0 }} 
+                                        />
+                                    </div>
+
                                     {designBlocks.map((block, idx) => (
                                         <div 
                                             key={block.id} 
@@ -667,7 +692,7 @@ export default function AdminEmailAutomations() {
                                             onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}
                                         >
                                             <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
-                                            <div className="modal-block-tools">
+                                            <div className="modal-block-tools" style={{ display: selectedBlockId === block.id ? 'flex' : 'none' }}>
                                                 <button className="tool-btn" onClick={(e) => { e.stopPropagation(); moveDesignBlock(idx, 'up'); }} disabled={idx === 0}><ArrowUp size={14} /></button>
                                                 <button className="tool-btn" onClick={(e) => { e.stopPropagation(); moveDesignBlock(idx, 'down'); }} disabled={idx === designBlocks.length - 1}><ArrowDown size={14} /></button>
                                                 <button className="tool-btn delete" onClick={(e) => { e.stopPropagation(); removeDesignBlock(block.id); }}><Trash2 size={14} /></button>
@@ -750,7 +775,7 @@ export default function AdminEmailAutomations() {
                                                 </div>
 
                                                 <button className="btn-save-indigo" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setSelectedBlockId(null)}>
-                                                    Done Editing
+                                                    Complete
                                                 </button>
                                             </div>
                                         );
