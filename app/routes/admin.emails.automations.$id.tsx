@@ -3,42 +3,25 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import React, { useState, useEffect } from "react";
 import { 
     Zap, 
-    UserPlus, 
-    AlertTriangle, 
-    ShieldAlert,
-    ChevronRight,
-    Eye,
-    History,
-    MessageSquare,
-    Edit3,
-    Plus,
-    Trash2,
-    ArrowUp,
-    ArrowDown,
-    Save,
-    RotateCcw,
-    Type,
-    Image as ImageIcon,
-    Square,
-    Layout,
-    Share2,
-    CheckCircle2,
-    X,
-    Info
+    MessageSquare, 
+    ShieldAlert, 
+    Plus, 
+    Trash2, 
+    RotateCcw, 
+    X, 
+    Info, 
+    ArrowLeft,
+    CheckCircle2
 } from "lucide-react";
-import { useState, useEffect } from "react";
-import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
-import { generateEmailHtml, type EmailBlock, type EmailBlockType } from "../utils/email-generator";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    const shop = "GLOBAL";
     const { id } = params;
     
     try {
-        // If specific ID is requested, fetch it
         let currentAutomation = null;
         if (id && id !== 'new') {
             currentAutomation = await (prisma as any).automation.findUnique({
@@ -50,7 +33,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             return redirect("/admin/emails/automations");
         }
 
-        return json({ shop, currentAutomation, requestedId: id });
+        const templates = await (prisma as any).emailTemplate.findMany({
+            where: { shop: 'GLOBAL' },
+            select: { id: true, name: true }
+        });
+
+        return json({ currentAutomation, requestedId: id, templates });
     } catch (error) {
         console.error("Prisma error in Automation Editor loader:", error);
         return redirect("/admin/emails/automations");
@@ -62,28 +50,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const action = formData.get("action");
     const type = formData.get("type") as string;
-    const shop = "GLOBAL"; // Default for Admin Panel
+    const shop = "GLOBAL";
 
     if (action === "save") {
-        const subject = formData.get("subject") as string;
+        const name = formData.get("name") as string;
         const config = formData.get("config") as string;
-        const html = formData.get("html") as string;
         const isActive = formData.get("isActive") === "true";
 
         await (prisma as any).automation.upsert({
             where: { shop_type: { shop, type } },
-            update: { subject, config, html, isActive },
-            create: { shop, type, subject, config, html, isActive }
+            update: { name, config, isActive },
+            create: { shop, type, name, config, isActive }
         });
 
-        return json({ success: true, message: "Automation saved successfully!" });
-    }
-
-    if (action === "reset") {
-        await (prisma as any).automation.deleteMany({
-            where: { shop, type }
-        });
-        return json({ success: true, message: "Restored to default template." });
+        return json({ success: true });
     }
 
     if (action === "toggle") {
@@ -100,585 +80,266 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function AdminEmailAutomations() {
-    const { shop, currentAutomation, requestedId } = useLoaderData<typeof loader>();
+    const { currentAutomation, requestedId, templates } = useLoaderData<typeof loader>();
     const fetcher = useFetcher();
-    const [view, setView] = useState<'flow' | 'designer'>('flow');
-    const [triggerType, setTriggerType] = useState<string>(currentAutomation?.type || requestedId || 'welcome');
-    const [editSubject, setEditSubject] = useState("");
-    const [editBlocks, setEditBlocks] = useState<EmailBlock[]>([]);
+    
+    const [workflowName, setWorkflowName] = useState("");
+    const [triggerType, setTriggerType] = useState<string>("");
+    const [nodes, setNodes] = useState<any[]>([]);
+    const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
     const [editIsActive, setEditIsActive] = useState(true);
-    const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+    const [isAddingStep, setIsAddingStep] = useState(false);
 
-    // Effect to initialize editor
     useEffect(() => {
         if (currentAutomation) {
+            setWorkflowName(currentAutomation.name || "Untitled Automation");
+            setTriggerType(currentAutomation.type);
             setEditIsActive(currentAutomation.isActive);
-            setEditSubject(currentAutomation.subject);
             try {
-                setEditBlocks(currentAutomation.config ? JSON.parse(currentAutomation.config) : []);
+                const config = JSON.parse(currentAutomation.config);
+                if (Array.isArray(config)) setNodes(config);
+                else setNodes([{ id: '1', type: 'action', data: { label: 'Send Email', templateId: '' } }]);
             } catch (e) {
-                setEditBlocks([]);
+                setNodes([{ id: '1', type: 'action', data: { label: 'Send Email', templateId: '' } }]);
             }
-        } else if (requestedId && ['welcome', 'limit_80', 'limit_100'].includes(requestedId)) {
-            setEditIsActive(true);
-            setEditSubject(requestedId === 'welcome' ? 'Welcome to Geo: Redirect & Country Block!' : 'Usage Warning: Geo: Redirect & Country Block');
-            setEditBlocks(getDefaultBlocks(requestedId));
+        } else {
+            setWorkflowName(requestedId === 'welcome' ? 'Welcome new subscribers' : 'Usage Warning Flow');
+            setTriggerType(requestedId || 'welcome');
+            setNodes([{ id: '1', type: 'action', data: { label: 'Send Email', templateId: '' } }]);
         }
     }, [currentAutomation, requestedId]);
 
-    const addBlock = (type: EmailBlockType) => {
-        const newBlock: EmailBlock = {
+    const addNode = (type: string) => {
+        const newNode = {
             id: Math.random().toString(36).substr(2, 9),
             type,
-            content: getDefaultContent(type),
-            style: getDefaultStyle(type)
+            data: type === 'action' ? { label: 'Send Email', templateId: '' } : 
+                  type === 'wait' ? { label: 'Wait Delay', duration: 1, unit: 'day' } :
+                  { label: 'Condition', logic: 'is_opened' }
         };
-        setEditBlocks([...editBlocks, newBlock]);
+        setNodes([...nodes, newNode]);
+        setActiveNodeId(newNode.id);
+        setIsAddingStep(false);
     };
 
-    const removeBlock = (id: string) => {
-        setEditBlocks(editBlocks.filter(b => b.id !== id));
+    const removeNode = (id: string) => {
+        setNodes(nodes.filter(n => n.id !== id));
+        if (activeNodeId === id) setActiveNodeId(null);
     };
 
-    const moveBlock = (index: number, direction: 'up' | 'down') => {
-        const newBlocks = [...editBlocks];
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex >= 0 && newIndex < newBlocks.length) {
-            [newBlocks[index], newBlocks[newIndex]] = [newBlocks[newIndex], newBlocks[index]];
-            setEditBlocks(newBlocks);
-        }
-    };
-
-    const updateBlockContent = (id: string, newContent: any) => {
-        setEditBlocks(editBlocks.map(b => b.id === id ? { ...b, content: { ...b.content, ...newContent } } : b));
-    };
-
-    const updateBlockStyle = (id: string, newStyle: any) => {
-        setEditBlocks(editBlocks.map(b => b.id === id ? { ...b, style: { ...b.style, ...newStyle } } : b));
+    const updateNodeData = (id: string, newData: any) => {
+        setNodes(nodes.map(n => n.id === id ? { ...n, data: { ...n.data, ...newData } } : n));
     };
 
     const handleSave = () => {
-        const html = generateEmailHtml(editBlocks, shop);
         fetcher.submit({
             action: "save",
             type: triggerType,
-            subject: editSubject,
-            config: JSON.stringify(editBlocks),
-            html,
+            name: workflowName,
+            config: JSON.stringify(nodes),
             isActive: String(editIsActive)
         }, { method: "post" });
     };
 
     return (
-            <div className="editor-overlay">
-                <style>{`
-                    .editor-overlay {
-                        position: fixed;
-                        inset: 0;
-                        background: #f1f5f9;
-                        z-index: 9999;
-                        display: flex;
-                        font-family: 'Outfit', sans-serif;
-                    }
-                    .editor-sidebar {
-                        width: 280px;
-                        background: white;
-                        border-right: 1px solid #e2e8f0;
-                        display: flex;
-                        flex-direction: column;
-                        overflow-y: auto;
-                    }
-                    .blocks-grid {
-                        padding: 24px;
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 12px;
-                    }
-                    .block-item {
-                        padding: 16px;
-                        background: #f8fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 12px;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        gap: 8px;
-                        cursor: pointer;
-                        transition: all 0.2s;
-                    }
-                    .block-item:hover {
-                        border-color: #6366f1;
-                        background: #f5f3ff;
-                        color: #6366f1;
-                    }
-                    .block-item strong { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-                    
-                    .editor-canvas {
-                        flex: 1;
-                        padding: 40px;
-                        overflow-y: auto;
-                        display: flex;
-                        justify-content: center;
-                    }
-                    .canvas-content {
-                        width: 600px;
-                        background: white;
-                        min-height: 800px;
-                        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-                        border-radius: 8px;
-                        overflow: hidden;
-                    }
-                    .canvas-block {
-                        position: relative;
-                        border: 2px solid transparent;
-                        cursor: pointer;
-                    }
-                    .canvas-block:hover { border-color: #f1f5f9; }
-                    .canvas-block.selected { border-color: #6366f1; background: rgba(99,102,241,0.02); }
-                    
-                    .block-actions {
-                        position: absolute;
-                        right: 10px;
-                        top: 10px;
-                        display: none;
-                        gap: 4px;
-                    }
-                    .canvas-block:hover .block-actions { display: flex; }
-                    .action-icon {
-                        width: 28px;
-                        height: 28px;
-                        background: white;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 6px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        cursor: pointer;
-                    }
-                    .action-icon:hover { color: #6366f1; border-color: #6366f1; }
-                    .action-icon.delete:hover { color: #ef4444; border-color: #ef4444; }
+        <div className="flow-builder-v3">
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+                .flow-builder-v3 { position: fixed; inset: 0; background: #f4f6f8; z-index: 9999; display: flex; flex-direction: column; font-family: 'Outfit', sans-serif; color: #1a1c1d; }
+                .flow-nav { height: 64px; background: white; border-bottom: 1px solid #e1e3e5; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+                .workflow-title-input { font-size: 16px; font-weight: 700; border: 1px solid transparent; padding: 4px 8px; border-radius: 6px; background: transparent; }
+                .workflow-title-input:hover { background: #f1f2f3; }
+                .workflow-title-input:focus { background: white; border-color: #008060; outline: none; }
+                .btn-shopify-primary { background: #008060; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+                .btn-shopify-secondary { background: white; border: 1px solid #d2d5d8; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+                .canvas-area { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 80px 0; background-image: radial-gradient(#d2d5d8 1px, transparent 1px); background-size: 20px 20px; }
+                .nodes-stack { display: flex; flex-direction: column; align-items: center; width: 400px; }
+                .node-v3 { width: 320px; background: white; border-radius: 12px; border: 1px solid #e1e3e5; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; overflow: hidden; transition: transform 0.2s; }
+                .node-v3:hover { transform: translateY(-2px); border-color: #008060; }
+                .node-v3.active { border-color: #008060; box-shadow: 0 0 0 2px rgba(0,128,96,0.2); }
+                .node-header { padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+                .trigger-node .node-header { background: #e0f2fe; color: #0369a1; }
+                .action-node .node-header { background: #f3e8ff; color: #7e22ce; }
+                .wait-node .node-header { background: #fef9c3; color: #854d0e; }
+                .condition-node .node-header { background: #ecfdf5; color: #047857; }
+                .node-body { padding: 16px; }
+                .node-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+                .node-desc { font-size: 13px; color: #6d7175; }
+                .connector { width: 2px; height: 40px; background: #d2d5d8; position: relative; }
+                .connector::after { content: ''; position: absolute; bottom: -6px; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #d2d5d8; }
+                .add-btn { width: 32px; height: 32px; background: white; border: 1px solid #d2d5d8; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; }
+                .add-btn:hover { background: #008060; color: white; border-color: #008060; }
+                .add-menu { position: absolute; background: white; border: 1px solid #e1e3e5; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 8px; display: flex; gap: 8px; margin-top: 40px; }
+                .menu-item { padding: 12px; border-radius: 8px; cursor: pointer; text-align: center; width: 70px; }
+                .menu-item:hover { background: #f4f6f8; }
+                .menu-item span { font-size: 10px; font-weight: 700; display: block; margin-top: 4px; }
+                .prop-panel { width: 360px; background: white; border-left: 1px solid #e1e3e5; display: flex; flex-direction: column; }
+                .panel-header { padding: 20px; border-bottom: 1px solid #e1e3e5; font-weight: 800; text-transform: uppercase; font-size: 13px; }
+                .panel-body { padding: 24px; flex: 1; overflow-y: auto; }
+                .form-label { font-size: 13px; font-weight: 600; margin-bottom: 8px; display: block; }
+                .form-input { width: 100%; padding: 10px; border: 1px solid #d2d5d8; border-radius: 8px; margin-bottom: 20px; }
+                .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+                .status-active { background: #e6f4ea; color: #1e8e3e; }
+                .status-inactive { background: #f1f3f4; color: #5f6368; }
+            `}</style>
 
-                    .editor-props {
-                        width: 320px;
-                        background: white;
-                        border-left: 1px solid #e2e8f0;
-                        padding: 24px;
-                        overflow-y: auto;
-                    }
-                    .prop-group { margin-bottom: 20px; }
-                    .prop-label { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 8px; display: block; }
-                    .prop-input {
-                        width: 100%;
-                        padding: 10px 14px;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        transition: all 0.2s;
-                    }
-                    .prop-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
-                    
-                    .action-btn {
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        padding: 8px 16px;
-                        border-radius: 8px;
-                        font-weight: 700;
-                        font-size: 13px;
-                        cursor: pointer;
-                        border: 1px solid #e2e8f0;
-                        background: white;
-                        color: #1e293b;
-                    }
-                    .btn-primary {
-                        background: #6366f1;
-                        color: white;
-                        border: none;
-                    }
-                    .btn-primary:hover { background: #4f46e5; }
+            <div className="flow-nav">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <button className="btn-shopify-secondary" style={{ padding: '8px' }} onClick={() => window.location.href="/admin/emails/automations"}>
+                        <ArrowLeft size={16} />
+                    </button>
+                    <input className="workflow-title-input" value={workflowName} onChange={e => setWorkflowName(e.target.value)} />
+                    <span className={`status-badge ${editIsActive ? 'status-active' : 'status-inactive'}`}>
+                        {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                </div>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button className="btn-shopify-primary" onClick={handleSave}>
+                        {fetcher.state === 'submitting' ? 'Saving...' : 'Save Workflow'}
+                    </button>
+                </div>
+            </div>
 
-                    /* Flow View Styles */
-                    .flow-container {
-                        flex: 1;
-                        background: #f8fafc;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        padding: 60px;
-                        overflow-y: auto;
-                    }
-                    .flow-header {
-                        width: 100%;
-                        max-width: 800px;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 40px;
-                    }
-                    .flow-node {
-                        width: 400px;
-                        background: white;
-                        border-radius: 16px;
-                        border: 1px solid #e2e8f0;
-                        padding: 24px;
-                        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-                        position: relative;
-                        transition: all 0.2s;
-                    }
-                    .flow-node:hover { border-color: #6366f1; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-                    .flow-node.trigger { border-left: 4px solid #6366f1; }
-                    .flow-node.action { border-left: 4px solid #10b981; }
-                    
-                    .flow-connector {
-                        width: 2px;
-                        height: 40px;
-                        background: #e2e8f0;
-                        position: relative;
-                    }
-                    .flow-connector::after {
-                        content: '';
-                        position: absolute;
-                        bottom: -5px;
-                        left: -4px;
-                        border-left: 5px solid transparent;
-                        border-right: 5px solid transparent;
-                        border-top: 5px solid #e2e8f0;
-                    }
-
-                    .node-icon {
-                        width: 40px;
-                        height: 40px;
-                        border-radius: 10px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin-bottom: 16px;
-                    }
-                    .trigger .node-icon { background: #f5f3ff; color: #6366f1; }
-                    .action .node-icon { background: #ecfdf5; color: #10b981; }
-                    
-                    .view-tabs {
-                        display: flex;
-                        background: #f1f5f9;
-                        padding: 4px;
-                        border-radius: 10px;
-                        gap: 4px;
-                    }
-                    .tab-btn {
-                        padding: 6px 16px;
-                        border-radius: 8px;
-                        font-size: 13px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        border: none;
-                        background: transparent;
-                        color: #64748b;
-                        transition: all 0.2s;
-                    }
-                    .tab-btn.active {
-                        background: white;
-                        color: #6366f1;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                    }
-                `}</style>
-
-                {view === 'designer' ? (
-                    <>
-                        <div className="editor-sidebar">
-                            <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Designer</h3>
-                                    <button className="tab-btn active" onClick={() => setView('flow')} style={{ padding: '4px 8px', fontSize: '11px' }}>Back to Flow</button>
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+                <div className="canvas-area">
+                    <div className="nodes-stack">
+                        <div className={`node-v3 trigger-node ${activeNodeId === 'trigger' ? 'active' : ''}`} onClick={() => setActiveNodeId('trigger')}>
+                            <div className="node-header"><Zap size={10} /> Trigger</div>
+                            <div className="node-body">
+                                <div className="node-title">
+                                    {triggerType === 'welcome' && "App Installation"}
+                                    {triggerType === 'limit_80' && "80% Usage"}
+                                    {triggerType === 'limit_100' && "100% Limit"}
+                                    {triggerType === 'manual' && "Manual API"}
                                 </div>
-                                <p style={{ fontSize: '11px', color: '#64748b' }}>Build your email content</p>
-                            </div>
-                            
-                            <div className="blocks-grid">
-                                <button className="block-item" onClick={() => addBlock('header')}>
-                                    <Layout size={22} />
-                                    <strong>Header</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('heading')}>
-                                    <Type size={22} />
-                                    <strong>Heading</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('text')}>
-                                    <Edit3 size={22} />
-                                    <strong>Text</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('button')}>
-                                    <Square size={22} />
-                                    <strong>Button</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('hero')}>
-                                    <ImageIcon size={22} />
-                                    <strong>Banner</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('coupon')}>
-                                    <Zap size={22} />
-                                    <strong>Coupon</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('divider')}>
-                                    <div style={{ height: '2px', width: '22px', background: '#94a3b8' }}></div>
-                                    <strong>Divider</strong>
-                                </button>
-                                <button className="block-item" onClick={() => addBlock('footer')}>
-                                    <Share2 size={22} />
-                                    <strong>Footer</strong>
-                                </button>
-                            </div>
-
-                            <div style={{ flex: 1 }}></div>
-
-                            <div style={{ padding: '24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <button className="action-btn btn-primary" style={{ width: '100%', height: '48px', justifyContent: 'center', fontSize: '13px', borderRadius: '12px' }} onClick={() => setView('flow')}>
-                                    <CheckCircle2 size={16} /> Save & Return to Flow
-                                </button>
+                                <div className="node-desc">Start when event occurs</div>
                             </div>
                         </div>
 
-                        <div className="editor-canvas">
-                            <div className="canvas-content">
-                                {(fetcher.data as any)?.success && (
-                                    <div style={{ padding: '12px 24px', background: '#ecfdf5', borderBottom: '1px solid #10b981', color: '#059669', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <CheckCircle2 size={16} /> Saved successfully!
+                        {nodes.map(node => (
+                            <React.Fragment key={node.id}>
+                                <div className="connector"></div>
+                                <div className={`node-v3 ${node.type}-node ${activeNodeId === node.id ? 'active' : ''}`} onClick={() => setActiveNodeId(node.id)}>
+                                    <div className="node-header">
+                                        {node.type === 'action' && <><MessageSquare size={10} /> Action</>}
+                                        {node.type === 'wait' && <><RotateCcw size={10} /> Wait</>}
+                                        {node.type === 'condition' && <><ShieldAlert size={10} /> Condition</>}
                                     </div>
-                                )}
-                                <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                                    <div className="prop-label">Email Subject</div>
-                                    <input className="prop-input" value={editSubject} onChange={e => setEditSubject(e.target.value)} />
-                                </div>
-                                
-                                <div style={{ padding: '0' }}>
-                                    {editBlocks.map((block, idx) => (
-                                        <div 
-                                            key={block.id} 
-                                            className={`canvas-block ${selectedBlockId === block.id ? 'selected' : ''}`}
-                                            onClick={(e) => { e.stopPropagation(); setSelectedBlockId(block.id); }}
-                                        >
-                                            <div dangerouslySetInnerHTML={{ __html: renderBlockPreview(block) }} />
-                                            <div className="block-actions">
-                                                <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'up'); }} disabled={idx === 0} title="Move Up"><ArrowUp size={14} /></button>
-                                                <button className="action-icon" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 'down'); }} disabled={idx === editBlocks.length - 1} title="Move Down"><ArrowDown size={14} /></button>
-                                                <button className="action-icon delete" onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} title="Delete Block"><Trash2 size={14} /></button>
-                                            </div>
+                                    <div className="node-body">
+                                        <div className="node-title">{node.data.label}</div>
+                                        <div className="node-desc">
+                                            {node.type === 'action' && (templates.find((t: any) => t.id === node.data.templateId)?.name || 'Choose a template')}
+                                            {node.type === 'wait' && `${node.data.duration} ${node.data.unit}(s)`}
+                                            {node.type === 'condition' && `Logic: ${node.data.logic}`}
                                         </div>
-                                    ))}
-                                    {editBlocks.length === 0 && (
-                                        <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-                                            <Info size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
-                                            <p>No blocks added yet. Use the sidebar to start building.</p>
-                                        </div>
-                                    )}
+                                    </div>
                                 </div>
+                            </React.Fragment>
+                        ))}
+
+                        <div className="connector"></div>
+                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                            <div className="add-btn" onClick={() => setIsAddingStep(!isAddingStep)}>
+                                <Plus size={16} />
                             </div>
-                        </div>
-
-                        <div className="editor-props" onClick={e => e.stopPropagation()}>
-                            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Type size={16} fill="#6366f1" color="#6366f1" /> Properties
-                            </h3>
-
-                            {selectedBlockId ? (
-                                (() => {
-                                    const block = editBlocks.find(b => b.id === selectedBlockId);
-                                    if (!block) return null;
-                                    return (
-                                        <div className="block-settings-form">
-                                            <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Editing</span>
-                                                <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '14px', textTransform: 'capitalize' }}>{block.type} Block</div>
-                                            </div>
-
-                                            {block.type === 'heading' || block.type === 'text' ? (
-                                                <div className="prop-group">
-                                                    <div className="prop-label">Content Text</div>
-                                                    <textarea 
-                                                        className="prop-input" 
-                                                        rows={4} 
-                                                        value={block.content.text} 
-                                                        onChange={e => updateBlockContent(block.id, { text: e.target.value })} 
-                                                    />
-                                                </div>
-                                            ) : null}
-
-                                            {block.type === 'button' ? (
-                                                <>
-                                                    <div className="prop-group">
-                                                        <div className="prop-label">Button Label</div>
-                                                        <input className="prop-input" value={block.content.label} onChange={e => updateBlockContent(block.id, { label: e.target.value })} />
-                                                    </div>
-                                                    <div className="prop-group">
-                                                        <div className="prop-label">Destination URL</div>
-                                                        <input className="prop-input" value={block.content.url} onChange={e => updateBlockContent(block.id, { url: e.target.value })} />
-                                                    </div>
-                                                </>
-                                            ) : null}
-
-                                            <button className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }} onClick={() => setSelectedBlockId(null)}>
-                                                <CheckCircle2 size={14} /> Done
-                                            </button>
-                                        </div>
-                                    )
-                                })()
-                            ) : (
-                                <div className="global-settings">
-                                    <div className="prop-group">
-                                        <div className="prop-label">Activation</div>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                                            <input type="checkbox" checked={editIsActive} onChange={e => setEditIsActive(e.target.checked)} /> 
-                                            Enable this automation
-                                        </label>
+                            {isAddingStep && (
+                                <div className="add-menu">
+                                    <div className="menu-item" onClick={() => addNode('action')}>
+                                        <MessageSquare size={20} color="#7e22ce" />
+                                        <span>Action</span>
+                                    </div>
+                                    <div className="menu-item" onClick={() => addNode('wait')}>
+                                        <RotateCcw size={20} color="#854d0e" />
+                                        <span>Wait</span>
+                                    </div>
+                                    <div className="menu-item" onClick={() => addNode('condition')}>
+                                        <ShieldAlert size={20} color="#047857" />
+                                        <span>Condition</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    </>
-                ) : (
-                    /* FLOW VIEW */
-                    <div className="flow-container">
-                        <div className="flow-header">
-                            <div>
-                                <h2 style={{ fontSize: '24px', fontWeight: 800 }}>Automation Flow</h2>
-                                <p style={{ color: '#64748b' }}>Configure your triggers and actions</p>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <button className="action-btn" onClick={() => window.location.href = "/admin/emails/automations"}>
-                                    <X size={14} /> Close
-                                </button>
-                                <button className="action-btn btn-primary" onClick={handleSave}>
-                                    <Save size={16} /> {fetcher.state === 'submitting' ? 'Saving...' : 'Save Flow'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flow-node trigger">
-                            <div className="node-icon">
-                                <Zap size={20} />
-                            </div>
-                            <div style={{ fontWeight: 800, fontSize: '14px', textTransform: 'uppercase', color: '#6366f1', marginBottom: '4px' }}>Trigger</div>
-                            <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: '12px' }}>
-                                {triggerType === 'welcome' && "New Installation"}
-                                {triggerType === 'limit_80' && "80% Usage Reached"}
-                                {triggerType === 'limit_100' && "100% Limit Reached"}
-                                {triggerType === 'manual' && "Manual Trigger"}
-                            </div>
-                            <div className="prop-group">
-                                <div className="prop-label">Change Trigger Event</div>
-                                <select 
-                                    className="prop-input" 
-                                    value={triggerType} 
-                                    onChange={e => setTriggerType(e.target.value)}
-                                >
-                                    <option value="welcome">On App Installation</option>
-                                    <option value="limit_80">On 80% Monthly Usage</option>
-                                    <option value="limit_100">On 100% Monthly Usage</option>
-                                    <option value="manual">Manual / API Trigger</option>
-                                </select>
-                            </div>
-                            <p style={{ color: '#64748b', fontSize: '13px', marginTop: '12px' }}>
-                                This automation will fire immediately when the selected event occurs for a shop.
-                            </p>
-                        </div>
-
-                        <div className="flow-connector"></div>
-
-                        <div className="flow-node action">
-                            <div className="node-icon">
-                                <MessageSquare size={20} />
-                            </div>
-                            <div style={{ fontWeight: 800, fontSize: '14px', textTransform: 'uppercase', color: '#10b981', marginBottom: '4px' }}>Action</div>
-                            <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: '16px' }}>Send Automated Email</div>
-                            
-                            <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-                                <div className="prop-label">Email Subject</div>
-                                <div style={{ fontSize: '14px', fontWeight: 600 }}>{editSubject || "(No subject set)"}</div>
-                            </div>
-                            
-                            <button className="action-btn" style={{ width: '100%', justifyContent: 'center', background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }} onClick={() => setView('designer')}>
-                                <Edit3 size={14} /> Customize Email Content
-                            </button>
-                        </div>
-
-                        <div className="flow-connector"></div>
-
-                        <div style={{ padding: '12px 24px', background: '#f1f5f9', borderRadius: '30px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            End of Flow
-                        </div>
                     </div>
-                )}
+                </div>
+
+                <div className="prop-panel">
+                    <div className="panel-header">Configure Step</div>
+                    <div className="panel-body">
+                        {!activeNodeId ? (
+                            <div style={{ textAlign: 'center', opacity: 0.5, marginTop: '40px' }}>
+                                <Info size={32} style={{ margin: '0 auto 12px' }} />
+                                <p>Select a node to edit</p>
+                            </div>
+                        ) : activeNodeId === 'trigger' ? (
+                            <>
+                                <label className="form-label">Workflow Status</label>
+                                <select className="form-input" value={editIsActive ? 'on' : 'off'} onChange={e => setEditIsActive(e.target.value === 'on')}>
+                                    <option value="on">Enable Workflow</option>
+                                    <option value="off">Disable Workflow</option>
+                                </select>
+
+                                <label className="form-label">Trigger Event</label>
+                                <select className="form-input" value={triggerType} onChange={e => setTriggerType(e.target.value)}>
+                                    <option value="welcome">App Installation</option>
+                                    <option value="limit_80">80% Monthly Usage</option>
+                                    <option value="limit_100">100% Monthly Usage</option>
+                                    <option value="manual">Manual Trigger (API)</option>
+                                </select>
+                            </>
+                        ) : (
+                            (() => {
+                                const node = nodes.find(n => n.id === activeNodeId);
+                                if (!node) return null;
+                                return (
+                                    <>
+                                        <label className="form-label">Step Label</label>
+                                        <input className="form-input" value={node.data.label} onChange={e => updateNodeData(node.id, { label: e.target.value })} />
+
+                                        {node.type === 'action' && (
+                                            <>
+                                                <label className="form-label">Email Template</label>
+                                                <select className="form-input" value={node.data.templateId || ''} onChange={e => updateNodeData(node.id, { templateId: e.target.value })}>
+                                                    <option value="">-- Select Template --</option>
+                                                    {templates.map((t: any) => (
+                                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                                    ))}
+                                                </select>
+                                            </>
+                                        )}
+
+                                        {node.type === 'wait' && (
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <label className="form-label">Duration</label>
+                                                    <input type="number" className="form-input" value={node.data.duration} onChange={e => updateNodeData(node.id, { duration: e.target.value })} />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <label className="form-label">Unit</label>
+                                                    <select className="form-input" value={node.data.unit} onChange={e => updateNodeData(node.id, { unit: e.target.value })}>
+                                                        <option value="minute">Minute(s)</option>
+                                                        <option value="hour">Hour(s)</option>
+                                                        <option value="day">Day(s)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <button className="btn-shopify-secondary" style={{ width: '100%', marginTop: '20px', color: '#d72c0d', borderColor: '#d72c0d' }} onClick={() => removeNode(node.id)}>
+                                            <Trash2 size={14} /> Delete Step
+                                        </button>
+                                    </>
+                                );
+                            })()
+                        )}
+                    </div>
+                </div>
             </div>
+
+            {fetcher.data?.success && (
+                <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: '#008060', color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 700, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10000 }}>
+                    <CheckCircle2 size={16} /> Saved!
+                </div>
+            )}
+        </div>
     );
-}
-
-// Helpers
-function Minus(props: any) {
-    return <svg {...props} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-}
-
-function getDefaultBlocks(type: string): EmailBlock[] {
-    const commonHeader: EmailBlock = { id: 'h1', type: 'header', content: { logoText: 'Geo: Redirect' }, style: { themeColor: '#6366f1' } };
-    const commonFooter: EmailBlock = { id: 'f1', type: 'footer', content: { text: '&copy; 2024 Geo: Redirect & Country Block. All rights reserved.' } };
-
-    if (type === 'welcome') {
-        return [
-            commonHeader,
-            { id: 'b1', type: 'heading', content: { text: 'Welcome to Geo: Redirect & Country Block!' }, style: { fontSize: '24px', textAlign: 'center' } },
-            { id: 'b2', type: 'text', content: { text: 'Hi there,\n\nThank you for installing our app! We are here to help you localized your international customers and protect your store from unwanted traffic.' } },
-            { id: 'b3', type: 'button', content: { label: 'Go to Dashboard', url: 'https://{shop}/admin/apps/geo-redirect-country-block' }, style: { buttonColor: '#6366f1' } },
-            commonFooter
-        ];
-    }
-    
-    return [
-        commonHeader,
-        { id: 'b1', type: 'heading', content: { text: 'Usage Warning' }, style: { fontSize: '24px' } },
-        { id: 'b2', type: 'text', content: { text: 'Your shop {shop_name} has reached {usage} visitors, which is 80% of your current plan limit.' } },
-        { id: 'b3', type: 'button', content: { label: 'Upgrade Plan', url: '#' }, style: { buttonColor: '#f59e0b' } },
-        commonFooter
-    ];
-}
-
-function getDefaultContent(type: EmailBlockType) {
-    switch(type) {
-        case 'header': return { logoText: 'Geo: Redirect' };
-        case 'heading': return { text: 'Enter Heading Text' };
-        case 'text': return { text: 'Compose your message here...' };
-        case 'button': return { label: 'Click Here', url: '#' };
-        case 'hero': return { title: 'Big Announcement!', imageUrl: '' };
-        case 'coupon': return { code: 'WELCOME20' };
-        case 'footer': return { text: '&copy; 2024 All rights reserved.' };
-        default: return {};
-    }
-}
-
-function getDefaultStyle(type: EmailBlockType) {
-    if (type === 'header') return { themeColor: '#6366f1' };
-    if (type === 'button') return { buttonColor: '#6366f1', textAlign: 'center' };
-    if (type === 'heading') return { fontSize: '24px', textAlign: 'left', color: '#1e293b' };
-    return { padding: '30px', backgroundColor: '#ffffff', color: '#475569' };
-}
-
-function renderBlockPreview(block: EmailBlock): string {
-    const { type, content } = block;
-    const style = block.style || {};
-    switch(type) {
-        case 'header': 
-            return `<div style="background: ${style.themeColor || '#6366f1'}; padding: 20px; text-align: center; color: white; font-weight: 800;">${content.logoText || 'Logo'}</div>`;
-        case 'heading':
-            return `<div style="padding: 20px 30px; font-size: ${style.fontSize || '24px'}; font-weight: 800; text-align: ${style.textAlign || 'left'}; color: ${style.color || '#1e293b'}">${content.text}</div>`;
-        case 'text':
-            return `<div style="padding: 10px 30px; font-size: 14px; color: ${style.color || '#64748b'}; line-height: 1.6; text-align: ${style.textAlign || 'left'}">${content.text.replace(/\n/g, '<br>')}</div>`;
-        case 'button':
-            return `<div style="padding: 20px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#6366f1'}; color: white; display: inline-block; padding: 10px 24px; border-radius: 8px; font-weight: 700;">${content.label}</div></div>`;
-        case 'hero':
-            return `<div style="background: #f1f5f9; padding: 40px 20px; text-align: center;"><div style="font-size: 24px; font-weight: 900;">${content.title}</div></div>`;
-        case 'coupon':
-            return `<div style="padding: 20px;"><div style="border: 2px dashed #facc15; background: #fefce8; padding: 20px; text-align: center; font-weight: 900; font-size: 24px;">${content.code}</div></div>`;
-        case 'divider':
-            return `<div style="padding: 10px 30px;"><hr style="border: 0; border-top: 1px solid #e2e8f0;"></div>`;
-        case 'footer':
-            return `<div style="padding: 24px; background: #f8fafc; text-align: center; color: #94a3b8; font-size: 11px;">${content.text}</div>`;
-        default: return `<div style="padding: 20px; text-align: center; color: #94a3b8;">Block: ${type}</div>`;
-    }
 }

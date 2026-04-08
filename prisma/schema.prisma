@@ -161,9 +161,10 @@ model Automation {
   id        String   @id @default(uuid())
   shop      String
   type      String   // 'welcome', 'limit_80', 'limit_100'
-  subject   String
-  config    String   @default("[]") // Stores JSON blocks for the editor
-  html      String   @default("")   // Stores the final generated HTML
+  name      String?  @default("Untitled Automation")
+  subject   String?
+  config    String   @default("[]") // Stores JSON nodes for the flow
+  html      String   @default("")   // Final generated HTML (for the first email action)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
