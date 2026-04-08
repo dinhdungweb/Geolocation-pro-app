@@ -169,6 +169,133 @@ export default function AdminEmailAutomations() {
 
     return (
             <div className="editor-overlay">
+                <style>{`
+                    .editor-overlay {
+                        position: fixed;
+                        inset: 0;
+                        background: #f1f5f9;
+                        z-index: 9999;
+                        display: flex;
+                        font-family: 'Outfit', sans-serif;
+                    }
+                    .editor-sidebar {
+                        width: 280px;
+                        background: white;
+                        border-right: 1px solid #e2e8f0;
+                        display: flex;
+                        flex-direction: column;
+                        overflow-y: auto;
+                    }
+                    .blocks-grid {
+                        padding: 24px;
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 12px;
+                    }
+                    .block-item {
+                        padding: 16px;
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 12px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 8px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .block-item:hover {
+                        border-color: #6366f1;
+                        background: #f5f3ff;
+                        color: #6366f1;
+                    }
+                    .block-item strong { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+                    
+                    .editor-canvas {
+                        flex: 1;
+                        padding: 40px;
+                        overflow-y: auto;
+                        display: flex;
+                        justify-content: center;
+                    }
+                    .canvas-content {
+                        width: 600px;
+                        background: white;
+                        min-height: 800px;
+                        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+                        border-radius: 8px;
+                        overflow: hidden;
+                    }
+                    .canvas-block {
+                        position: relative;
+                        border: 2px solid transparent;
+                        cursor: pointer;
+                    }
+                    .canvas-block:hover { border-color: #f1f5f9; }
+                    .canvas-block.selected { border-color: #6366f1; background: rgba(99,102,241,0.02); }
+                    
+                    .block-actions {
+                        position: absolute;
+                        right: 10px;
+                        top: 10px;
+                        display: none;
+                        gap: 4px;
+                    }
+                    .canvas-block:hover .block-actions { display: flex; }
+                    .action-icon {
+                        width: 28px;
+                        height: 28px;
+                        background: white;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 6px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                    }
+                    .action-icon:hover { color: #6366f1; border-color: #6366f1; }
+                    .action-icon.delete:hover { color: #ef4444; border-color: #ef4444; }
+
+                    .editor-props {
+                        width: 320px;
+                        background: white;
+                        border-left: 1px solid #e2e8f0;
+                        padding: 24px;
+                        overflow-y: auto;
+                    }
+                    .prop-group { margin-bottom: 20px; }
+                    .prop-label { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 8px; display: block; }
+                    .prop-input {
+                        width: 100%;
+                        padding: 10px 14px;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        transition: all 0.2s;
+                    }
+                    .prop-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+                    
+                    .action-btn {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        font-weight: 700;
+                        font-size: 13px;
+                        cursor: pointer;
+                        border: 1px solid #e2e8f0;
+                        background: white;
+                        color: #1e293b;
+                    }
+                    .btn-primary {
+                        background: #6366f1;
+                        color: white;
+                        border: none;
+                    }
+                    .btn-primary:hover { background: #4f46e5; }
+                `}</style>
+
                 <div className="editor-sidebar">
                     <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9' }}>
                         <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Elements</h3>
