@@ -135,10 +135,26 @@ export default function AdminEmailAutomations() {
             setEditingType(currentAutomation.type);
             setEditIsActive(currentAutomation.isActive);
             setEditSubject(currentAutomation.subject);
-            setEditBlocks(JSON.parse(currentAutomation.config));
+            try {
+                setEditBlocks(currentAutomation.config ? JSON.parse(currentAutomation.config) : []);
+            } catch (e) {
+                console.error("Failed to parse automation config:", e);
+                setEditBlocks([]);
+            }
         } else if (requestedId && ['welcome', 'limit_80', 'limit_100'].includes(requestedId)) {
-            const auto = automations.find(a => a.id === requestedId);
-            if (auto) startEditing(auto);
+            // Need to wait for automations array or use a helper
+            const fixedAuto = [
+                { id: 'welcome', title: 'Welcome Campaign' },
+                { id: 'limit_80', title: '80% Warning' },
+                { id: 'limit_100', title: '100% Critical' }
+            ].find(a => a.id === requestedId);
+            
+            if (fixedAuto) {
+                setEditingType(fixedAuto.id);
+                setEditIsActive(true);
+                setEditSubject(fixedAuto.id === 'welcome' ? 'Welcome to Geo: Redirect & Country Block!' : 'Usage Warning: Geo: Redirect & Country Block');
+                setEditBlocks(getDefaultBlocks(fixedAuto.id));
+            }
         }
     }, [currentAutomation, requestedId]);
 

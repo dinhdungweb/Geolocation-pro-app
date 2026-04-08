@@ -43,12 +43,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         return json({
             automations: automations.map((a: any) => ({
                 id: a.id,
-                name: a.type === 'welcome' ? 'Welcome new subscribers with a discount email' : 
+                name: a.subject || (a.type === 'welcome' ? 'Welcome new subscribers with a discount email' : 
                       a.type === 'limit80' ? '80% Usage limit notification' : 
                       a.type === 'limit100' ? '100% Usage limit notification' : 
                       a.type === 'limit_80' ? '80% Usage limit notification' :
                       a.type === 'limit_100' ? '100% Usage limit notification' :
-                      'Custom automation',
+                      'Custom automation'),
                 type: a.type,
                 status: a.isActive ? 'Active' : 'Inactive',
                 sent: sentMap[a.type] || 0,
