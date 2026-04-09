@@ -71,7 +71,7 @@ export default function TemplatesGallery() {
                     cursor: pointer;
                     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-                    display: flex;
+                    display: inline-flex;
                     align-items: center;
                     gap: 8px;
                 }
@@ -88,7 +88,7 @@ export default function TemplatesGallery() {
                     font-weight: 600;
                     color: #475569;
                     cursor: pointer;
-                    display: flex;
+                    display: inline-flex;
                     align-items: center;
                     gap: 8px;
                     transition: all 0.3s;
