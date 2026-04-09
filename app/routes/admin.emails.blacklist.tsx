@@ -67,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function EmailBlacklist() {
     const { blacklist, knownShops } = useLoaderData<typeof loader>();
-    const actionData = useActionData<typeof action>();
+    const actionData = useActionData<{ success?: boolean; error?: string; message?: string }>();
     const navigation = useNavigation();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedShop, setSelectedShop] = useState("");
@@ -140,10 +140,6 @@ export default function EmailBlacklist() {
                 .empty-icon { margin: 0 auto 16px; width: 64px; height: 64px; background: #f8fafc; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #cbd5e1; }
             `}</style>
             
-            <div className="header-section">
-                <h1>Email Blacklist</h1>
-                <p>Prevent automated emails from being sent to specific store domains.</p>
-            </div>
 
             <div className="grid-layout">
                 {/* Left: Blacklist Table */}

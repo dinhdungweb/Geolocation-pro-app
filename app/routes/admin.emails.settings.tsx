@@ -176,12 +176,6 @@ export default function EmailSettings() {
                 }
             `}</style>
 
-            <div className="glass-header">
-                <div className="title-group">
-                    <h1>Settings</h1>
-                    <p>Configure your sender profile and verification preferences.</p>
-                </div>
-            </div>
 
             <div className="settings-layout-premium">
                 <div className="premium-nav">

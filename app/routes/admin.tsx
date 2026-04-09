@@ -421,7 +421,6 @@ export default function AdminLayout() {
                         <button className="btn-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
                             <Menu size={20} />
                         </button>
-                        <h2>{location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.toUpperCase()}</h2>
                         <div className="global-search">
                             <Search size={16} color="var(--text-muted)" />
                             <input type="text" placeholder="Search systems, shops..." />
@@ -439,6 +438,17 @@ export default function AdminLayout() {
                     </div>
                 </header>
                 <main className="page-content">
+                    <div style={{ marginBottom: '32px' }}>
+                        <h1 style={{ 
+                            fontSize: '32px', 
+                            fontWeight: 800, 
+                            color: '#1e293b', 
+                            letterSpacing: '-0.02em',
+                            margin: 0
+                        }}>
+                            {location.pathname === '/admin' ? 'System Overview' : location.pathname.split('/').pop()?.replace(/-/g, ' ').toUpperCase()}
+                        </h1>
+                    </div>
                     <Outlet />
                 </main>
             </div>
