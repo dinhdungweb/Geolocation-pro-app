@@ -12,10 +12,6 @@ automatically_update_urls_on_dev = true
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/installed" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/installed"
-
-  [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
   uri = "https://geopro.bluepeaks.top/webhooks/app/scopes_update"
 

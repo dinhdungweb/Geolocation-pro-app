@@ -12,6 +12,8 @@ import prisma from "./db.server";
 
 import { PREMIUM_PLAN, PLUS_PLAN } from "./billing.config";
 import { initUsageCron } from "./utils/usage-cron.server";
+import { sendAdminEmail, hasSentEmail } from "./utils/email.server";
+import { getWelcomeEmailHtml } from "./utils/email-templates";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -65,6 +67,21 @@ const shopify = shopifyApp({
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
+  hooks: {
+    afterAuth: async ({ session }) => {
+      const shop = session.shop;
+      const welcomed = await hasSentEmail(shop, 'welcome');
+      if (!welcomed) {
+        console.log(`[AfterAuth] Sending welcome email to ${shop}`);
+        await sendAdminEmail({
+          shop,
+          type: 'welcome',
+          subject: 'Welcome to Geo: Redirect & Country Block!',
+          html: getWelcomeEmailHtml(shop)
+        });
+      }
+    },
+  },
 });
 
 export default shopify;
