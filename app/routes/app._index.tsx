@@ -111,45 +111,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Calculate and charge overage if applicable (only for paid plans)
   await checkAndChargeOverage(shop, billing, isTest);
 
-  // --- Automated Email Triggers ---
-  const usagePercentRaw = Math.round((currentUsage / planLimit) * 100);
-  
-  // 1. Welcome Email (First time visiting dashboard after install)
-  const welcomed = await hasSentEmail(shop, 'welcome');
-  if (!welcomed) {
-    await sendAdminEmail({
-      shop,
-      type: 'welcome',
-      subject: 'Welcome to Geo: Redirect & Country Block!',
-      html: getWelcomeEmailHtml(shop)
-    });
-  }
-
-  // 2. 80% Usage Limit Warning
-  if (usagePercentRaw >= 80 && usagePercentRaw < 100) {
-    const sent80 = await hasSentEmail(shop, 'limit_80');
-      if (!sent80) {
-        await sendAdminEmail({
-          shop,
-          type: 'limit_80',
-          subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
-          html: getLimit80EmailHtml(shop, currentUsage, planLimit)
-        });
-      }
-  }
-
-  // 3. 100% Usage Limit Warning
-  if (usagePercentRaw >= 100) {
-    const sent100 = await hasSentEmail(shop, 'limit_100');
-      if (!sent100) {
-        await sendAdminEmail({
-          shop,
-          type: 'limit_100',
-          subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
-          html: getLimit100EmailHtml(shop, currentUsage, planLimit)
-        });
-      }
-  }
   // --------------------------------
 
 
