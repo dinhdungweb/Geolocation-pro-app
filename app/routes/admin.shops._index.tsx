@@ -99,7 +99,7 @@ export default function AdminShops() {
                 .filter-select {
                     appearance: none;
                     background: white; border: 1px solid var(--border);
-                    border-radius: 12px; padding: 10px 36px 10px 16px;
+                    border-radius: 12px; padding: 12px 36px 12px 16px;
                     font-size: 13px; font-weight: 600; color: var(--text);
                     cursor: pointer; transition: all 0.2s;
                     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
@@ -111,7 +111,7 @@ export default function AdminShops() {
                 .btn-clear {
                     display: flex; align-items: center; gap: 6px;
                     color: #ec4899; background: #fdf2f8; border: 1px solid #fbcfe8;
-                    padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+                    padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
                     cursor: pointer; transition: all 0.2s;
                 }
                 .btn-clear:hover { background: #fce7f3; transform: translateY(-1px); }
