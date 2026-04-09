@@ -1,3 +1,8 @@
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, Link } from "@remix-run/react";
+import prisma from "../db.server";
+import { requireAdminAuth } from "../utils/admin.session.server";
 import { useState, useMemo } from "react";
 import { Search, ExternalLink, Filter, X } from "lucide-react";
 
@@ -17,11 +22,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         })
     ]);
 
-    const rulesMap = new Map(ruleCounts.map(r => [r.shop, r._count.id]));
-    const usageMap = new Map(usage.map(u => [u.shop, u]));
+    const rulesMap = new Map(ruleCounts.map((r: any) => [r.shop, r._count.id]));
+    const usageMap = new Map(usage.map((u: any) => [u.shop, u]));
 
     return json({ 
-        shops: shops.map(s => ({
+        shops: shops.map((s: any) => ({
             ...s,
             createdAt: s.createdAt.toISOString(),
             ruleCount: rulesMap.get(s.shop) || 0,
@@ -38,7 +43,7 @@ export default function AdminShops() {
     const [modeFilter, setModeFilter] = useState("all");
 
     const filteredShops = useMemo(() => {
-        return shops.filter(shop => {
+        return shops.filter((shop: any) => {
             const matchesSearch = shop.shop.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesPlan = planFilter === "all" || shop.currentPlan === planFilter;
             const matchesMode = modeFilter === "all" || shop.mode === modeFilter;
@@ -241,7 +246,7 @@ export default function AdminShops() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredShops.map(shop => (
+                                filteredShops.map((shop: any) => (
                                     <tr key={shop.id}>
                                         <td>
                                             <Link to={`/admin/shops/${shop.shop}`} className="shop-link">
