@@ -56,6 +56,7 @@ export default function AdminLayout() {
                 { label: "Messaging", to: "/admin/emails", end: true },
                 { label: "Automations", to: "/admin/emails/automations", end: true },
                 { label: "Templates", to: "/admin/emails/templates" },
+                { label: "Blacklist", to: "/admin/emails/blacklist" },
                 { label: "Settings", to: "/admin/emails/settings" },
             ]
         },

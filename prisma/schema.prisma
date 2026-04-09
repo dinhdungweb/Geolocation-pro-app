@@ -205,3 +205,9 @@ model Campaign {
 
   @@index([shop, status])
 }
+
+model EmailBlacklist {
+  id        String   @id @default(uuid())
+  shop      String   @unique
+  createdAt DateTime @default(now())
+}

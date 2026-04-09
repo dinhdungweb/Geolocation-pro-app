@@ -23,6 +23,16 @@ export async function sendAdminEmail({
     html: string 
 }) {
     console.log(`[Email Service] Preparing to send ${type} email to ${shop}`);
+    
+    // Check if the shop is in the Blacklist
+    const isBlacklisted = await (prisma as any).emailBlacklist.findUnique({
+        where: { shop }
+    });
+
+    if (isBlacklisted) {
+        console.log(`[Email Service] Shop ${shop} is BLACKLISTED. Skipping email delivery.`);
+        return { success: true, skipped: true, reason: 'blacklisted' };
+    }
 
     // Fetch settings for SMTP and sender info
     const settings = await (prisma as any).settings.findUnique({
