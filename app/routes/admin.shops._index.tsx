@@ -42,10 +42,16 @@ export default function AdminShops() {
     const [planFilter, setPlanFilter] = useState("all");
     const [modeFilter, setModeFilter] = useState("all");
 
+    // Dynamic plans list from actual data
+    const uniquePlans = useMemo(() => {
+        const plans = new Set(shops.map((s: any) => s.currentPlan?.toLowerCase()).filter(Boolean));
+        return Array.from(plans).sort();
+    }, [shops]);
+
     const filteredShops = useMemo(() => {
         return shops.filter((shop: any) => {
             const matchesSearch = shop.shop.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesPlan = planFilter === "all" || shop.currentPlan === planFilter;
+            const matchesPlan = planFilter === "all" || shop.currentPlan?.toLowerCase() === planFilter.toLowerCase();
             const matchesMode = modeFilter === "all" || shop.mode === modeFilter;
             return matchesSearch && matchesPlan && matchesMode;
         });
@@ -198,8 +204,11 @@ export default function AdminShops() {
                             onChange={(e) => setPlanFilter(e.target.value)}
                         >
                             <option value="all">All Plans</option>
-                            <option value="FREE">Free Plan</option>
-                            <option value="PREMIUM">Premium Plan</option>
+                            {uniquePlans.map((plan: string) => (
+                                <option key={plan} value={plan}>
+                                    {plan.toUpperCase()} Plan
+                                </option>
+                            ))}
                         </select>
                         <select 
                             className="filter-select"
@@ -254,8 +263,8 @@ export default function AdminShops() {
                                             </Link>
                                         </td>
                                         <td>
-                                            <span className={`plan-badge ${shop.currentPlan === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
-                                                {shop.currentPlan}
+                                            <span className={`plan-badge ${(shop.currentPlan || '').toUpperCase() === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
+                                                {(shop.currentPlan || 'FREE').toUpperCase()}
                                             </span>
                                         </td>
                                         <td>
