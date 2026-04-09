@@ -178,11 +178,38 @@ export default function AdminShops() {
                 .empty-search { padding: 80px 0; text-align: center; color: var(--text-muted); }
 
                 @media (max-width: 768px) {
-                    .shops-header { flex-direction: column; align-items: stretch; margin-bottom: 24px; }
-                    .header-left { min-width: 100%; }
+                    .shops-header { 
+                        flex-direction: column; 
+                        align-items: stretch; 
+                        margin-bottom: 24px; 
+                        gap: 12px;
+                    }
+                    .header-left { 
+                        min-width: 100%; 
+                        flex-direction: column; 
+                        gap: 12px;
+                    }
+                    .filters-row { 
+                        flex-wrap: wrap; 
+                        gap: 12px;
+                    }
+                    .filter-select {
+                        flex: 1;
+                        min-width: 120px;
+                    }
+                    .btn-clear {
+                        width: 100%;
+                        justify-content: center;
+                    }
                     .shops-table-card { border-radius: 16px; }
                     td, th { padding: 16px; }
-                    .filters-row { overflow-x: auto; padding-bottom: 4px; }
+                    
+                    div[style*="var(--text-muted)"] {
+                        text-align: center;
+                        border-top: 1px solid var(--border);
+                        padding-top: 12px;
+                        margin-top: 4px;
+                    }
                 }
             `}</style>
 
