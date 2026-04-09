@@ -106,6 +106,10 @@ export default function AdminLayout() {
                     -webkit-font-smoothing: antialiased;
                 }
                 
+                button, input, select, textarea {
+                    font-family: inherit;
+                }
+                
                 .admin-shell {
                     display: flex;
                     min-height: 100vh;
