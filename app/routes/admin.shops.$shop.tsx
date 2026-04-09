@@ -130,7 +130,7 @@ export default function AdminShopDetail() {
                     background: white; border-radius: 24px; padding: 32px;
                     border: 1px solid #e2e8f0; margin-bottom: 32px;
                     display: flex; align-items: center; justify-content: space-between;
-                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
                 }
                 
                 .hero-content { display: flex; align-items: center; gap: 20px; }
@@ -163,7 +163,6 @@ export default function AdminShopDetail() {
                     border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px;
                     transition: all 0.3s ease;
                 }
-                .premium-stat-card:hover { transform: translateY(-3px); border-color: #6366f144; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
                 
                 .stat-card-icon { 
                     width: 48px; height: 48px; border-radius: 14px; 
