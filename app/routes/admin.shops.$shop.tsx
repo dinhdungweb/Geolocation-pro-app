@@ -1,9 +1,13 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { Form, Link, useLoaderData } from "@remix-run/react";
-import { requireAdminAuth } from "../utils/admin.session.server";
-import prisma from "../db.server";
-import { FREE_PLAN } from "../billing.config";
+import { 
+    ArrowLeft, 
+    Eye, 
+    Zap, 
+    ShieldAlert, 
+    Store,
+    Calendar,
+    Settings as SettingsIcon,
+    History
+} from "lucide-react";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
@@ -58,6 +62,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         shop,
         hasSettings: !!settings,
         hasProPlan,
+        currentPlan,
         settings: settings ? {
             mode: settings.mode,
             template: settings.template,
@@ -75,7 +80,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 
 export default function AdminShopDetail() {
-    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan } = useLoaderData<typeof loader>();
+    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan, currentPlan } = useLoaderData<typeof loader>();
 
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString("en-GB", {
@@ -102,31 +107,65 @@ export default function AdminShopDetail() {
     return (
         <div className="shop-detail-view">
             <style>{`
+                .shop-detail-view { animation: fadeIn 0.4s ease-out; }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
                 .back-bar { margin-bottom: 24px; }
                 .back-btn { 
                     display: inline-flex; align-items: center; gap: 8px; 
-                    text-decoration: none; color: var(--text-muted); font-size: 14px; font-weight: 500;
-                    transition: color 0.2s;
+                    text-decoration: none; color: #64748b; font-size: 14px; font-weight: 600;
+                    padding: 8px 16px; background: white; border-radius: 10px;
+                    border: 1px solid #e2e8f0; transition: all 0.2s;
                 }
-                .back-btn:hover { color: var(--primary); }
+                .back-btn:hover { color: #1e293b; border-color: #cbd5e1; transform: translateX(-4px); }
 
-                .shop-header { 
-                    margin-bottom: 32px; 
-                    display: flex; 
-                    align-items: flex-end; 
-                    justify-content: space-between;
-                    gap: 16px; 
+                .hero-section {
+                    background: white; border-radius: 24px; padding: 32px;
+                    border: 1px solid #e2e8f0; margin-bottom: 32px;
+                    display: flex; align-items: center; justify-content: space-between;
+                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
                 }
-                .shop-header h1 { font-size: 28px; font-weight: 700; color: var(--text); word-break: break-all; }
-                .shop-header .domain { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+                
+                .hero-content { display: flex; align-items: center; gap: 20px; }
+                .hero-icon { 
+                    width: 64px; height: 64px; border-radius: 18px; 
+                    background: #f1f5f9; display: flex; align-items: center; justify-content: center;
+                    color: #6366f1; border: 1px solid #e2e8f0;
+                }
 
-                .stats-grid-small { 
+                .shop-title-group h1 { font-size: 24px; font-weight: 800; color: #1e293b; margin: 0; letter-spacing: -0.02em; }
+                .shop-title-group .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+
+                .plan-badge-premium {
+                    padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 800;
+                    display: flex; align-items: center; gap: 8px;
+                    background: ${hasProPlan ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)' : '#f8fafc'};
+                    color: ${hasProPlan ? '#059669' : '#64748b'};
+                    border: 1px solid ${hasProPlan ? '#10b98133' : '#e2e8f0'};
+                }
+
+                .stats-grid-v3 { 
                     display: grid; 
-                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-                    gap: 16px; 
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+                    gap: 20px; 
                     margin-bottom: 32px; 
                 }
                 
+                .premium-stat-card {
+                    background: white; border-radius: 20px; padding: 24px;
+                    border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px;
+                    transition: all 0.3s ease;
+                }
+                .premium-stat-card:hover { transform: translateY(-3px); border-color: #6366f144; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+                
+                .stat-card-icon { 
+                    width: 48px; height: 48px; border-radius: 14px; 
+                    display: flex; align-items: center; justify-content: center;
+                }
+
+                .stat-info .label { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+                .stat-info .value { font-size: 22px; font-weight: 800; color: #1e293b; }
+
                 .section-grid { 
                     display: grid; 
                     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); 
@@ -135,83 +174,111 @@ export default function AdminShopDetail() {
                 }
                 
                 .card-v3 {
-                    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; 
+                    background: white; border: 1px solid #e2e8f0; border-radius: 16px; 
                     display: flex; flex-direction: column; overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
                 }
-                .card-v3-header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: #f8fafc; font-weight: 600; font-size: 14px; }
+                .card-v3-header { 
+                    padding: 16px 20px; border-bottom: 1px solid #f1f5f9; 
+                    background: #fcfdfe; font-weight: 700; font-size: 14px; color: #1e293b;
+                    display: flex; align-items: center; gap: 10px;
+                }
                 .card-v3-body { padding: 20px; flex: 1; }
 
                 .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
                 .info-item:last-child { border-bottom: none; }
-                .info-item .label { color: var(--text-muted); font-size: 13px; }
-                .info-item .value { font-weight: 600; font-size: 13px; text-align: right; }
+                .info-item .label { color: #64748b; font-size: 13px; font-weight: 500; }
+                .info-item .value { font-weight: 700; font-size: 13px; color: #1e293b; }
 
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
-                .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 10px; }
-                .month-name { font-weight: 700; font-size: 14px; color: var(--primary); }
-                .month-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); }
-
-                .table-container { width: 100%; overflow-x: auto; }
-                table { width: 100%; border-collapse: collapse; min-width: 600px; }
-                th { text-align: left; padding: 12px 20px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); background: #f8fafc; }
-                td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
-                .badge-v3 { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+                .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid transparent; transition: all 0.2s; }
+                .month-row:hover { border-color: #e2e8f0; background: #f1f5f9; }
+                .month-name { font-weight: 800; font-size: 14px; color: #6366f1; }
+                .month-stats { display: flex; gap: 16px; font-size: 12px; color: #64748b; font-weight: 600; }
 
                 @media (max-width: 768px) {
-                    .shop-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-                    .shop-header h1 { font-size: 24px; }
-                    .stats-grid-small { grid-template-columns: 1fr 1fr; gap: 12px; }
-                    .stats-grid-small .flat-card div:last-child { font-size: 20px !important; }
-                    .section-grid { grid-template-columns: 1fr; gap: 16px; }
-                    .card-v3-header { padding: 12px 16px; }
-                    .card-v3-body { padding: 16px; }
-                    .month-stats { flex-direction: column; gap: 4px; align-items: flex-end; }
+                    .hero-section { flex-direction: column; align-items: flex-start; gap: 20px; padding: 24px; }
+                    .stats-grid-v3 { grid-template-columns: 1fr 1fr; }
                 }
-
                 @media (max-width: 480px) {
-                    .stats-grid-small { grid-template-columns: 1fr; }
+                    .stats-grid-v3 { grid-template-columns: 1fr; }
+                    .month-stats { flex-direction: column; gap: 4px; align-items: flex-end; }
                 }
             `}</style>
 
             <div className="back-bar">
-                <Link to="/admin/shops" className="back-btn">← Back to Shops List</Link>
+                <Link to="/admin/shops" className="back-btn">
+                    <ArrowLeft size={16} /> <span>Back to Shops List</span>
+                </Link>
             </div>
 
-            <div className="shop-header">
-                <div style={{ flex: 1 }}>
-                    <div className="domain">Managed Shop</div>
-                    <h1>{shop}</h1>
+            <div className="hero-section">
+                <div className="hero-content">
+                    <div className="hero-icon">
+                        <Store size={32} />
+                    </div>
+                    <div className="shop-title-group">
+                        <div className="label">Managed Store</div>
+                        <h1>{shop}</h1>
+                    </div>
                 </div>
-                <div style={{ padding: '8px 16px', background: hasProPlan ? '#ecfdf5' : '#f1f5f9', color: hasProPlan ? '#10b981' : '#64748b', borderRadius: '10px', fontSize: '12px', fontWeight: 700 }}>
-                    {hasProPlan ? 'PRO PLAN' : 'FREE PLAN'}
+                <div className="plan-badge-premium">
+                    <Zap size={14} fill={hasProPlan ? "#059669" : "none"} />
+                    {currentPlan.toUpperCase()}
                 </div>
             </div>
 
-            <div className="stats-grid-small">
-                <div className="flat-card">
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Views</div>
-                    <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.totalVisitors.toLocaleString()}</div>
+            <div className="stats-grid-v3">
+                <div className="premium-stat-card">
+                    <div className="stat-card-icon" style={{ background: '#e0f2fe', color: '#0ea5e9' }}>
+                        <Eye size={22} />
+                    </div>
+                    <div className="stat-info">
+                        <div className="label">Total Views</div>
+                        <div className="value">{stats.totalVisitors.toLocaleString()}</div>
+                    </div>
                 </div>
-                <div className="flat-card">
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Redirects</div>
-                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)' }}>{stats.totalRedirected.toLocaleString()}</div>
+                <div className="premium-stat-card">
+                    <div className="stat-card-icon" style={{ background: '#eef2ff', color: '#6366f1' }}>
+                        <Zap size={22} />
+                    </div>
+                    <div className="stat-info">
+                        <div className="label">Redirects</div>
+                        <div className="value">{stats.totalRedirected.toLocaleString()}</div>
+                    </div>
                 </div>
-                <div className="flat-card">
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Blocked</div>
-                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#ef4444' }}>{stats.totalBlocked.toLocaleString()}</div>
+                <div className="premium-stat-card">
+                    <div className="stat-card-icon" style={{ background: '#fef2f2', color: '#ef4444' }}>
+                        <ShieldAlert size={22} />
+                    </div>
+                    <div className="stat-info">
+                        <div className="label">Blocked</div>
+                        <div className="value">{stats.totalBlocked.toLocaleString()}</div>
+                    </div>
                 </div>
-                <div className="flat-card">
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Active Rules</div>
-                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>{stats.activeRules}</div>
+                <div className="premium-stat-card">
+                    <div className="stat-card-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
+                        <SettingsIcon size={22} />
+                    </div>
+                    <div className="stat-info">
+                        <div className="label">Active Rules</div>
+                        <div className="value">{stats.activeRules}</div>
+                    </div>
                 </div>
             </div>
 
             <div className="section-grid">
                 <div className="card-v3">
-                    <div className="card-v3-header">App Configurations</div>
+                    <div className="card-v3-header">
+                        <SettingsIcon size={18} color="#6366f1" />
+                        App Configurations
+                    </div>
                     <div className="card-v3-body">
                         {!hasSettings ? (
-                            <div style={{ padding: '24px', textAlign: 'center', color: '#f59e0b' }}>No settings found.</div>
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#f59e0b', fontSize: '13px', fontWeight: 600 }}>
+                                <ShieldAlert size={24} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                                <div>No settings found for this shop.</div>
+                            </div>
                         ) : (
                             <>
                                 <div className="info-item">
@@ -240,11 +307,14 @@ export default function AdminShopDetail() {
                 </div>
 
                 <div className="card-v3">
-                    <div className="card-v3-header">Monthly Usage History</div>
+                    <div className="card-v3-header">
+                        <History size={18} color="#6366f1" />
+                        Monthly Usage History
+                    </div>
                     <div className="card-v3-body">
                         <div className="monthly-list">
                             {monthlyUsage.length === 0 ? (
-                                <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No usage data recorded.</div>
+                                <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No usage data recorded.</div>
                             ) : (
                                 monthlyUsage.map((u: any) => (
                                     <div className="month-row" key={u.yearMonth}>
@@ -262,7 +332,10 @@ export default function AdminShopDetail() {
             </div>
 
             <div className="card-v3" style={{ marginBottom: '32px' }}>
-                <div className="card-v3-header">Redirect & Block Rules</div>
+                <div className="card-v3-header">
+                    <Zap size={18} color="#6366f1" />
+                    Redirect & Block Rules
+                </div>
                 <div className="table-container">
                     <table>
                         <thead>
@@ -302,7 +375,10 @@ export default function AdminShopDetail() {
             </div>
 
             <div className="card-v3">
-                <div className="card-v3-header">Live Interaction Logs</div>
+                <div className="card-v3-header">
+                    <Globe size={18} color="#6366f1" />
+                    Live Interaction Logs
+                </div>
                 <div className="table-container">
                     <table>
                         <thead>
