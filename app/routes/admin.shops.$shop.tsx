@@ -142,6 +142,8 @@ export default function AdminShopDetail() {
 
                 .shop-title-group h1 { font-size: 24px; font-weight: 800; color: #1e293b; margin: 0; letter-spacing: -0.02em; }
                 .shop-title-group .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+                .shop-link-hover { transition: color 0.2s; cursor: pointer; }
+                .shop-link-hover:hover { color: #6366f1; text-decoration: underline; }
 
                 .plan-badge-premium {
                     padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 800;
@@ -236,7 +238,9 @@ export default function AdminShopDetail() {
                     </div>
                     <div className="shop-title-group">
                         <div className="label">Managed Store</div>
-                        <h1>{shop}</h1>
+                        <a href={`https://${shop}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                            <h1 className="shop-link-hover">{shop}</h1>
+                        </a>
                     </div>
                 </div>
                 <div className="plan-badge-premium">
