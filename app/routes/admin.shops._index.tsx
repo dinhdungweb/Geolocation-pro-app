@@ -1,10 +1,5 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
-import prisma from "../db.server";
-import { requireAdminAuth } from "../utils/admin.session.server";
-
-import { Search, ExternalLink } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, ExternalLink, Filter, X } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
@@ -37,6 +32,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminShops() {
     const { shops } = useLoaderData<typeof loader>();
+    
+    const [searchQuery, setSearchQuery] = useState("");
+    const [planFilter, setPlanFilter] = useState("all");
+    const [modeFilter, setModeFilter] = useState("all");
+
+    const filteredShops = useMemo(() => {
+        return shops.filter(shop => {
+            const matchesSearch = shop.shop.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesPlan = planFilter === "all" || shop.currentPlan === planFilter;
+            const matchesMode = modeFilter === "all" || shop.mode === modeFilter;
+            return matchesSearch && matchesPlan && matchesMode;
+        });
+    }, [shops, searchQuery, planFilter, modeFilter]);
+
+    const clearFilters = () => {
+        setSearchQuery("");
+        setPlanFilter("all");
+        setModeFilter("all");
+    };
 
     return (
         <div className="shops-view">
@@ -47,7 +61,9 @@ export default function AdminShops() {
                     align-items: center;
                     margin-bottom: 32px;
                     gap: 16px;
+                    flex-wrap: wrap;
                 }
+                .header-left { display: flex; gap: 12px; flex: 1; min-width: 300px; }
                 .search-box {
                     background: white;
                     border: 1px solid var(--border);
@@ -56,8 +72,10 @@ export default function AdminShops() {
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    width: 400px;
+                    flex: 1;
+                    transition: all 0.2s;
                 }
+                .search-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1); }
                 .search-box input {
                     border: none;
                     outline: none;
@@ -65,6 +83,27 @@ export default function AdminShops() {
                     font-size: 14px;
                     font-family: inherit;
                 }
+
+                .filters-row { display: flex; gap: 12px; align-items: center; }
+                .filter-select {
+                    appearance: none;
+                    background: white; border: 1px solid var(--border);
+                    border-radius: 12px; padding: 10px 36px 10px 16px;
+                    font-size: 13px; font-weight: 600; color: var(--text);
+                    cursor: pointer; transition: all 0.2s;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+                    background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+                }
+                .filter-select:hover { border-color: #cbd5e1; }
+                .filter-select:focus { outline: none; border-color: var(--primary); }
+
+                .btn-clear {
+                    display: flex; align-items: center; gap: 6px;
+                    color: #ec4899; background: #fdf2f8; border: 1px solid #fbcfe8;
+                    padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+                    cursor: pointer; transition: all 0.2s;
+                }
+                .btn-clear:hover { background: #fce7f3; transform: translateY(-1px); }
                 
                 .shops-table-card {
                     background: white;
@@ -125,21 +164,56 @@ export default function AdminShops() {
                 }
                 .action-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1); }
 
+                .empty-search { padding: 80px 0; text-align: center; color: var(--text-muted); }
+
                 @media (max-width: 768px) {
                     .shops-header { flex-direction: column; align-items: stretch; margin-bottom: 24px; }
-                    .search-box { width: 100%; }
+                    .header-left { min-width: 100%; }
                     .shops-table-card { border-radius: 16px; }
                     td, th { padding: 16px; }
+                    .filters-row { overflow-x: auto; padding-bottom: 4px; }
                 }
             `}</style>
 
             <div className="shops-header">
-                <div className="search-box">
-                    <Search size={18} color="var(--text-muted)" />
-                    <input type="text" placeholder="Search shops by domain..." />
+                <div className="header-left">
+                    <div className="search-box">
+                        <Search size={18} color="var(--text-muted)" />
+                        <input 
+                            type="text" 
+                            placeholder="Search shops by domain..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <div className="filters-row">
+                        <select 
+                            className="filter-select"
+                            value={planFilter}
+                            onChange={(e) => setPlanFilter(e.target.value)}
+                        >
+                            <option value="all">All Plans</option>
+                            <option value="FREE">Free Plan</option>
+                            <option value="PREMIUM">Premium Plan</option>
+                        </select>
+                        <select 
+                            className="filter-select"
+                            value={modeFilter}
+                            onChange={(e) => setModeFilter(e.target.value)}
+                        >
+                            <option value="all">All Modes</option>
+                            <option value="popup">Popup</option>
+                            <option value="auto_redirect">Auto Redirect</option>
+                        </select>
+                        {(searchQuery || planFilter !== "all" || modeFilter !== "all") && (
+                            <button className="btn-clear" onClick={clearFilters}>
+                                <X size={14} /> Clear
+                            </button>
+                        )}
+                    </div>
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                    Total: <b>{shops.length}</b> merchants
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px', fontWeight: 600 }}>
+                    Showing <b>{filteredShops.length}</b> / {shops.length} merchants
                 </div>
             </div>
 
@@ -158,39 +232,49 @@ export default function AdminShops() {
                             </tr>
                         </thead>
                         <tbody>
-                            {shops.map(shop => (
-                                <tr key={shop.id}>
-                                    <td>
-                                        <Link to={`/admin/shops/${shop.shop}`} className="shop-link">
-                                            {shop.shop}
-                                        </Link>
-                                    </td>
-                                    <td>
-                                        <span className={`plan-badge ${shop.currentPlan === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
-                                            {shop.currentPlan}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="mode-tag">
-                                            <div className="mode-dot" style={{ background: shop.mode === 'auto_redirect' ? '#10b981' : '#6366f1' }} />
-                                            {shop.mode.replace('_', ' ').toUpperCase()}
-                                        </div>
-                                    </td>
-                                    <td><b>{shop.ruleCount}</b> active</td>
-                                    <td>
-                                        <div style={{ fontWeight: 600 }}>{shop.latestUsage?.totalVisitors?.toLocaleString() || 0}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{shop.latestUsage?.redirected || 0} actions</div>
-                                    </td>
-                                    <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                                        {new Date(shop.createdAt).toLocaleDateString('en-GB')}
-                                    </td>
-                                    <td>
-                                        <Link to={`/admin/shops/${shop.shop}`} className="action-btn">
-                                            Manage <ExternalLink size={14} />
-                                        </Link>
+                            {filteredShops.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="empty-search">
+                                        <Search size={40} strokeWidth={1.5} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                                        <div style={{ fontSize: '16px', fontWeight: 600 }}>No merchants found</div>
+                                        <div style={{ fontSize: '13px', opacity: 0.7 }}>Try adjusting your search or filters</div>
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                filteredShops.map(shop => (
+                                    <tr key={shop.id}>
+                                        <td>
+                                            <Link to={`/admin/shops/${shop.shop}`} className="shop-link">
+                                                {shop.shop}
+                                            </Link>
+                                        </td>
+                                        <td>
+                                            <span className={`plan-badge ${shop.currentPlan === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
+                                                {shop.currentPlan}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div className="mode-tag">
+                                                <div className="mode-dot" style={{ background: shop.mode === 'auto_redirect' ? '#10b981' : '#6366f1' }} />
+                                                {shop.mode.replace('_', ' ').toUpperCase()}
+                                            </div>
+                                        </td>
+                                        <td><b>{shop.ruleCount}</b> active</td>
+                                        <td>
+                                            <div style={{ fontWeight: 600 }}>{shop.latestUsage?.totalVisitors?.toLocaleString() || 0}</div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{shop.latestUsage?.redirected || 0} actions</div>
+                                        </td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                            {new Date(shop.createdAt).toLocaleDateString('en-GB')}
+                                        </td>
+                                        <td>
+                                            <Link to={`/admin/shops/${shop.shop}`} className="action-btn">
+                                                Manage <ExternalLink size={14} />
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
