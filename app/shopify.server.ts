@@ -68,11 +68,41 @@ const shopify = shopifyApp({
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
   hooks: {
-    afterAuth: async ({ session }) => {
+    afterAuth: async ({ session, admin }) => {
       const shop = session.shop;
+
+      // 1. Fetch shop email via GraphQL if missing (Shopify doesn't provide it in session by default)
+      let shopEmail = session.email;
+      if (!shopEmail && admin) {
+        try {
+          const response = await admin.graphql(
+            `#graphql
+            query {
+              shop {
+                email
+              }
+            }`
+          );
+          const data = await response.json();
+          shopEmail = data?.data?.shop?.email;
+          
+          if (shopEmail) {
+            console.log(`[AfterAuth] Fetched email for ${shop}: ${shopEmail}`);
+            // Update the session record in DB so we have it for future use
+            await prisma.session.update({
+              where: { id: session.id },
+              data: { email: shopEmail }
+            });
+          }
+        } catch (e) {
+          console.error(`[AfterAuth] Error fetching shop email for ${shop}:`, e);
+        }
+      }
+
+      // 2. Send welcome email if not already sent
       const welcomed = await hasSentEmail(shop, 'welcome');
       if (!welcomed) {
-        console.log(`[AfterAuth] Sending welcome email to ${shop}`);
+        console.log(`[AfterAuth] Triggering welcome email to ${shop}`);
         await sendAdminEmail({
           shop,
           type: 'welcome',
