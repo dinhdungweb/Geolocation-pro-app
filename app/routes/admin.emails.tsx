@@ -13,7 +13,6 @@ export default function AdminEmailsLayout() {
         <div className="admin-emails-layout">
             <style>{`
                 .admin-emails-layout {
-                    background: #f8fafc;
                     min-height: calc(100vh - 80px);
                     display: flex;
                     flex-direction: column;
