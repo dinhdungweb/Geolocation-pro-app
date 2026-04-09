@@ -211,6 +211,17 @@ export default function AdminShopDetail() {
                     .stats-grid-v3 { grid-template-columns: 1fr; }
                     .month-stats { flex-direction: column; gap: 4px; align-items: flex-end; }
                 }
+
+                .table-container { width: 100%; overflow-x: auto; }
+                table { width: 100%; border-collapse: collapse; min-width: 600px; }
+                th { 
+                    text-align: left; padding: 12px 20px; font-size: 11px; 
+                    font-weight: 700; color: #94a3b8; text-transform: uppercase; 
+                    border-bottom: 1px solid #f1f5f9; background: #fcfdfe; 
+                    letter-spacing: 0.05em;
+                }
+                td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
+                .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block; }
             `}</style>
 
             <div className="back-bar">
