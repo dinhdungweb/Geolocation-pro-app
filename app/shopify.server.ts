@@ -72,7 +72,7 @@ const shopify = shopifyApp({
       const shop = session.shop;
 
       // 1. Fetch shop email via GraphQL if missing (Shopify doesn't provide it in session by default)
-      let shopEmail = session.email;
+      let shopEmail = (session as any).email;
       if (!shopEmail && admin) {
         try {
           const response = await admin.graphql(
