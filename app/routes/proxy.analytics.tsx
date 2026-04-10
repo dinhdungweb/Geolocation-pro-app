@@ -173,17 +173,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // 3. Update Monthly Usage (for billing and statistics)
-        if (type === 'visit' || type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
-            type === 'ip_redirected' || type === 'ip_blocked' || type === 'popup_shown') {
+        // ONLY count billable events: popup_shown, redirected, auto_redirected, blocked, ip_redirected, ip_blocked
+        // We EXCLUDED 'visit' (standard traffic) from billing as per user request
+        if (type === 'popup_shown' || type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
+            type === 'ip_redirected' || type === 'ip_blocked') {
             const now = new Date();
             const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-            const usageUpdateData: any = {};
-
-            // Deduplication: 'redirected' (click) is preceded by 'popup_shown', so we don't count it as a NEW billable visitor
-            if (type !== 'redirected') {
-                usageUpdateData.totalVisitors = { increment: 1 };
-            }
+            const usageUpdateData: any = {
+                totalVisitors: { increment: 1 }
+            };
 
             if (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') {
                 usageUpdateData.redirected = { increment: 1 };
