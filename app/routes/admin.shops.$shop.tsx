@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
 import { FREE_PLAN } from "../billing.config";
@@ -17,7 +18,9 @@ import {
     Globe,
     CreditCard,
     ChevronRight,
-    Loader2
+    Loader2,
+    X,
+    Settings2
 } from "lucide-react";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -61,7 +64,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-// ... existing loader code ...
     await requireAdminAuth(request);
     const shop = decodeURIComponent(params.shop ?? "");
     if (!shop) throw redirect("/admin");
@@ -136,6 +138,22 @@ export default function AdminShopDetail() {
     const actionData = useActionData<any>();
     const navigation = useNavigation();
     const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
+    
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Close modal on escape key
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsModalOpen(false); };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, []);
+
+    // Close modal after successful submission
+    useEffect(() => {
+        if (actionData?.success && isModalOpen) {
+            setIsModalOpen(false);
+        }
+    }, [actionData, isModalOpen]);
 
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString("en-GB", {
@@ -165,7 +183,7 @@ export default function AdminShopDetail() {
                 .shop-detail-view { animation: fadeIn 0.4s ease-out; }
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-                .back-bar { margin-bottom: 24px; }
+                .back-bar { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
                 .back-btn { 
                     display: inline-flex; align-items: center; gap: 8px; 
                     text-decoration: none; color: #64748b; font-size: 14px; font-weight: 600;
@@ -173,6 +191,14 @@ export default function AdminShopDetail() {
                     border: 1px solid #e2e8f0; transition: all 0.2s;
                 }
                 .back-btn:hover { color: #1e293b; border-color: #cbd5e1; transform: translateX(-4px); }
+
+                .adjust-trigger-btn {
+                    display: inline-flex; align-items: center; gap: 8px;
+                    padding: 8px 16px; background: #1e293b; color: white;
+                    border: none; border-radius: 10px; font-weight: 700; font-size: 13px;
+                    cursor: pointer; transition: all 0.2s;
+                }
+                .adjust-trigger-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(30, 41, 59, 0.2); }
 
                 .hero-section {
                     background: white; border-radius: 24px; padding: 32px;
@@ -273,9 +299,6 @@ export default function AdminShopDetail() {
                 .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block; }
 
                 /* Billing Forms */
-                .billing-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-                @media (max-width: 850px) { .billing-form-grid { grid-template-columns: 1fr; } }
-                
                 .billing-input-group { margin-bottom: 16px; }
                 .billing-input-group label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
                 .billing-input { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 14px; transition: all 0.2s; }
@@ -292,12 +315,46 @@ export default function AdminShopDetail() {
                 .alert { padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
                 .alert-success { background: #ecfdf5; color: #059669; border: 1px solid #10b98133; }
                 .alert-error { background: #fef2f2; color: #ef4444; border: 1px solid #ef444433; }
+
+                /* MODAL STYLES */
+                .modal-overlay {
+                    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+                    backdrop-filter: blur(4px); z-index: 9999;
+                    display: flex; align-items: center; justify-content: center;
+                    animation: modalFadeIn 0.2s ease-out;
+                }
+                .modal-content {
+                    background: white; width: 90%; max-width: 500px;
+                    border-radius: 24px; overflow: hidden;
+                    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+                    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+                @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes modalSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+                .modal-header {
+                    padding: 24px; border-bottom: 1px solid #f1f5f9;
+                    display: flex; align-items: center; justify-content: space-between;
+                }
+                .modal-title { display: flex; align-items: center; gap: 12px; font-weight: 800; color: #1e293b; font-size: 18px; }
+                .modal-close { 
+                    background: #f1f5f9; border: none; width: 32px; height: 32px; 
+                    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                    color: #64748b; cursor: pointer; transition: all 0.2s;
+                }
+                .modal-close:hover { background: #e2e8f0; color: #1e293b; }
+                .modal-body { padding: 24px; }
             `}</style>
 
             <div className="back-bar">
                 <Link to="/admin/shops" className="back-btn">
                     <ArrowLeft size={16} /> <span>Back to Shops List</span>
                 </Link>
+
+                <button className="adjust-trigger-btn" onClick={() => setIsModalOpen(true)}>
+                    <Settings2 size={16} />
+                    <span>Adjust Monthly Usage</span>
+                </button>
             </div>
 
             {/* Action Feedback Area */}
@@ -326,20 +383,25 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="billing-form-grid" style={{ marginBottom: '32px' }}>
-                {/* Usage Adjustment Box */}
-                <div className="card-v3" style={{ border: '1px solid #1e293b33', gridColumn: 'span 2' }}>
-                    <div className="card-v3-header" style={{ background: 'linear-gradient(90deg, #fcfdfe 0%, #f1f5f9 100%)' }}>
-                        <History size={18} color="#1e293b" />
-                        Adjust Monthly Usage Records (Internal DB)
-                    </div>
-                    <div className="card-v3-body" style={{ display: 'flex', flexDirection: 'column' }}>
-                        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
-                            Manually update the "Charged Visitors" counter to correct errors or reset billing status in our internal database.
-                        </p>
-                        <Form method="post" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            <input type="hidden" name="intent" value="adjust_usage" />
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            {/* USAGE ADJUSTMENT MODAL */}
+            {isModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div className="modal-title">
+                                <History size={20} color="#1e293b" />
+                                Adjust Usage Data
+                            </div>
+                            <button className="modal-close" onClick={() => setIsModalOpen(false)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
+                                Manually update the "Charged Visitors" counter for a specific month in our internal database.
+                            </p>
+                            <Form method="post">
+                                <input type="hidden" name="intent" value="adjust_usage" />
                                 <div className="billing-input-group">
                                     <label>Select Month</label>
                                     <select name="yearMonth" className="billing-input" required>
@@ -353,16 +415,16 @@ export default function AdminShopDetail() {
                                     <label>Set Charged Visitors to:</label>
                                     <input type="number" name="chargedVisitors" placeholder="0" className="billing-input" required />
                                 </div>
-                            </div>
-                            <div style={{ marginTop: '20px' }}>
-                                <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Update Database <ChevronRight size={16} /></>}
-                                </button>
-                            </div>
-                        </Form>
+                                <div style={{ marginTop: '32px' }}>
+                                    <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Update Records <ChevronRight size={16} /></>}
+                                    </button>
+                                </div>
+                            </Form>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             <div className="stats-grid-v3">
                 <div className="premium-stat-card">
@@ -547,4 +609,3 @@ export default function AdminShopDetail() {
         </div>
     );
 }
-
