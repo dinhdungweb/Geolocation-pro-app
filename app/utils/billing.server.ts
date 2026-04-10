@@ -1,5 +1,6 @@
 import prisma from "../db.server";
 import { ALL_PAID_PLANS, FREE_PLAN, PLAN_LIMITS, OVERAGE_RATE } from "../billing.config";
+import { unauthenticated } from "../shopify.server";
 
 /**
  * Check and charge overage for a shop.
@@ -67,5 +68,53 @@ export async function checkAndChargeOverage(
         console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
     } catch (error) {
         console.error("[Billing] Failed to check/charge overage:", error);
+    }
+}
+
+/**
+ * Issue an application credit to a shop (Refund).
+ */
+export async function issueApplicationCredit(shop: string, amount: number, description: string) {
+    try {
+        const { admin } = await unauthenticated.admin(shop);
+
+        const response = await admin.graphql(
+            `#graphql
+            mutation applicationCreditCreate($description: String!, $amount: MoneyInput!) {
+              applicationCreditCreate(description: $description, amount: $amount) {
+                userErrors {
+                  field
+                  message
+                }
+                applicationCredit {
+                  id
+                  amount {
+                    amount
+                    currencyCode
+                  }
+                }
+              }
+            }`,
+            {
+                variables: {
+                    description,
+                    amount: {
+                        amount: amount.toString(),
+                        currencyCode: "USD",
+                    },
+                },
+            }
+        );
+
+        const data = await response.json();
+        if (data.data?.applicationCreditCreate?.userErrors?.length > 0) {
+            throw new Error(data.data.applicationCreditCreate.userErrors[0].message);
+        }
+
+        console.log(`[Billing] Issued $${amount} credit to ${shop}: ${description}`);
+        return { success: true, credit: data.data.applicationCreditCreate.applicationCredit };
+    } catch (error: any) {
+        console.error(`[Billing] Failed to issue credit to ${shop}:`, error);
+        return { success: false, error: error.message };
     }
 }

@@ -1,9 +1,10 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { Form, Link, useLoaderData } from "@remix-run/react";
+import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
 import { FREE_PLAN } from "../billing.config";
+import { issueApplicationCredit } from "../utils/billing.server";
 import { 
     ArrowLeft, 
     Eye, 
@@ -13,10 +14,54 @@ import {
     Calendar,
     Settings as SettingsIcon,
     History,
-    Globe
+    Globe,
+    CreditCard,
+    ChevronRight,
+    Loader2
 } from "lucide-react";
 
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+    await requireAdminAuth(request);
+    const shop = decodeURIComponent(params.shop ?? "");
+    const formData = await request.formData();
+    const intent = formData.get("intent");
+
+    if (intent === "issue_credit") {
+        const amount = parseFloat(formData.get("amount") as string);
+        const description = formData.get("description") as string;
+        
+        if (isNaN(amount) || amount <= 0) {
+            return json({ success: false, error: "Invalid amount" }, { status: 400 });
+        }
+
+        const result = await issueApplicationCredit(shop, amount, description);
+        return json(result);
+    }
+
+    if (intent === "adjust_usage") {
+        const yearMonth = formData.get("yearMonth") as string;
+        const chargedVisitors = parseInt(formData.get("chargedVisitors") as string);
+
+        if (isNaN(chargedVisitors) || !yearMonth) {
+            return json({ success: false, error: "Invalid input" }, { status: 400 });
+        }
+
+        try {
+            await (prisma as any).monthlyUsage.update({
+                where: { shop_yearMonth: { shop, yearMonth } },
+                data: { chargedVisitors }
+            });
+            return json({ success: true, message: "Usage adjusted successfully" });
+        } catch (e: any) {
+            return json({ success: false, error: e.message }, { status: 500 });
+        }
+    }
+
+    return json({ success: false, error: "Unknown intent" }, { status: 400 });
+};
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+// ... existing loader code ...
     await requireAdminAuth(request);
     const shop = decodeURIComponent(params.shop ?? "");
     if (!shop) throw redirect("/admin");
@@ -88,6 +133,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function AdminShopDetail() {
     const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan, currentPlan } = useLoaderData<typeof loader>();
+    const actionData = useActionData<any>();
+    const navigation = useNavigation();
+    const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
 
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString("en-GB", {
@@ -223,6 +271,27 @@ export default function AdminShopDetail() {
                 }
                 td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
                 .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block; }
+
+                /* Billing Forms */
+                .billing-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+                @media (max-width: 850px) { .billing-form-grid { grid-template-columns: 1fr; } }
+                
+                .billing-input-group { margin-bottom: 16px; }
+                .billing-input-group label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
+                .billing-input { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 14px; transition: all 0.2s; }
+                .billing-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+                
+                .primary-btn { 
+                    width: 100%; padding: 12px; background: #6366f1; color: white; border: none; border-radius: 10px;
+                    font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+                    transition: all 0.2s;
+                }
+                .primary-btn:hover { background: #4f46e5; }
+                .primary-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+                .alert { padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+                .alert-success { background: #ecfdf5; color: #059669; border: 1px solid #10b98133; }
+                .alert-error { background: #fef2f2; color: #ef4444; border: 1px solid #ef444433; }
             `}</style>
 
             <div className="back-bar">
@@ -230,6 +299,14 @@ export default function AdminShopDetail() {
                     <ArrowLeft size={16} /> <span>Back to Shops List</span>
                 </Link>
             </div>
+
+            {/* Action Feedback Area */}
+            {actionData && (
+                <div className={`alert ${actionData.success ? 'alert-success' : 'alert-error'}`}>
+                    {actionData.success ? <Zap size={16} /> : <ShieldAlert size={16} />}
+                    <span>{actionData.success ? (actionData.message || "Action completed successfully") : actionData.error}</span>
+                </div>
+            )}
 
             <div className="hero-section">
                 <div className="hero-content">
@@ -246,6 +323,66 @@ export default function AdminShopDetail() {
                 <div className="plan-badge-premium">
                     <Zap size={14} fill={hasProPlan ? "#059669" : "none"} />
                     {currentPlan.toUpperCase()}
+                </div>
+            </div>
+
+            {/* NEW: Billing Management Section */}
+            <div className="card-v3" style={{ marginBottom: '32px', border: '1px solid #6366f133', background: '#f8fafc55' }}>
+                <div className="card-v3-header" style={{ background: 'linear-gradient(90deg, #fcfdfe 0%, #eef2ff 100%)' }}>
+                    <CreditCard size={18} color="#6366f1" />
+                    Billing & Refund Management
+                </div>
+                <div className="card-v3-body">
+                    <div className="billing-form-grid">
+                        {/* Refund/Credit Form */}
+                        <div style={{ padding: '4px' }}>
+                            <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, color: '#1e293b' }}>Issue Application Credit (Refund)</h3>
+                            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
+                                This will add a credit to the merchant's Shopify account to be deducted from their next invoice.
+                            </p>
+                            <Form method="post">
+                                <input type="hidden" name="intent" value="issue_credit" />
+                                <div className="billing-input-group">
+                                    <label>Amount (USD)</label>
+                                    <input type="number" step="0.01" name="amount" placeholder="0.00" className="billing-input" required />
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Reason / Description</label>
+                                    <input type="text" name="description" placeholder="Refund for overbilling due to visit event duplication" className="billing-input" required />
+                                </div>
+                                <button type="submit" className="primary-btn" disabled={isSubmitting}>
+                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Issue Credit <ChevronRight size={16} /></>}
+                                </button>
+                            </Form>
+                        </div>
+
+                        {/* Usage Adjustment Form */}
+                        <div style={{ padding: '4px', borderLeft: '1px solid #e2e8f0', paddingLeft: '24px' }}>
+                            <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, color: '#1e293b' }}>Adjust Monthly Usage Records</h3>
+                            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
+                                Manually update the "Charged Visitors" counter to correct errors or reset monthly billing status in our DB.
+                            </p>
+                            <Form method="post">
+                                <input type="hidden" name="intent" value="adjust_usage" />
+                                <div className="billing-input-group">
+                                    <label>Select Month</label>
+                                    <select name="yearMonth" className="billing-input" required>
+                                        <option value="">-- Select Month --</option>
+                                        {monthlyUsage.map((u: any) => (
+                                            <option key={u.id} value={u.yearMonth}>{u.yearMonth} (Logged: {u.totalVisitors})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Set Charged Visitors to:</label>
+                                    <input type="number" name="chargedVisitors" placeholder="0" className="billing-input" required />
+                                </div>
+                                <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>
+                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Update Database <ChevronRight size={16} /></>}
+                                </button>
+                            </Form>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -343,6 +480,7 @@ export default function AdminShopDetail() {
                                         <div className="month-stats">
                                             <span><b>{u.totalVisitors.toLocaleString()}</b> views</span>
                                             <span><b>{u.redirected}</b> redirs</span>
+                                            <span>(Charged: <b>{u.chargedVisitors.toLocaleString()}</b>)</span>
                                         </div>
                                     </div>
                                 ))
