@@ -335,12 +335,12 @@ export default function AdminShopDetail() {
                 <div className="card-v3-body">
                     <div className="billing-form-grid">
                         {/* Refund/Credit Form */}
-                        <div style={{ padding: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, color: '#1e293b' }}>Issue Application Credit (Refund)</h3>
-                            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
+                            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px', minHeight: '36px' }}>
                                 This will add a credit to the merchant's Shopify account to be deducted from their next invoice.
                             </p>
-                            <Form method="post">
+                            <Form method="post" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                 <input type="hidden" name="intent" value="issue_credit" />
                                 <div className="billing-input-group">
                                     <label>Amount (USD)</label>
@@ -350,19 +350,21 @@ export default function AdminShopDetail() {
                                     <label>Reason / Description</label>
                                     <input type="text" name="description" placeholder="Refund for overbilling due to visit event duplication" className="billing-input" required />
                                 </div>
-                                <button type="submit" className="primary-btn" disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Issue Credit <ChevronRight size={16} /></>}
-                                </button>
+                                <div style={{ marginTop: 'auto' }}>
+                                    <button type="submit" className="primary-btn" disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Issue Credit <ChevronRight size={16} /></>}
+                                    </button>
+                                </div>
                             </Form>
                         </div>
 
                         {/* Usage Adjustment Form */}
-                        <div style={{ padding: '4px', borderLeft: '1px solid #e2e8f0', paddingLeft: '24px' }}>
+                        <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: '24px', display: 'flex', flexDirection: 'column' }}>
                             <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, color: '#1e293b' }}>Adjust Monthly Usage Records</h3>
-                            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
+                            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px', minHeight: '36px' }}>
                                 Manually update the "Charged Visitors" counter to correct errors or reset monthly billing status in our DB.
                             </p>
-                            <Form method="post">
+                            <Form method="post" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                 <input type="hidden" name="intent" value="adjust_usage" />
                                 <div className="billing-input-group">
                                     <label>Select Month</label>
@@ -377,9 +379,11 @@ export default function AdminShopDetail() {
                                     <label>Set Charged Visitors to:</label>
                                     <input type="number" name="chargedVisitors" placeholder="0" className="billing-input" required />
                                 </div>
-                                <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Update Database <ChevronRight size={16} /></>}
-                                </button>
+                                <div style={{ marginTop: 'auto' }}>
+                                    <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Update Database <ChevronRight size={16} /></>}
+                                    </button>
+                                </div>
                             </Form>
                         </div>
                     </div>
