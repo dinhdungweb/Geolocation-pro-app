@@ -327,61 +327,34 @@ export default function AdminShopDetail() {
             </div>
 
             <div className="billing-form-grid" style={{ marginBottom: '32px' }}>
-                {/* Refund/Credit Box */}
-                <div className="card-v3" style={{ border: '1px solid #6366f133' }}>
-                    <div className="card-v3-header" style={{ background: 'linear-gradient(90deg, #fcfdfe 0%, #eef2ff 100%)' }}>
-                        <CreditCard size={18} color="#6366f1" />
-                        Issue Application Credit (Refund)
-                    </div>
-                    <div className="card-v3-body" style={{ display: 'flex', flexDirection: 'column' }}>
-                        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px', minHeight: '36px' }}>
-                            Add a credit to the merchant's Shopify account to be deducted from their next invoice.
-                        </p>
-                        <Form method="post" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            <input type="hidden" name="intent" value="issue_credit" />
-                            <div className="billing-input-group">
-                                <label>Amount (USD)</label>
-                                <input type="number" step="0.01" name="amount" placeholder="0.00" className="billing-input" required />
-                            </div>
-                            <div className="billing-input-group">
-                                <label>Reason / Description</label>
-                                <input type="text" name="description" placeholder="Refund for overbilling..." className="billing-input" required />
-                            </div>
-                            <div style={{ marginTop: 'auto' }}>
-                                <button type="submit" className="primary-btn" disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Issue Credit <ChevronRight size={16} /></>}
-                                </button>
-                            </div>
-                        </Form>
-                    </div>
-                </div>
-
                 {/* Usage Adjustment Box */}
-                <div className="card-v3" style={{ border: '1px solid #1e293b33' }}>
+                <div className="card-v3" style={{ border: '1px solid #1e293b33', gridColumn: 'span 2' }}>
                     <div className="card-v3-header" style={{ background: 'linear-gradient(90deg, #fcfdfe 0%, #f1f5f9 100%)' }}>
                         <History size={18} color="#1e293b" />
-                        Adjust Monthly Usage Records
+                        Adjust Monthly Usage Records (Internal DB)
                     </div>
                     <div className="card-v3-body" style={{ display: 'flex', flexDirection: 'column' }}>
-                        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px', minHeight: '36px' }}>
-                            Manually update the "Charged Visitors" counter to correct errors or reset billing status in our DB.
+                        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
+                            Manually update the "Charged Visitors" counter to correct errors or reset billing status in our internal database.
                         </p>
                         <Form method="post" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                             <input type="hidden" name="intent" value="adjust_usage" />
-                            <div className="billing-input-group">
-                                <label>Select Month</label>
-                                <select name="yearMonth" className="billing-input" required>
-                                    <option value="">-- Select Month --</option>
-                                    {monthlyUsage.map((u: any) => (
-                                        <option key={u.id} value={u.yearMonth}>{u.yearMonth} (Logged: {u.totalVisitors})</option>
-                                    ))}
-                                </select>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <div className="billing-input-group">
+                                    <label>Select Month</label>
+                                    <select name="yearMonth" className="billing-input" required>
+                                        <option value="">-- Select Month --</option>
+                                        {monthlyUsage.map((u: any) => (
+                                            <option key={u.id} value={u.yearMonth}>{u.yearMonth} (Logged: {u.totalVisitors})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Set Charged Visitors to:</label>
+                                    <input type="number" name="chargedVisitors" placeholder="0" className="billing-input" required />
+                                </div>
                             </div>
-                            <div className="billing-input-group">
-                                <label>Set Charged Visitors to:</label>
-                                <input type="number" name="chargedVisitors" placeholder="0" className="billing-input" required />
-                            </div>
-                            <div style={{ marginTop: 'auto' }}>
+                            <div style={{ marginTop: '20px' }}>
                                 <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>
                                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Update Database <ChevronRight size={16} /></>}
                                 </button>
