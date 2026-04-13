@@ -611,10 +611,27 @@
             return;
           }
           
-          log('Redirecting due to IP rule:', matchingIPRule.name);
-          trackEvent('ip_redirected', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
-          window.location.href = matchingIPRule.targetUrl;
-          return;
+          // Determine effective mode - favor rule setting, fallback to global mode
+          const effectiveMode = matchingIPRule.redirectMode || config.mode || 'popup';
+          log('Effective IP redirect mode:', effectiveMode);
+
+          // Check cookie - ONLY for popup mode
+          if (effectiveMode === 'popup' && CookieManager.has('geo_choice')) {
+            log('User preference found, skipping IP popup');
+            return;
+          }
+
+          if (effectiveMode === 'auto_redirect') {
+            log('Redirecting due to IP rule:', matchingIPRule.name);
+            trackEvent('ip_redirected', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
+            window.location.href = matchingIPRule.targetUrl;
+            return;
+          } else {
+            log('Showing popup for IP rule');
+            trackEvent('popup_shown', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
+            showPopup(config, matchingIPRule, countryCode);
+            return;
+          }
         }
       }
     }

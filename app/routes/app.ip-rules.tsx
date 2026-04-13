@@ -17,6 +17,7 @@ import {
     FormLayout,
     InlineStack,
     EmptyState,
+    Select,
     useBreakpoints,
     Tag,
     LegacyStack,
@@ -36,6 +37,7 @@ interface IPRule {
     isActive: boolean;
     priority: number;
     ruleType: string;
+    redirectMode: string;
 }
 
 // Loader: Fetch all IP rules for the current shop
@@ -89,6 +91,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "block";
+            const redirectMode = formData.get("redirectMode") as string || "popup";
 
             await prisma.redirectRule.create({
                 data: {
@@ -101,6 +104,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     isActive: true,
                     ruleType,
+                    redirectMode,
                 },
             });
             return json({ success: true, message: "IP Rule created successfully" });
@@ -116,6 +120,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "block";
+            const redirectMode = formData.get("redirectMode") as string || "popup";
 
             await prisma.redirectRule.update({
                 where: { id, shop },
@@ -125,6 +130,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     targetUrl,
                     priority,
                     ruleType,
+                    redirectMode,
                 },
             });
             return json({ success: true, message: "IP Rule updated successfully" });
@@ -169,6 +175,7 @@ export default function IPRulesPage() {
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("block");
+    const [formRedirectMode, setFormRedirectMode] = useState("popup");
 
     const { smUp } = useBreakpoints();
     const [mounted, setMounted] = useState(false);
@@ -199,6 +206,7 @@ export default function IPRulesPage() {
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("block");
+            setFormRedirectMode("popup");
         }
     }, [editingRule, modalOpen]);
 
@@ -228,12 +236,13 @@ export default function IPRulesPage() {
         formData.append("targetUrl", formTargetUrl);
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
+        formData.append("redirectMode", formRedirectMode);
 
         fetcher.submit(formData, { method: "POST" });
         handleCloseModal();
     }, [
         editingRule, formName, formIPAddresses, formTargetUrl, formPriority,
-        formRuleType, fetcher, handleCloseModal
+        formRuleType, formRedirectMode, fetcher, handleCloseModal
     ]);
 
     const handleToggle = useCallback(
@@ -293,6 +302,11 @@ export default function IPRulesPage() {
                     ) : (
                         <>
                             <Badge tone="warning">Redirect</Badge>
+                            <span style={{ marginLeft: 4 }}>
+                                <Badge tone="info" size="small">
+                                    {rule.redirectMode === "popup" ? "Popup" : "Auto"}
+                                </Badge>
+                            </span>
                             <span style={{ marginLeft: 8 }}>{rule.targetUrl}</span>
                         </>
                     )}
@@ -470,14 +484,26 @@ export default function IPRulesPage() {
                         </BlockStack>
 
                         {formRuleType === "redirect" && (
-                            <TextField
-                                label="Target URL"
-                                value={formTargetUrl}
-                                onChange={setFormTargetUrl}
-                                placeholder="https://example.com/blocked"
-                                helpText="URL to redirect matching IPs to"
-                                autoComplete="off"
-                            />
+                            <BlockStack gap="400">
+                                <TextField
+                                    label="Target URL"
+                                    value={formTargetUrl}
+                                    onChange={setFormTargetUrl}
+                                    placeholder="https://example.com/blocked"
+                                    helpText="URL to redirect matching IPs to"
+                                    autoComplete="off"
+                                />
+                                <Select
+                                    label="Redirect Method"
+                                    options={[
+                                        { label: "Popup (Recommended)", value: "popup" },
+                                        { label: "Auto Redirect", value: "auto_redirect" },
+                                    ]}
+                                    value={formRedirectMode}
+                                    onChange={setFormRedirectMode}
+                                    helpText="Auto Redirect may affect SEO. Popup is safer for search engines."
+                                />
+                            </BlockStack>
                         )}
 
                         <TextField

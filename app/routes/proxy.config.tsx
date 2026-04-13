@@ -150,6 +150,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 targetUrl: true,
                 priority: true,
                 ruleType: true,
+                redirectMode: true,
             },
         });
 
@@ -296,6 +297,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ips: rule.ipAddresses.split(",").map((ip) => ip.trim()),
             targetUrl: rule.targetUrl,
             ruleType: rule.ruleType,
+            redirectMode: rule.redirectMode,
             priority: rule.priority,
         }));
 
