@@ -214,12 +214,6 @@ export default function SettingsPage() {
         cookieDuration, fetcher, isEnabled
     ]);
 
-    const modeOptions = [
-        { label: "Popup (Recommended)", value: "popup" },
-        { label: "Auto Redirect", value: "auto_redirect" },
-        { label: "Disabled", value: "disabled" },
-    ];
-
     const templateOptions = [
         { label: "Modal (Centered)", value: "modal" },
         { label: "Top Bar", value: "top_bar" },
@@ -247,7 +241,6 @@ export default function SettingsPage() {
                     </CalloutCard>
                 )}
                 <Layout>
-                    {/* Application Status */}
                     <Layout.Section>
                         <Card>
                             <BlockStack gap="400">
@@ -270,248 +263,242 @@ export default function SettingsPage() {
                     </Layout.Section>
                 </Layout>
 
-                {/* Always show customization settings if enabled */}
                 {isEnabled && (
                     <>
                         <Layout>
-                        <Layout.Section>
-                            <Card>
-                                <BlockStack gap="400">
-                                    <Text as="h2" variant="headingMd">
-                                        Popup Appearance
-                                    </Text>
-                                    <Select
-                                        label="Template Design"
-                                        options={templateOptions}
-                                        value={template}
-                                        onChange={setTemplate}
-                                        helpText="Choose how the popup appears on the visitor's screen."
-                                    />
-                                    <Divider />
-                                    <Text as="h2" variant="headingMd">
-                                        Popup Customization
-                                    </Text>
-                                    <TextField
-                                        label="Popup Title"
-                                        value={popupTitle}
-                                        onChange={setPopupTitle}
-                                        autoComplete="off"
-                                    />
-                                    <TextField
-                                        label="Popup Message"
-                                        value={popupMessage}
-                                        onChange={setPopupMessage}
-                                        helpText="Use {country} for visitor's country and {target} for target store name"
-                                        multiline={2}
-                                        autoComplete="off"
-                                    />
-                                    <InlineStack gap="400">
-                                        <TextField
-                                            label="Confirm Button Text"
-                                            value={confirmBtnText}
-                                            onChange={setConfirmBtnText}
-                                            autoComplete="off"
-                                        />
-                                        <TextField
-                                            label="Cancel Button Text"
-                                            value={cancelBtnText}
-                                            onChange={setCancelBtnText}
-                                            autoComplete="off"
-                                        />
-                                    </InlineStack>
-                                    <Divider />
-                                    <Text as="h3" variant="headingSm">
-                                        Colors
-                                    </Text>
-                                    <InlineStack gap="400">
-                                        <TextField
-                                            label="Background Color"
-                                            value={popupBgColor}
-                                            onChange={setPopupBgColor}
-                                            placeholder="#ffffff"
-                                            autoComplete="off"
-                                        />
-                                        <TextField
-                                            label="Text Color"
-                                            value={popupTextColor}
-                                            onChange={setPopupTextColor}
-                                            placeholder="#333333"
-                                            autoComplete="off"
-                                        />
-                                        <TextField
-                                            label="Button Color"
-                                            value={popupBtnColor}
-                                            onChange={setPopupBtnColor}
-                                            placeholder="#007bff"
-                                            autoComplete="off"
-                                        />
-                                    </InlineStack>
-                                </BlockStack>
-                            </Card>
-                        </Layout.Section>
-
-                        {/* Preview Section - Side by Side with options */}
-                        <Layout.Section variant="oneThird">
-                            <div style={{ position: 'sticky', top: '20px' }}>
+                            <Layout.Section>
                                 <Card>
                                     <BlockStack gap="400">
                                         <Text as="h2" variant="headingMd">
-                                            Popup Preview
+                                            Popup Appearance
                                         </Text>
-                                        <div
-                                            style={{
-                                                position: "relative",
-                                                height: "300px",
-                                                backgroundColor: "#f4f6f8",
-                                                border: "1px solid #ddd",
-                                                borderRadius: "8px",
-                                                overflow: "hidden",
-                                                display: "flex",
-                                                alignItems: template === "modal" ? "center" : (template === "top_bar" ? "flex-start" : "flex-end"),
-                                                justifyContent: "center",
-                                            }}
-                                        >
-                                            {/* Mock Page Content */}
-                                            <div style={{ position: "absolute", top: 20, left: 20, right: 20, bottom: 20, opacity: 0.3 }}>
-                                                <div style={{ height: "20px", width: "100px", background: "#ccc", marginBottom: "20px" }}></div>
-                                                <div style={{ height: "150px", width: "100%", background: "#ccc", marginBottom: "20px" }}></div>
-                                                <div style={{ height: "20px", width: "80%", background: "#ccc" }}></div>
-                                            </div>
-
-                                            {/* Preview Element */}
-                                            <div
-                                                style={{
-                                                    padding: template === "modal" ? "20px" : "12px 20px",
-                                                    borderRadius: template === "modal" ? "8px" : "0",
-                                                    backgroundColor: popupBgColor,
-                                                    color: popupTextColor,
-                                                    width: template === "modal" ? "90%" : "100%",
-                                                    maxWidth: template === "modal" ? "300px" : "100%",
-                                                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                                                    display: "flex",
-                                                    flexDirection: template === "modal" ? "column" : "row",
-                                                    alignItems: "center",
-                                                    gap: "10px",
-                                                    justifyContent: template === "modal" ? "center" : "space-between",
-                                                    textAlign: template === "modal" ? "center" : "left",
-                                                    border: template === "modal" ? "1px solid #ddd" : "none",
-                                                    zIndex: 10,
-                                                }}
-                                            >
-                                                <div style={{ flex: 1 }}>
-                                                    {template === "modal" && (
-                                                        <Text as="h3" variant="headingMd" fontWeight="bold">
-                                                            {popupTitle}
-                                                        </Text>
-                                                    )}
-                                                    <p style={{ margin: template === "modal" ? "10px 0" : "0", fontSize: template === "modal" ? "14px" : "13px" }}>
-                                                        {template !== "modal" && <strong style={{ marginRight: 5 }}>{popupTitle}</strong>}
-                                                        {popupMessage
-                                                            .replace("{country}", "US")
-                                                            .replace("{target}", "US Store")}
-                                                    </p>
-                                                </div>
-
-                                                <InlineStack gap="200">
-                                                    <button
-                                                        style={{
-                                                            backgroundColor: popupBtnColor,
-                                                            color: "#fff",
-                                                            border: "none",
-                                                            padding: template === "modal" ? "8px 16px" : "6px 12px",
-                                                            borderRadius: "4px",
-                                                            cursor: "pointer",
-                                                            fontSize: "13px",
-                                                            whiteSpace: "nowrap",
-                                                        }}
-                                                    >
-                                                        {confirmBtnText}
-                                                    </button>
-                                                    <button
-                                                        style={{
-                                                            backgroundColor: "transparent",
-                                                            border: `1px solid ${popupTextColor}`,
-                                                            color: popupTextColor,
-                                                            padding: template === "modal" ? "8px 16px" : "6px 12px",
-                                                            borderRadius: "4px",
-                                                            cursor: "pointer",
-                                                            fontSize: "13px",
-                                                            whiteSpace: "nowrap",
-                                                        }}
-                                                    >
-                                                        {cancelBtnText}
-                                                    </button>
-                                                </InlineStack>
-                                            </div>
-                                        </div>
-                                        <Text as="p" tone="subdued">
-                                            Preview shows how the popup will appear relative to the screen.
+                                        <Select
+                                            label="Template Design"
+                                            options={templateOptions}
+                                            value={template}
+                                            onChange={setTemplate}
+                                            helpText="Choose how the popup appears on the visitor's screen."
+                                        />
+                                        <Divider />
+                                        <Text as="h2" variant="headingMd">
+                                            Popup Customization
                                         </Text>
+                                        <TextField
+                                            label="Popup Title"
+                                            value={popupTitle}
+                                            onChange={setPopupTitle}
+                                            autoComplete="off"
+                                        />
+                                        <TextField
+                                            label="Popup Message"
+                                            value={popupMessage}
+                                            onChange={setPopupMessage}
+                                            helpText="Use {country} for visitor's country and {target} for target store name"
+                                            multiline={2}
+                                            autoComplete="off"
+                                        />
+                                        <InlineStack gap="400">
+                                            <TextField
+                                                label="Confirm Button Text"
+                                                value={confirmBtnText}
+                                                onChange={setConfirmBtnText}
+                                                autoComplete="off"
+                                            />
+                                            <TextField
+                                                label="Cancel Button Text"
+                                                value={cancelBtnText}
+                                                onChange={setCancelBtnText}
+                                                autoComplete="off"
+                                            />
+                                        </InlineStack>
+                                        <Divider />
+                                        <Text as="h3" variant="headingSm">
+                                            Colors
+                                        </Text>
+                                        <InlineStack gap="400">
+                                            <TextField
+                                                label="Background Color"
+                                                value={popupBgColor}
+                                                onChange={setPopupBgColor}
+                                                placeholder="#ffffff"
+                                                autoComplete="off"
+                                            />
+                                            <TextField
+                                                label="Text Color"
+                                                value={popupTextColor}
+                                                onChange={setPopupTextColor}
+                                                placeholder="#333333"
+                                                autoComplete="off"
+                                            />
+                                            <TextField
+                                                label="Button Color"
+                                                value={popupBtnColor}
+                                                onChange={setPopupBtnColor}
+                                                placeholder="#007bff"
+                                                autoComplete="off"
+                                            />
+                                        </InlineStack>
                                     </BlockStack>
                                 </Card>
-                            </div>
-                        </Layout.Section>
-                    </Layout>
-                    <Layout>
-                        <Layout.Section>
-                            <Card>
-                                <BlockStack gap="400">
-                                    <Text as="h2" variant="headingMd">
-                                        Blocked Page Appearance
-                                    </Text>
-                                    <TextField
-                                    label="Blocked Title"
-                                    value={blockedTitle}
-                                    onChange={setBlockedTitle}
-                                    placeholder="Access Denied"
-                                    autoComplete="off"
-                                />
-                                <TextField
-                                    label="Blocked Message"
-                                    value={blockedMessage}
-                                    onChange={setBlockedMessage}
-                                    placeholder="We do not offer services in your country/region."
-                                    multiline={2}
-                                    autoComplete="off"
-                                />
-                            </BlockStack>
-                        </Card>
-                    </Layout.Section>
+                            </Layout.Section>
 
-                    {/* Advanced Settings */}
-                    <Layout.Section>
-                        <Card>
-                            <BlockStack gap="400">
-                                <Text as="h2" variant="headingMd">
-                                    Advanced Settings
-                                </Text>
-                                <Checkbox
-                                    label="Exclude Search Engine Bots"
-                                    checked={excludeBots}
-                                    onChange={setExcludeBots}
-                                    helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
-                                />
-                                <TextField
-                                    label="Excluded IP Addresses"
-                                    value={excludedIPs}
-                                    onChange={setExcludedIPs}
-                                    placeholder="192.168.1.1, 10.0.0.1"
-                                    helpText="Comma-separated list of IP addresses to exclude from redirection"
-                                    autoComplete="off"
-                                />
-                                {mode === "popup" && (
-                                    <TextField
-                                        label="Cookie Duration (days)"
-                                        type="number"
-                                        value={cookieDuration}
-                                        onChange={setCookieDuration}
-                                        helpText="How long to remember visitor's preference (only for Popup mode)"
-                                        autoComplete="off"
-                                    />
-                                )}
-                            </BlockStack>
-                        </Card>
-                    </Layout.Section>
+                            <Layout.Section variant="oneThird">
+                                <div style={{ position: 'sticky', top: '20px' }}>
+                                    <Card>
+                                        <BlockStack gap="400">
+                                            <Text as="h2" variant="headingMd">
+                                                Popup Preview
+                                            </Text>
+                                            <div
+                                                style={{
+                                                    position: "relative",
+                                                    height: "300px",
+                                                    backgroundColor: "#f4f6f8",
+                                                    border: "1px solid #ddd",
+                                                    borderRadius: "8px",
+                                                    overflow: "hidden",
+                                                    display: "flex",
+                                                    alignItems: template === "modal" ? "center" : (template === "top_bar" ? "flex-start" : "flex-end"),
+                                                    justifyContent: "center",
+                                                }}
+                                            >
+                                                <div style={{ position: "absolute", top: 20, left: 20, right: 20, bottom: 20, opacity: 0.3 }}>
+                                                    <div style={{ height: "20px", width: "100px", background: "#ccc", marginBottom: "20px" }}></div>
+                                                    <div style={{ height: "150px", width: "100%", background: "#ccc", marginBottom: "20px" }}></div>
+                                                    <div style={{ height: "20px", width: "80%", background: "#ccc" }}></div>
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        padding: template === "modal" ? "20px" : "12px 20px",
+                                                        borderRadius: template === "modal" ? "8px" : "0",
+                                                        backgroundColor: popupBgColor,
+                                                        color: popupTextColor,
+                                                        width: template === "modal" ? "90%" : "100%",
+                                                        maxWidth: template === "modal" ? "300px" : "100%",
+                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                                        display: "flex",
+                                                        flexDirection: template === "modal" ? "column" : "row",
+                                                        alignItems: "center",
+                                                        gap: "10px",
+                                                        justifyContent: template === "modal" ? "center" : "space-between",
+                                                        textAlign: template === "modal" ? "center" : "left",
+                                                        border: template === "modal" ? "1px solid #ddd" : "none",
+                                                        zIndex: 10,
+                                                    }}
+                                                >
+                                                    <div style={{ flex: 1 }}>
+                                                        {template === "modal" && (
+                                                            <Text as="h3" variant="headingMd" fontWeight="bold">
+                                                                {popupTitle}
+                                                            </Text>
+                                                        )}
+                                                        <p style={{ margin: template === "modal" ? "10px 0" : "0", fontSize: template === "modal" ? "14px" : "13px" }}>
+                                                            {template !== "modal" && <strong style={{ marginRight: 5 }}>{popupTitle}</strong>}
+                                                            {popupMessage
+                                                                .replace("{country}", "US")
+                                                                .replace("{target}", "US Store")}
+                                                        </p>
+                                                    </div>
+
+                                                    <InlineStack gap="200">
+                                                        <button
+                                                            style={{
+                                                                backgroundColor: popupBtnColor,
+                                                                color: "#fff",
+                                                                border: "none",
+                                                                padding: template === "modal" ? "8px 16px" : "6px 12px",
+                                                                borderRadius: "4px",
+                                                                cursor: "pointer",
+                                                                fontSize: "13px",
+                                                                whiteSpace: "nowrap",
+                                                            }}
+                                                        >
+                                                            {confirmBtnText}
+                                                        </button>
+                                                        <button
+                                                            style={{
+                                                                backgroundColor: "transparent",
+                                                                border: `1px solid ${popupTextColor}`,
+                                                                color: popupTextColor,
+                                                                padding: template === "modal" ? "8px 16px" : "6px 12px",
+                                                                borderRadius: "4px",
+                                                                cursor: "pointer",
+                                                                fontSize: "13px",
+                                                                whiteSpace: "nowrap",
+                                                            }}
+                                                        >
+                                                            {cancelBtnText}
+                                                        </button>
+                                                    </InlineStack>
+                                                </div>
+                                            </div>
+                                            <Text as="p" tone="subdued">
+                                                Preview shows how the popup will appear relative to the screen.
+                                            </Text>
+                                        </BlockStack>
+                                    </Card>
+                                </div>
+                            </Layout.Section>
+                        </Layout>
+
+                        <Layout>
+                            <Layout.Section>
+                                <Card>
+                                    <BlockStack gap="400">
+                                        <Text as="h2" variant="headingMd">
+                                            Blocked Page Appearance
+                                        </Text>
+                                        <TextField
+                                            label="Blocked Title"
+                                            value={blockedTitle}
+                                            onChange={setBlockedTitle}
+                                            placeholder="Access Denied"
+                                            autoComplete="off"
+                                        />
+                                        <TextField
+                                            label="Blocked Message"
+                                            value={blockedMessage}
+                                            onChange={setBlockedMessage}
+                                            placeholder="We do not offer services in your country/region."
+                                            multiline={2}
+                                            autoComplete="off"
+                                        />
+                                    </BlockStack>
+                                </Card>
+                            </Layout.Section>
+
+                            <Layout.Section>
+                                <Card>
+                                    <BlockStack gap="400">
+                                        <Text as="h2" variant="headingMd">
+                                            Advanced Settings
+                                        </Text>
+                                        <Checkbox
+                                            label="Exclude Search Engine Bots"
+                                            checked={excludeBots}
+                                            onChange={setExcludeBots}
+                                            helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
+                                        />
+                                        <TextField
+                                            label="Excluded IP Addresses"
+                                            value={excludedIPs}
+                                            onChange={setExcludedIPs}
+                                            placeholder="192.168.1.1, 10.0.0.1"
+                                            helpText="Comma-separated list of IP addresses to exclude from redirection"
+                                            autoComplete="off"
+                                        />
+                                        <TextField
+                                            label="Cookie Duration (days)"
+                                            type="number"
+                                            value={cookieDuration}
+                                            onChange={setCookieDuration}
+                                            helpText="How long to remember visitor's preference (only for rules using Popup mode)"
+                                            autoComplete="off"
+                                        />
+                                    </BlockStack>
+                                </Card>
+                            </Layout.Section>
                         </Layout>
                     </>
                 )}
