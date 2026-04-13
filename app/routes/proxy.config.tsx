@@ -90,6 +90,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     try {
         // Fetch settings for the shop
         const settings = await (prisma as any).settings.findUnique({
+            where: { shop },
             select: {
                 isEnabled: true,
                 mode: true,
@@ -221,6 +222,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         // If no settings found, auto-create default settings so app works immediately
         const effectiveSettings = settings ?? await (prisma as any).settings.create({
             data: { shop },
+            select: {
                 isEnabled: true,
                 mode: true,
                 popupTitle: true, popupMessage: true,
