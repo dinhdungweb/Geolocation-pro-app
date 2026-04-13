@@ -19,19 +19,6 @@ export default function App() {
         />
         <Meta />
         <Links />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.$crisp=[];
-              window.CRISP_WEBSITE_ID="b882709c-9f60-4bf7-b823-0f6bc6196f4a";
-              (function(){
-                d=document;s=d.createElement("script");
-                s.src="https://client.crisp.chat/l.js";
-                s.async=1;d.getElementsByTagName("head")[0].appendChild(s);
-              })();
-            `,
-          }}
-        />
       </head>
       <body>
         <Outlet />

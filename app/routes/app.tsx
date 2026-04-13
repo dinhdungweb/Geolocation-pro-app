@@ -22,7 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Lazy cleanup: delete old visitor logs (fire-and-forget, max 1x/day)
   cleanupOldLogs().catch(() => { });
 
-  // Get shop info for Crisp Support
+  // Lấy thông tin shop để hiển thị trong Crisp
   const { admin } = await authenticate.admin(request);
   const response = await admin.graphql(`
     #graphql
@@ -46,16 +46,31 @@ export default function App() {
   const { apiKey, shopInfo } = useLoaderData<typeof loader>();
 
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).$crisp && shopInfo) {
-      const crisp = (window as any).$crisp;
+    // Chỉ chạy ở phía Client
+    if (typeof window !== "undefined") {
+      // 1. Khởi tạo Crisp
+      (window as any).$crisp = [];
+      (window as any).CRISP_WEBSITE_ID = "b882709c-9f60-4bf7-b823-0f6bc6196f4a";
       
-      // Identify the merchant
-      crisp.push(["set", "user:email", [shopInfo.email]]);
-      crisp.push(["set", "user:nickname", [shopInfo.name]]);
-      crisp.push(["set", "session:data", [[["shop_domain", shopInfo.myshopifyDomain]]]]);
-      
-      // Ép khung chat hiển thị nếu nó bị ẩn hoặc bị treo
-      crisp.push(["do", "chat:show"]);
+      const d = document;
+      const s = d.createElement("script");
+      s.src = "https://client.crisp.chat/l.js";
+      s.async = true;
+      d.getElementsByTagName("head")[0].appendChild(s);
+
+      // 2. Nhận diện Shop khi script đã tải xong
+      const handleIdentify = () => {
+        if ((window as any).$crisp && shopInfo) {
+          const crisp = (window as any).$crisp;
+          crisp.push(["set", "user:email", [shopInfo.email]]);
+          crisp.push(["set", "user:nickname", [shopInfo.name]]);
+          crisp.push(["set", "session:data", [[["shop", shopInfo.myshopifyDomain]]]]);
+          crisp.push(["do", "chat:show"]);
+        }
+      };
+
+      // Đợi một chút để Crisp init hoàn toàn
+      setTimeout(handleIdentify, 1000);
     }
   }, [shopInfo]);
 
