@@ -1,5 +1,6 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
+import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -21,11 +22,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Lazy cleanup: delete old visitor logs (fire-and-forget, max 1x/day)
   cleanupOldLogs().catch(() => { });
 
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  // Get shop info for Crisp Support
+  const { admin } = await authenticate.admin(request);
+  const response = await admin.graphql(`
+    #graphql
+    query getShopInfo {
+      shop {
+        name
+        email
+        myshopifyDomain
+      }
+    }
+  `);
+  const { data: { shop: shopData } } = await response.json();
+
+  return { 
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    shopInfo: shopData
+  };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, shopInfo } = useLoaderData<typeof loader>();
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).$crisp && shopInfo) {
+      const crisp = (window as any).$crisp;
+      // Identify the merchant
+      crisp.push(["set", "user:email", [shopInfo.email]]);
+      crisp.push(["set", "user:nickname", [shopInfo.name]]);
+      // Store shop domain as session data for easy filtering
+      crisp.push(["set", "session:data", [[["shop_domain", shopInfo.myshopifyDomain]]]]);
+    }
+  }, [shopInfo]);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
