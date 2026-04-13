@@ -272,7 +272,8 @@ export default function SettingsPage() {
 
                 {/* Always show customization settings if enabled */}
                 {isEnabled && (
-                    <Layout>
+                    <>
+                        <Layout>
                         <Layout.Section>
                             <Card>
                                 <BlockStack gap="400">
@@ -451,16 +452,14 @@ export default function SettingsPage() {
                             </div>
                         </Layout.Section>
                     </Layout>
-                )}
-
-                <Layout>
-                    <Layout.Section>
-                        <Card>
-                            <BlockStack gap="400">
-                                <Text as="h2" variant="headingMd">
-                                    Blocked Page Appearance
-                                </Text>
-                                <TextField
+                    <Layout>
+                        <Layout.Section>
+                            <Card>
+                                <BlockStack gap="400">
+                                    <Text as="h2" variant="headingMd">
+                                        Blocked Page Appearance
+                                    </Text>
+                                    <TextField
                                     label="Blocked Title"
                                     value={blockedTitle}
                                     onChange={setBlockedTitle}
@@ -513,7 +512,8 @@ export default function SettingsPage() {
                             </BlockStack>
                         </Card>
                     </Layout.Section>
-                </Layout>
+                        </Layout>
+                    </>
                 )}
             </BlockStack>
         </Page>
