@@ -48,11 +48,14 @@ export default function App() {
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).$crisp && shopInfo) {
       const crisp = (window as any).$crisp;
+      
       // Identify the merchant
       crisp.push(["set", "user:email", [shopInfo.email]]);
       crisp.push(["set", "user:nickname", [shopInfo.name]]);
-      // Store shop domain as session data for easy filtering
       crisp.push(["set", "session:data", [[["shop_domain", shopInfo.myshopifyDomain]]]]);
+      
+      // Ép khung chat hiển thị nếu nó bị ẩn hoặc bị treo
+      crisp.push(["do", "chat:show"]);
     }
   }, [shopInfo]);
 
