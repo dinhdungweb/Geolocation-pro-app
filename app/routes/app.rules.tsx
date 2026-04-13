@@ -471,7 +471,7 @@ export default function RulesPage() {
                         {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
                     </Badge>
                 ) : (
-                    <Text as="span" tone="subdued">—</Text>
+                    <Badge tone="critical">Block</Badge>
                 )}
             </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
