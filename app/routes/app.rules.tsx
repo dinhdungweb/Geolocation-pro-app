@@ -339,7 +339,7 @@ export default function RulesPage() {
         handleCloseModal();
     }, [
         editingRule, formName, selectedCountries, formTargetUrl, formPriority,
-        formRuleType, scheduleEnabled, startTime, endTime, activeDays, timezone,
+        formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
         fetcher, handleCloseModal
     ]);
 
