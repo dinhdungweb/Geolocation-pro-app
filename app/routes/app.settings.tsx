@@ -24,7 +24,8 @@ import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
 
 interface Settings {
     id: string;
-    mode: string;
+    isEnabled: boolean;
+    mode: string; // Keep for legacy/internal purposes
     popupTitle: string;
     popupMessage: string;
     confirmBtnText: string;
@@ -41,6 +42,7 @@ interface Settings {
 }
 
 const defaultSettings: Omit<Settings, "id"> = {
+    isEnabled: true,
     mode: "popup",
     template: "modal",
     popupTitle: "Would you like to switch to a local version?",
@@ -96,7 +98,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
 
     try {
-        const mode = formData.get("mode") as string;
+        const isEnabled = formData.get("isEnabled") === "true";
+        const mode = formData.get("mode") as string || "popup";
         const popupTitle = formData.get("popupTitle") as string;
         const popupMessage = formData.get("popupMessage") as string;
         const confirmBtnText = formData.get("confirmBtnText") as string;
@@ -114,8 +117,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await prisma.settings.upsert({
             where: { shop },
             update: {
+                isEnabled,
                 mode,
-                template,
                 popupTitle,
                 popupMessage,
                 confirmBtnText,
@@ -131,6 +134,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             },
             create: {
                 shop,
+                isEnabled,
                 mode,
                 template,
                 popupTitle,
@@ -161,6 +165,7 @@ export default function SettingsPage() {
     const shopify = useAppBridge();
 
     // Form state
+    const [isEnabled, setIsEnabled] = useState(settings.isEnabled);
     const [mode, setMode] = useState(settings.mode);
     const [template, setTemplate] = useState(settings.template || "modal");
     const [popupTitle, setPopupTitle] = useState(settings.popupTitle);
@@ -186,6 +191,7 @@ export default function SettingsPage() {
 
     const handleSave = useCallback(() => {
         const formData = new FormData();
+        formData.append("isEnabled", isEnabled.toString());
         formData.append("mode", mode);
         formData.append("template", template);
         formData.append("popupTitle", popupTitle);
@@ -205,7 +211,7 @@ export default function SettingsPage() {
     }, [
         mode, template, popupTitle, popupMessage, confirmBtnText, cancelBtnText,
         popupBgColor, popupTextColor, popupBtnColor, excludeBots, excludedIPs,
-        cookieDuration, fetcher
+        cookieDuration, fetcher, isEnabled
     ]);
 
     const modeOptions = [
@@ -241,30 +247,22 @@ export default function SettingsPage() {
                     </CalloutCard>
                 )}
                 <Layout>
-                    {/* Mode Selection */}
+                    {/* Application Status */}
                     <Layout.Section>
                         <Card>
                             <BlockStack gap="400">
                                 <Text as="h2" variant="headingMd">
-                                    Redirect Mode
+                                    Application Status
                                 </Text>
-                                <Select
-                                    label="How should visitors be redirected?"
-                                    options={modeOptions}
-                                    value={mode}
-                                    onChange={setMode}
+                                <Checkbox
+                                    label="Enable Geolocation App"
+                                    checked={isEnabled}
+                                    onChange={setIsEnabled}
+                                    helpText="When disabled, all redirects and blocking rules will be inactive."
                                 />
-                                {mode === "auto_redirect" && (
-                                    <Banner tone="warning">
-                                        <p>
-                                            Auto redirect may affect SEO. We recommend using Popup mode and
-                                            enabling Bot Exclusion to prevent search engine issues.
-                                        </p>
-                                    </Banner>
-                                )}
-                                {mode === "disabled" && (
-                                    <Banner>
-                                        <p>Geolocation redirect is currently disabled.</p>
+                                {!isEnabled && (
+                                    <Banner tone="info">
+                                        <p>The app is currently disabled on your storefront.</p>
                                     </Banner>
                                 )}
                             </BlockStack>
@@ -272,8 +270,8 @@ export default function SettingsPage() {
                     </Layout.Section>
                 </Layout>
 
-                {/* Popup Customization Row - Only show if mode is popup */}
-                {mode === "popup" && (
+                {/* Always show customization settings if enabled */}
+                {isEnabled && (
                     <Layout>
                         <Layout.Section>
                             <Card>
@@ -516,6 +514,7 @@ export default function SettingsPage() {
                         </Card>
                     </Layout.Section>
                 </Layout>
+                )}
             </BlockStack>
         </Page>
     );

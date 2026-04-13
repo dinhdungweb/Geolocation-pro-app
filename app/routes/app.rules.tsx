@@ -80,6 +80,7 @@ interface RedirectRule {
     isActive: boolean;
     priority: number;
     ruleType: string;
+    redirectMode: string;
     scheduleEnabled: boolean;
     startTime: string | null;
     endTime: string | null;
@@ -135,6 +136,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "redirect";
+            const redirectMode = formData.get("redirectMode") as string || "popup";
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
@@ -150,6 +152,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     isActive: true,
                     ruleType,
+                    redirectMode,
                     matchType: "country", // Mark as country rule
                     scheduleEnabled,
                     startTime,
@@ -171,6 +174,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "redirect";
+            const redirectMode = formData.get("redirectMode") as string || "popup";
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
@@ -185,6 +189,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     targetUrl,
                     priority,
                     ruleType,
+                    redirectMode,
                     scheduleEnabled,
                     startTime,
                     endTime,
@@ -234,6 +239,7 @@ export default function RulesPage() {
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
+    const [formRedirectMode, setFormRedirectMode] = useState("popup");
     // Scheduling State
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [startTime, setStartTime] = useState("09:00");
@@ -279,6 +285,7 @@ export default function RulesPage() {
             setFormTargetUrl(editingRule.targetUrl);
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "redirect");
+            setFormRedirectMode(editingRule.redirectMode || "popup");
             setScheduleEnabled(editingRule.scheduleEnabled || false);
             setStartTime(editingRule.startTime || "09:00");
             setEndTime(editingRule.endTime || "17:00");
@@ -291,6 +298,7 @@ export default function RulesPage() {
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("redirect");
+            setFormRedirectMode("popup");
             setScheduleEnabled(false);
             setStartTime("09:00");
             setEndTime("17:00");
@@ -320,6 +328,7 @@ export default function RulesPage() {
         formData.append("targetUrl", formTargetUrl);
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
+        formData.append("redirectMode", formRedirectMode);
         formData.append("scheduleEnabled", scheduleEnabled.toString());
         formData.append("startTime", startTime);
         formData.append("endTime", endTime);
@@ -456,6 +465,15 @@ export default function RulesPage() {
                     </Badge>
                 )}
             </IndexTable.Cell>
+            <IndexTable.Cell>
+                {rule.ruleType === 'redirect' ? (
+                    <Badge tone={rule.redirectMode === 'auto_redirect' ? 'warning' : 'info'}>
+                        {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
+                    </Badge>
+                ) : (
+                    <Text as="span" tone="subdued">—</Text>
+                )}
+            </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
             <IndexTable.Cell>
                 <div onClick={(e) => e.stopPropagation()}>
@@ -538,6 +556,7 @@ export default function RulesPage() {
                                         { title: "Countries" },
                                         { title: "Target URL" },
                                         { title: "Status" },
+                                        { title: "Method" },
                                         { title: "Priority" },
                                         { title: "Actions" },
                                     ]}
@@ -689,14 +708,27 @@ export default function RulesPage() {
                         </BlockStack>
 
                         {formRuleType === "redirect" && (
-                            <TextField
-                                label="Target URL"
-                                value={formTargetUrl}
-                                onChange={setFormTargetUrl}
-                                placeholder="https://your-store.com or /us/"
-                                helpText="Full URL or relative path to redirect to"
-                                autoComplete="off"
-                            />
+                            <BlockStack gap="400">
+                                <TextField
+                                    label="Target URL"
+                                    value={formTargetUrl}
+                                    onChange={setFormTargetUrl}
+                                    placeholder="https://your-store.com or /us/"
+                                    helpText="Full URL or relative path to redirect to"
+                                    autoComplete="off"
+                                />
+
+                                <Select
+                                    label="Redirect Method"
+                                    options={[
+                                        { label: "Popup (Recommended)", value: "popup" },
+                                        { label: "Auto Redirect", value: "auto_redirect" },
+                                    ]}
+                                    value={formRedirectMode}
+                                    onChange={setFormRedirectMode}
+                                    helpText="Auto Redirect may affect SEO. Popup is safer for search engines."
+                                />
+                            </BlockStack>
                         )}
                         <TextField
                             label="Priority"

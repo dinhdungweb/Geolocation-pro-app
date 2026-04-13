@@ -36,6 +36,7 @@ model RedirectRule {
   isActive        Boolean  @default(true)
   priority        Int      @default(0)
   ruleType        String   @default("redirect")
+  redirectMode    String   @default("popup")
   scheduleEnabled Boolean  @default(false)
   startTime       String?
   endTime         String?
@@ -53,6 +54,7 @@ model RedirectRule {
 model Settings {
   id             String   @id @default(uuid())
   shop           String   @unique
+  isEnabled      Boolean  @default(true)
   mode           String   @default("popup")
   template       String   @default("modal")
   popupTitle     String   @default("Would you like to switch to a local version?")

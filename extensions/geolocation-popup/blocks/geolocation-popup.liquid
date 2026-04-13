@@ -625,14 +625,7 @@
       return;
     }
 
-    // NOW check cookie - but only for popup mode (auto_redirect ignores cookies)
-    if (config.mode === 'popup' && CookieManager.has('geo_choice')) {
-      log('User preference found, skipping popup. Use GeolocationDebug.clearPreference() to reset.');
-      return;
-    }
-
     log('Looking for country rule matching:', countryCode);
-    log('Available country rules:', config.rules);
 
     // Find matching country rule
     const matchingRule = findMatchingRule(config.rules, countryCode);
@@ -657,8 +650,18 @@
       return;
     }
 
-    // Handle based on mode
-    if (config.mode === 'auto_redirect') {
+    // Determine effective mode - favor rule setting, fallback to global mode
+    const effectiveMode = matchingRule.redirectMode || config.mode || 'popup';
+    log('Effective redirect mode:', effectiveMode);
+
+    // Check cookie - ONLY for popup mode (auto_redirect ignores cookies)
+    if (effectiveMode === 'popup' && CookieManager.has('geo_choice')) {
+      log('User preference found, skipping popup. Use GeolocationDebug.clearPreference() to reset.');
+      return;
+    }
+
+    // Handle based on effective mode
+    if (effectiveMode === 'auto_redirect') {
       // Force redirect - no cookie, always redirect
       log('Force redirecting to:', matchingRule.targetUrl);
       trackEvent('auto_redirected', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
