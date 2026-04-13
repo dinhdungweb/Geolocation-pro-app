@@ -93,7 +93,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const ruleType = formData.get("ruleType") as string || "block";
             const redirectMode = formData.get("redirectMode") as string || "popup";
 
-            await prisma.redirectRule.create({
+            await (prisma as any).redirectRule.create({
                 data: {
                     shop,
                     name,
@@ -105,7 +105,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     isActive: true,
                     ruleType,
                     redirectMode,
-                },
+                } as any,
             });
             return json({ success: true, message: "IP Rule created successfully" });
         }
@@ -131,7 +131,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     ruleType,
                     redirectMode,
-                },
+                } as any,
             });
             return json({ success: true, message: "IP Rule updated successfully" });
         }
@@ -272,7 +272,7 @@ export default function IPRulesPage() {
         },
     ];
 
-    const rowMarkup = rules.map((rule: IPRule, index: number) => (
+    const rowMarkup = rules.map((rule: any, index: number) => (
         <IndexTable.Row
             id={rule.id}
             key={rule.id}

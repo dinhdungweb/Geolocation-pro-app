@@ -143,7 +143,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const daysOfWeek = formData.get("daysOfWeek") as string;
             const timezone = formData.get("timezone") as string;
 
-            await prisma.redirectRule.create({
+            await (prisma as any).redirectRule.create({
                 data: {
                     shop,
                     name,
@@ -159,7 +159,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     endTime,
                     daysOfWeek,
                     timezone,
-                },
+                } as any,
             });
             return json({ success: true, message: "Rule created successfully" });
         }
@@ -195,7 +195,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     endTime,
                     daysOfWeek,
                     timezone,
-                },
+                } as any,
             });
             return json({ success: true, message: "Rule updated successfully" });
         }
@@ -424,7 +424,7 @@ export default function RulesPage() {
         },
     ];
 
-    const rowMarkup = rules.map((rule: RedirectRule, index: number) => (
+    const rowMarkup = rules.map((rule: any, index: number) => (
         <IndexTable.Row
             id={rule.id}
             key={rule.id}
