@@ -386,7 +386,7 @@ export default function Index() {
           {/* Left: Visits Table */}
           <div className="left-column">
             <Card padding="0">
-              <BlockStack gap="0" fullHeight>
+              <BlockStack gap="0">
                 <div style={{ padding: '16px' }}>
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
