@@ -272,7 +272,7 @@ export default function Index() {
             }
             .equal-height-container > .left-column {
               flex: 1;
-              height: 560px;
+              height: 600px;
               overflow: hidden;
             }
             .equal-height-container > .left-column > *,
