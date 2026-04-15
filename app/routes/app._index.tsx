@@ -235,9 +235,7 @@ export default function Index() {
     window.open(`https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps`, '_blank');
   };
 
-  const resourceNameVisits = { singular: 'visit', plural: 'visits' };
-  const { selectedResources: selectedVisits, allResourcesSelected: allVisitsSelected, handleSelectionChange: handleVisitsSelectionChange } =
-    useIndexResourceState(visitsData as any);
+  // Removed IndexTable state for visits - using plain HTML table now
 
   const popupsRowMarkup = popupsData.map(
     ({ id, rule, seen, clickedYes, clickedNo, dismissed }: any, index: number) => (
@@ -260,30 +258,7 @@ export default function Index() {
     ),
   );
 
-  const visitsRowMarkup = visitsData.map(
-    ({ id, country, code, visitors, popup, redirected, blocked }: any, index: number) => (
-      <IndexTable.Row id={id} key={id} position={index}>
-        <IndexTable.Cell>
-          <InlineStack gap="200" align="start" blockAlign="center">
-            <img
-              src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`}
-              srcSet={`https://flagcdn.com/w80/${code.toLowerCase()}.png 2x`}
-              width="30"
-              alt={country}
-              loading="lazy" // Optimize performance
-              decoding="async"
-              style={{ borderRadius: '2px', objectFit: 'cover' }}
-            />
-            <Text variant="bodyMd" fontWeight="bold" as="span">{country}</Text>
-          </InlineStack>
-        </IndexTable.Cell>
-        <IndexTable.Cell><div style={{ textAlign: 'right' }}>{visitors}</div></IndexTable.Cell>
-        <IndexTable.Cell><div style={{ textAlign: 'right' }}>{popup}</div></IndexTable.Cell>
-        <IndexTable.Cell><div style={{ textAlign: 'right' }}>{redirected}</div></IndexTable.Cell>
-        <IndexTable.Cell><div style={{ textAlign: 'right' }}>{blocked}</div></IndexTable.Cell>
-      </IndexTable.Row>
-    ),
-  );
+  // visitsRowMarkup removed - using plain HTML table
 
   return (
     <Page>
@@ -291,40 +266,64 @@ export default function Index() {
       <style>
         {`
           @media (min-width: 48em) {
-            .table-scroll-container {
-              max-height: 500px;
-              overflow-y: auto;
-            }
             .equal-height-container {
               display: flex;
-              align-items: flex-start;
               gap: var(--p-space-500);
             }
             .equal-height-container > .left-column {
               flex: 1;
+              height: 560px;
             }
             .equal-height-container > .right-column {
               width: 33.33%;
+              height: 560px;
+              overflow-y: auto;
             }
             .table-scroll-container-short {
               max-height: 200px;
               overflow-y: auto;
             }
-            .table-scroll-container th {
-              position: static !important;
-            }
-            .table-scroll-container .Polaris-IndexTable__StickyTable {
-              display: none !important;
-            }
-            .table-scroll-container .Polaris-IndexTable__IndexTableWrapper {
-              overflow: visible !important;
-            }
-            .table-scroll-container .Polaris-IndexTable__ScrollContainer {
-              overflow: visible !important;
-            }
-            .table-scroll-container .Polaris-IndexTable {
-              overflow: visible !important;
-            }
+          }
+          .traffic-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+          }
+          .traffic-table th {
+            padding: 10px 16px;
+            text-align: left;
+            font-weight: 500;
+            color: var(--p-color-text-secondary, #6d7175);
+            border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
+            position: sticky;
+            top: 0;
+            background: var(--p-color-bg-surface, #fff);
+            z-index: 1;
+          }
+          .traffic-table th.text-right {
+            text-align: right;
+          }
+          .traffic-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
+          }
+          .traffic-table td.text-right {
+            text-align: right;
+          }
+          .traffic-table tbody tr:hover {
+            background: var(--p-color-bg-surface-hover, #f6f6f7);
+          }
+          .traffic-table .country-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .traffic-table .country-cell img {
+            border-radius: 2px;
+            object-fit: cover;
+          }
+          .traffic-table .country-cell span {
+            font-weight: 600;
           }
         `}
       </style>
@@ -389,28 +388,48 @@ export default function Index() {
           {/* Left: Visits Table */}
           <div className="left-column">
             <Card padding="0">
-              <div style={{ padding: '16px' }}>
-                <Text as="h3" variant="headingMd">Traffic Overview</Text>
-                <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
-              </div>
-              <div className="table-scroll-container">
-                <IndexTable
-                  condensed={!smUp}
-                  resourceName={resourceNameVisits}
-                  itemCount={visitsData.length}
-                  selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
-                  onSelectionChange={handleVisitsSelectionChange}
-                  headings={[
-                    { title: 'Country' },
-                    { title: 'Visitors', alignment: 'end' },
-                    { title: 'Popup/banners', alignment: 'end' },
-                    { title: 'Redirected', alignment: 'end' },
-                    { title: 'Blocked', alignment: 'end' },
-                  ]}
-                  selectable={false}
-                >
-                  {visitsRowMarkup}
-                </IndexTable>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ padding: '16px' }}>
+                  <Text as="h3" variant="headingMd">Traffic Overview</Text>
+                  <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                  <table className="traffic-table">
+                    <thead>
+                      <tr>
+                        <th>Country</th>
+                        <th className="text-right">Visitors</th>
+                        <th className="text-right">Popup/banners</th>
+                        <th className="text-right">Redirected</th>
+                        <th className="text-right">Blocked</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitsData.map((item: any) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="country-cell">
+                              <img
+                                src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
+                                srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
+                                width="30"
+                                height="20"
+                                alt={item.country}
+                                loading="lazy"
+                                decoding="async"
+                              />
+                              <span>{item.country}</span>
+                            </div>
+                          </td>
+                          <td className="text-right">{item.visitors}</td>
+                          <td className="text-right">{item.popup}</td>
+                          <td className="text-right">{item.redirected}</td>
+                          <td className="text-right">{item.blocked}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </Card>
           </div>
