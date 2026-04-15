@@ -293,8 +293,8 @@ export default function Index() {
           @media (min-width: 48em) {
             .table-scroll-container {
               flex: 1;
-              max-height: 500px;
               overflow-y: auto;
+              min-height: 0;
             }
             .equal-height-container {
               display: flex;
@@ -385,7 +385,7 @@ export default function Index() {
           {/* Left: Visits Table */}
           <div className="left-column">
             <Card padding="0">
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '100%' }}>
                 <div style={{ padding: '16px' }}>
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
