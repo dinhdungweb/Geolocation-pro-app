@@ -584,6 +584,21 @@
       return;
     }
 
+    // ========== PRIORITY 0: VPN/PROXY SHIELD ==========
+    if (config.vpnBlocked) {
+      log('Access blocked due to Proxy/VPN');
+      trackEvent('vpn_blocked', { visitorIP, countryCode });
+      showBlockScreen(config, { targetUrl: '', ruleId: 'vpn-shield', name: 'Anti-Fraud Shield' }, countryCode);
+      // Wait for DOM
+      setTimeout(() => {
+        const titleEl = document.querySelector('#geo-block-screen h1');
+        const msgEl = document.querySelector('#geo-block-screen p');
+        if (titleEl) titleEl.textContent = 'Security Alert';
+        if (msgEl) msgEl.textContent = 'Access via VPN or Proxy is not allowed for this store.';
+      }, 100);
+      return;
+    }
+
     // ========== IP RULES CHECK (PRIORITY 1) ==========
     // IP rules are checked FIRST and have highest priority
     if (config.ipRules && config.ipRules.length > 0) {

@@ -49,6 +49,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 excludeBots: true,
                 excludedIPs: true,
                 cookieDuration: true,
+                blockVpn: true,
             },
         });
 
@@ -89,6 +90,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const isIPExcluded = settings.excludedIPs
             ? settings.excludedIPs.split(',').map(ip => ip.trim()).includes(visitorIP)
             : false;
+
+        // VPN/Proxy Detection
+        let vpnBlocked = false;
+        if (settings.blockVpn && !isIPExcluded && visitorIP !== "0.0.0.0" && visitorIP !== "127.0.0.1" && visitorIP !== "::1") {
+            try {
+                // Using ip-api.com for basic VPN/Proxy detection
+                // Note: For high traffic, integrate with MaxMind Anonymous IP or a dedicated VPN service.
+                const proxyResponse = await fetch(`http://ip-api.com/json/${visitorIP}?fields=proxy,hosting`);
+                if (proxyResponse.ok) {
+                    const data = await proxyResponse.json();
+                    if (data.proxy || data.hosting) {
+                        vpnBlocked = true;
+                    }
+                }
+            } catch (err) {
+                console.error("[Geopro VPN Check] Error resolving proxy for IP", visitorIP, err);
+            }
+        }
 
         // Transform Country rules
         const rules = allRules
@@ -134,6 +153,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 },
                 excludeBots: settings.excludeBots,
                 cookieDuration: settings.cookieDuration,
+                vpnBlocked,
                 rules: rules,
                 ipRules: ipRules,
                 detectedCountry,

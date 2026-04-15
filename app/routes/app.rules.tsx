@@ -439,7 +439,7 @@ export default function RulesPage() {
             </IndexTable.Cell>
             <IndexTable.Cell>
                 <InlineStack gap="100" wrap={false}>
-                    {rule.countryCodes.split(",").slice(0, 3).map(code => (
+                    {rule.countryCodes.split(",").slice(0, 3).map((code: string) => (
                         <Badge key={code} tone="info">{code.trim()}</Badge>
                     ))}
                     {rule.countryCodes.split(",").length > 3 && (

@@ -39,6 +39,7 @@ interface Settings {
     blockedTitle: string;
     blockedMessage: string;
     template: string;
+    blockVpn: boolean;
 }
 
 const defaultSettings: Omit<Settings, "id"> = {
@@ -57,6 +58,7 @@ const defaultSettings: Omit<Settings, "id"> = {
     cookieDuration: 7,
     blockedTitle: "Access Denied",
     blockedMessage: "We do not offer services in your country/region.",
+    blockVpn: false,
 };
 
 // Loader: Fetch settings for the current shop
@@ -113,6 +115,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const blockedTitle = formData.get("blockedTitle") as string;
         const blockedMessage = formData.get("blockedMessage") as string;
         const template = formData.get("template") as string || "modal";
+        const blockVpn = formData.get("blockVpn") === "true";
 
         await prisma.settings.upsert({
             where: { shop },
@@ -131,6 +134,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 cookieDuration,
                 blockedTitle,
                 blockedMessage,
+                blockVpn,
             },
             create: {
                 shop,
@@ -149,6 +153,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 cookieDuration,
                 blockedTitle,
                 blockedMessage,
+                blockVpn,
             },
         });
 
@@ -180,6 +185,7 @@ export default function SettingsPage() {
     const [cookieDuration, setCookieDuration] = useState(settings.cookieDuration.toString());
     const [blockedTitle, setBlockedTitle] = useState(settings.blockedTitle || "Access Denied");
     const [blockedMessage, setBlockedMessage] = useState(settings.blockedMessage || "We do not offer services in your country/region.");
+    const [blockVpn, setBlockVpn] = useState(settings.blockVpn);
 
     const isLoading = fetcher.state !== "idle";
 
@@ -206,12 +212,13 @@ export default function SettingsPage() {
         formData.append("cookieDuration", cookieDuration);
         formData.append("blockedTitle", blockedTitle);
         formData.append("blockedMessage", blockedMessage);
+        formData.append("blockVpn", blockVpn.toString());
 
         fetcher.submit(formData, { method: "POST" });
     }, [
         mode, template, popupTitle, popupMessage, confirmBtnText, cancelBtnText,
         popupBgColor, popupTextColor, popupBtnColor, excludeBots, excludedIPs,
-        cookieDuration, fetcher, isEnabled
+        cookieDuration, fetcher, isEnabled, blockVpn, blockedTitle, blockedMessage
     ]);
 
     const templateOptions = [
@@ -488,13 +495,43 @@ export default function SettingsPage() {
                                             helpText="Comma-separated list of IP addresses to exclude from redirection"
                                             autoComplete="off"
                                         />
-                                        <TextField
+                                         <TextField
                                             label="Cookie Duration (days)"
                                             type="number"
                                             value={cookieDuration}
                                             onChange={setCookieDuration}
                                             helpText="How long to remember visitor's preference (only for rules using Popup mode)"
                                             autoComplete="off"
+                                        />
+                                    </BlockStack>
+                                </Card>
+                            </Layout.Section>
+                            
+                            <Layout.Section>
+                                <Card>
+                                    <BlockStack gap="400">
+                                        <InlineStack align="space-between">
+                                            <Text as="h2" variant="headingMd">
+                                                Anti-Fraud Protection
+                                            </Text>
+                                            {!isFreePlan ? (
+                                                <span style={{ background: '#e1e3e5', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>PRO</span>
+                                            ) : null}
+                                        </InlineStack>
+                                        <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
+                                        
+                                        {isFreePlan ? (
+                                            <Banner tone="warning">
+                                                <p>Upgrade to a paid plan to enable advanced security checks.</p>
+                                            </Banner>
+                                        ) : null}
+
+                                        <Checkbox
+                                            label="Block VPNs, Proxies & Tor Exit Nodes"
+                                            checked={blockVpn}
+                                            onChange={setBlockVpn}
+                                            disabled={isFreePlan}
+                                            helpText="Overrides all rules to unconditionally block connections that mask their real location."
                                         />
                                     </BlockStack>
                                 </Card>

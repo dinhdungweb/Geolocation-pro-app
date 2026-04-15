@@ -79,6 +79,7 @@ model Settings {
   smtpUser         String?
   smtpPass         String?
   smtpSecure       Boolean  @default(true)
+  blockVpn         Boolean  @default(false)
 }
 
 model AnalyticsCountry {

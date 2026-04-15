@@ -287,7 +287,7 @@ export default function IPRulesPage() {
             </IndexTable.Cell>
             <IndexTable.Cell>
                 <InlineStack gap="100" wrap={false}>
-                    {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).slice(0, 3).map(ip => (
+                    {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).slice(0, 3).map((ip: string) => (
                         <Badge key={ip} tone="info">{ip.trim()}</Badge>
                     ))}
                     {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length > 3 && (
