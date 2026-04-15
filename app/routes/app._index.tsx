@@ -273,11 +273,14 @@ export default function Index() {
             .equal-height-container > .left-column {
               flex: 1;
               height: 560px;
+              overflow: hidden;
+            }
+            .equal-height-container > .left-column > *,
+            .equal-height-container > .left-column > * > * {
+              height: 100%;
             }
             .equal-height-container > .right-column {
               width: 33.33%;
-              height: 560px;
-              overflow-y: auto;
             }
             .table-scroll-container-short {
               max-height: 200px;
