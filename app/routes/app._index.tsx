@@ -292,8 +292,23 @@ export default function Index() {
         {`
           @media (min-width: 48em) {
             .table-scroll-container {
-              max-height: 440px;
+              max-height: 520px;
               overflow-y: auto;
+            }
+            .equal-height-container {
+              display: flex;
+              align-items: stretch;
+              gap: var(--p-space-400);
+            }
+            .equal-height-container > .left-column {
+              flex: 1;
+              display: flex;
+            }
+            .equal-height-container > .left-column > * {
+              flex: 1;
+            }
+            .equal-height-container > .right-column {
+              width: 33.33%;
             }
             .table-scroll-container-short {
               max-height: 200px;
@@ -366,10 +381,12 @@ export default function Index() {
 
         {/* Main Section */}
         <Layout>
+        {/* Main Section using Flex for Equal Height */}
+        <div className="equal-height-container">
           {/* Left: Visits Table */}
-          <Layout.Section>
+          <div className="left-column">
             <Card padding="0">
-              <BlockStack gap="0">
+              <BlockStack gap="0" fullHeight>
                 <div style={{ padding: '16px' }}>
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
                   <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
@@ -395,10 +412,10 @@ export default function Index() {
                 </div>
               </BlockStack>
             </Card>
-          </Layout.Section>
+          </div>
 
           {/* Right: Sidebar */}
-          <Layout.Section variant="oneThird">
+          <div className="right-column">
             <BlockStack gap="500">
               {/* Theme Integration */}
               <Card>
@@ -409,32 +426,10 @@ export default function Index() {
                   </BlockStack>
                   <Card background="bg-surface-secondary">
                     <BlockStack gap="400">
-                        <InlineStack gap="300" blockAlign="center">
-                            <div
-                                style={{
-                                    width: "28px",
-                                    height: "28px",
-                                    borderRadius: "50%",
-                                    background: "#005bd3",
-                                    color: "#fff",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontWeight: "700",
-                                    fontSize: "12px",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                1
-                            </div>
-                            <Text as="h2" variant="headingSm">
-                                Enable App Embed
-                            </Text>
-                        </InlineStack>
+                        <Text as="h2" variant="headingSm">
+                            Enable App Embed
+                        </Text>
                         <BlockStack gap="200">
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                The app works via a Theme App Embed. You must enable it in your Shopify Theme Editor.
-                            </Text>
                             <List type="bullet">
                                 <List.Item><Text as="span" variant="bodySm">Click "App embeds" in the left panel.</Text></List.Item>
                                 <List.Item><Text as="span" variant="bodySm">Find "Geo: Redirect & Country Block" and toggle it ON.</Text></List.Item>
@@ -477,7 +472,8 @@ export default function Index() {
                 </BlockStack>
               </Card>
             </BlockStack>
-          </Layout.Section>
+          </div>
+        </div>
         </Layout>
 
         {/* Banners/Popups and Instant Redirects - Side by Side */}
