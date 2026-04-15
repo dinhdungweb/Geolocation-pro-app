@@ -227,6 +227,7 @@ export default function PricingPage() {
                 "Includes all Free features",
                 "Country Blocking",
                 "IP Blocking & Redirects",
+                "Page-specific Targeting",
             ],
             hasTrial: true,
         },
