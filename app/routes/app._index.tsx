@@ -356,12 +356,18 @@ export default function Index() {
             </BlockStack>
             {isOverLimit && (
               <Banner tone="critical">
-                You have exceeded your plan limit. Consider upgrading to avoid overage charges.
+                {currentPlan === PLUS_PLAN 
+                  ? "You have exceeded your Plus plan limit. Overage charges will apply for additional visitors."
+                  : "You have exceeded your plan limit. Consider upgrading to avoid overage charges."
+                }
               </Banner>
             )}
             {isNearLimit && !isOverLimit && (
               <Banner tone="warning">
-                You're approaching your plan limit ({usagePercent}% used). Consider upgrading.
+                {currentPlan === PLUS_PLAN
+                  ? `You're approaching your Plus plan limit (${usagePercent}% used).`
+                  : `You're approaching your plan limit (${usagePercent}% used). Consider upgrading.`
+                }
               </Banner>
             )}
           </BlockStack>
