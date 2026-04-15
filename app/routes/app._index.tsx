@@ -292,21 +292,15 @@ export default function Index() {
         {`
           @media (min-width: 48em) {
             .table-scroll-container {
-              flex: 1;
               max-height: 500px;
               overflow-y: auto;
-              min-height: 0;
             }
             .equal-height-container {
               display: flex;
-              align-items: stretch;
+              align-items: flex-start;
               gap: var(--p-space-500);
             }
             .equal-height-container > .left-column {
-              flex: 1;
-              display: flex;
-            }
-            .equal-height-container > .left-column > * {
               flex: 1;
             }
             .equal-height-container > .right-column {
@@ -386,30 +380,28 @@ export default function Index() {
           {/* Left: Visits Table */}
           <div className="left-column">
             <Card padding="0">
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '100%' }}>
-                <div style={{ padding: '16px' }}>
-                  <Text as="h3" variant="headingMd">Traffic Overview</Text>
-                  <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
-                </div>
-                <div className="table-scroll-container">
-                  <IndexTable
-                    condensed={!smUp}
-                    resourceName={resourceNameVisits}
-                    itemCount={visitsData.length}
-                    selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
-                    onSelectionChange={handleVisitsSelectionChange}
-                    headings={[
-                      { title: 'Country' },
-                      { title: 'Visitors', alignment: 'end' },
-                      { title: 'Popup/banners', alignment: 'end' },
-                      { title: 'Redirected', alignment: 'end' },
-                      { title: 'Blocked', alignment: 'end' },
-                    ]}
-                    selectable={false}
-                  >
-                    {visitsRowMarkup}
-                  </IndexTable>
-                </div>
+              <div style={{ padding: '16px' }}>
+                <Text as="h3" variant="headingMd">Traffic Overview</Text>
+                <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
+              </div>
+              <div className="table-scroll-container">
+                <IndexTable
+                  condensed={!smUp}
+                  resourceName={resourceNameVisits}
+                  itemCount={visitsData.length}
+                  selectedItemsCount={allVisitsSelected ? 'All' : selectedVisits.length}
+                  onSelectionChange={handleVisitsSelectionChange}
+                  headings={[
+                    { title: 'Country' },
+                    { title: 'Visitors', alignment: 'end' },
+                    { title: 'Popup/banners', alignment: 'end' },
+                    { title: 'Redirected', alignment: 'end' },
+                    { title: 'Blocked', alignment: 'end' },
+                  ]}
+                  selectable={false}
+                >
+                  {visitsRowMarkup}
+                </IndexTable>
               </div>
             </Card>
           </div>
