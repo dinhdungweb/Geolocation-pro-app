@@ -234,18 +234,6 @@ export default function Index() {
     window.open(`https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps`, '_blank');
   };
 
-  const getModeLabel = (mode: string) => {
-    switch (mode) {
-      case "popup":
-        return { label: "Popup", tone: "success" as const, description: "App is configured to display a popup." };
-      case "auto_redirect":
-        return { label: "Auto Redirect", tone: "success" as const, description: "App is configured to automatically redirect visitors." };
-      default:
-        return { label: "Disabled", tone: "critical" as const, description: "App configuration is disabled." };
-    }
-  };
-
-  const modeInfo = getModeLabel(stats.mode);
   const resourceNameVisits = { singular: 'visit', plural: 'visits' };
   const { selectedResources: selectedVisits, allResourcesSelected: allVisitsSelected, handleSelectionChange: handleVisitsSelectionChange } =
     useIndexResourceState(visitsData as any);
@@ -421,12 +409,7 @@ export default function Index() {
                   <Card background="bg-surface-secondary">
                     <BlockStack gap="400">
                       <Text as="p">To enable/disable, verify App Embed status.</Text>
-                      <BlockStack gap="300">
-                        <div>
-                          <Badge tone={modeInfo.tone}>{`Mode: ${modeInfo.label}`}</Badge>
-                        </div>
-                        <Button variant="primary" onClick={handleOpenThemeEditor} fullWidth>Open Theme Editor</Button>
-                      </BlockStack>
+                      <Button variant="primary" onClick={handleOpenThemeEditor} fullWidth>Open Theme Editor</Button>
                     </BlockStack>
                   </Card>
                 </BlockStack>
