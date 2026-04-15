@@ -293,7 +293,7 @@ export default function Index() {
           @media (min-width: 48em) {
             .table-scroll-container {
               flex: 1;
-              max-height: 700px;
+              max-height: 500px;
               overflow-y: auto;
               min-height: 0;
             }
