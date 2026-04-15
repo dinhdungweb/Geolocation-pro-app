@@ -316,6 +316,15 @@ export default function Index() {
             .table-scroll-container .Polaris-IndexTable__StickyTable {
               display: none !important;
             }
+            .table-scroll-container .Polaris-IndexTable__IndexTableWrapper {
+              overflow: visible !important;
+            }
+            .table-scroll-container .Polaris-IndexTable__ScrollContainer {
+              overflow: visible !important;
+            }
+            .table-scroll-container .Polaris-IndexTable {
+              overflow: visible !important;
+            }
           }
         `}
       </style>
