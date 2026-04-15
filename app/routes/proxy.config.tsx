@@ -16,6 +16,7 @@ import { PLAN_LIMITS, FREE_PLAN } from "../billing.config";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
+    const currentPath = url.searchParams.get("path") || "/"; // Current path from storefront
 
     // CORS headers for cross-origin requests
     const headers = {
@@ -132,6 +133,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 timezone: true,
                 ruleType: true,
                 redirectMode: true,
+                pageTargetingType: true,
+                pagePaths: true,
             },
         });
 
@@ -151,6 +154,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 priority: true,
                 ruleType: true,
                 redirectMode: true,
+                pageTargetingType: true,
+                pagePaths: true,
             },
         });
 
@@ -220,6 +225,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
         });
 
+        // --- NEW: Filter rules based on Page Targeting ---
+        const checkPageTargeting = (rule: any, path: string) => {
+            const type = rule.pageTargetingType || "all";
+            if (type === "all") return true;
+
+            const paths = (rule.pagePaths || "")
+                .split(/[\n,]+/)
+                .map((p: string) => p.trim())
+                .filter(Boolean);
+            
+            if (paths.length === 0) return type === "exclude"; // If empty, include: none matches (false) / exclude: none matches (true)
+
+            const isMatch = paths.some((p: string) => {
+                // Support simple wildcard like /products/*
+                if (p.endsWith("*")) {
+                    const prefix = p.slice(0, -1);
+                    return path.startsWith(prefix);
+                }
+                return path === p;
+            });
+
+            return type === "include" ? isMatch : !isMatch;
+        };
+
+        const pageFilteredCountryRules = activeCountryRules.filter((r: any) => checkPageTargeting(r, currentPath));
+        const pageFilteredIPRules = ipRulesRaw.filter((r: any) => checkPageTargeting(r, currentPath));
+
         // If no settings found, auto-create default settings so app works immediately
         const effectiveSettings = settings ?? await (prisma as any).settings.create({
             data: { shop },
@@ -271,13 +303,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         // Filter country rules based on plan (Block Access is Pro)
         const countryRulesToServe = (currentPlan === FREE_PLAN)
-            ? activeCountryRules.filter(r => r.ruleType !== 'block')
-            : activeCountryRules;
+            ? pageFilteredCountryRules.filter(r => r.ruleType !== 'block')
+            : pageFilteredCountryRules;
 
         // Filter IP rules based on plan (IP Rules is Pro)
         const ipRulesToServe = (currentPlan === FREE_PLAN)
             ? [] // No IP rules for free plan
-            : ipRulesRaw;
+            : pageFilteredIPRules;
 
         // Transform country rules to a simpler format for frontend
         const transformedCountryRules = countryRulesToServe.map((rule) => ({
@@ -325,9 +357,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             },
             rules: transformedCountryRules, // Country rules
             ipRules: transformedIPRules, // IP rules
+            currentPath, // Feedback path
         };
 
-        console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);
+        console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, path: ${currentPath}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);
 
         return json(response, { headers });
     } catch (error) {
@@ -353,3 +386,4 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     }
     return json({ error: "Method not allowed" }, { status: 405 });
 };
+

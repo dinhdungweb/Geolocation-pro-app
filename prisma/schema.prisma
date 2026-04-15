@@ -46,6 +46,8 @@ model RedirectRule {
   updatedAt       DateTime @updatedAt
   ipAddresses     String   @default("")
   matchType       String   @default("country")
+  pageTargetingType String   @default("all") // "all", "include", "exclude"
+  pagePaths         String?  @db.Text
 
   @@index([shop])
   @@index([shop, matchType])
@@ -142,6 +144,7 @@ model VisitorLog {
   ruleName    String?
   targetUrl   String?
   userAgent   String?
+  path        String?
   timestamp   DateTime @default(now())
 
   @@index([shop, timestamp])

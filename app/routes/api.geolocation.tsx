@@ -7,6 +7,7 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
+    const currentPath = url.searchParams.get("path") || "/";
 
     // Get Visitor IP
     const visitorIP = request.headers.get("x-shopify-client-ip") ||
@@ -69,6 +70,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 ipAddresses: true,
                 targetUrl: true,
                 priority: true,
+                pageTargetingType: true,
+                pagePaths: true,
             },
         });
 
@@ -109,9 +112,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
         }
 
+        // Page Targeting Logic
+        const checkPageTargeting = (rule: any, path: string) => {
+            const type = rule.pageTargetingType || "all";
+            if (type === "all") return true;
+
+            const paths = (rule.pagePaths || "")
+                .split(/[\n,]+/)
+                .map((p: string) => p.trim())
+                .filter(Boolean);
+            
+            if (paths.length === 0) return type === "exclude";
+
+            const isMatch = paths.some((p: string) => {
+                if (p.endsWith("*")) {
+                    const prefix = p.slice(0, -1);
+                    return path.startsWith(prefix);
+                }
+                return path === p;
+            });
+
+            return type === "include" ? isMatch : !isMatch;
+        };
+
         // Transform Country rules
         const rules = allRules
-            .filter(r => r.matchType === 'country')
+            .filter(r => r.matchType === 'country' && checkPageTargeting(r, currentPath))
             .map((rule) => ({
                 ruleId: rule.id,
                 name: rule.name,
@@ -123,7 +149,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         // Transform IP rules
         const ipRules = allRules
-            .filter(r => r.matchType === 'ip')
+            .filter(r => r.matchType === 'ip' && checkPageTargeting(r, currentPath))
             .map((rule) => ({
                 ruleId: rule.id,
                 name: rule.name,

@@ -127,6 +127,15 @@ export default function VisitorLogs() {
                 </IndexTable.Cell>
                 <IndexTable.Cell>{getActionBadge(log.action)}</IndexTable.Cell>
                 <IndexTable.Cell>
+                    {log.path ? (
+                        <div style={{ fontSize: "12px", color: "#666", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.path}>
+                            {log.path}
+                        </div>
+                    ) : (
+                        <Text as="span" variant="bodyMd" tone="subdued">-</Text>
+                    )}
+                </IndexTable.Cell>
+                <IndexTable.Cell>
                     <Text as="span" variant="bodyMd">
                         {log.ruleName || "-"}
                     </Text>
@@ -160,6 +169,7 @@ export default function VisitorLogs() {
                                         { title: "IP Address" },
                                         { title: "Country" },
                                         { title: "Action" },
+                                        { title: "Page Path" },
                                         { title: "Details / Rule" },
                                         { title: "User Agent" },
                                     ]}

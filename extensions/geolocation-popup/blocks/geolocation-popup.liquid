@@ -83,7 +83,7 @@
   const fetchConfig = async () => {
     try {
       // Use App Proxy URL - this is a stable URL that Shopify routes to our app
-      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
+      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
       log('Fetching config from:', apiUrl);
       
       const response = await fetch(apiUrl);
@@ -114,6 +114,7 @@
       const payload = {
         shop: GEOLOCATION_CONFIG.shop,
         type,
+        path: window.location.pathname,
         ...data
       };
 
@@ -539,7 +540,7 @@
     // Fetch config from App Proxy FIRST - we need detectedCountry from it
     const fetchConfigData = async () => {
       try {
-        const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
+        const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.json();
@@ -718,7 +719,7 @@
     },
     getConfig: async () => {
       // Need to re-define fetchConfig or access it via init if scoped, for this debug simple version:
-      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}`;
+      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
       const response = await fetch(apiUrl);
       return response.json();
     }

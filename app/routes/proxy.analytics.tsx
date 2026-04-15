@@ -43,7 +43,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return json({ error: "Invalid JSON" }, { status: 400 });
         }
 
-        const { type, countryCode, ruleId, ruleName, visitorIP } = data;
+        const { type, countryCode, ruleId, ruleName, visitorIP, path } = data;
 
         if (!shop || !type) {
             console.log(`[Analytics] Missing required fields: shop=${shop}, type=${type}`);
@@ -82,7 +82,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'popup_shown') action = 'popup_shown';
 
             try {
-                await prisma.visitorLog.create({
+                await (prisma as any).visitorLog.create({
                     data: {
                         shop,
                         ipAddress: visitorIP,
@@ -92,6 +92,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         ruleName: ruleName || null,
                         targetUrl: data.targetUrl || null, // Assuming targetUrl might be passed, or we can infer it? For now null is fine or we can add it to frontend payload if needed.
                         userAgent,
+                        path: path || null,
                     }
                 });
             } catch (logError) {

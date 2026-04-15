@@ -23,6 +23,8 @@ import {
     LegacyStack,
     RadioButton,
     Banner,
+    Divider,
+    ChoiceList,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -38,6 +40,8 @@ interface IPRule {
     priority: number;
     ruleType: string;
     redirectMode: string;
+    pageTargetingType: string;
+    pagePaths: string | null;
 }
 
 // Loader: Fetch all IP rules for the current shop
@@ -92,6 +96,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "block";
             const redirectMode = formData.get("redirectMode") as string || "popup";
+            const pageTargetingType = formData.get("pageTargetingType") as string || "all";
+            const pagePaths = formData.get("pagePaths") as string || "";
 
             await (prisma as any).redirectRule.create({
                 data: {
@@ -105,6 +111,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     isActive: true,
                     ruleType,
                     redirectMode,
+                    pageTargetingType,
+                    pagePaths,
                 } as any,
             });
             return json({ success: true, message: "IP Rule created successfully" });
@@ -121,6 +129,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "block";
             const redirectMode = formData.get("redirectMode") as string || "popup";
+            const pageTargetingType = formData.get("pageTargetingType") as string || "all";
+            const pagePaths = formData.get("pagePaths") as string || "";
 
             await prisma.redirectRule.update({
                 where: { id, shop },
@@ -131,6 +141,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     ruleType,
                     redirectMode,
+                    pageTargetingType,
+                    pagePaths,
                 } as any,
             });
             return json({ success: true, message: "IP Rule updated successfully" });
@@ -176,6 +188,8 @@ export default function IPRulesPage() {
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("block");
     const [formRedirectMode, setFormRedirectMode] = useState("popup");
+    const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
+    const [pagePaths, setPagePaths] = useState("");
 
     const { smUp } = useBreakpoints();
     const [mounted, setMounted] = useState(false);
@@ -200,6 +214,8 @@ export default function IPRulesPage() {
             setFormTargetUrl(editingRule.targetUrl);
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "block");
+            setPageTargetingType([editingRule.pageTargetingType || "all"]);
+            setPagePaths(editingRule.pagePaths || "");
         } else {
             setFormName("");
             setFormIPAddresses("");
@@ -207,6 +223,8 @@ export default function IPRulesPage() {
             setFormPriority("0");
             setFormRuleType("block");
             setFormRedirectMode("popup");
+            setPageTargetingType(["all"]);
+            setPagePaths("");
         }
     }, [editingRule, modalOpen]);
 
@@ -237,12 +255,14 @@ export default function IPRulesPage() {
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
         formData.append("redirectMode", formRedirectMode);
+        formData.append("pageTargetingType", pageTargetingType[0]);
+        formData.append("pagePaths", pagePaths);
 
         fetcher.submit(formData, { method: "POST" });
         handleCloseModal();
     }, [
         editingRule, formName, formIPAddresses, formTargetUrl, formPriority,
-        formRuleType, formRedirectMode, fetcher, handleCloseModal
+        formRuleType, formRedirectMode, pageTargetingType, pagePaths, fetcher, handleCloseModal
     ]);
 
     const handleToggle = useCallback(
@@ -514,6 +534,33 @@ export default function IPRulesPage() {
                             helpText="Higher priority rules are checked first"
                             autoComplete="off"
                         />
+
+                        <Divider />
+                        <BlockStack gap="200">
+                            <Text as="h3" variant="headingSm">Page Targeting</Text>
+                            <ChoiceList
+                                title="Apply to"
+                                choices={[
+                                    { label: "All Pages", value: "all" },
+                                    { label: "Specific Pages", value: "include" },
+                                    { label: "Exclude Pages", value: "exclude" },
+                                ]}
+                                selected={pageTargetingType}
+                                onChange={setPageTargetingType}
+                            />
+
+                            {pageTargetingType[0] !== "all" && (
+                                <TextField
+                                    label="Paths"
+                                    value={pagePaths}
+                                    onChange={setPagePaths}
+                                    multiline={3}
+                                    placeholder="/products/*, /collections/summer-sale, /pages/about-us"
+                                    helpText="Enter one path per line or separated by commas. Use * for wildcards."
+                                    autoComplete="off"
+                                />
+                            )}
+                        </BlockStack>
                     </FormLayout>
                 </Modal.Section>
             </Modal>

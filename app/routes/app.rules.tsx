@@ -26,6 +26,7 @@ import {
     ChoiceList,
     Select,
     RadioButton,
+    Divider,
 } from "@shopify/polaris";
 import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
@@ -86,6 +87,8 @@ interface RedirectRule {
     endTime: string | null;
     daysOfWeek: string | null;
     timezone: string | null;
+    pageTargetingType: string;
+    pagePaths: string | null;
 }
 
 // Loader: Fetch all rules for the current shop
@@ -137,12 +140,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "redirect";
             const redirectMode = formData.get("redirectMode") as string || "popup";
+            const daysOfWeek = formData.get("daysOfWeek") as string;
+            const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
-            const daysOfWeek = formData.get("daysOfWeek") as string;
-            const timezone = formData.get("timezone") as string;
-
+            const pageTargetingType = formData.get("pageTargetingType") as string || "all";
+            const pagePaths = formData.get("pagePaths") as string || "";
+ 
             await (prisma as any).redirectRule.create({
                 data: {
                     shop,
@@ -159,6 +164,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     endTime,
                     daysOfWeek,
                     timezone,
+                    pageTargetingType,
+                    pagePaths,
                 } as any,
             });
             return json({ success: true, message: "Rule created successfully" });
@@ -175,11 +182,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = formData.get("ruleType") as string || "redirect";
             const redirectMode = formData.get("redirectMode") as string || "popup";
+            const daysOfWeek = formData.get("daysOfWeek") as string;
+            const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
-            const daysOfWeek = formData.get("daysOfWeek") as string;
-            const timezone = formData.get("timezone") as string;
+            const pageTargetingType = formData.get("pageTargetingType") as string || "all";
+            const pagePaths = formData.get("pagePaths") as string || "";
 
             await prisma.redirectRule.update({
                 where: { id, shop },
@@ -195,6 +204,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     endTime,
                     daysOfWeek,
                     timezone,
+                    pageTargetingType,
+                    pagePaths,
                 } as any,
             });
             return json({ success: true, message: "Rule updated successfully" });
@@ -246,6 +257,8 @@ export default function RulesPage() {
     const [endTime, setEndTime] = useState("17:00");
     const [activeDays, setActiveDays] = useState<string[]>(["1", "2", "3", "4", "5"]); // Mon-Fri default
     const [timezone, setTimezone] = useState("Asia/Ho_Chi_Minh");
+    const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
+    const [pagePaths, setPagePaths] = useState("");
 
     // Autocomplete state
     const [inputValue, setInputValue] = useState("");
@@ -291,6 +304,8 @@ export default function RulesPage() {
             setEndTime(editingRule.endTime || "17:00");
             setActiveDays(editingRule.daysOfWeek ? editingRule.daysOfWeek.split(",") : ["1", "2", "3", "4", "5"]);
             setTimezone(editingRule.timezone || "Asia/Ho_Chi_Minh");
+            setPageTargetingType([editingRule.pageTargetingType || "all"]);
+            setPagePaths(editingRule.pagePaths || "");
             setExpandedRegions([]); // Reset expansion
         } else {
             setFormName("");
@@ -304,6 +319,8 @@ export default function RulesPage() {
             setEndTime("17:00");
             setActiveDays(["1", "2", "3", "4", "5"]);
             setTimezone("Asia/Ho_Chi_Minh");
+            setPageTargetingType(["all"]);
+            setPagePaths("");
             setExpandedRegions([]);
         }
         setInputValue("");
@@ -334,12 +351,15 @@ export default function RulesPage() {
         formData.append("endTime", endTime);
         formData.append("daysOfWeek", activeDays.join(","));
         formData.append("timezone", timezone);
+        formData.append("pageTargetingType", pageTargetingType[0]);
+        formData.append("pagePaths", pagePaths);
 
         fetcher.submit(formData, { method: "POST" });
         handleCloseModal();
     }, [
         editingRule, formName, selectedCountries, formTargetUrl, formPriority,
         formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
+        pageTargetingType, pagePaths,
         fetcher, handleCloseModal
     ]);
 
@@ -799,6 +819,57 @@ export default function RulesPage() {
                                 />
                             </BlockStack>
                         )}
+
+                        <Divider />
+                        <BlockStack gap="200">
+                            <Text as="h3" variant="headingSm">Page Targeting</Text>
+                            <ChoiceList
+                                title="Apply to"
+                                choices={[
+                                    { label: "All Pages", value: "all" },
+                                    {
+                                        label: (
+                                            <InlineStack gap="200">
+                                                <span>Specific Pages</span>
+                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
+                                            </InlineStack>
+                                        ),
+                                        value: "include",
+                                        disabled: !hasProPlan
+                                    },
+                                    {
+                                        label: (
+                                            <InlineStack gap="200">
+                                                <span>Exclude Pages</span>
+                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
+                                            </InlineStack>
+                                        ),
+                                        value: "exclude",
+                                        disabled: !hasProPlan
+                                    },
+                                ]}
+                                selected={pageTargetingType}
+                                onChange={(val) => {
+                                    if (!hasProPlan && val[0] !== "all") {
+                                        setShowUpgradeModal(true);
+                                    } else {
+                                        setPageTargetingType(val);
+                                    }
+                                }}
+                            />
+
+                            {pageTargetingType[0] !== "all" && (
+                                <TextField
+                                    label="Paths"
+                                    value={pagePaths}
+                                    onChange={setPagePaths}
+                                    multiline={3}
+                                    placeholder="/products/*, /collections/summer-sale, /pages/about-us"
+                                    helpText="Enter one path per line or separated by commas. Use * for wildcards."
+                                    autoComplete="off"
+                                />
+                            )}
+                        </BlockStack>
                     </FormLayout>
                 </Modal.Section>
             </Modal>
