@@ -293,7 +293,7 @@ export default function Index() {
             font-size: 13px;
           }
           .traffic-table th {
-            padding: 10px 16px;
+            padding: 8px 16px;
             text-align: left;
             font-weight: 500;
             color: var(--p-color-text-secondary, #6d7175);
@@ -307,7 +307,7 @@ export default function Index() {
             text-align: right;
           }
           .traffic-table td {
-            padding: 10px 16px;
+            padding: 8px 16px;
             border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
           }
           .traffic-table td.text-right {
