@@ -298,7 +298,7 @@ export default function Index() {
             .equal-height-container {
               display: flex;
               align-items: stretch;
-              gap: var(--p-space-400);
+              gap: var(--p-space-500);
             }
             .equal-height-container > .left-column {
               flex: 1;
@@ -379,8 +379,6 @@ export default function Index() {
 
 
 
-        {/* Main Section */}
-        <Layout>
         {/* Main Section using Flex for Equal Height */}
         <div className="equal-height-container">
           {/* Left: Visits Table */}
@@ -474,7 +472,6 @@ export default function Index() {
             </BlockStack>
           </div>
         </div>
-        </Layout>
 
         {/* Banners/Popups and Instant Redirects - Side by Side */}
         <Layout>
