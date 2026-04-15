@@ -17,6 +17,7 @@ import {
   ProgressBar,
   useIndexResourceState,
   useBreakpoints,
+  List,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -404,11 +405,42 @@ export default function Index() {
                 <BlockStack gap="400">
                   <BlockStack gap="200">
                     <Text as="h3" variant="headingMd">Theme Integration</Text>
-                    <Text as="p" tone="subdued">Control visibility via Theme Editor.</Text>
+                    <Text as="p" tone="subdued">Follow these steps to enable the app on your store.</Text>
                   </BlockStack>
                   <Card background="bg-surface-secondary">
                     <BlockStack gap="400">
-                      <Text as="p">To enable/disable, verify App Embed status.</Text>
+                        <InlineStack gap="300" blockAlign="center">
+                            <div
+                                style={{
+                                    width: "28px",
+                                    height: "28px",
+                                    borderRadius: "50%",
+                                    background: "#005bd3",
+                                    color: "#fff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "700",
+                                    fontSize: "12px",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                1
+                            </div>
+                            <Text as="h2" variant="headingSm">
+                                Enable App Embed
+                            </Text>
+                        </InlineStack>
+                        <BlockStack gap="200">
+                            <Text as="p" variant="bodySm" tone="subdued">
+                                The app works via a Theme App Embed. You must enable it in your Shopify Theme Editor.
+                            </Text>
+                            <List type="bullet">
+                                <List.Item><Text as="span" variant="bodySm">Click "App embeds" in the left panel.</Text></List.Item>
+                                <List.Item><Text as="span" variant="bodySm">Find "Geo: Redirect & Country Block" and toggle it ON.</Text></List.Item>
+                                <List.Item><Text as="span" variant="bodySm">Click Save in the top right corner.</Text></List.Item>
+                            </List>
+                        </BlockStack>
                       <Button variant="primary" onClick={handleOpenThemeEditor} fullWidth>Open Theme Editor</Button>
                     </BlockStack>
                   </Card>
