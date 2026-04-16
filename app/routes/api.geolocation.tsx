@@ -94,21 +94,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? settings.excludedIPs.split(',').map(ip => ip.trim()).includes(visitorIP)
             : false;
 
-        // VPN/Proxy Detection
+        // VPN/Proxy & Apple Private Relay Detection
         let vpnBlocked = false;
         if (settings.blockVpn && !isIPExcluded && visitorIP !== "0.0.0.0" && visitorIP !== "127.0.0.1" && visitorIP !== "::1") {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+
             try {
                 // Using ip-api.com for basic VPN/Proxy detection
-                // Note: For high traffic, integrate with MaxMind Anonymous IP or a dedicated VPN service.
-                const proxyResponse = await fetch(`http://ip-api.com/json/${visitorIP}?fields=proxy,hosting`);
+                const proxyResponse = await fetch(
+                    `http://ip-api.com/json/${visitorIP}?fields=status,message,proxy,hosting,isp,org`,
+                    { signal: controller.signal }
+                );
+                
                 if (proxyResponse.ok) {
                     const data = await proxyResponse.json();
-                    if (data.proxy || data.hosting) {
-                        vpnBlocked = true;
+                    
+                    if (data.status === "success") {
+                        const isProxyOrHosting = data.proxy || data.hosting;
+                        const isAppleRelay = (data.isp && data.isp.includes('iCloud Private Relay')) || 
+                                           (data.org && data.org.includes('Apple Inc.') && data.proxy);
+                        
+                        if (isProxyOrHosting || isAppleRelay) {
+                            vpnBlocked = true;
+                            console.log(`[Geopro VPN Block] Blocked IP: ${visitorIP} | Reason: ${isAppleRelay ? 'Apple Private Relay' : 'VPN/Proxy/Hosting'}`);
+                        }
+                    } else {
+                        console.warn(`[Geopro VPN Check] API returned error for ${visitorIP}: ${data.message}`);
                     }
                 }
-            } catch (err) {
-                console.error("[Geopro VPN Check] Error resolving proxy for IP", visitorIP, err);
+            } catch (err: any) {
+                if (err.name === 'AbortError') {
+                    console.warn(`[Geopro VPN Check] API timeout for IP ${visitorIP} (2s reached)`);
+                } else {
+                    console.error("[Geopro VPN Check] Error resolving proxy for IP", visitorIP, err);
+                }
+                // Fail-open logic remains: vpnBlocked is false
+            } finally {
+                clearTimeout(timeoutId);
             }
         }
 

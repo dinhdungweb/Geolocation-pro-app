@@ -62,7 +62,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // Validate event type against whitelist
-        const VALID_TYPES = ['visit', 'popup_shown', 'redirected', 'auto_redirected', 'blocked', 'ip_redirected', 'ip_blocked', 'clicked_no', 'dismissed'];
+        const VALID_TYPES = ['visit', 'popup_shown', 'redirected', 'auto_redirected', 'blocked', 'ip_redirected', 'ip_blocked', 'clicked_no', 'dismissed', 'vpn_blocked'];
         if (!VALID_TYPES.includes(type)) {
             return json({ error: "Invalid event type" }, { status: 400 });
         }
@@ -77,6 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'auto_redirected') action = 'auto_redirect';
             if (type === 'ip_redirected') action = 'ip_redirect';
             if (type === 'ip_blocked') action = 'ip_block';
+            if (type === 'vpn_blocked') action = 'vpn_block';
             if (type === 'clicked_no') action = 'declined';
             if (type === 'dismissed') action = 'dismissed';
             if (type === 'popup_shown') action = 'popup_shown';
@@ -90,14 +91,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         city: null,
                         action,
                         ruleName: ruleName || null,
-                        targetUrl: data.targetUrl || null, // Assuming targetUrl might be passed, or we can infer it? For now null is fine or we can add it to frontend payload if needed.
+                        targetUrl: data.targetUrl || null,
                         userAgent,
                         path: path || null,
                     }
                 });
             } catch (logError) {
                 console.error('[Analytics] Error saving visitor log:', logError);
-                // Don't fail the request if logging fails
             }
         }
 
@@ -110,7 +110,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'visit') updateData.visitors = { increment: 1 };
             if (type === 'popup_shown') updateData.popupShown = { increment: 1 };
             if (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') updateData.redirected = { increment: 1 };
-            if (type === 'blocked' || type === 'ip_blocked') updateData.blocked = { increment: 1 };
+            if (type === 'blocked' || type === 'ip_blocked' || type === 'vpn_blocked') updateData.blocked = { increment: 1 };
 
             if (Object.keys(updateData).length > 0) {
                 await (prisma as any).analyticsCountry.upsert({
@@ -129,7 +129,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         visitors: type === 'visit' ? 1 : 0,
                         popupShown: type === 'popup_shown' ? 1 : 0,
                         redirected: (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
-                        blocked: (type === 'blocked' || type === 'ip_blocked') ? 1 : 0,
+                        blocked: (type === 'blocked' || type === 'ip_blocked' || type === 'vpn_blocked') ? 1 : 0,
                     },
                 });
             }
@@ -144,6 +144,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'clicked_no') updateRuleData.clickedNo = { increment: 1 };
             if (type === 'dismissed') updateRuleData.dismissed = { increment: 1 };
             if (type === 'ip_blocked') updateRuleData.blocked = { increment: 1 };
+            // Note: vpn_blocked typically won't have a ruleId unless it's the "vpn-shield" virtual rule
 
             if (Object.keys(updateRuleData).length > 0) {
                 await (prisma as any).analyticsRule.upsert({
@@ -168,16 +169,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         autoRedirected: (type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
                         clickedNo: type === 'clicked_no' ? 1 : 0,
                         dismissed: type === 'dismissed' ? 1 : 0,
+                        blocked: (type === 'ip_blocked') ? 1 : 0,
                     },
                 });
             }
         }
 
         // 3. Update Monthly Usage (for billing and statistics)
-        // ONLY count billable events: popup_shown, redirected, auto_redirected, blocked, ip_redirected, ip_blocked
-        // We EXCLUDED 'visit' (standard traffic) from billing as per user request
+        // ONLY count billable events: popup_shown, redirected, auto_redirected, blocked, ip_redirected, ip_blocked, vpn_blocked
         if (type === 'popup_shown' || type === 'redirected' || type === 'auto_redirected' || type === 'blocked' ||
-            type === 'ip_redirected' || type === 'ip_blocked') {
+            type === 'ip_redirected' || type === 'ip_blocked' || type === 'vpn_blocked') {
             const now = new Date();
             const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -188,7 +189,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') {
                 usageUpdateData.redirected = { increment: 1 };
             }
-            if (type === 'blocked' || type === 'ip_blocked') {
+            if (type === 'blocked' || type === 'ip_blocked' || type === 'vpn_blocked') {
                 usageUpdateData.blocked = { increment: 1 };
             }
             if (type === 'popup_shown') {
@@ -206,9 +207,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 create: {
                     shop,
                     yearMonth,
-                    totalVisitors: (type !== 'redirected') ? 1 : 0,
+                    totalVisitors: 1,
                     redirected: (type === 'redirected' || type === 'auto_redirected' || type === 'ip_redirected') ? 1 : 0,
-                    blocked: (type === 'blocked' || type === 'ip_blocked') ? 1 : 0,
+                    blocked: (type === 'blocked' || type === 'ip_blocked' || type === 'vpn_blocked') ? 1 : 0,
                     popupShown: type === 'popup_shown' ? 1 : 0,
                 },
             });

@@ -36,7 +36,6 @@ model RedirectRule {
   isActive        Boolean  @default(true)
   priority        Int      @default(0)
   ruleType        String   @default("redirect")
-  redirectMode    String   @default("popup")
   scheduleEnabled Boolean  @default(false)
   startTime       String?
   endTime         String?
@@ -46,7 +45,8 @@ model RedirectRule {
   updatedAt       DateTime @updatedAt
   ipAddresses     String   @default("")
   matchType       String   @default("country")
-  pageTargetingType String   @default("all") // "all", "include", "exclude"
+  redirectMode    String   @default("popup")
+  pageTargetingType String   @default("all")
   pagePaths         String?  @db.Text
 
   @@index([shop])
@@ -54,33 +54,33 @@ model RedirectRule {
 }
 
 model Settings {
-  id             String   @id @default(uuid())
-  shop           String   @unique
-  isEnabled      Boolean  @default(true)
-  mode           String   @default("popup")
-  template       String   @default("modal")
-  popupTitle     String   @default("Would you like to switch to a local version?")
-  popupMessage   String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
-  confirmBtnText String   @default("Go now")
-  cancelBtnText  String   @default("Stay here")
-  popupBgColor   String   @default("#ffffff")
-  popupTextColor String   @default("#333333")
-  popupBtnColor  String   @default("#007bff")
-  blockedTitle   String   @default("Access Denied")
-  blockedMessage String   @default("We do not offer services in your country/region.")
-  excludeBots    Boolean  @default(true)
-  excludedIPs    String   @default("")
-  cookieDuration Int      @default(7)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  currentPlan    String   @default("free")
-  emailSenderName  String?  @default("Geo Admin")
+  id               String   @id @default(uuid())
+  shop             String   @unique
+  mode             String   @default("popup")
+  template         String   @default("modal")
+  popupTitle       String   @default("Would you like to switch to a local version?")
+  popupMessage     String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
+  confirmBtnText   String   @default("Go now")
+  cancelBtnText    String   @default("Stay here")
+  popupBgColor     String   @default("#ffffff")
+  popupTextColor   String   @default("#333333")
+  popupBtnColor    String   @default("#007bff")
+  blockedTitle     String   @default("Access Denied")
+  blockedMessage   String   @default("We do not offer services in your country/region.")
+  excludeBots      Boolean  @default(true)
+  excludedIPs      String   @default("")
+  cookieDuration   Int      @default(7)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  currentPlan      String   @default("free")
   emailSenderEmail String?  @default("noreply@geopro.bluepeaks.top")
+  emailSenderName  String?  @default("Geo Admin")
   smtpHost         String?
-  smtpPort         Int?
-  smtpUser         String?
   smtpPass         String?
+  smtpPort         Int?
   smtpSecure       Boolean  @default(true)
+  smtpUser         String?
+  isEnabled        Boolean  @default(true)
   blockVpn         Boolean  @default(false)
 }
 
@@ -122,13 +122,13 @@ model MonthlyUsage {
   id              String   @id @default(uuid())
   shop            String
   yearMonth       String
-  totalVisitors   Int      @default(0) // Total affected = redirected + blocked + popupShown
+  totalVisitors   Int      @default(0)
   redirected      Int      @default(0)
   blocked         Int      @default(0)
-  popupShown      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   chargedVisitors Int      @default(0)
+  popupShown      Int      @default(0)
 
   @@unique([shop, yearMonth])
   @@index([shop])
@@ -144,7 +144,6 @@ model VisitorLog {
   ruleName    String?
   targetUrl   String?
   userAgent   String?
-  path        String?
   timestamp   DateTime @default(now())
 
   @@index([shop, timestamp])
@@ -153,12 +152,12 @@ model VisitorLog {
 model AdminEmailLog {
   id        String   @id @default(uuid())
   shop      String
-  type      String   // 'welcome', 'limit_80', 'limit_100', 'manual'
+  type      String
   subject   String?
-  status    String   @default("sent") // 'sent', 'failed'
+  status    String   @default("sent")
   error     String?
-  html      String?  @db.Text
   createdAt DateTime @default(now())
+  html      String?
 
   @@index([shop, type])
 }
@@ -166,14 +165,14 @@ model AdminEmailLog {
 model Automation {
   id        String   @id @default(uuid())
   shop      String
-  type      String   // 'welcome', 'limit_80', 'limit_100'
-  name      String?  @default("Untitled Automation")
+  type      String
   subject   String?
-  config    String   @default("[]") // Stores JSON nodes for the flow
-  html      String   @default("")   // Final generated HTML (for the first email action)
+  config    String   @default("[]")
+  html      String   @default("")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  name      String?  @default("Untitled Automation")
 
   @@unique([shop, type])
   @@index([shop])
@@ -184,7 +183,7 @@ model EmailTemplate {
   shop      String
   name      String
   subject   String?
-  config    String   @default("[]") // For JSON builder
+  config    String   @default("[]")
   html      String?  @default("")
   thumb     String?
   createdAt DateTime @default(now())
@@ -194,20 +193,20 @@ model EmailTemplate {
 }
 
 model Campaign {
-  id              String   @id @default(uuid())
-  shop            String
-  name            String
-  subject         String
-  templateId      String?
-  status          String   @default("draft") // 'draft', 'scheduled', 'sent'
-  sentCount       Int      @default(0)
-  openCount       Int      @default(0)
-  clickCount      Int      @default(0)
-  salesAmount     Decimal  @default(0) @db.Decimal(12, 2)
-  scheduledAt     DateTime?
-  sentAt          DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String    @id @default(uuid())
+  shop        String
+  name        String
+  subject     String
+  templateId  String?
+  status      String    @default("draft")
+  sentCount   Int       @default(0)
+  openCount   Int       @default(0)
+  clickCount  Int       @default(0)
+  salesAmount Decimal   @default(0) @db.Decimal(12, 2)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([shop, status])
 }
