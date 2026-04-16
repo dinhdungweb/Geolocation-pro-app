@@ -343,12 +343,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }, { headers });
         }
 
-        // Check if visitor IP is in excluded list
-        const excludedIPsList = effectiveSettings.excludedIPs
-            ? effectiveSettings.excludedIPs.split(",").map((ip: string) => ip.trim())
-            : [];
-        const isIPExcluded = excludedIPsList.includes(visitorIP);
-
         // Filter country rules based on plan (Block Access is Pro)
         const countryRulesToServe = (currentPlan === FREE_PLAN)
             ? pageFilteredCountryRules.filter(r => r.ruleType !== 'block')
