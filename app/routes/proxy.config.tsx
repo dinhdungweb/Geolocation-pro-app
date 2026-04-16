@@ -109,6 +109,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 blockedMessage: true,
                 template: true,
                 currentPlan: true,
+                blockVpn: true,
             },
         });
 
@@ -158,6 +159,52 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 pagePaths: true,
             },
         });
+
+        // VPN/Proxy & Apple Private Relay Detection
+        let vpnBlocked = false;
+        
+        // If settings not found yet, we'll check it after auto-creation if needed, 
+        // but for now let's use the loaded settings or sensible defaults.
+        const blockVpnEnabled = settings?.blockVpn ?? false;
+        const excludedIPs = settings?.excludedIPs ?? "";
+        const isIPExcluded = excludedIPs.split(",").map((ip: string) => ip.trim()).includes(visitorIP);
+
+        if (blockVpnEnabled && !isIPExcluded && visitorIP !== "0.0.0.0" && visitorIP !== "127.0.0.1" && visitorIP !== "::1") {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+
+            try {
+                const proxyResponse = await fetch(
+                    `http://ip-api.com/json/${visitorIP}?fields=status,message,proxy,hosting,isp,org`,
+                    { signal: controller.signal }
+                );
+                
+                if (proxyResponse.ok) {
+                    const data = await proxyResponse.json();
+                    
+                    if (data.status === "success") {
+                        const isProxyOrHosting = data.proxy || data.hosting;
+                        const isAppleRelay = (data.isp && data.isp.includes('iCloud Private Relay')) || 
+                                           (data.org && data.org.includes('Apple Inc.') && data.proxy);
+                        
+                        if (isProxyOrHosting || isAppleRelay) {
+                            vpnBlocked = true;
+                            console.log(`[Proxy VPN Block] Blocked IP: ${visitorIP} | Reason: ${isAppleRelay ? 'Apple Private Relay' : 'VPN/Proxy/Hosting'}`);
+                        }
+                    } else {
+                        console.warn(`[Proxy VPN Check] API returned error for ${visitorIP}: ${data.message}`);
+                    }
+                }
+            } catch (err: any) {
+                if (err.name === 'AbortError') {
+                    console.warn(`[Proxy VPN Check] API timeout for IP ${visitorIP} (2s reached)`);
+                } else {
+                    console.error("[Proxy VPN Check] Error resolving proxy for IP", visitorIP, err);
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
 
         // Filter country rules based on schedule
         const activeCountryRules = countryRules.filter(rule => {
@@ -264,6 +311,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 excludeBots: true, excludedIPs: true, cookieDuration: true,
                 blockedTitle: true, blockedMessage: true, template: true,
                 currentPlan: true,
+                blockVpn: true,
             },
         });
         console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
@@ -358,6 +406,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             rules: transformedCountryRules, // Country rules
             ipRules: transformedIPRules, // IP rules
             currentPath, // Feedback path
+            vpnBlocked, // Send VPN block status
         };
 
         console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, path: ${currentPath}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);

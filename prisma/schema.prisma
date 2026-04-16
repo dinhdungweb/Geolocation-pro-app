@@ -28,26 +28,26 @@ model Session {
 }
 
 model RedirectRule {
-  id              String   @id @default(uuid())
-  shop            String
-  name            String
-  countryCodes    String   @default("")
-  targetUrl       String   @default("")
-  isActive        Boolean  @default(true)
-  priority        Int      @default(0)
-  ruleType        String   @default("redirect")
-  scheduleEnabled Boolean  @default(false)
-  startTime       String?
-  endTime         String?
-  daysOfWeek      String?
-  timezone        String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  ipAddresses     String   @default("")
-  matchType       String   @default("country")
-  redirectMode    String   @default("popup")
+  id                String   @id @default(uuid())
+  shop              String
+  name              String
+  countryCodes      String   @default("")
+  targetUrl         String   @default("")
+  isActive          Boolean  @default(true)
+  priority          Int      @default(0)
+  ruleType          String   @default("redirect")
+  scheduleEnabled   Boolean  @default(false)
+  startTime         String?
+  endTime           String?
+  daysOfWeek        String?
+  timezone          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  ipAddresses       String   @default("")
+  matchType         String   @default("country")
+  redirectMode      String   @default("popup")
+  pagePaths         String?
   pageTargetingType String   @default("all")
-  pagePaths         String?  @db.Text
 
   @@index([shop])
   @@index([shop, matchType])
@@ -111,9 +111,9 @@ model AnalyticsRule {
   clickedNo      Int      @default(0)
   dismissed      Int      @default(0)
   autoRedirected Int      @default(0)
-  blocked        Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  blocked        Int      @default(0)
 
   @@unique([shop, date, ruleId])
   @@index([shop, date])
@@ -145,8 +145,8 @@ model VisitorLog {
   ruleName    String?
   targetUrl   String?
   userAgent   String?
-  path        String?
   timestamp   DateTime @default(now())
+  path        String?
 
   @@index([shop, timestamp])
 }
