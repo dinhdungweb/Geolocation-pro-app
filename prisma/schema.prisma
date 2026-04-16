@@ -111,6 +111,7 @@ model AnalyticsRule {
   clickedNo      Int      @default(0)
   dismissed      Int      @default(0)
   autoRedirected Int      @default(0)
+  blocked        Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
