@@ -145,6 +145,7 @@ model VisitorLog {
   ruleName    String?
   targetUrl   String?
   userAgent   String?
+  path        String?
   timestamp   DateTime @default(now())
 
   @@index([shop, timestamp])
