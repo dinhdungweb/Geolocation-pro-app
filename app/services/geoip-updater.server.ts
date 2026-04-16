@@ -63,8 +63,8 @@ export async function updateGeoIPDatabase() {
         }
 
         // Convert web stream to Node readable stream
-        // @ts-ignore
-        const nodeStream = Readable.fromWeb(response.body);
+        // Using Readable.from because fromWeb has compatibility issues in some Node versions
+        const nodeStream = Readable.from(response.body as any);
 
         await new Promise((resolve, reject) => {
             nodeStream.pipe(
