@@ -105,17 +105,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     });
 
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     for (const shop of selectedShops) {
-        const res = await sendAdminEmail({
-            shop,
-            type: 'manual',
-            subject,
-            html
-        });
+        let attempts = 0;
+        let res: any = { success: false, error: 'Initial' };
+
+        // Retry logic (Max 2 attempts)
+        while (attempts < 2 && !res.success) {
+            if (attempts > 0) {
+                console.log(`[Campaign] Retrying send for ${shop} (Attempt ${attempts + 1})`);
+                await sleep(1000); // Wait 1s before retry
+            }
+            
+            res = await sendAdminEmail({
+                shop,
+                type: 'manual',
+                subject,
+                html
+            });
+            attempts++;
+        }
+
         results.push({ shop, ...res });
+        
+        // Rate limiting delay between different shops
+        await sleep(300); 
     }
 
     const successCount = results.filter(r => r.success).length;
+    const failCount = results.length - successCount;
     
     // Update campaign record
     await (prisma as any).campaign.update({
@@ -127,7 +146,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     });
 
-    return json({ success: true, message: `Successfully sent to ${successCount} out of ${selectedShops.length} shops.` });
+    return json({ 
+        success: true, 
+        message: `Campaign complete: ${successCount} successful, ${failCount} failed.` 
+    });
 };
 
 export default function EmailComposer() {
