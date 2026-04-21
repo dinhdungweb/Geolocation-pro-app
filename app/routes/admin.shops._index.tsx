@@ -23,7 +23,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ]);
 
     const rulesMap = new Map(ruleCounts.map((r: any) => [r.shop, r._count.id]));
-    const usageMap = new Map(usage.map((u: any) => [u.shop, u]));
+    
+    // Create usage map - since usage is ordered by yearMonth DESC, 
+    // we want the FIRST occurrence for each shop (the latest month)
+    const usageMap = new Map();
+    usage.forEach((u: any) => {
+        if (!usageMap.has(u.shop)) {
+            usageMap.set(u.shop, u);
+        }
+    });
 
     return json({ 
         shops: shops.map((s: any) => ({
