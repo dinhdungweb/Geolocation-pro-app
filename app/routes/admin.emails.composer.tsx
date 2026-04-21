@@ -60,8 +60,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                         await prisma.session.updateMany({ where: { shop: s.shop }, data: { email } });
                     }
                 }
-            } catch (e) {
-                console.error(`[EmailSync] Failed to fetch email for ${s.shop}:`, e);
+            } catch (e: any) {
+                // Ignore 404s or auth errors for ghost shops
+                if (e?.response?.code !== 404) {
+                    console.error(`[EmailSync] Skip background sync for ${s.shop}: Authentication or Shop not found.`);
+                }
             }
         }
 
