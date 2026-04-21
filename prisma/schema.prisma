@@ -209,6 +209,7 @@ model Campaign {
   sentAt      DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  html        String?
 
   @@index([shop, status])
 }

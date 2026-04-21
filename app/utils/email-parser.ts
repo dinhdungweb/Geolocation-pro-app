@@ -14,8 +14,8 @@ export function replaceEmailVariables(
     const replacements: Record<string, string> = {
         '{shop}': data.shop,
         '{shop_name}': data.shopName || data.shop,
-        '{usage}': (data.usage || 0).toLocaleString(),
-        '{limit}': (data.limit || 0).toLocaleString(),
+        '[Shop Name]': data.shopName || data.shop,
+        '[shop_name]': data.shopName || data.shop,
         '{year}': now.getFullYear().toString()
     };
 
