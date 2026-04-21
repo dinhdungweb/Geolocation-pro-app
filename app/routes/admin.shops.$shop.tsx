@@ -222,9 +222,13 @@ export default function AdminShopDetail() {
                 .plan-badge-premium {
                     padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 800;
                     display: flex; align-items: center; gap: 8px;
-                    background: ${hasProPlan ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)' : '#f8fafc'};
-                    color: ${hasProPlan ? '#059669' : '#64748b'};
-                    border: 1px solid ${hasProPlan ? '#10b98133' : '#e2e8f0'};
+                    ${(() => {
+                        const plan = (currentPlan || 'FREE').toUpperCase();
+                        if (plan === 'ELITE') return 'background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); color: #7c3aed; border: 1px solid #7c3aed33; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);';
+                        if (plan === 'PLUS') return 'background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #059669; border: 1px solid #05966933;';
+                        if (plan === 'PREMIUM') return 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #4f46e5; border: 1px solid #4f46e533;';
+                        return 'background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0;';
+                    })()}
                 }
 
                 .stats-grid-v3 { 

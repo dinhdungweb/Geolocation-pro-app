@@ -42,10 +42,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }, {});
 
     // Est. Revenue
-    // Plus: $8, Premium: $5 (Based on UI screenshots found in codebase)
     const revenueMap: Record<string, number> = {
-        'PLUS': 8,
-        'PREMIUM': 5,
+        'ELITE': 14.99,
+        'PLUS': 7.99,
+        'PREMIUM': 4.99,
         'FREE': 0
     };
     

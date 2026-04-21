@@ -20,7 +20,7 @@ export const getWelcomeEmailHtml = (shop: string) => `
         <p>Best regards,<br>The Geo Support Team</p>
     </div>
     <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777;">
-        &copy; 2024 Geo: Redirect & Country Block. All rights reserved.
+        &copy; ${new Date().getFullYear()} Geo: Redirect & Country Block. All rights reserved.
     </div>
 </div>
 `;
@@ -43,6 +43,9 @@ export const getLimit80EmailHtml = (shop: string, usage: number, limit: number) 
         </div>
         <p>Best regards,<br>The Geo Support Team</p>
     </div>
+    <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777;">
+        &copy; ${new Date().getFullYear()} Geo: Redirect & Country Block. All rights reserved.
+    </div>
 </div>
 `;
 
@@ -63,6 +66,9 @@ export const getLimit100EmailHtml = (shop: string, usage: number, limit: number)
             <a href="https://${shop}/admin/apps/geo-redirect-country-block/app/pricing" style="background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Upgrade Now</a>
         </div>
         <p>Best regards,<br>The Geo Support Team</p>
+    </div>
+    <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777;">
+        &copy; ${new Date().getFullYear()} Geo: Redirect & Country Block. All rights reserved.
     </div>
 </div>
 `;

@@ -142,12 +142,20 @@ export default function AdminShops() {
                 .plan-badge {
                     padding: 6px 12px;
                     border-radius: 8px;
-                    font-size: 12px;
-                    font-weight: 700;
+                    font-size: 11px;
+                    font-weight: 800;
                     text-transform: uppercase;
+                    letter-spacing: 0.02em;
                 }
-                .plan-free { background: #f1f5f9; color: #64748b; }
-                .plan-pro { background: #eef2ff; color: #6366f1; }
+                .plan-free { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+                .plan-premium { background: #eef2ff; color: #6366f1; border: 1px solid #c7d2fe; }
+                .plan-plus { background: #ecfdf5; color: #10b981; border: 1px solid #a7f3d0; }
+                .plan-elite { 
+                    background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); 
+                    color: #a855f7; 
+                    border: 1px solid #e9d5ff;
+                    box-shadow: 0 2px 4px rgba(168, 85, 247, 0.1);
+                }
 
                 .mode-tag {
                     display: inline-flex;
@@ -290,9 +298,19 @@ export default function AdminShops() {
                                             </Link>
                                         </td>
                                         <td>
-                                            <span className={`plan-badge ${(shop.currentPlan || '').toUpperCase() === 'FREE' ? 'plan-free' : 'plan-pro'}`}>
-                                                {(shop.currentPlan || 'FREE').toUpperCase()}
-                                            </span>
+                                            {(() => {
+                                                const plan = (shop.currentPlan || 'FREE').toUpperCase();
+                                                let badgeClass = 'plan-free';
+                                                if (plan === 'PREMIUM') badgeClass = 'plan-premium';
+                                                if (plan === 'PLUS') badgeClass = 'plan-plus';
+                                                if (plan === 'ELITE') badgeClass = 'plan-elite';
+                                                
+                                                return (
+                                                    <span className={`plan-badge ${badgeClass}`}>
+                                                        {plan}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td>
                                             <div className="mode-tag">
