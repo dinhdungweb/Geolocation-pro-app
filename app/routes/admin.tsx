@@ -41,14 +41,9 @@ export default function AdminLayout() {
         setIsMounted(true);
     }, []);
 
-    // Close sidebar on route change (mobile)
     useEffect(() => {
         setIsSidebarOpen(false);
     }, [location.pathname]);
-
-    if (isLoginPage) {
-        return <Outlet />;
-    }
 
     const menuItems = [
         { label: "Dashboard", to: "/admin", icon: <Home size={18} />, end: true },
@@ -70,7 +65,6 @@ export default function AdminLayout() {
     const [openMenus, setOpenMenus] = useState<string[]>([]);
 
     useEffect(() => {
-        // Auto-expand menu if a child is active
         const activeParent = menuItems.find(item => 
             item.children?.some(child => location.pathname === child.to)
         );
@@ -78,6 +72,10 @@ export default function AdminLayout() {
             setOpenMenus(prev => [...prev, activeParent.label]);
         }
     }, [location.pathname]);
+
+    if (isLoginPage) {
+        return <Outlet />;
+    }
 
     const toggleMenu = (label: string) => {
         setOpenMenus(prev => 
