@@ -157,6 +157,22 @@ export default function AutomationsList() {
                 .tag-status { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
                 .tag-active { background: #ecfdf5; color: #059669; }
                 .tag-inactive { background: #f1f5f9; color: #94a3b8; }
+
+                @media (max-width: 1024px) {
+                    .glass-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+                    .banner-premium { flex-direction: column; gap: 12px; align-items: flex-start; padding: 20px; }
+                    .stats-grid-premium { grid-template-columns: repeat(2, 1fr); gap: 24px; padding: 24px; }
+                    .stat-box-premium { border-right: none; border-bottom: 1px solid #f1f5f9; padding: 0 0 16px 0; }
+                    .stat-box-premium:nth-child(2n) { border-right: none; }
+                    .stat-box-premium:last-child { border-bottom: none; }
+                    .table-premium { overflow-x: auto; }
+                    .t-header-row, .t-row { grid-template-columns: 200px 150px 100px 80px 80px 80px 80px 40px; width: fit-content; padding: 16px 20px; }
+                }
+
+                @media (max-width: 480px) {
+                    .stats-grid-premium { grid-template-columns: 1fr; }
+                    .title-group h1 { font-size: 24px; }
+                }
             `}</style>
 
             <div className="glass-header">

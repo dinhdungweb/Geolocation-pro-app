@@ -253,6 +253,23 @@ export default function MessagingDashboard() {
                 .tag-sent { background: #ecfdf5; color: #059669; }
                 .tag-draft { background: #f1f1f1; color: #64748b; }
 
+                @media (max-width: 1024px) {
+                    .glass-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+                    .metrics-grid-v2 { grid-template-columns: 1fr; }
+                    .stats-grid-v2 { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+                    .calendar-grid-v2 { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+                    .table-premium { overflow-x: auto; }
+                    .table-tabs-v2 { min-width: 600px; }
+                    .t-header-v2, .t-row-v2 { grid-template-columns: 250px 100px 80px 100px 100px 80px 80px 120px 40px; width: fit-content; padding: 16px 20px; }
+                }
+
+                @media (max-width: 640px) {
+                    .stats-grid-v2 { grid-template-columns: 1fr; }
+                    .stat-box-v2 .value { font-size: 24px; }
+                    .calendar-grid-v2 { grid-template-columns: repeat(2, 1fr); }
+                    .title-group h1 { font-size: 24px; }
+                }
+
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
             `}</style>
 

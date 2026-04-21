@@ -517,8 +517,44 @@ export default function EmailComposer() {
                 }
 
                 @media (max-width: 1024px) {
-                    .composer-container { grid-template-columns: 1fr; height: auto; }
-                    .editor-sidebar { border-right: none; }
+                    .composer-container { 
+                        grid-template-columns: 1fr; 
+                        height: auto; 
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .editor-sidebar { 
+                        border-right: none; 
+                        width: 100%;
+                        height: auto;
+                        max-height: none;
+                    }
+                    .preview-viewport {
+                        padding: 30px 16px;
+                        width: 100%;
+                        min-height: 100vh;
+                    }
+                    .mac-window {
+                        max-height: none;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                    }
+                    .preview-email-header {
+                        padding: 20px;
+                    }
+                    .preview-subj { font-size: 16px; }
+                }
+                
+                @media (max-width: 480px) {
+                    .plan-filters { gap: 4px; }
+                    .plan-chip { padding: 5px 10px; font-size: 11px; }
+                    .footer-actions { 
+                        flex-direction: column; 
+                        gap: 16px; 
+                        align-items: stretch;
+                        padding: 20px;
+                    }
+                    .btn-submit-premium { width: 100%; justify-content: center; }
                 }
             `}</style>
 
@@ -562,6 +598,7 @@ export default function EmailComposer() {
                             <div className={`plan-chip ${filterPlan === 'free' ? 'active' : ''}`} onClick={() => setFilterPlan('free')}>Free</div>
                             <div className={`plan-chip ${filterPlan === 'premium' ? 'active' : ''}`} onClick={() => setFilterPlan('premium')}>Premium</div>
                             <div className={`plan-chip ${filterPlan === 'plus' ? 'active' : ''}`} onClick={() => setFilterPlan('plus')}>Plus</div>
+                            <div className={`plan-chip ${filterPlan === 'elite' ? 'active' : ''}`} onClick={() => setFilterPlan('elite')}>Elite</div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px 12px' }}>

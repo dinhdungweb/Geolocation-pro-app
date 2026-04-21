@@ -38,9 +38,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         // Calculate distributions
         const plans = settings.reduce((acc: any, s) => {
-            acc[s.currentPlan] = (acc[s.currentPlan] || 0) + 1;
+            const planKey = (s.currentPlan || 'FREE').toUpperCase();
+            acc[planKey] = (acc[planKey] || 0) + 1;
             return acc;
-        }, {});
+        }, {
+            'FREE': 0,
+            'PREMIUM': 0,
+            'PLUS': 0,
+            'ELITE': 0
+        });
 
         // Est. Revenue
         const revenueMap: Record<string, number> = {

@@ -171,6 +171,36 @@ export default function TemplateEditor() {
                     overflow: hidden;
                 }
 
+                @media (max-width: 1200px) {
+                    .editor-main {
+                        grid-template-columns: 1fr;
+                        height: auto;
+                        overflow-y: auto;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .sidebar-left, .sidebar-right { 
+                        width: 100%; 
+                        border: none; 
+                        border-top: 1px solid #e2e8f0; 
+                        height: auto;
+                    }
+                    .canvas-area { 
+                        padding: 20px 10px; 
+                        width: 100%;
+                    }
+                    .canvas-inner { 
+                        width: 100% !important; 
+                        min-height: auto; 
+                    }
+                    .template-editor-page {
+                        position: relative;
+                        height: auto;
+                        min-height: 100vh;
+                        overflow-y: auto;
+                    }
+                }
+
                 .sidebar-left {
                     background: white;
                     border-right: 1px solid #e2e8f0;

@@ -134,6 +134,13 @@ export default function TemplatesGallery() {
                 .template-info-v2 { padding: 20px; }
                 .template-info-v2 .name { font-weight: 700; font-size: 16px; color: #1e293b; display: block; margin-bottom: 4px; }
                 .template-info-v2 .edited { font-size: 12px; color: #94a3b8; font-weight: 500; }
+
+                @media (max-width: 768px) {
+                    .glass-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+                    .actions-group { width: 100%; justify-content: space-between; }
+                    .templates-grid-premium { grid-template-columns: 1fr; gap: 20px; }
+                    .template-preview-v2 { height: 200px; }
+                }
             `}</style>
 
             <div className="glass-header">

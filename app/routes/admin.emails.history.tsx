@@ -84,6 +84,17 @@ export default function EmailHistory() {
                 .modal-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
                 .modal-body { flex: 1; overflow-y: auto; background: #f8fafc; padding: 20px; }
                 .html-preview { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+
+                @media (max-width: 768px) {
+                    .header-flex { flex-direction: column; align-items: flex-start; gap: 12px; }
+                    .filters-bar { flex-direction: column; align-items: stretch; }
+                    .search-pill { width: 100%; }
+                    .filter-select { width: 100%; }
+                    .log-table { overflow-x: auto; border-radius: 12px; }
+                    .t-head, .t-row { grid-template-columns: 200px 180px 100px 120px 80px; width: fit-content; padding: 12px 16px; }
+                    .modal-overlay { padding: 0; }
+                    .modal-content { max-height: 100vh; border-radius: 0; }
+                }
             `}</style>
 
             <div className="header-flex">
