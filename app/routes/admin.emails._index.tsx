@@ -14,7 +14,11 @@ import {
     Filter,
     ArrowUpDown,
     Search,
-    Rocket
+    Rocket,
+    Eye,
+    X,
+    Info,
+    CheckCircle2
 } from "lucide-react";
 
 import prisma from "../db.server";
@@ -28,7 +32,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const logs = await (prisma as any).adminEmailLog.findMany({
         where: { createdAt: { gte: thirtyDaysAgo } },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, type: true, subject: true, status: true, html: true, createdAt: true }
     });
 
     const totalSent = logs.filter((l: any) => l.status === 'sent').length;
@@ -65,7 +70,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             open: "-",
             click: "-",
             conv: "-",
-            sales: "-"
+            sales: "-",
+            html: l.html
         })),
         activityDays,
         campaigns: await (async () => {
@@ -86,6 +92,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function MessagingDashboard() {
     const { stats, activities, activityDays } = useLoaderData<typeof loader>();
     const [activeTab, setActiveTab] = useState("All");
+    const [viewingHtml, setViewingHtml] = useState<string | null>(null);
 
     return (
         <div className="messaging-dashboard-v2">
@@ -98,6 +105,16 @@ export default function MessagingDashboard() {
                     color: #0f172a;
                     background: transparent;
                 }
+
+                /* Modal Review */
+                .modal-overlay-v2 { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+                .modal-content-v2 { width: 90vw; height: 90vh; background: white; border-radius: 24px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+                .modal-header-v2 { padding: 20px 32px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; }
+                .modal-body-v2 { flex: 1; overflow: auto; background: #f1f5f9; padding: 40px; display: flex; justify-content: center; }
+                .iframe-container-v2 { width: 600px; min-height: 800px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+                .iframe-container-v2 iframe { width: 100%; height: 100%; border: none; }
+                .btn-close-v2 { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 8px; cursor: pointer; color: #64748b; transition: all 0.2s; }
+                .btn-close-v2:hover { color: #ef4444; border-color: #ef4444; transform: rotate(90deg); }
                 
                 /* --- Header Section --- */
                 .glass-header {
@@ -389,7 +406,7 @@ export default function MessagingDashboard() {
                 </div>
 
                 {activities.map((act: any) => (
-                    <div key={act.id} className="t-row-v2">
+                    <div key={act.id} className="t-row-v2" onClick={() => act.html ? setViewingHtml(act.html) : null}>
                         <div className="subj-group">
                             <div className="subj-thumb">
                                 <Mail size={20} color="white" />
@@ -410,10 +427,38 @@ export default function MessagingDashboard() {
                         <div style={{ fontWeight: 600 }}>{act.orders}</div>
                         <div style={{ fontWeight: 600 }}>{act.conv}</div>
                         <div style={{ fontWeight: 700, color: '#1e293b' }}>{act.sales}</div>
-                        <div><MoreHorizontal size={18} color="#94a3b8" /></div>
+                        <div className="action-view">
+                            <Eye size={18} color={act.html ? "#6366f1" : "#e2e8f0"} />
+                        </div>
                     </div>
                 ))}
             </div>
+
+            {viewingHtml && (
+                <div className="modal-overlay-v2" onClick={() => setViewingHtml(null)}>
+                    <div className="modal-content-v2" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header-v2">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ background: '#e0f2fe', padding: '10px', borderRadius: '12px' }}>
+                                    <Mail size={24} color="#0369a1" />
+                                </div>
+                                <div>
+                                    <h3 style={{ fontWeight: 800, fontSize: '18px', color: '#1e293b' }}>Email Content Preview</h3>
+                                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Audit Trail: Reviewing sent campaign payload</span>
+                                </div>
+                            </div>
+                            <button className="btn-close-v2" onClick={() => setViewingHtml(null)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body-v2">
+                            <div className="iframe-container-v2">
+                                <iframe title="Email Content" srcDoc={viewingHtml} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
