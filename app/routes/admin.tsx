@@ -33,8 +33,13 @@ export default function AdminLayout() {
     const { username } = useLoaderData<typeof loader>();
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
 
     const isLoginPage = location.pathname === "/admin/login";
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Close sidebar on route change (mobile)
     useEffect(() => {
@@ -437,7 +442,7 @@ export default function AdminLayout() {
                             <span>System Live</span>
                         </div>
                         <div className="topbar-date" style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            {isMounted ? new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '...'}
                         </div>
                     </div>
                 </header>

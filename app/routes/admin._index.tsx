@@ -9,72 +9,83 @@ import { Store, TrendingUp, Gem } from "lucide-react";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
-    const [
-        totalShops,
-        activeRules,
-        totalVisitors,
-        countryStats,
-        settings,
-        monthlyTrends
-    ] = await Promise.all([
-        prisma.settings.count(),
-        prisma.redirectRule.count({ where: { isActive: true } }),
-        prisma.analyticsCountry.aggregate({ _sum: { visitors: true } }),
-        prisma.analyticsCountry.groupBy({
-            by: ['countryCode'],
-            _sum: { visitors: true, redirected: true },
-            orderBy: { _sum: { visitors: 'desc' } },
-            take: 5
-        }),
-        prisma.settings.findMany({ select: { currentPlan: true, mode: true } }),
-        prisma.monthlyUsage.groupBy({
-            by: ['yearMonth'],
-            _sum: { totalVisitors: true, redirected: true },
-            orderBy: { yearMonth: 'desc' },
-            take: 12
-        })
-    ]);
-
-    // Calculate distributions
-    const plans = settings.reduce((acc: any, s) => {
-        acc[s.currentPlan] = (acc[s.currentPlan] || 0) + 1;
-        return acc;
-    }, {});
-
-    // Est. Revenue
-    const revenueMap: Record<string, number> = {
-        'ELITE': 14.99,
-        'PLUS': 7.99,
-        'PREMIUM': 4.99,
-        'FREE': 0
-    };
-    
-    // Normalize currentPlan to uppercase to match revenueMap keys regardless of DB storage case
-    const totalRevenue = settings.reduce((sum, s) => {
-        const planKey = (s.currentPlan || 'FREE').toUpperCase();
-        return sum + (revenueMap[planKey] || 0);
-    }, 0);
-
-    const modes = settings.reduce((acc: any, s) => {
-        acc[s.mode] = (acc[s.mode] || 0) + 1;
-        return acc;
-    }, {});
-
-    return json({ 
-        stats: {
+    try {
+        const [
             totalShops,
             activeRules,
-            totalVisitors: totalVisitors._sum.visitors || 0,
-            estMonthlyRevenue: totalRevenue
-        },
-        countries: countryStats.map(c => ({
-            code: c.countryCode,
-            visitors: c._sum.visitors || 0,
-            redirects: c._sum.redirected || 0
-        })),
-        distributions: { plans, modes },
-        trends: monthlyTrends.reverse()
-    });
+            totalVisitors,
+            countryStats,
+            settings,
+            monthlyTrends
+        ] = await Promise.all([
+            prisma.settings.count(),
+            prisma.redirectRule.count({ where: { isActive: true } }),
+            prisma.analyticsCountry.aggregate({ _sum: { visitors: true } }),
+            prisma.analyticsCountry.groupBy({
+                by: ['countryCode'],
+                _sum: { visitors: true, redirected: true },
+                orderBy: { _sum: { visitors: 'desc' } },
+                take: 5
+            }),
+            prisma.settings.findMany({ select: { currentPlan: true, mode: true } }),
+            prisma.monthlyUsage.groupBy({
+                by: ['yearMonth'],
+                _sum: { totalVisitors: true, redirected: true },
+                orderBy: { yearMonth: 'desc' },
+                take: 12
+            })
+        ]);
+
+        // Calculate distributions
+        const plans = settings.reduce((acc: any, s) => {
+            acc[s.currentPlan] = (acc[s.currentPlan] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Est. Revenue
+        const revenueMap: Record<string, number> = {
+            'ELITE': 14.99,
+            'PLUS': 7.99,
+            'PREMIUM': 4.99,
+            'FREE': 0
+        };
+        
+        // Normalize currentPlan to uppercase to match revenueMap keys regardless of DB storage case
+        const totalRevenue = settings.reduce((sum, s) => {
+            const planKey = (s.currentPlan || 'FREE').toUpperCase();
+            return sum + (revenueMap[planKey] || 0);
+        }, 0);
+
+        const modes = settings.reduce((acc: any, s) => {
+            acc[s.mode] = (acc[s.mode] || 0) + 1;
+            return acc;
+        }, {});
+
+        return json({ 
+            stats: {
+                totalShops,
+                activeRules,
+                totalVisitors: totalVisitors._sum.visitors || 0,
+                estMonthlyRevenue: totalRevenue
+            },
+            countries: countryStats.map(c => ({
+                code: c.countryCode,
+                visitors: c._sum.visitors || 0,
+                redirects: c._sum.redirected || 0
+            })),
+            distributions: { plans, modes },
+            trends: monthlyTrends.reverse()
+        });
+    } catch (error) {
+        console.error("Dashboard Loader Error:", error);
+        // Return a safe empty state to avoid ErrorBoundary crash
+        return json({
+            stats: { totalShops: 0, activeRules: 0, totalVisitors: 0, estMonthlyRevenue: 0 },
+            countries: [],
+            distributions: { plans: {}, modes: {} },
+            trends: []
+        });
+    }
 };
 
 // Helper to fill all 12 months of the current year
