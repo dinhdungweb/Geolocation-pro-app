@@ -18,6 +18,7 @@ import {
     FREE_PLAN,
     PREMIUM_PLAN,
     PLUS_PLAN,
+    ELITE_PLAN,
     ALL_PAID_PLANS,
     PLAN_LIMITS,
     OVERAGE_RATE,
@@ -243,6 +244,18 @@ export default function PricingPage() {
             ],
             hasTrial: true,
         },
+        {
+            name: ELITE_PLAN,
+            price: "14.99",
+            visitorLimit: PLAN_LIMITS[ELITE_PLAN],
+            features: [
+                `${PLAN_LIMITS[ELITE_PLAN]} Visitors / month`,
+                "Includes all Plus features",
+                "VIP Support",
+                "Highest Traffic Priority",
+            ],
+            hasTrial: true,
+        },
     ];
 
     return (
@@ -251,7 +264,7 @@ export default function PricingPage() {
                 <Box paddingBlockStart="200">
                     <Grid>
                         {plans.map((plan) => (
-                            <Grid.Cell key={plan.name} columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
+                            <Grid.Cell key={plan.name} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
                                 <PlanCard
                                     name={plan.name}
                                     price={plan.price}
