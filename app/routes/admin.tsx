@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { Outlet, useLoaderData, NavLink, Form, useLocation } from "@remix-run/react";
+import { Outlet, useLoaderData, NavLink, Form, useLocation, useRouteError, isRouteErrorResponse } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
@@ -466,10 +466,54 @@ export default function AdminLayout() {
 }
 
 export function ErrorBoundary() {
+    const error = useRouteError();
+    console.error("Admin Error:", error);
+
+    let errorMessage = "An unknown error occurred";
+    if (isRouteErrorResponse(error)) {
+        errorMessage = `${error.status} ${error.statusText}`;
+    } else if (error instanceof Error) {
+        errorMessage = error.message;
+    } else if (typeof error === 'string') {
+        errorMessage = error;
+    }
+
     return (
-        <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h1>Oops! Something went wrong.</h1>
-            <p>We couldn't load this page. Please try again.</p>
+        <div style={{ padding: '80px 40px', textAlign: 'center', fontFamily: 'Outfit, sans-serif' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1e293b', marginBottom: '16px' }}>Oops! Something went wrong</h1>
+            <p style={{ color: '#64748b', marginBottom: '24px' }}>We encountered an error while loading the admin panel.</p>
+            
+            <div style={{ 
+                background: '#fef2f2', 
+                border: '1px solid #fee2e2', 
+                color: '#ef4444', 
+                padding: '16px', 
+                borderRadius: '12px',
+                maxWidth: '600px',
+                margin: '0 auto 32px',
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                textAlign: 'left',
+                overflowX: 'auto'
+            }}>
+                <div style={{ fontWeight: 800, marginBottom: '8px' }}>Error Details:</div>
+                {errorMessage}
+            </div>
+
+            <button 
+                onClick={() => window.location.reload()}
+                style={{
+                    background: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                }}
+            >
+                Refresh Page
+            </button>
         </div>
     );
 }
