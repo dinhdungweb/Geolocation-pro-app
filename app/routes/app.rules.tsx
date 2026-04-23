@@ -112,6 +112,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
     const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
+    // hasPlusPlan is kept for reference if needed elsewhere, but we use hasProPlan for import/export
     const hasPlusPlan = currentPlan === PLUS_PLAN || currentPlan === ELITE_PLAN;
 
     return json({ rules, shop, hasProPlan, hasPlusPlan });
@@ -234,14 +235,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (intent === "import") {
-            // Server-side plan check: only Plus and Elite can import
+            // Server-side plan check: Pro (Premium), Plus and Elite can import
             const billingConfig = await billing.check({
                 plans: ALL_PAID_PLANS as any,
                 isTest: false,
             });
-            const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
-            if (currentPlan !== PLUS_PLAN && currentPlan !== ELITE_PLAN) {
-                return json({ success: false, message: "Import is only available on Plus plan and above" }, { status: 403 });
+            const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+            if (!hasProPlan) {
+                return json({ success: false, message: "Import is only available on Pro plan and above" }, { status: 403 });
             }
 
             const rulesJson = formData.get("rulesJson") as string;
@@ -563,7 +564,7 @@ export default function RulesPage() {
             content: "Delete selected",
             onAction: handleBulkDelete,
         },
-        ...(hasPlusPlan ? [{
+        ...(hasProPlan ? [{
             content: "Export selected",
             onAction: () => handleExportRules(false),
         }] : []),
@@ -687,21 +688,21 @@ export default function RulesPage() {
                     <Button
                         icon={ExportIcon}
                         onClick={() => {
-                            if (!hasPlusPlan) { setShowUpgradeModal(true); return; }
+                            if (!hasProPlan) { setShowUpgradeModal(true); return; }
                             handleExportRules(true);
                         }}
                         disabled={rules.length === 0}
                     >
-                        Export All{!hasPlusPlan ? " (Plus)" : ""}
+                        Export All{!hasProPlan ? " (Pro)" : ""}
                     </Button>
                     <Button
                         icon={ImportIcon}
                         onClick={() => {
-                            if (!hasPlusPlan) { setShowUpgradeModal(true); return; }
+                            if (!hasProPlan) { setShowUpgradeModal(true); return; }
                             setImportModalOpen(true);
                         }}
                     >
-                        Import{!hasPlusPlan ? " (Plus)" : ""}
+                        Import{!hasProPlan ? " (Pro)" : ""}
                     </Button>
                 </InlineStack>
             </div>
