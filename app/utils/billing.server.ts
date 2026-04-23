@@ -42,30 +42,44 @@ export async function checkAndChargeOverage(
 
         const chargeAmount = overageVisitors * OVERAGE_RATE;
 
-        // Create usage record in Shopify
-        await billing.createUsageRecord({
-            description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
-            price: {
-                amount: chargeAmount,
-                currencyCode: "USD",
+        // Reserve the charge by updating the database FIRST using optimistic locking
+        const updateResult = await (prisma as any).monthlyUsage.updateMany({
+            where: { 
+                shop_yearMonth: { shop, yearMonth },
+                chargedVisitors: chargedVisitors // Optimistic lock: ensure no one else modified it
             },
-            isTest,
-        });
-
-        // Update chargedVisitors atomically to prevent double charging
-        await (prisma as any).$transaction(async (tx: any) => {
-            const current = await tx.monthlyUsage.findUnique({
-                where: { shop_yearMonth: { shop, yearMonth } },
-            });
-            if (current) {
-                await tx.monthlyUsage.update({
-                    where: { shop_yearMonth: { shop, yearMonth } },
-                    data: { chargedVisitors: current.chargedVisitors + overageVisitors },
-                });
+            data: {
+                chargedVisitors: chargedVisitors + overageVisitors
             }
         });
 
-        console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
+        if (updateResult.count === 0) {
+            console.log(`[Billing] Race condition prevented for ${shop}. Overage already processed.`);
+            return; // Another process already charged this overage
+        }
+
+        try {
+            // Create usage record in Shopify
+            await billing.createUsageRecord({
+                description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
+                price: {
+                    amount: chargeAmount,
+                    currencyCode: "USD",
+                },
+                isTest,
+            });
+            console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
+        } catch (error) {
+            // If Shopify fails, rollback the reservation
+            console.error("[Billing] Failed to create usage record in Shopify, rolling back DB:", error);
+            await (prisma as any).monthlyUsage.updateMany({
+                where: { shop_yearMonth: { shop, yearMonth } },
+                data: {
+                    chargedVisitors: chargedVisitors // Revert back to the original value
+                }
+            });
+            throw error; // Rethrow to be caught by the outer catch block
+        }
     } catch (error) {
         console.error("[Billing] Failed to check/charge overage:", error);
     }
