@@ -28,8 +28,9 @@ import {
     RadioButton,
     Divider,
     Banner,
+    Tooltip,
 } from "@shopify/polaris";
-import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon } from "@shopify/polaris-icons";
+import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
@@ -682,25 +683,33 @@ export default function RulesPage() {
             {/* Import/Export Action Bar */}
             <div style={{ marginBottom: '16px' }}>
                 <InlineStack gap="200" align="end">
-                    <Button
-                        icon={ExportIcon}
-                        onClick={() => {
-                            if (!hasProPlan) { setShowUpgradeModal(true); return; }
-                            handleExportRules(true);
-                        }}
-                        disabled={rules.length === 0}
-                    >
-                        Export All{!hasProPlan ? " (Pro)" : ""}
-                    </Button>
-                    <Button
-                        icon={ImportIcon}
-                        onClick={() => {
-                            if (!hasProPlan) { setShowUpgradeModal(true); return; }
-                            setImportModalOpen(true);
-                        }}
-                    >
-                        Import{!hasProPlan ? " (Pro)" : ""}
-                    </Button>
+                    <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
+                        <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
+                            <Button
+                                icon={!hasProPlan ? LockIcon : ExportIcon}
+                                onClick={() => {
+                                    if (!hasProPlan) { setShowUpgradeModal(true); return; }
+                                    handleExportRules(true);
+                                }}
+                                disabled={rules.length === 0 && hasProPlan}
+                            >
+                                Export All
+                            </Button>
+                        </div>
+                    </Tooltip>
+                    <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
+                        <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
+                            <Button
+                                icon={!hasProPlan ? LockIcon : ImportIcon}
+                                onClick={() => {
+                                    if (!hasProPlan) { setShowUpgradeModal(true); return; }
+                                    setImportModalOpen(true);
+                                }}
+                            >
+                                Import
+                            </Button>
+                        </div>
+                    </Tooltip>
                 </InlineStack>
             </div>
             <BlockStack gap="500">
