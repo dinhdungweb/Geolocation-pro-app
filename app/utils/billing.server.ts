@@ -339,13 +339,13 @@ export async function checkAndChargeOverageBackground(shop: string) {
     } catch (error: any) {
         const statusCode = error?.response?.code || error?.networkStatusCode;
         const errorStr = String(error).toLowerCase();
-        const isSessionError = errorStr.includes('sessionnotfound') || errorStr.includes('session not found');
+        const isSessionError = errorStr.includes('session'); // Cực kỳ bao quát
 
         if (statusCode === 402 || statusCode === 404 || isSessionError) {
             let reason = "Unknown";
             if (statusCode === 402) reason = "Payment Required (Frozen)";
             else if (statusCode === 404) reason = "Not Found (Deleted)";
-            else if (isSessionError) reason = "Session Not Found";
+            else if (isSessionError) reason = "Session Issue (Uninstalled)";
             
             console.warn(`[Cron Billing] Skipping ${shop}: ${reason}.`);
             return;
