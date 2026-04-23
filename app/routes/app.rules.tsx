@@ -32,7 +32,7 @@ import {
 import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS } from "../billing.config";
+import { ALL_PAID_PLANS, PLUS_PLAN, ELITE_PLAN, FREE_PLAN } from "../billing.config";
 import prisma from "../db.server";
 
 import { COUNTRY_MAP } from "../utils/countries";
@@ -111,13 +111,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isTest: false,
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+    const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
+    const hasPlusPlan = currentPlan === PLUS_PLAN || currentPlan === ELITE_PLAN;
 
-    return json({ rules, shop, hasProPlan });
+    return json({ rules, shop, hasProPlan, hasPlusPlan });
 };
 
 // Action: Handle CRUD operations
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const formData = await request.formData();
     const intent = formData.get("intent") as string;
@@ -232,6 +234,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (intent === "import") {
+            // Server-side plan check: only Plus and Elite can import
+            const billingConfig = await billing.check({
+                plans: ALL_PAID_PLANS as any,
+                isTest: false,
+            });
+            const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
+            if (currentPlan !== PLUS_PLAN && currentPlan !== ELITE_PLAN) {
+                return json({ success: false, message: "Import is only available on Plus plan and above" }, { status: 403 });
+            }
+
             const rulesJson = formData.get("rulesJson") as string;
             if (!rulesJson) {
                 return json({ success: false, message: "No rules data provided" }, { status: 400 });
@@ -286,7 +298,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function RulesPage() {
-    const { rules, hasProPlan } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan, hasPlusPlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -551,10 +563,10 @@ export default function RulesPage() {
             content: "Delete selected",
             onAction: handleBulkDelete,
         },
-        {
+        ...(hasPlusPlan ? [{
             content: "Export selected",
             onAction: () => handleExportRules(false),
-        },
+        }] : []),
     ];
 
     const rowMarkup = rules.map((rule: any, index: number) => (
@@ -674,16 +686,22 @@ export default function RulesPage() {
                 <InlineStack gap="200" align="end">
                     <Button
                         icon={ExportIcon}
-                        onClick={() => handleExportRules(true)}
+                        onClick={() => {
+                            if (!hasPlusPlan) { setShowUpgradeModal(true); return; }
+                            handleExportRules(true);
+                        }}
                         disabled={rules.length === 0}
                     >
-                        Export All
+                        Export All{!hasPlusPlan ? " (Plus)" : ""}
                     </Button>
                     <Button
                         icon={ImportIcon}
-                        onClick={() => setImportModalOpen(true)}
+                        onClick={() => {
+                            if (!hasPlusPlan) { setShowUpgradeModal(true); return; }
+                            setImportModalOpen(true);
+                        }}
                     >
-                        Import
+                        Import{!hasPlusPlan ? " (Plus)" : ""}
                     </Button>
                 </InlineStack>
             </div>
