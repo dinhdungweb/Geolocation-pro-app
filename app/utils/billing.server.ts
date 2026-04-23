@@ -40,7 +40,11 @@ export async function checkAndChargeOverage(
         const overageVisitors = currentUsage - planLimit - chargedVisitors;
         if (overageVisitors <= 0) return; // Already charged
 
-        const chargeAmount = overageVisitors * OVERAGE_RATE;
+        const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+        
+        // Enforce a minimum charge of $1.00 to avoid spamming Shopify API with micro-charges (e.g., $0.01 or $0.002)
+        // This effectively batches overage charges in increments of 500 visitors.
+        if (chargeAmount < 1.00) return;
 
         // Reserve the charge by updating the database FIRST using optimistic locking
         const updateResult = await (prisma as any).monthlyUsage.updateMany({
@@ -69,9 +73,19 @@ export async function checkAndChargeOverage(
                 isTest,
             });
             console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
-        } catch (error) {
-            // If Shopify fails, rollback the reservation
-            console.error("[Billing] Failed to create usage record in Shopify, rolling back DB:", error);
+        } catch (error: any) {
+            console.error("[Billing] Failed to create usage record in Shopify:", error);
+            
+            // If the error is about exceeding the capped amount (spending limit), DO NOT rollback.
+            // If we rollback, the system will infinitely retry charging the exact same amount on every page load.
+            const errorMsg = String(error?.message || error).toLowerCase();
+            if (errorMsg.includes("capped") || errorMsg.includes("exceed")) {
+                console.log(`[Billing] Shop ${shop} hit their spending limit. Skipping DB rollback to prevent retry loops.`);
+                return;
+            }
+
+            // For other errors (like network failures), rollback the DB reservation so we can try again later.
+            console.log(`[Billing] Rolling back DB reservation for ${shop}`);
             await (prisma as any).monthlyUsage.updateMany({
                 where: { shop_yearMonth: { shop, yearMonth } },
                 data: {
