@@ -100,36 +100,98 @@ export async function checkAndChargeOverage(
 }
 
 /**
- * Issue an application credit to a shop (Refund).
+ * Issue an application credit to a shop (Refund) using Partner API.
  */
 export async function issueApplicationCredit(shop: string, amount: number, description: string) {
     try {
-        const { session } = await unauthenticated.admin(shop);
+        const orgId = process.env.PARTNER_ORGANIZATION_ID;
+        const partnerToken = process.env.PARTNER_ACCESS_TOKEN;
+        const appId = process.env.PARTNER_APP_ID;
 
-        const response = await fetch(`https://${shop}/admin/api/2025-01/application_credits.json`, {
+        if (!orgId || !partnerToken || !appId) {
+            throw new Error("Missing Partner API credentials in environment variables.");
+        }
+
+        // 1. Get the shop's Global ID using Admin API
+        const { admin } = await unauthenticated.admin(shop);
+        const shopInfoResponse = await admin.graphql(`
+            #graphql
+            query {
+                shop {
+                    id
+                }
+            }
+        `);
+        const shopInfoData = await shopInfoResponse.json();
+        const shopGlobalId = shopInfoData?.data?.shop?.id;
+
+        if (!shopGlobalId) {
+            throw new Error("Failed to retrieve shop's global ID for Partner API.");
+        }
+
+        // 2. Call the Partner API
+        const partnerUrl = `https://partners.shopify.com/${orgId}/api/2024-01/graphql.json`;
+        const partnerResponse = await fetch(partnerUrl, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Shopify-Access-Token": session.accessToken || "",
+                "X-Shopify-Access-Token": partnerToken,
             },
             body: JSON.stringify({
-                application_credit: {
+                query: `
+                    mutation appCreditCreate($appId: ID!, $shopId: ID!, $amount: MoneyInput!, $description: String!, $test: Boolean!) {
+                        appCreditCreate(appId: $appId, shopId: $shopId, input: {amount: $amount, description: $description, test: $test}) {
+                            appCredit {
+                                id
+                                amount {
+                                    amount
+                                    currencyCode
+                                }
+                            }
+                            userErrors {
+                                field
+                                message
+                            }
+                        }
+                    }
+                `,
+                variables: {
+                    appId: appId,
+                    shopId: shopGlobalId,
+                    amount: {
+                        amount: amount.toString(),
+                        currencyCode: "USD"
+                    },
                     description,
-                    amount: amount.toString(),
                     test: process.env.NODE_ENV !== "production"
                 }
             })
         });
 
-        const data = await response.json();
-        
-        if (!response.ok) {
-            console.error("[Billing] Error from REST API:", data);
-            throw new Error(data.errors || "Failed to create application credit");
+        const partnerData = await partnerResponse.json();
+
+        // Check for HTTP errors
+        if (!partnerResponse.ok) {
+            console.error("[Billing] Error from Partner API Network:", partnerData);
+            throw new Error("Failed to connect to Partner API");
         }
 
-        console.log(`[Billing] Issued $${amount} credit to ${shop}: ${description}`);
-        return { success: true, credit: data.application_credit };
+        // Check for GraphQL errors
+        if (partnerData.errors) {
+            console.error("[Billing] GraphQL Errors from Partner API:", partnerData.errors);
+            throw new Error(partnerData.errors[0]?.message || "GraphQL error from Partner API");
+        }
+
+        // Check for userErrors in the mutation
+        const userErrors = partnerData.data?.appCreditCreate?.userErrors;
+        if (userErrors && userErrors.length > 0) {
+            console.error("[Billing] UserErrors from appCreditCreate:", userErrors);
+            throw new Error(userErrors[0].message);
+        }
+
+        const creditResult = partnerData.data?.appCreditCreate?.appCredit;
+        console.log(`[Billing] Issued $${amount} Partner API credit to ${shop}: ${description}`);
+        return { success: true, credit: creditResult };
     } catch (error: any) {
         console.error(`[Billing] Failed to issue credit to ${shop}:`, error);
         return { success: false, error: error.message };
