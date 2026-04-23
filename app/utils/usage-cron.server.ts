@@ -3,6 +3,7 @@ import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml } from './email-templates';
 import { PLAN_LIMITS, FREE_PLAN } from '../billing.config';
+import { checkAndChargeOverageBackground } from './billing.server';
 
 /**
  * Checks usage for all shops and sends warning emails if needed.
@@ -61,6 +62,9 @@ export async function checkAllShopsUsage() {
                 });
             }
         }
+
+        // 3. Auto-bill any accumulated overage in the background
+        await checkAndChargeOverageBackground(shop);
     }
     
     console.log('[Cron] Usage check completed.');

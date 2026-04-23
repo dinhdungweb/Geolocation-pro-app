@@ -197,3 +197,145 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Background Auto-Billing: Check and charge overage for a shop via GraphQL Admin API.
+ * This is designed to be called by a cron job without an active HTTP request session.
+ */
+export async function checkAndChargeOverageBackground(shop: string) {
+    try {
+        const { admin } = await unauthenticated.admin(shop);
+        if (!admin) return;
+
+        // 1. Fetch active subscription and find the usage line item
+        const subResponse = await admin.graphql(`
+            #graphql
+            query {
+                currentAppInstallation {
+                    activeSubscriptions {
+                        id
+                        name
+                        status
+                        lineItems {
+                            id
+                            plan {
+                                pricingDetails {
+                                    __typename
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `);
+        
+        const subData = await subResponse.json();
+        const activeSubscriptions = subData?.data?.currentAppInstallation?.activeSubscriptions;
+        
+        if (!activeSubscriptions || activeSubscriptions.length === 0) return; // No active subscription
+
+        const subscription = activeSubscriptions[0];
+        const currentPlan = subscription.name;
+        
+        // Find the line item that handles usage pricing
+        const usageLineItem = subscription.lineItems.find((item: any) => 
+            item.plan?.pricingDetails?.__typename === 'AppUsagePricing'
+        );
+        
+        if (!usageLineItem) return; // No usage pricing attached to this plan
+
+        const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+
+        // 2. Get current month usage from DB
+        const now = new Date();
+        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+            where: { shop_yearMonth: { shop, yearMonth } },
+        });
+
+        const currentUsage = monthlyUsage?.totalVisitors || 0;
+        const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
+
+        if (currentUsage <= planLimit) return; // Within limits
+
+        const overageVisitors = currentUsage - planLimit - chargedVisitors;
+        if (overageVisitors <= 0) return; // Already charged
+
+        const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+        
+        // Enforce minimum charge batching ($1.00 minimum)
+        if (chargeAmount < 1.00) return;
+
+        // Reserve the charge by updating the database FIRST using optimistic locking
+        const updateResult = await (prisma as any).monthlyUsage.updateMany({
+            where: { 
+                shop_yearMonth: { shop, yearMonth },
+                chargedVisitors: chargedVisitors
+            },
+            data: {
+                chargedVisitors: chargedVisitors + overageVisitors
+            }
+        });
+
+        if (updateResult.count === 0) {
+            console.log(`[Cron Billing] Race condition prevented for ${shop}. Overage already processed.`);
+            return; 
+        }
+
+        try {
+            // 3. Create usage record in Shopify via GraphQL Mutation
+            const chargeResponse = await admin.graphql(`
+                #graphql
+                mutation appUsageRecordCreate($description: String!, $price: MoneyInput!, $subscriptionLineItemId: ID!) {
+                    appUsageRecordCreate(description: $description, price: $price, subscriptionLineItemId: $subscriptionLineItemId) {
+                        appUsageRecord {
+                            id
+                        }
+                        userErrors {
+                            field
+                            message
+                        }
+                    }
+                }
+            `, {
+                variables: {
+                    description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
+                    price: {
+                        amount: chargeAmount,
+                        currencyCode: "USD"
+                    },
+                    subscriptionLineItemId: usageLineItem.id
+                }
+            });
+            
+            const chargeData = await chargeResponse.json();
+            const userErrors = chargeData?.data?.appUsageRecordCreate?.userErrors;
+            
+            if (userErrors && userErrors.length > 0) {
+                throw new Error(userErrors[0].message);
+            }
+            
+            console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
+        } catch (error: any) {
+            console.error(`[Cron Billing] Failed to create usage record for ${shop}:`, error);
+            
+            // Handle capped amount errors safely
+            const errorMsg = String(error?.message || error).toLowerCase();
+            if (errorMsg.includes("capped") || errorMsg.includes("exceed")) {
+                console.log(`[Cron Billing] Shop ${shop} hit their spending limit. Skipping DB rollback.`);
+                return;
+            }
+
+            // Rollback the DB reservation on network/temporary errors
+            console.log(`[Cron Billing] Rolling back DB reservation for ${shop}`);
+            await (prisma as any).monthlyUsage.updateMany({
+                where: { shop_yearMonth: { shop, yearMonth } },
+                data: {
+                    chargedVisitors: chargedVisitors
+                }
+            });
+        }
+    } catch (error) {
+        console.error(`[Cron Billing] Critical error processing background billing for ${shop}:`, error);
+    }
+}
