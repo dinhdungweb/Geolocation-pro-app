@@ -90,44 +90,32 @@ export async function checkAndChargeOverage(
  */
 export async function issueApplicationCredit(shop: string, amount: number, description: string) {
     try {
-        const { admin } = await unauthenticated.admin(shop);
+        const { session } = await unauthenticated.admin(shop);
 
-        const response = await admin.graphql(
-            `#graphql
-            mutation appCreditCreate($description: String!, $amount: MoneyInput!, $test: Boolean) {
-              appCreditCreate(description: $description, amount: $amount, test: $test) {
-                userErrors {
-                  field
-                  message
-                }
-                appCredit {
-                  id
-                  amount {
-                    amount
-                    currencyCode
-                  }
-                }
-              }
-            }`,
-            {
-                variables: {
+        const response = await fetch(`https://${shop}/admin/api/2025-01/application_credits.json`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Shopify-Access-Token": session.accessToken || "",
+            },
+            body: JSON.stringify({
+                application_credit: {
                     description,
-                    amount: {
-                        amount: amount.toString(),
-                        currencyCode: "USD",
-                    },
+                    amount: amount.toString(),
                     test: process.env.NODE_ENV !== "production"
-                },
-            }
-        );
+                }
+            })
+        });
 
         const data = await response.json();
-        if (data.data?.appCreditCreate?.userErrors?.length > 0) {
-            throw new Error(data.data.appCreditCreate.userErrors[0].message);
+        
+        if (!response.ok) {
+            console.error("[Billing] Error from REST API:", data);
+            throw new Error(data.errors || "Failed to create application credit");
         }
 
         console.log(`[Billing] Issued $${amount} credit to ${shop}: ${description}`);
-        return { success: true, credit: data.data.appCreditCreate.appCredit };
+        return { success: true, credit: data.application_credit };
     } catch (error: any) {
         console.error(`[Billing] Failed to issue credit to ${shop}:`, error);
         return { success: false, error: error.message };
