@@ -204,7 +204,18 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
  */
 export async function checkAndChargeOverageBackground(shop: string) {
     try {
-        let admin; try { const context = await unauthenticated.admin(shop); admin = context.admin; } catch (error: any) { if (error.name === 'SessionNotFoundError') { console.warn('[Cron Billing] Skipping ' + shop + ': Session not found'); return; } throw error; }
+        let admin;
+        try {
+            const context = await unauthenticated.admin(shop);
+            admin = context.admin;
+        } catch (error: any) {
+            if (error.name === 'SessionNotFoundError') {
+                console.warn(`[Cron Billing] Skipping ${shop}: Session not found.`);
+                return;
+            }
+            throw error;
+        }
+
         if (!admin) return;
 
         // 1. Fetch active subscription and find the usage line item
@@ -336,6 +347,11 @@ export async function checkAndChargeOverageBackground(shop: string) {
             });
         }
     } catch (error: any) {
+        const statusCode = error?.response?.code || error?.networkStatusCode;
+        if (statusCode === 402 || statusCode === 404) {
+            console.warn(`[Cron Billing] Skipping ${shop}: ${statusCode === 402 ? 'Payment Required (Frozen)' : 'Not Found (Deleted)'}.`);
+            return;
+        }
         console.error(`[Cron Billing] Critical error processing background billing for ${shop}:`, error);
     }
 }
