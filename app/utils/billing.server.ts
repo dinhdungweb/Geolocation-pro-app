@@ -204,18 +204,8 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
  */
 export async function checkAndChargeOverageBackground(shop: string) {
     try {
-        let admin;
-        try {
-            const context = await unauthenticated.admin(shop);
-            admin = context.admin;
-        } catch (error: any) {
-            if (error.name === 'SessionNotFoundError') {
-                console.warn(`[Cron Billing] Skipping ${shop}: Session not found.`);
-                return;
-            }
-            throw error;
-        }
-
+        const context = await unauthenticated.admin(shop);
+        const admin = context.admin;
         if (!admin) return;
 
         // 1. Fetch active subscription and find the usage line item
@@ -348,8 +338,8 @@ export async function checkAndChargeOverageBackground(shop: string) {
         }
     } catch (error: any) {
         const statusCode = error?.response?.code || error?.networkStatusCode;
-        const errorMsg = String(error?.message || "").toLowerCase();
-        const isSessionError = error.name === 'SessionNotFoundError' || errorMsg.includes('sessionnotfound');
+        const errorStr = String(error).toLowerCase();
+        const isSessionError = errorStr.includes('sessionnotfound') || errorStr.includes('session not found');
 
         if (statusCode === 402 || statusCode === 404 || isSessionError) {
             let reason = "Unknown";
