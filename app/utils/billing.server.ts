@@ -339,3 +339,4 @@ export async function checkAndChargeOverageBackground(shop: string) {
         console.error(`[Cron Billing] Critical error processing background billing for ${shop}:`, error);
     }
 }
+
