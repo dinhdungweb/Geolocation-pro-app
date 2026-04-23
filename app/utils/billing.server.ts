@@ -94,13 +94,13 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
 
         const response = await admin.graphql(
             `#graphql
-            mutation applicationCreditCreate($description: String!, $amount: MoneyInput!) {
-              applicationCreditCreate(description: $description, amount: $amount) {
+            mutation appCreditCreate($description: String!, $amount: MoneyInput!, $test: Boolean) {
+              appCreditCreate(description: $description, amount: $amount, test: $test) {
                 userErrors {
                   field
                   message
                 }
-                applicationCredit {
+                appCredit {
                   id
                   amount {
                     amount
@@ -116,17 +116,18 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
                         amount: amount.toString(),
                         currencyCode: "USD",
                     },
+                    test: process.env.NODE_ENV !== "production"
                 },
             }
         );
 
         const data = await response.json();
-        if (data.data?.applicationCreditCreate?.userErrors?.length > 0) {
-            throw new Error(data.data.applicationCreditCreate.userErrors[0].message);
+        if (data.data?.appCreditCreate?.userErrors?.length > 0) {
+            throw new Error(data.data.appCreditCreate.userErrors[0].message);
         }
 
         console.log(`[Billing] Issued $${amount} credit to ${shop}: ${description}`);
-        return { success: true, credit: data.data.applicationCreditCreate.applicationCredit };
+        return { success: true, credit: data.data.appCreditCreate.appCredit };
     } catch (error: any) {
         console.error(`[Billing] Failed to issue credit to ${shop}:`, error);
         return { success: false, error: error.message };
