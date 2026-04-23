@@ -94,7 +94,7 @@ export async function checkAndChargeOverage(
             });
             throw error; // Rethrow to be caught by the outer catch block
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("[Billing] Failed to check/charge overage:", error);
     }
 }
@@ -113,7 +113,7 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
         }
 
         // 1. Get the shop's Global ID using Admin API
-        const { admin } = await unauthenticated.admin(shop);
+        let admin; try { const context = await unauthenticated.admin(shop); admin = context.admin; } catch (error: any) { if (error.name === 'SessionNotFoundError') { console.warn('[Cron Billing] Skipping ' + shop + ': Session not found'); return; } throw error; }
         const shopInfoResponse = await admin.graphql(`
             #graphql
             query {
@@ -204,7 +204,7 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
  */
 export async function checkAndChargeOverageBackground(shop: string) {
     try {
-        const { admin } = await unauthenticated.admin(shop);
+        let admin; try { const context = await unauthenticated.admin(shop); admin = context.admin; } catch (error: any) { if (error.name === 'SessionNotFoundError') { console.warn('[Cron Billing] Skipping ' + shop + ': Session not found'); return; } throw error; }
         if (!admin) return;
 
         // 1. Fetch active subscription and find the usage line item
@@ -335,7 +335,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
                 }
             });
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error(`[Cron Billing] Critical error processing background billing for ${shop}:`, error);
     }
 }
