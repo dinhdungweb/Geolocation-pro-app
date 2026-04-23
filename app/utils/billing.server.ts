@@ -348,8 +348,16 @@ export async function checkAndChargeOverageBackground(shop: string) {
         }
     } catch (error: any) {
         const statusCode = error?.response?.code || error?.networkStatusCode;
-        if (statusCode === 402 || statusCode === 404) {
-            console.warn(`[Cron Billing] Skipping ${shop}: ${statusCode === 402 ? 'Payment Required (Frozen)' : 'Not Found (Deleted)'}.`);
+        const errorMsg = String(error?.message || "").toLowerCase();
+        const isSessionError = error.name === 'SessionNotFoundError' || errorMsg.includes('sessionnotfound');
+
+        if (statusCode === 402 || statusCode === 404 || isSessionError) {
+            let reason = "Unknown";
+            if (statusCode === 402) reason = "Payment Required (Frozen)";
+            else if (statusCode === 404) reason = "Not Found (Deleted)";
+            else if (isSessionError) reason = "Session Not Found";
+            
+            console.warn(`[Cron Billing] Skipping ${shop}: ${reason}.`);
             return;
         }
         console.error(`[Cron Billing] Critical error processing background billing for ${shop}:`, error);
