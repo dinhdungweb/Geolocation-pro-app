@@ -72,11 +72,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     let detectedCountry = "";
     try {
         detectedCountry = await getCountryFromIP(visitorIP);
+        /* 
         if (detectedCountry) {
             console.log(`[Proxy] Country detected from IP ${visitorIP}: ${detectedCountry}`);
         } else {
             console.log(`[Proxy] Could not detect country for IP ${visitorIP}`);
         }
+        */
     } catch (error: any) {
         console.error(`[Proxy] MaxMind lookup error for IP ${visitorIP}:`, error.message);
     }
@@ -314,7 +316,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 blockVpn: true,
             },
         });
-        console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
+        // console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
 
         // === PLAN LIMIT CHECK ===
         // Only enforce limits when plan is explicitly "free"
@@ -332,7 +334,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const currentUsage = monthlyUsage?.totalVisitors || 0;
 
         if (currentPlan === FREE_PLAN && currentUsage >= planLimit) {
-            console.log(`[Proxy] Free plan limit exceeded for ${shop}: ${currentUsage}/${planLimit}`);
+            // console.log(`[Proxy] Free plan limit exceeded for ${shop}: ${currentUsage}/${planLimit}`);
             return json({
                 enabled: false,
                 limitExceeded: true,
@@ -403,7 +405,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             vpnBlocked, // Send VPN block status
         };
 
-        console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, path: ${currentPath}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);
+        // console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, path: ${currentPath}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);
 
         return json(response, { headers });
     } catch (error) {
