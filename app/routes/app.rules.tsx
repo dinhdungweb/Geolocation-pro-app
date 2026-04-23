@@ -27,8 +27,9 @@ import {
     Select,
     RadioButton,
     Divider,
+    Banner,
 } from "@shopify/polaris";
-import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
+import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
@@ -230,6 +231,53 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return json({ success: true, message: "Rule(s) deleted successfully" });
         }
 
+        if (intent === "import") {
+            const rulesJson = formData.get("rulesJson") as string;
+            if (!rulesJson) {
+                return json({ success: false, message: "No rules data provided" }, { status: 400 });
+            }
+
+            let importedRules: any[];
+            try {
+                importedRules = JSON.parse(rulesJson);
+                if (!Array.isArray(importedRules)) {
+                    return json({ success: false, message: "Invalid format: expected an array of rules" }, { status: 400 });
+                }
+            } catch {
+                return json({ success: false, message: "Invalid JSON format" }, { status: 400 });
+            }
+
+            let created = 0;
+            for (const rule of importedRules) {
+                if (!rule.name || !rule.countryCodes) continue;
+                if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
+
+                await (prisma as any).redirectRule.create({
+                    data: {
+                        shop,
+                        name: rule.name,
+                        countryCodes: rule.countryCodes || "",
+                        targetUrl: rule.targetUrl || "",
+                        priority: parseInt(rule.priority) || 0,
+                        isActive: rule.isActive !== false,
+                        ruleType: rule.ruleType || "redirect",
+                        redirectMode: rule.redirectMode || "popup",
+                        matchType: "country",
+                        scheduleEnabled: rule.scheduleEnabled || false,
+                        startTime: rule.startTime || null,
+                        endTime: rule.endTime || null,
+                        daysOfWeek: rule.daysOfWeek || null,
+                        timezone: rule.timezone || null,
+                        pageTargetingType: rule.pageTargetingType || "all",
+                        pagePaths: rule.pagePaths || null,
+                    } as any,
+                });
+                created++;
+            }
+
+            return json({ success: true, message: `Successfully imported ${created} rule(s)` });
+        }
+
         return json({ success: false, message: "Unknown intent" });
     } catch (error) {
         console.error("Action error:", error);
@@ -243,6 +291,9 @@ export default function RulesPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [importData, setImportData] = useState("");
+    const [importFileName, setImportFileName] = useState("");
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -437,10 +488,72 @@ export default function RulesPage() {
         }
     };
 
+    // --- Export Rules ---
+    const handleExportRules = useCallback((exportAll: boolean) => {
+        const rulesToExport = exportAll
+            ? rules
+            : rules.filter((r: any) => selectedResources.includes(r.id));
+
+        const exportData = rulesToExport.map((rule: any) => ({
+            name: rule.name,
+            countryCodes: rule.countryCodes,
+            targetUrl: rule.targetUrl,
+            isActive: rule.isActive,
+            priority: rule.priority,
+            ruleType: rule.ruleType,
+            redirectMode: rule.redirectMode,
+            scheduleEnabled: rule.scheduleEnabled,
+            startTime: rule.startTime,
+            endTime: rule.endTime,
+            daysOfWeek: rule.daysOfWeek,
+            timezone: rule.timezone,
+            pageTargetingType: rule.pageTargetingType,
+            pagePaths: rule.pagePaths,
+        }));
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `geolocation-rules-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, [rules, selectedResources]);
+
+    // --- Import Rules ---
+    const handleImportFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setImportFileName(file.name);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result as string;
+            setImportData(text);
+        };
+        reader.readAsText(file);
+    }, []);
+
+    const handleImportSubmit = useCallback(() => {
+        if (!importData) return;
+        const formData = new FormData();
+        formData.append("intent", "import");
+        formData.append("rulesJson", importData);
+        fetcher.submit(formData, { method: "POST" });
+        setImportModalOpen(false);
+        setImportData("");
+        setImportFileName("");
+    }, [importData, fetcher]);
+
     const promotedBulkActions = [
         {
             content: "Delete selected",
             onAction: handleBulkDelete,
+        },
+        {
+            content: "Export selected",
+            onAction: () => handleExportRules(false),
         },
     ];
 
@@ -556,6 +669,24 @@ export default function RulesPage() {
                     Add Rule
                 </button>
             </TitleBar>
+            {/* Import/Export Action Bar */}
+            <div style={{ marginBottom: '16px' }}>
+                <InlineStack gap="200" align="end">
+                    <Button
+                        icon={ExportIcon}
+                        onClick={() => handleExportRules(true)}
+                        disabled={rules.length === 0}
+                    >
+                        Export All
+                    </Button>
+                    <Button
+                        icon={ImportIcon}
+                        onClick={() => setImportModalOpen(true)}
+                    >
+                        Import
+                    </Button>
+                </InlineStack>
+            </div>
             <BlockStack gap="500">
                 <Layout>
                     <Layout.Section>
@@ -871,6 +1002,78 @@ export default function RulesPage() {
                             )}
                         </BlockStack>
                     </FormLayout>
+                </Modal.Section>
+            </Modal>
+
+            {/* Import Modal */}
+            <Modal
+                open={importModalOpen}
+                onClose={() => { setImportModalOpen(false); setImportData(""); setImportFileName(""); }}
+                title="Import Rules"
+                primaryAction={{
+                    content: "Import",
+                    onAction: handleImportSubmit,
+                    disabled: !importData,
+                }}
+                secondaryActions={[
+                    {
+                        content: "Cancel",
+                        onAction: () => { setImportModalOpen(false); setImportData(""); setImportFileName(""); },
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <BlockStack gap="400">
+                        <Text as="p">
+                            Upload a JSON file containing rules to import. The file should be in the same format as the exported file.
+                        </Text>
+                        <div
+                            style={{
+                                border: '2px dashed #c4cdd5',
+                                borderRadius: '8px',
+                                padding: '24px',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                background: importFileName ? '#f1f8f5' : '#fafbfc',
+                                transition: 'all 0.2s ease',
+                            }}
+                            onClick={() => document.getElementById('import-file-input')?.click()}
+                        >
+                            <input
+                                id="import-file-input"
+                                type="file"
+                                accept=".json"
+                                style={{ display: 'none' }}
+                                onChange={handleImportFile}
+                            />
+                            <BlockStack gap="200" inlineAlign="center">
+                                <Icon source={ImportIcon} tone="subdued" />
+                                {importFileName ? (
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
+                                        ✓ {importFileName}
+                                    </Text>
+                                ) : (
+                                    <Text as="p" variant="bodyMd" tone="subdued">
+                                        Click to select a JSON file
+                                    </Text>
+                                )}
+                            </BlockStack>
+                        </div>
+                        {importData && (
+                            <Banner tone="info">
+                                <p>
+                                    {(() => {
+                                        try {
+                                            const parsed = JSON.parse(importData);
+                                            return `Found ${Array.isArray(parsed) ? parsed.length : 0} rule(s) ready to import.`;
+                                        } catch {
+                                            return "Invalid JSON format. Please check the file.";
+                                        }
+                                    })()}
+                                </p>
+                            </Banner>
+                        )}
+                    </BlockStack>
                 </Modal.Section>
             </Modal>
 

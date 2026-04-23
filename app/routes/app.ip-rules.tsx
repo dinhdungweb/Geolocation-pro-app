@@ -25,8 +25,10 @@ import {
     Banner,
     Divider,
     ChoiceList,
+    Icon,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { ImportIcon, ExportIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
@@ -167,6 +169,49 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return json({ success: true, message: "IP Rule(s) deleted successfully" });
         }
 
+        if (intent === "import") {
+            const rulesJson = formData.get("rulesJson") as string;
+            if (!rulesJson) {
+                return json({ success: false, message: "No rules data provided" }, { status: 400 });
+            }
+
+            let importedRules: any[];
+            try {
+                importedRules = JSON.parse(rulesJson);
+                if (!Array.isArray(importedRules)) {
+                    return json({ success: false, message: "Invalid format: expected an array of rules" }, { status: 400 });
+                }
+            } catch {
+                return json({ success: false, message: "Invalid JSON format" }, { status: 400 });
+            }
+
+            let created = 0;
+            for (const rule of importedRules) {
+                if (!rule.name || !rule.ipAddresses) continue;
+                if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
+
+                await (prisma as any).redirectRule.create({
+                    data: {
+                        shop,
+                        name: rule.name,
+                        ipAddresses: rule.ipAddresses || "",
+                        countryCodes: "",
+                        targetUrl: rule.targetUrl || "",
+                        priority: parseInt(rule.priority) || 0,
+                        isActive: rule.isActive !== false,
+                        ruleType: rule.ruleType || "block",
+                        redirectMode: rule.redirectMode || "popup",
+                        matchType: "ip",
+                        pageTargetingType: rule.pageTargetingType || "all",
+                        pagePaths: rule.pagePaths || null,
+                    } as any,
+                });
+                created++;
+            }
+
+            return json({ success: true, message: `Successfully imported ${created} IP rule(s)` });
+        }
+
         return json({ success: false, message: "Unknown intent" });
     } catch (error) {
         console.error("Action error:", error);
@@ -180,6 +225,9 @@ export default function IPRulesPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingRule, setEditingRule] = useState<IPRule | null>(null);
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [importData, setImportData] = useState("");
+    const [importFileName, setImportFileName] = useState("");
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -285,10 +333,67 @@ export default function IPRulesPage() {
         clearSelection();
     }, [selectedResources, fetcher, clearSelection]);
 
+    // --- Export Rules ---
+    const handleExportRules = useCallback((exportAll: boolean) => {
+        const rulesToExport = exportAll
+            ? rules
+            : rules.filter((r: any) => selectedResources.includes(r.id));
+
+        const exportData = rulesToExport.map((rule: any) => ({
+            name: rule.name,
+            ipAddresses: rule.ipAddresses,
+            targetUrl: rule.targetUrl,
+            isActive: rule.isActive,
+            priority: rule.priority,
+            ruleType: rule.ruleType,
+            redirectMode: rule.redirectMode,
+            pageTargetingType: rule.pageTargetingType,
+            pagePaths: rule.pagePaths,
+        }));
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ip-rules-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, [rules, selectedResources]);
+
+    // --- Import Rules ---
+    const handleImportFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setImportFileName(file.name);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result as string;
+            setImportData(text);
+        };
+        reader.readAsText(file);
+    }, []);
+
+    const handleImportSubmit = useCallback(() => {
+        if (!importData) return;
+        const formData = new FormData();
+        formData.append("intent", "import");
+        formData.append("rulesJson", importData);
+        fetcher.submit(formData, { method: "POST" });
+        setImportModalOpen(false);
+        setImportData("");
+        setImportFileName("");
+    }, [importData, fetcher]);
+
     const promotedBulkActions = [
         {
             content: "Delete selected",
             onAction: handleBulkDelete,
+        },
+        {
+            content: "Export selected",
+            onAction: () => handleExportRules(false),
         },
     ];
 
@@ -404,6 +509,25 @@ export default function IPRulesPage() {
                     Add IP Rule
                 </button>
             </TitleBar>
+            {/* Import/Export Action Bar */}
+            <div style={{ marginBottom: '16px' }}>
+                <InlineStack gap="200" align="end">
+                    <Button
+                        icon={ExportIcon}
+                        onClick={() => handleExportRules(true)}
+                        disabled={rules.length === 0}
+                    >
+                        Export All
+                    </Button>
+                    <Button
+                        icon={ImportIcon}
+                        onClick={() => setImportModalOpen(true)}
+                        disabled={!hasProPlan}
+                    >
+                        Import
+                    </Button>
+                </InlineStack>
+            </div>
             <BlockStack gap="500">
                 {!hasProPlan && rules.length > 0 && (
                     <Banner
@@ -562,6 +686,78 @@ export default function IPRulesPage() {
                             )}
                         </BlockStack>
                     </FormLayout>
+                </Modal.Section>
+            </Modal>
+
+            {/* Import Modal */}
+            <Modal
+                open={importModalOpen}
+                onClose={() => { setImportModalOpen(false); setImportData(""); setImportFileName(""); }}
+                title="Import IP Rules"
+                primaryAction={{
+                    content: "Import",
+                    onAction: handleImportSubmit,
+                    disabled: !importData,
+                }}
+                secondaryActions={[
+                    {
+                        content: "Cancel",
+                        onAction: () => { setImportModalOpen(false); setImportData(""); setImportFileName(""); },
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <BlockStack gap="400">
+                        <Text as="p">
+                            Upload a JSON file containing IP rules to import. The file should be in the same format as the exported file.
+                        </Text>
+                        <div
+                            style={{
+                                border: '2px dashed #c4cdd5',
+                                borderRadius: '8px',
+                                padding: '24px',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                background: importFileName ? '#f1f8f5' : '#fafbfc',
+                                transition: 'all 0.2s ease',
+                            }}
+                            onClick={() => document.getElementById('import-ip-file-input')?.click()}
+                        >
+                            <input
+                                id="import-ip-file-input"
+                                type="file"
+                                accept=".json"
+                                style={{ display: 'none' }}
+                                onChange={handleImportFile}
+                            />
+                            <BlockStack gap="200" inlineAlign="center">
+                                <Icon source={ImportIcon} tone="subdued" />
+                                {importFileName ? (
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
+                                        ✓ {importFileName}
+                                    </Text>
+                                ) : (
+                                    <Text as="p" variant="bodyMd" tone="subdued">
+                                        Click to select a JSON file
+                                    </Text>
+                                )}
+                            </BlockStack>
+                        </div>
+                        {importData && (
+                            <Banner tone="info">
+                                <p>
+                                    {(() => {
+                                        try {
+                                            const parsed = JSON.parse(importData);
+                                            return `Found ${Array.isArray(parsed) ? parsed.length : 0} IP rule(s) ready to import.`;
+                                        } catch {
+                                            return "Invalid JSON format. Please check the file.";
+                                        }
+                                    })()}
+                                </p>
+                            </Banner>
+                        )}
+                    </BlockStack>
                 </Modal.Section>
             </Modal>
 
