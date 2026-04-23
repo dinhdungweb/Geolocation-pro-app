@@ -30,7 +30,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { ImportIcon, ExportIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS, PLUS_PLAN, ELITE_PLAN, FREE_PLAN } from "../billing.config";
+import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
 
 interface IPRule {
@@ -65,14 +65,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isTest: false,
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
-    const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
-    // hasPlusPlan is kept for reference if needed elsewhere, but we use hasProPlan for import/export
-    const hasPlusPlan = currentPlan === PLUS_PLAN || currentPlan === ELITE_PLAN;
 
     // Free plan: Allow 1 IP rule max
     const canCreateRule = hasProPlan || rules.length < 1;
 
-    return json({ rules, shop, hasProPlan, hasPlusPlan, canCreateRule });
+    return json({ rules, shop, hasProPlan, canCreateRule });
 };
 
 // Action: Handle CRUD operations
@@ -233,7 +230,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function IPRulesPage() {
-    const { rules, hasProPlan, hasPlusPlan } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
