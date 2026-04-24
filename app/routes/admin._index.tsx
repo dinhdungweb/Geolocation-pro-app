@@ -10,13 +10,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
     try {
+        const now = new Date();
+        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
         const [
             totalShops,
             activeRules,
             totalVisitors,
             countryStats,
             settings,
-            monthlyTrends
+            monthlyTrends,
+            currentMonthUsage
         ] = await Promise.all([
             prisma.settings.count(),
             prisma.redirectRule.count({ where: { isActive: true } }),
@@ -27,43 +31,63 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 orderBy: { _sum: { visitors: 'desc' } },
                 take: 5
             }),
-            prisma.settings.findMany({ select: { currentPlan: true, mode: true } }),
+            prisma.settings.findMany({ select: { shop: true, currentPlan: true, mode: true } }),
             prisma.monthlyUsage.groupBy({
                 by: ['yearMonth'],
                 _sum: { totalVisitors: true, redirected: true },
                 orderBy: { yearMonth: 'desc' },
                 take: 12
+            }),
+            (prisma as any).monthlyUsage.findMany({
+                where: { yearMonth }
             })
         ]);
+
+        // 1. Calculate Subscription Revenue
+        const planPrices: Record<string, number> = {
+            'ELITE': 14.99,
+            'PLUS': 7.99,
+            'PREMIUM': 4.99,
+            'FREE': 0
+        };
+        const planLimits: Record<string, number> = {
+            'ELITE': 6000,
+            'PLUS': 2500,
+            'PREMIUM': 1000,
+            'FREE': 100
+        };
+        const OVERAGE_RATE = 100 / 50000; // $0.002
+
+        const subscriptionRevenue = settings.reduce((sum, s) => {
+            const planKey = (s.currentPlan || 'FREE').toUpperCase();
+            return sum + (planPrices[planKey] || 0);
+        }, 0);
+
+        // 2. Calculate Overage Revenue (Current Month)
+        const usageMap = new Map((currentMonthUsage as any[]).map(u => [u.shop, u]));
+        const overageRevenue = settings.reduce((sum, s) => {
+            const planKey = (s.currentPlan || 'FREE').toUpperCase();
+            if (planKey === 'FREE') return sum;
+
+            const limit = planLimits[planKey] || 100;
+            const usage = usageMap.get(s.shop);
+            if (!usage) return sum;
+
+            // Only count successfully charged visitors in revenue
+            const chargedAmount = (usage.chargedVisitors || 0) * OVERAGE_RATE;
+            return sum + chargedAmount;
+        }, 0);
 
         // Calculate distributions
         const plans = settings.reduce((acc: any, s) => {
             const planKey = (s.currentPlan || 'FREE').toUpperCase();
             acc[planKey] = (acc[planKey] || 0) + 1;
             return acc;
-        }, {
-            'FREE': 0,
-            'PREMIUM': 0,
-            'PLUS': 0,
-            'ELITE': 0
-        });
-
-        // Est. Revenue
-        const revenueMap: Record<string, number> = {
-            'ELITE': 14.99,
-            'PLUS': 7.99,
-            'PREMIUM': 4.99,
-            'FREE': 0
-        };
-        
-        // Normalize currentPlan to uppercase to match revenueMap keys regardless of DB storage case
-        const totalRevenue = settings.reduce((sum, s) => {
-            const planKey = (s.currentPlan || 'FREE').toUpperCase();
-            return sum + (revenueMap[planKey] || 0);
-        }, 0);
+        }, { 'FREE': 0, 'PREMIUM': 0, 'PLUS': 0, 'ELITE': 0 });
 
         const modes = settings.reduce((acc: any, s) => {
-            acc[s.mode] = (acc[s.mode] || 0) + 1;
+            const modeKey = s.mode || 'popup';
+            acc[modeKey] = (acc[modeKey] || 0) + 1;
             return acc;
         }, {});
 
@@ -72,7 +96,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 totalShops,
                 activeRules,
                 totalVisitors: totalVisitors._sum.visitors || 0,
-                estMonthlyRevenue: totalRevenue
+                subscriptionRevenue,
+                overageRevenue,
+                totalRevenue: subscriptionRevenue + overageRevenue
             },
             countries: countryStats.map(c => ({
                 code: c.countryCode,
@@ -84,9 +110,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
     } catch (error) {
         console.error("Dashboard Loader Error:", error);
-        // Return a safe empty state to avoid ErrorBoundary crash
         return json({
-            stats: { totalShops: 0, activeRules: 0, totalVisitors: 0, estMonthlyRevenue: 0 },
+            stats: { totalShops: 0, activeRules: 0, totalVisitors: 0, subscriptionRevenue: 0, overageRevenue: 0, totalRevenue: 0 },
             countries: [],
             distributions: { plans: {}, modes: {} },
             trends: []
@@ -188,9 +213,12 @@ export default function AdminDashboard() {
                 </div>
                 <div className="premium-card" style={{ background: 'var(--primary-gradient)', color: 'white', border: 'none' }}>
                     <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}><Gem size={24} /></div>
-                    <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Est. Monthly Revenue</div>
-                    <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>${stats.estMonthlyRevenue.toLocaleString()}</div>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', marginTop: '8px', fontWeight: 600 }}>Based on plan distribution</div>
+                    <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Total Revenue (This Month)</div>
+                    <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>${stats.totalRevenue.toFixed(2)}</div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.8)', marginTop: '8px', lineHeight: '1.4' }}>
+                        <div>• Subscriptions: ${stats.subscriptionRevenue.toFixed(2)}</div>
+                        <div>• Overage: ${stats.overageRevenue.toFixed(2)}</div>
+                    </div>
                 </div>
             </div>
 
