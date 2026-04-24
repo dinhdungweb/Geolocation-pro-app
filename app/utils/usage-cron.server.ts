@@ -60,27 +60,29 @@ export async function checkAllShopsUsage() {
 
         // 1. Check for 100% threshold
         if (usagePercent >= 100) {
-            const sent100 = await hasSentEmail(shop, 'limit_100');
+            const sent100 = await hasSentEmail(shop, 'limit_100', yearMonth);
             if (!sent100) {
                 console.log(`[Cron] Sending 100% usage email to ${shop}`);
                 await sendAdminEmail({
                     shop,
                     type: 'limit_100',
                     subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
-                    html: getLimit100EmailHtml(shop, currentUsage, planLimit)
+                    html: getLimit100EmailHtml(shop, currentUsage, planLimit),
+                    dedupeKey: yearMonth,
                 });
             }
         } 
         // 2. Check for 80% threshold
         else if (usagePercent >= 80) {
-            const sent80 = await hasSentEmail(shop, 'limit_80');
+            const sent80 = await hasSentEmail(shop, 'limit_80', yearMonth);
             if (!sent80) {
                 console.log(`[Cron] Sending 80% usage email to ${shop}`);
                 await sendAdminEmail({
                     shop,
                     type: 'limit_80',
                     subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
-                    html: getLimit80EmailHtml(shop, currentUsage, planLimit)
+                    html: getLimit80EmailHtml(shop, currentUsage, planLimit),
+                    dedupeKey: yearMonth,
                 });
             }
         }
@@ -94,7 +96,6 @@ export async function checkAllShopsUsage() {
     
     console.log('[Cron] Usage check completed.');
 }
-
 /**
  * Initializes the cron job scheduler.
  * Uses a global variable to ensure only one instance runs during development.
@@ -116,8 +117,19 @@ export function initUsageCron() {
         });
     });
 
+    // Schedule GeoIP database update daily at 3:00 AM
+    cron.schedule('0 3 * * *', async () => {
+        try {
+            const { checkAndRunLiteUpdate } = await import('../services/geoip-updater.server');
+            await checkAndRunLiteUpdate();
+        } catch (err) {
+            console.error('[Cron Error] Failed to update GeoIP database:', err);
+        }
+    });
+
     globalAny.__usageCronStarted = true;
     console.log('[Cron] Usage monitoring scheduled (every 6 hours).');
+    console.log('[Cron] GeoIP auto-update scheduled (daily at 3:00 AM).');
     
     // Also run once immediately on startup to catch any missed windows
     checkAllShopsUsage().catch(err => {

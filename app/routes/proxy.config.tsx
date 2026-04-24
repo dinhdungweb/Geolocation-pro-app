@@ -39,8 +39,33 @@ const corsHeaders = {
   "Cache-Control": "no-store, no-cache, must-revalidate",
 };
 
-const vpnCache = new Map<string, { blocked: boolean; expiresAt: number }>();
+const VPN_CACHE_MAX_SIZE = 10_000;
 const VPN_CACHE_TTL_MS = 10 * 60 * 1000;
+const IP_API_FREE_URL = "http://ip-api.com/json/{ip}?fields=status,message,proxy,hosting,query";
+const vpnCache = new Map<string, { blocked: boolean; expiresAt: number }>();
+
+// Evict expired entries and enforce size limit
+function vpnCacheSet(key: string, value: { blocked: boolean; expiresAt: number }) {
+  // Periodically purge expired entries when cache is getting large
+  if (vpnCache.size >= VPN_CACHE_MAX_SIZE) {
+    const now = Date.now();
+    for (const [k, v] of vpnCache) {
+      if (v.expiresAt <= now) vpnCache.delete(k);
+    }
+    // If still over limit after purge, delete oldest 20%
+    if (vpnCache.size >= VPN_CACHE_MAX_SIZE) {
+      const toDelete = Math.floor(VPN_CACHE_MAX_SIZE * 0.2);
+      let deleted = 0;
+      for (const k of vpnCache.keys()) {
+        if (deleted >= toDelete) break;
+        vpnCache.delete(k);
+        deleted++;
+      }
+    }
+  }
+  vpnCache.set(key, value);
+}
+
 
 function getVisitorIP(request: Request): string {
   return (
@@ -214,9 +239,32 @@ function buildBlocked(settings: any) {
   };
 }
 
+function buildVpnProviderUrl(providerUrl: string, visitorIP: string) {
+  const rawProviderUrl = providerUrl.trim();
+  if (!rawProviderUrl) return null;
+
+  const hasProtocol = /^[a-z][a-z\d+\-.]*:\/\//i.test(rawProviderUrl);
+  const providerUrlWithProtocol = hasProtocol ? rawProviderUrl : `https://${rawProviderUrl}`;
+  const parsedUrl = new URL(providerUrlWithProtocol);
+  const hostname = parsedUrl.hostname.toLowerCase();
+
+  if (hostname === "ip-api.com" || hostname === "www.ip-api.com") {
+    return new URL(IP_API_FREE_URL.replace("{ip}", encodeURIComponent(visitorIP)));
+  }
+
+  if (parsedUrl.protocol !== "https:") return null;
+
+  if (rawProviderUrl.includes("{ip}")) {
+    return new URL(providerUrlWithProtocol.replace("{ip}", encodeURIComponent(visitorIP)));
+  }
+
+  parsedUrl.searchParams.set("ip", visitorIP);
+  return parsedUrl;
+}
+
 async function checkVpnBlocked(visitorIP: string, ipHash: string) {
   const providerUrl = process.env.VPN_CHECK_API_URL;
-  if (!providerUrl || !providerUrl.startsWith("https://") || isLocalOrUnknownIP(visitorIP)) {
+  if (!providerUrl || isLocalOrUnknownIP(visitorIP)) {
     return false;
   }
 
@@ -228,17 +276,15 @@ async function checkVpnBlocked(visitorIP: string, ipHash: string) {
   const timeoutId = setTimeout(() => controller.abort(), 2000);
 
   try {
-    const url = providerUrl.includes("{ip}")
-      ? new URL(providerUrl.replace("{ip}", encodeURIComponent(visitorIP)))
-      : new URL(providerUrl);
-    if (!providerUrl.includes("{ip}")) {
-      url.searchParams.set("ip", visitorIP);
-    }
+    const url = buildVpnProviderUrl(providerUrl, visitorIP);
+    if (!url) return false;
 
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) return false;
 
     const data = await response.json();
+    if (data.status === "fail") return false;
+
     const blocked = Boolean(
       data.proxy ||
         data.hosting ||
@@ -253,7 +299,7 @@ async function checkVpnBlocked(visitorIP: string, ipHash: string) {
           ((data.org || "").includes("Apple Inc.") && data.proxy))
     );
 
-    vpnCache.set(ipHash, { blocked, expiresAt: now + VPN_CACHE_TTL_MS });
+    vpnCacheSet(ipHash, { blocked, expiresAt: now + VPN_CACHE_TTL_MS });
     return blocked;
   } catch (error: any) {
     if (error?.name !== "AbortError") {

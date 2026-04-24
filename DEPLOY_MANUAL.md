@@ -85,10 +85,12 @@ ADMIN_PASSWORD_HASH=pbkdf2_sha256$310000$base64_salt$base64_hash
 ADMIN_SESSION_SECRET=replace_with_32_plus_random_chars
 APP_ENCRYPTION_KEY=replace_with_32_plus_random_chars
 MAXMIND_LICENSE_KEY=your_maxmind_license_key
-VPN_CHECK_API_URL=
+VPN_CHECK_API_URL=http://ip-api.com/json/{ip}?fields=status,message,proxy,hosting,query
 ```
 
 Generate `ADMIN_PASSWORD_HASH` with a local script or password manager using PBKDF2-SHA256. The format must be `pbkdf2_sha256$iterations$saltBase64$hashBase64` with at least 100000 iterations.
+
+`VPN_CHECK_API_URL` is used only for VPN/proxy/Tor detection. The default example uses ip-api.com's JSON fields `proxy` and `hosting`. For production/commercial usage, check ip-api.com's current terms and consider their Pro HTTPS endpoint.
 
 ### Đẩy Database Schema
 ```bash

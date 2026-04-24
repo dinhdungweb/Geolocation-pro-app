@@ -40,7 +40,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     prisma.analyticsCountry.deleteMany({ where: { shop } }),
                     prisma.analyticsRule.deleteMany({ where: { shop } }),
                     prisma.monthlyUsage.deleteMany({ where: { shop } }),
+                    prisma.billableUsageEvent.deleteMany({ where: { shop } }),
                     prisma.visitorLog.deleteMany({ where: { shop } }),
+                    prisma.adminEmailLog.deleteMany({ where: { shop } }),
+                    prisma.automation.deleteMany({ where: { shop } }),
+                    prisma.emailTemplate.deleteMany({ where: { shop } }),
+                    prisma.campaign.deleteMany({ where: { shop } }),
+                    prisma.emailBlacklist.deleteMany({ where: { shop } }),
                     prisma.session.deleteMany({ where: { shop } }),
                 ]);
                 console.log(`[GDPR] All data deleted for ${shop}`);

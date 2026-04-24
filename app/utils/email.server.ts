@@ -12,18 +12,25 @@ const DEFAULT_SENDER = process.env.SENDER_EMAIL || 'send@geopro.bluepeaks.top';
 
 export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'manual';
 
+function getEmailLogType(type: EmailType, dedupeKey?: string) {
+    return dedupeKey ? `${type}:${dedupeKey}` : type;
+}
+
 export async function sendAdminEmail({ 
     shop, 
     type, 
     subject, 
-    html 
+    html,
+    dedupeKey,
 }: { 
     shop: string, 
     type: EmailType, 
     subject: string, 
-    html: string 
+    html: string,
+    dedupeKey?: string,
 }) {
     console.log(`[Email Service] Preparing to send ${type} email to ${shop}`);
+    const logType = getEmailLogType(type, dedupeKey);
     
     // Check if the shop is in the Blacklist
     const isBlacklisted = await prisma.emailBlacklist.findUnique({
@@ -107,7 +114,7 @@ export async function sendAdminEmail({
             });
 
             await prisma.adminEmailLog.create({
-                data: { shop, type, subject: finalSubject, html: finalHtml, status: 'sent' }
+                data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'sent' }
             });
             return { success: true };
         }
@@ -123,13 +130,13 @@ export async function sendAdminEmail({
 
             if (error) {
                 await prisma.adminEmailLog.create({
-                    data: { shop, type, subject: finalSubject, html: finalHtml, status: 'failed', error: JSON.stringify(error) }
+                    data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'failed', error: JSON.stringify(error) }
                 });
                 return { success: false, error };
             }
 
             await prisma.adminEmailLog.create({
-                data: { shop, type, subject: finalSubject, html: finalHtml, status: 'sent' }
+                data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'sent' }
             });
             return { success: true, data };
         }
@@ -137,14 +144,14 @@ export async function sendAdminEmail({
         // Fallback: Simulation
         console.log(`[Email Simulation] TO: ${recipient} | SUBJECT: ${finalSubject}`);
         await prisma.adminEmailLog.create({
-            data: { shop, type, subject: finalSubject, html: finalHtml, status: 'simulated' }
+            data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'simulated' }
         });
         
         return { success: true, simulated: true };
     } catch (err: any) {
         console.error(`[Email Service] Error:`, err);
         await prisma.adminEmailLog.create({
-            data: { shop, type, subject: finalSubject, html: finalHtml, status: 'failed', error: err.message }
+            data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'failed', error: err.message }
         });
         return { success: false, error: err.message };
     }
@@ -153,13 +160,14 @@ export async function sendAdminEmail({
 /**
  * Checks if an automated email of a certain type has already been sent to a shop.
  */
-export async function hasSentEmail(shop: string, type: EmailType) {
+export async function hasSentEmail(shop: string, type: EmailType, dedupeKey?: string) {
     if (type === 'manual') return false;
+    const logType = getEmailLogType(type, dedupeKey);
     
     const log = await prisma.adminEmailLog.findFirst({
         where: { 
             shop, 
-            type,
+            type: logType,
             status: { in: ['sent', 'simulated'] }
         }
     });

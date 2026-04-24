@@ -135,28 +135,28 @@
     let overlayStyle = '';
     let contentStyle = '';
     if (template === 'top_bar' || template === 'bottom_bar') {
-      const verticalPosition = template === 'top_bar' ? 'top: 0;' : 'bottom: 0;';
+      const verticalPosition = template === 'top_bar' ? 'top: 0 !important;' : 'bottom: 0 !important;';
       const animation = template === 'top_bar' ? 'geo-slide-down' : 'geo-slide-up';
       overlayStyle = `
-        position: fixed; ${verticalPosition} left: 0; right: 0;
-        background: ${bgColor}; color: ${textColor};
-        padding: 12px 20px; z-index: 999999;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        display: flex; align-items: center; justify-content: space-between;
-        flex-wrap: wrap; gap: 15px; animation: ${animation} 0.3s ease;
+        position: fixed !important; ${verticalPosition} left: 0 !important; right: 0 !important;
+        background: ${bgColor} !important; color: ${textColor} !important;
+        padding: 12px 20px !important; z-index: 2147483647 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        display: flex !important; align-items: center !important; justify-content: space-between !important;
+        flex-wrap: wrap !important; gap: 15px !important; animation: ${animation} 0.3s ease !important;
       `;
-      contentStyle = 'display: flex; align-items: center; gap: 15px; flex: 1;';
+      contentStyle = 'display: flex !important; align-items: center !important; gap: 15px !important; flex: 1 !important;';
     } else {
       overlayStyle = `
-        position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
-        z-index: 999999; display: flex; align-items: center; justify-content: center;
-        animation: geo-fade-in 0.3s ease;
+        position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.5) !important;
+        z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+        animation: geo-fade-in 0.3s ease !important;
       `;
       contentStyle = `
-        background: ${bgColor}; color: ${textColor};
-        padding: 24px; border-radius: 12px; max-width: 400px; width: 90%;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        text-align: center; animation: geo-slide-up 0.3s ease; position: relative;
+        background: ${bgColor} !important; color: ${textColor} !important;
+        padding: 24px !important; border-radius: 12px !important; max-width: 400px !important; width: 90% !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
+        text-align: center !important; animation: geo-slide-up 0.3s ease !important; position: relative !important;
       `;
     }
 
