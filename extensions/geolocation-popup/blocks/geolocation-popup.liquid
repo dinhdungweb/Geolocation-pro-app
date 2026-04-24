@@ -11,6 +11,8 @@
 (function() {
   'use strict';
 
+  const SCRIPT_VERSION = '2026-04-24-cookie-popup-only';
+
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
     proxyUrl: '/apps/geolocation/config',
@@ -287,12 +289,14 @@
     }
 
     if (config.action === 'block') {
+      CookieManager.remove('geo_choice');
       trackEvent(config.analyticsEvent || 'blocked', config);
       showBlockScreen(config);
       return;
     }
 
     if (config.action === 'auto_redirect') {
+      CookieManager.remove('geo_choice');
       trackEvent(config.analyticsEvent || 'auto_redirected', config);
       window.location.href = rule.targetUrl;
       return;
@@ -309,10 +313,12 @@
   };
 
   window.GeolocationDebug = {
+    version: SCRIPT_VERSION,
     clearPreference: () => {
       CookieManager.remove('geo_choice');
       console.log('Cleared geolocation preference. Refresh the page to test again.');
     },
+    getPreference: () => CookieManager.get('geo_choice'),
     getConfig: fetchConfig
   };
 
