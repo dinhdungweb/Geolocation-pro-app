@@ -198,11 +198,13 @@ export default function AdminBilling() {
                 .billing-table-wrap { width: 100%; overflow-x: auto; }
                 .billing-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
                 .billing-table th {
-                    text-align: left; padding: 16px 20px; background: #f8fafc;
+                    padding: 16px 20px; background: #f8fafc;
                     font-size: 11px; font-weight: 700; color: var(--text-muted);
                     text-transform: uppercase; letter-spacing: 0.06em;
                     border-bottom: 1px solid var(--border);
+                    text-align: left;
                 }
+                .billing-table th.text-right { text-align: right; }
                 .billing-table td { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 14px; }
                 .billing-table tr:last-child td { border-bottom: none; }
                 .billing-table tr:hover td { background: #f9fafb; }
@@ -219,6 +221,7 @@ export default function AdminBilling() {
                 .status-tag {
                     padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
                     display: inline-block;
+                    white-space: nowrap;
                 }
 
                 .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
@@ -345,7 +348,7 @@ export default function AdminBilling() {
                             <tr>
                                 <th>Shop</th>
                                 <th>Plan</th>
-                                <th>Limit</th>
+                                <th className="text-right">Limit</th>
                                 <th className="text-right">Visitors</th>
                                 <th className="text-right">Overage</th>
                                 <th className="text-right">Charged</th>
