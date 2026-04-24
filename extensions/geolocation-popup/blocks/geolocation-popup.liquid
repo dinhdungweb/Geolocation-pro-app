@@ -1,7 +1,7 @@
 {% comment %}
   Geolocation Popup - Theme App Extension.
-  This Liquid block stays intentionally small so Shopify homepage HTML caching
-  does not freeze the redirect/block/popup runtime logic.
+  Storefront decisions are resolved by the app proxy. The browser only renders
+  the returned action and reports signed analytics events.
 {% endcomment %}
 
 <div id="geolocation-app-container" style="display: none;"></div>
@@ -10,30 +10,329 @@
 (function() {
   'use strict';
 
-  var LOADER_VERSION = '2026-04-24-runtime-loader';
-  var THEME_BLOCK_ENABLED = {{ block.settings.enabled | json }};
-  var shop = '{{ shop.permanent_domain }}';
+  const SCRIPT_VERSION = '2026-04-24-theme-debug';
+  const THEME_BLOCK_ENABLED = {{ block.settings.enabled | json }};
 
-  window.__GEOLOCATION_APP_CONFIG__ = {
-    shop: shop,
+  const GEOLOCATION_CONFIG = {
+    shop: '{{ shop.permanent_domain }}',
     proxyUrl: '/apps/geolocation/config',
-    analyticsUrl: '/apps/geolocation/analytics?shop=' + encodeURIComponent(shop),
+    analyticsUrl: '/apps/geolocation/analytics?shop={{ shop.permanent_domain }}',
     visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}',
     themeBlockEnabled: THEME_BLOCK_ENABLED
   };
 
-  window.GeolocationDebug = Object.assign(window.GeolocationDebug || {}, {
-    loaderVersion: LOADER_VERSION,
-    themeBlockEnabled: THEME_BLOCK_ENABLED
-  });
+  const urlParams = new URLSearchParams(window.location.search);
+  const DEBUG = urlParams.get('debug') === 'true';
+  const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
 
-  if (document.getElementById('geolocation-runtime-script')) return;
+  const escapeHtml = (value) => {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(value || ''));
+    return div.innerHTML;
+  };
 
-  var runtimeScript = document.createElement('script');
-  runtimeScript.id = 'geolocation-runtime-script';
-  runtimeScript.src = '/apps/geolocation/runtime?shop=' + encodeURIComponent(shop) + '&v=' + encodeURIComponent(LOADER_VERSION);
-  runtimeScript.async = false;
-  document.head.appendChild(runtimeScript);
+  const safeColor = (value, fallback) => {
+    return /^#[0-9a-f]{3,8}$/i.test(value || '') ? value : fallback;
+  };
+
+  const CookieManager = {
+    set(name, value, days) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+    },
+    get(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    },
+    has(name) {
+      return this.get(name) !== null;
+    },
+    remove(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }
+  };
+
+  const fetchConfig = async () => {
+    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}${DEBUG ? '&debug=true' : ''}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  };
+
+  const getCountryCode = (config) => {
+    if (DEBUG && urlParams.get('test_country')) {
+      return urlParams.get('test_country').toUpperCase();
+    }
+    return (config.countryCode || GEOLOCATION_CONFIG.visitorCountry || '').toUpperCase();
+  };
+
+  const trackEvent = (type, config, extra = {}) => {
+    try {
+      if (window.Shopify && window.Shopify.designMode) return;
+
+      if (type === 'visit') {
+        if (sessionStorage.getItem('geo_visit_tracked')) return;
+        sessionStorage.setItem('geo_visit_tracked', 'true');
+      }
+
+      const rule = config.rule || {};
+      const payload = {
+        type,
+        path: window.location.pathname,
+        countryCode: getCountryCode(config),
+        eventToken: config.eventToken || undefined,
+        ruleId: rule.ruleId || undefined,
+        ruleName: rule.name || undefined,
+        targetUrl: rule.targetUrl || undefined,
+        ...extra
+      };
+
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        if (navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob)) return;
+      }
+
+      fetch(GEOLOCATION_CONFIG.analyticsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch((error) => log('Analytics error:', error));
+    } catch (error) {
+      log('Analytics failed:', error);
+    }
+  };
+
+  const alreadyOnTarget = (targetUrl) => {
+    if (!targetUrl) return true;
+    try {
+      const current = new URL(window.location.href);
+      const target = new URL(targetUrl, current.origin);
+      if (current.origin !== target.origin) return false;
+
+      const normalizePath = (path) => path.replace(/\/+$/, '') || '/';
+      return normalizePath(current.pathname) === normalizePath(target.pathname);
+    } catch {
+      return window.location.href.includes(targetUrl);
+    }
+  };
+
+  const showPopup = (config) => {
+    const rule = config.rule || {};
+    const popup = config.popup || {};
+    const template = popup.template || 'modal';
+    const container = document.getElementById('geolocation-app-container');
+    if (!container) return;
+
+    let targetName = rule.targetUrl || '';
+    try {
+      targetName = new URL(rule.targetUrl, window.location.origin).hostname;
+    } catch {}
+
+    const title = escapeHtml(popup.title || 'Redirect Available');
+    const message = escapeHtml((popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
+      .replace('{country}', getCountryCode(config) || 'your region')
+      .replace('{target}', targetName || 'the recommended store'));
+    const confirmBtn = escapeHtml(popup.confirmBtn || 'Go now');
+    const cancelBtn = escapeHtml(popup.cancelBtn || 'Stay here');
+    const bgColor = safeColor(popup.bgColor, '#ffffff');
+    const textColor = safeColor(popup.textColor, '#333333');
+    const btnColor = safeColor(popup.btnColor, '#007bff');
+
+    let overlayStyle = '';
+    let contentStyle = '';
+    if (template === 'top_bar' || template === 'bottom_bar') {
+      const verticalPosition = template === 'top_bar' ? 'top: 0 !important;' : 'bottom: 0 !important;';
+      const animation = template === 'top_bar' ? 'geo-slide-down' : 'geo-slide-up';
+      overlayStyle = `
+        position: fixed !important; ${verticalPosition} left: 0 !important; right: 0 !important;
+        background: ${bgColor} !important; color: ${textColor} !important;
+        padding: 12px 20px !important; z-index: 2147483647 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        display: flex !important; align-items: center !important; justify-content: space-between !important;
+        flex-wrap: wrap !important; gap: 15px !important; animation: ${animation} 0.3s ease !important;
+      `;
+      contentStyle = 'display: flex !important; align-items: center !important; gap: 15px !important; flex: 1 !important;';
+    } else {
+      overlayStyle = `
+        position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.5) !important;
+        z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+        animation: geo-fade-in 0.3s ease !important;
+      `;
+      contentStyle = `
+        background: ${bgColor} !important; color: ${textColor} !important;
+        padding: 24px !important; border-radius: 12px !important; max-width: 400px !important; width: 90% !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
+        text-align: center !important; animation: geo-slide-up 0.3s ease !important; position: relative !important;
+      `;
+    }
+
+    const buttonsHtml = `
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
+        <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
+      </div>
+    `;
+
+    const contentHtml = template === 'modal'
+      ? `
+        <div id="geo-popup-modal" style="${contentStyle}">
+          <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">${title}</h3>
+          <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">${message}</p>
+          ${buttonsHtml}
+        </div>
+      `
+      : `
+        <div id="geo-bar-content" style="${contentStyle}">
+          <span style="font-weight: 600; font-size: 14px;">${title}</span>
+          <span style="font-size: 14px; opacity: 0.9; margin-right: auto;">${message}</span>
+          ${buttonsHtml}
+        </div>
+      `;
+
+    container.innerHTML = `
+      <div id="geo-popup-overlay" style="${overlayStyle}">
+        ${contentHtml}
+      </div>
+      <style>
+        @keyframes geo-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes geo-slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes geo-slide-down { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      </style>
+    `;
+    container.style.display = 'block';
+
+    document.getElementById('geo-confirm-btn').addEventListener('click', () => {
+      CookieManager.set('geo_choice', 'redirected', config.popup?.cookieDuration || 7);
+      trackEvent('redirected', config);
+      window.location.href = rule.targetUrl;
+    });
+
+    document.getElementById('geo-cancel-btn').addEventListener('click', () => {
+      CookieManager.set('geo_choice', 'stayed', config.popup?.cookieDuration || 7);
+      trackEvent('clicked_no', config);
+      container.style.display = 'none';
+    });
+
+    if (template === 'modal') {
+      document.getElementById('geo-popup-overlay').addEventListener('click', (event) => {
+        if (event.target.id === 'geo-popup-overlay') {
+          trackEvent('dismissed', config);
+          container.style.display = 'none';
+        }
+      });
+    }
+  };
+
+  const showBlockScreen = (config) => {
+    const blockedSettings = config.blocked || {};
+    const isVpn = config.rule && config.rule.source === 'vpn';
+    const title = escapeHtml(isVpn ? 'Security Alert' : (blockedSettings.title || 'Access Denied'));
+    const message = escapeHtml(isVpn ? 'Access via VPN or proxy is not allowed for this store.' : (blockedSettings.message || 'We do not offer services in your country/region.'));
+
+    const overlay = document.createElement('div');
+    overlay.id = 'geo-block-screen';
+    overlay.style.cssText = `
+      position: fixed !important; inset: 0 !important;
+      background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%) !important;
+      color: #fff !important; z-index: 2147483647 !important;
+      display: flex !important; align-items: center !important; justify-content: center !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      padding: 20px !important; visibility: visible !important;
+    `;
+
+    overlay.innerHTML = `
+      <div style="background: rgba(255,255,255,0.05) !important; padding: 40px !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.1) !important; text-align: center !important; max-width: 500px !important; width: 100% !important; box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important; color: #ffffff !important;">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block !important; margin:0 auto 24px !important;">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 9 6 6"></path>
+          <path d="m15 9-6 6"></path>
+        </svg>
+        <h1 style="font-size: 24px !important; font-weight: 600 !important; margin: 0 0 16px !important; color: #ffffff !important;">${title}</h1>
+        <p style="font-size: 16px !important; line-height: 1.6 !important; color: rgba(255,255,255,0.8) !important; margin: 0 !important;">${message}</p>
+      </div>
+      <style id="geo-block-overrides">
+        html.geo-blocked, html.geo-blocked body { overflow: hidden !important; height: 100% !important; }
+        html.geo-blocked body { position: fixed !important; width: 100% !important; }
+        html.geo-blocked body > *:not(#geolocation-app-container):not(#geo-block-screen) {
+          display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;
+        }
+      </style>
+    `;
+
+    document.documentElement.classList.add('geo-blocked');
+    document.body.appendChild(overlay);
+  };
+
+  const init = async () => {
+    if (window.Shopify && window.Shopify.designMode) return;
+    if (window.location.search.includes('preview_theme_id') || window.location.pathname.includes('/editor')) return;
+    if (!THEME_BLOCK_ENABLED) {
+      log('Theme block is disabled');
+      return;
+    }
+
+    let config;
+    try {
+      config = await fetchConfig();
+    } catch (error) {
+      log('Could not fetch config:', error);
+      return;
+    }
+
+    trackEvent('visit', config);
+
+    if (!config || config.action === 'none' || config.limitExceeded) {
+      log('No storefront action required', config);
+      return;
+    }
+
+    const rule = config.rule || {};
+    if ((config.action === 'popup' || config.action === 'auto_redirect') && alreadyOnTarget(rule.targetUrl)) {
+      log('Already on target URL');
+      return;
+    }
+
+    if (config.action === 'block') {
+      CookieManager.remove('geo_choice');
+      trackEvent(config.analyticsEvent || 'blocked', config);
+      showBlockScreen(config);
+      return;
+    }
+
+    if (config.action === 'auto_redirect') {
+      CookieManager.remove('geo_choice');
+      trackEvent(config.analyticsEvent || 'auto_redirected', config);
+      window.location.href = rule.targetUrl;
+      return;
+    }
+
+    if (config.action === 'popup') {
+      if (CookieManager.has('geo_choice')) {
+        log('User preference found, skipping popup');
+        return;
+      }
+      trackEvent('popup_shown', config);
+      showPopup(config);
+    }
+  };
+
+  window.GeolocationDebug = {
+    version: SCRIPT_VERSION,
+    themeBlockEnabled: THEME_BLOCK_ENABLED,
+    clearPreference: () => {
+      CookieManager.remove('geo_choice');
+      console.log('Cleared geolocation preference. Refresh the page to test again.');
+    },
+    getPreference: () => CookieManager.get('geo_choice'),
+    getConfig: fetchConfig
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
 
