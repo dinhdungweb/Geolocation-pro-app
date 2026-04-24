@@ -1,5 +1,5 @@
 import prisma from "../db.server";
-import { ALL_PAID_PLANS, FREE_PLAN, PLAN_LIMITS, OVERAGE_RATE } from "../billing.config";
+import { ALL_PAID_PLANS, FREE_PLAN, PLAN_LIMITS, OVERAGE_RATE, OVERAGE_HARD_LIMIT } from "../billing.config";
 import { unauthenticated } from "../shopify.server";
 
 /**
@@ -292,6 +292,12 @@ export async function checkAndChargeOverageBackground(shop: string) {
 
         const currentUsage = monthlyUsage?.totalVisitors || 0;
         const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
+
+        // Hard cap at visitors as per requirement
+        if (currentUsage >= OVERAGE_HARD_LIMIT) {
+            console.log(`[Billing] Shop ${shop} reached hard limit of ${OVERAGE_HARD_LIMIT} visitors. Overage charging halted.`);
+            return;
+        }
 
         if (currentUsage <= planLimit) return; // Within limits
 

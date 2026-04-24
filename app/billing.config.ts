@@ -18,4 +18,7 @@ export const PLAN_LIMITS = {
 // Overage pricing: $100 per 50,000 visitors = $0.002 per visitor
 export const OVERAGE_RATE = 100 / 50000; // $0.002 per visitor
 
+// Maximum visitors allowed per month before halting overage billing (Hard Cap)
+export const OVERAGE_HARD_LIMIT = 70000;
+
 export type PlanName = typeof ALL_PLANS[number];
