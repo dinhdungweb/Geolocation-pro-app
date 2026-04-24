@@ -378,15 +378,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const visitorIP = getVisitorIP(request);
   const ipHash = hashIP(visitorIP);
-  let countryCode = shopifyCountryCode;
+  let countryCode = "";
 
-  if (!countryCode) {
-    try {
-      countryCode = await getCountryFromIP(visitorIP);
-    } catch (error: any) {
-      console.error(`[Proxy] MaxMind lookup error:`, error.message);
-    }
+  try {
+    countryCode = await getCountryFromIP(visitorIP);
+  } catch (error: any) {
+    console.error(`[Proxy] MaxMind lookup error:`, error.message);
   }
+
+  if (!countryCode) countryCode = shopifyCountryCode;
 
   if (process.env.GEO_DEBUG_IP === "true") {
     console.log("[Proxy IP Debug]", {
