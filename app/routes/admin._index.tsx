@@ -38,7 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 orderBy: { yearMonth: 'desc' },
                 take: 12
             }),
-            (prisma as any).monthlyUsage.findMany({
+            prisma.monthlyUsage.findMany({
                 where: { yearMonth }
             })
         ]);

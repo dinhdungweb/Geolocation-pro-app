@@ -50,7 +50,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
 
         try {
-            await (prisma as any).monthlyUsage.update({
+            await prisma.monthlyUsage.update({
                 where: { shop_yearMonth: { shop, yearMonth } },
                 data: { chargedVisitors }
             });
@@ -79,7 +79,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 scheduleEnabled: true, createdAt: true,
             },
         }),
-        (prisma as any).visitorLog.findMany({
+        prisma.visitorLog.findMany({
             where: { shop },
             orderBy: { timestamp: "desc" },
             take: 100,
@@ -88,7 +88,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 ruleName: true, targetUrl: true, timestamp: true,
             },
         }),
-        (prisma as any).monthlyUsage.findMany({
+        prisma.monthlyUsage.findMany({
             where: { shop },
             orderBy: { yearMonth: "desc" },
             take: 6,

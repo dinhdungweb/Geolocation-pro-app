@@ -19,8 +19,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const [allSettings, currentUsage, prevUsage] = await Promise.all([
         prisma.settings.findMany({ where: { NOT: { shop: 'GLOBAL' } } }),
-        (prisma as any).monthlyUsage.findMany({ where: { yearMonth } }),
-        (prisma as any).monthlyUsage.findMany({ where: { yearMonth: prevYearMonth } }),
+        prisma.monthlyUsage.findMany({ where: { yearMonth } }),
+        prisma.monthlyUsage.findMany({ where: { yearMonth: prevYearMonth } }),
     ]);
 
     const usageMap = new Map((currentUsage as any[]).map((u) => [u.shop, u]));

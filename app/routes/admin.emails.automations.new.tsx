@@ -7,7 +7,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
     try {
-        const automation = await (prisma as any).automation.create({
+        const automation = await prisma.automation.create({
             data: {
                 shop: 'GLOBAL',
                 type: 'manual_' + Date.now(),

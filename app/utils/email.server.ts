@@ -25,7 +25,7 @@ export async function sendAdminEmail({
     console.log(`[Email Service] Preparing to send ${type} email to ${shop}`);
     
     // Check if the shop is in the Blacklist
-    const isBlacklisted = await (prisma as any).emailBlacklist.findUnique({
+    const isBlacklisted = await prisma.emailBlacklist.findUnique({
         where: { shop }
     });
 
@@ -35,17 +35,17 @@ export async function sendAdminEmail({
     }
 
     // Fetch settings for SMTP and sender info
-    const settings = await (prisma as any).settings.findUnique({
+    const settings = await prisma.settings.findUnique({
         where: { shop: 'GLOBAL' }
     });
 
     // Check for custom automation template (Specific Shop then GLOBAL)
-    let customAuto = await (prisma as any).automation.findUnique({
+    let customAuto = await prisma.automation.findUnique({
         where: { shop_type: { shop, type } }
     });
 
     if (!customAuto) {
-        customAuto = await (prisma as any).automation.findUnique({
+        customAuto = await prisma.automation.findUnique({
             where: { shop_type: { shop: 'GLOBAL', type } }
         });
     }
@@ -62,7 +62,7 @@ export async function sendAdminEmail({
 
     if (customAuto) {
         console.log(`[Email Service] Using CUSTOM template for ${type} email to ${shop}`);
-        finalSubject = replaceEmailVariables(customAuto.subject, { shop });
+        finalSubject = replaceEmailVariables(customAuto.subject || subject, { shop });
         finalHtml = replaceEmailVariables(customAuto.html, { shop });
     } else {
         finalSubject = replaceEmailVariables(subject, { shop });
@@ -96,7 +96,7 @@ export async function sendAdminEmail({
                     user: settings.smtpUser,
                     pass: settings.smtpPass,
                 },
-            });
+            } as nodemailer.TransportOptions);
 
             await transporter.sendMail({
                 from: `"${senderName}" <${senderEmail}>`,
@@ -105,7 +105,7 @@ export async function sendAdminEmail({
                 html: finalHtml,
             });
 
-            await (prisma as any).adminEmailLog.create({
+            await prisma.adminEmailLog.create({
                 data: { shop, type, subject: finalSubject, html: finalHtml, status: 'sent' }
             });
             return { success: true };
@@ -121,13 +121,13 @@ export async function sendAdminEmail({
             });
 
             if (error) {
-                await (prisma as any).adminEmailLog.create({
+                await prisma.adminEmailLog.create({
                     data: { shop, type, subject: finalSubject, html: finalHtml, status: 'failed', error: JSON.stringify(error) }
                 });
                 return { success: false, error };
             }
 
-            await (prisma as any).adminEmailLog.create({
+            await prisma.adminEmailLog.create({
                 data: { shop, type, subject: finalSubject, html: finalHtml, status: 'sent' }
             });
             return { success: true, data };
@@ -135,14 +135,14 @@ export async function sendAdminEmail({
 
         // Fallback: Simulation
         console.log(`[Email Simulation] TO: ${recipient} | SUBJECT: ${finalSubject}`);
-        await (prisma as any).adminEmailLog.create({
+        await prisma.adminEmailLog.create({
             data: { shop, type, subject: finalSubject, html: finalHtml, status: 'simulated' }
         });
         
         return { success: true, simulated: true };
     } catch (err: any) {
         console.error(`[Email Service] Error:`, err);
-        await (prisma as any).adminEmailLog.create({
+        await prisma.adminEmailLog.create({
             data: { shop, type, subject: finalSubject, html: finalHtml, status: 'failed', error: err.message }
         });
         return { success: false, error: err.message };
@@ -155,7 +155,7 @@ export async function sendAdminEmail({
 export async function hasSentEmail(shop: string, type: EmailType) {
     if (type === 'manual') return false;
     
-    const log = await (prisma as any).adminEmailLog.findFirst({
+    const log = await prisma.adminEmailLog.findFirst({
         where: { 
             shop, 
             type,

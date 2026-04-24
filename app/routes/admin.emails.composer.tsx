@@ -76,7 +76,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         };
     }));
 
-    const templates = await (prisma as any).emailTemplate.findMany({ select: { id: true, name: true, subject: true, html: true } });
+    const templates = await prisma.emailTemplate.findMany({ select: { id: true, name: true, subject: true, html: true } });
 
     return json({ shops: shopMap, templates });
 };
@@ -95,7 +95,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const results = [];
     // Create campaign record
-    const campaign = await (prisma as any).campaign.create({
+    const campaign = await prisma.campaign.create({
         data: {
             shop: 'GLOBAL',
             name: formData.get("campaignName") as string || "Manual Broadcast",
@@ -137,7 +137,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const failCount = results.length - successCount;
     
     // Update campaign record
-    await (prisma as any).campaign.update({
+    await prisma.campaign.update({
         where: { id: campaign.id },
         data: { 
             status: 'sent', 

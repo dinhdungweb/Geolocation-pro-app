@@ -1,6 +1,6 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -44,34 +44,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function App() {
   const { apiKey, shopInfo } = useLoaderData<typeof loader>();
 
+  const crispInitialized = useRef(false);
+
   useEffect(() => {
-    // Chỉ chạy ở phía Client
-    if (typeof window !== "undefined") {
-      // 1. Khởi tạo Crisp
+    // Chỉ chạy ở phía Client và chỉ khởi tạo 1 lần duy nhất
+    if (typeof window === "undefined" || crispInitialized.current) return;
+    crispInitialized.current = true;
+
+    // 1. Khởi tạo Crisp (chỉ khi chưa có script trong DOM)
+    if (!(window as any).CRISP_WEBSITE_ID) {
       (window as any).$crisp = [];
       (window as any).CRISP_WEBSITE_ID = "b882709c-9f60-4bf7-b823-0f6bc6196f4a";
-      
-      const d = document;
-      const s = d.createElement("script");
-      s.src = "https://client.crisp.chat/l.js";
-      s.async = true;
-      d.getElementsByTagName("head")[0].appendChild(s);
 
-      // 2. Nhận diện Shop khi script đã tải xong
-      const handleIdentify = () => {
-        if ((window as any).$crisp && shopInfo) {
-          const crisp = (window as any).$crisp;
-          crisp.push(["set", "user:email", [shopInfo.email]]);
-          crisp.push(["set", "user:nickname", [shopInfo.name]]);
-          crisp.push(["set", "session:data", [[["shop", shopInfo.myshopifyDomain]]]]);
-          crisp.push(["do", "chat:show"]);
-        }
-      };
-
-      // Đợi một chút để Crisp init hoàn toàn
-      setTimeout(handleIdentify, 1000);
+      const existingScript = document.querySelector('script[src*="crisp.chat"]');
+      if (!existingScript) {
+        const s = document.createElement("script");
+        s.src = "https://client.crisp.chat/l.js";
+        s.async = true;
+        document.head.appendChild(s);
+      }
     }
-  }, [shopInfo]);
+
+    // 2. Nhận diện Shop khi script đã tải xong
+    const handleIdentify = () => {
+      if ((window as any).$crisp && shopInfo) {
+        const crisp = (window as any).$crisp;
+        crisp.push(["set", "user:email", [shopInfo.email]]);
+        crisp.push(["set", "user:nickname", [shopInfo.name]]);
+        crisp.push(["set", "session:data", [[["shop", shopInfo.myshopifyDomain]]]]);
+        crisp.push(["do", "chat:show"]);
+      }
+    };
+
+    // Đợi một chút để Crisp init hoàn toàn
+    const timer = setTimeout(handleIdentify, 1500);
+    return () => clearTimeout(timer);
+  }, []); // Empty deps: chỉ chạy 1 lần khi mount
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>

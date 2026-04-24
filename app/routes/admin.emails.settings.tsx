@@ -35,7 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const smtpPass = formData.get("smtpPass") as string;
     const smtpSecure = formData.get("smtpSecure") === "true";
 
-    await (prisma as any).settings.upsert({
+    await prisma.settings.upsert({
         where: { shop: 'GLOBAL' },
         update: { 
             emailSenderName: name,

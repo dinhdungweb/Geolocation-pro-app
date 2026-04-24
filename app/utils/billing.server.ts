@@ -28,7 +28,7 @@ export async function checkAndChargeOverage(
         // Get current month usage
         const now = new Date();
         const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+        const monthlyUsage = await prisma.monthlyUsage.findUnique({
             where: { shop_yearMonth: { shop, yearMonth } },
         });
 
@@ -47,7 +47,7 @@ export async function checkAndChargeOverage(
         if (chargeAmount < 1.00) return;
 
         // Reserve the charge by updating the database FIRST using optimistic locking
-        const updateResult = await (prisma as any).monthlyUsage.updateMany({
+        const updateResult = await prisma.monthlyUsage.updateMany({
             where: { 
                 shop,
                 yearMonth,
@@ -87,7 +87,7 @@ export async function checkAndChargeOverage(
 
             // For other errors (like network failures), rollback the DB reservation so we can try again later.
             console.log(`[Billing] Rolling back DB reservation for ${shop}`);
-            await (prisma as any).monthlyUsage.updateMany({
+            await prisma.monthlyUsage.updateMany({
                 where: { shop, yearMonth },
                 data: {
                     chargedVisitors: chargedVisitors // Revert back to the original value
@@ -286,7 +286,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
         // 2. Get current month usage from DB
         const now = new Date();
         const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+        const monthlyUsage = await prisma.monthlyUsage.findUnique({
             where: { shop_yearMonth: { shop, yearMonth } },
         });
 
@@ -304,7 +304,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
         if (chargeAmount < 1.00) return;
 
         // Reserve the charge by updating the database FIRST using optimistic locking
-        const updateResult = await (prisma as any).monthlyUsage.updateMany({
+        const updateResult = await prisma.monthlyUsage.updateMany({
             where: { 
                 shop,
                 yearMonth,
@@ -366,7 +366,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
 
             // Rollback the DB reservation on network/temporary errors
             console.log(`[Cron Billing] Rolling back DB reservation for ${shop}`);
-            await (prisma as any).monthlyUsage.updateMany({
+            await prisma.monthlyUsage.updateMany({
                 where: { shop, yearMonth },
                 data: {
                     chargedVisitors: chargedVisitors

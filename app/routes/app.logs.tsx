@@ -24,13 +24,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const maxLogs = 250;
 
     let [logs, dbCount] = await Promise.all([
-        (prisma as any).visitorLog.findMany({
+        prisma.visitorLog.findMany({
             where: { shop: session.shop },
             orderBy: { timestamp: "desc" },
             skip,
             take: limit,
         }),
-        (prisma as any).visitorLog.count({
+        prisma.visitorLog.count({
             where: { shop: session.shop },
         }),
     ]);

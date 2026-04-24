@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const logs = await (prisma as any).adminEmailLog.findMany({
+    const logs = await prisma.adminEmailLog.findMany({
         where: { createdAt: { gte: thirtyDaysAgo } },
         orderBy: { createdAt: 'desc' },
         select: { id: true, type: true, subject: true, status: true, html: true, createdAt: true }
@@ -76,7 +76,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         activityDays,
         campaigns: await (async () => {
             try {
-                return await (prisma as any).campaign.findMany({
+                return await prisma.campaign.findMany({
                     where: { shop: 'GLOBAL' },
                     orderBy: { createdAt: 'desc' },
                     take: 10

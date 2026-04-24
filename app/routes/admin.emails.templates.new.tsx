@@ -7,7 +7,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
     try {
-        const template = await (prisma as any).emailTemplate.create({
+        const template = await prisma.emailTemplate.create({
             data: {
                 shop: 'GLOBAL',
                 name: "Untitled Template",

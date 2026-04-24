@@ -21,7 +21,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log(`[Subscription Update] Shop ${shop} plan updated to: ${currentPlan} (Status: ${appSubscription?.status})`);
 
     try {
-        await (db as any).settings.upsert({
+        await db.settings.upsert({
             where: { shop },
             update: { currentPlan },
             create: { shop, currentPlan },

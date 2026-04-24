@@ -21,7 +21,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
     try {
-        const logs = await (prisma as any).adminEmailLog.findMany({
+        const logs = await prisma.adminEmailLog.findMany({
             orderBy: { createdAt: 'desc' },
             take: 100
         });

@@ -15,9 +15,9 @@ import prisma from "../db.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
-    let templates = [];
+    let templates: Awaited<ReturnType<typeof prisma.emailTemplate.findMany>> = [];
     try {
-        templates = await (prisma as any).emailTemplate.findMany({
+        templates = await prisma.emailTemplate.findMany({
             where: { shop: 'GLOBAL' },
             orderBy: { updatedAt: 'desc' }
         });

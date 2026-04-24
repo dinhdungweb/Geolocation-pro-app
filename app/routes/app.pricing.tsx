@@ -67,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 const planLimit = PLAN_LIMITS[activePlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
                 const now = new Date();
                 const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+                const monthlyUsage = await prisma.monthlyUsage.findUnique({
                     where: { shop_yearMonth: { shop, yearMonth } },
                 });
 
@@ -83,7 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                                     price: { amount: chargeAmount, currencyCode: "USD" },
                                     isTest,
                                 });
-                                await (prisma as any).monthlyUsage.update({
+                                await prisma.monthlyUsage.update({
                                     where: { shop_yearMonth: { shop, yearMonth } },
                                     data: { chargedVisitors: { increment: overageVisitors } },
                                 });
@@ -107,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             // Sync currentPlan to Settings for proxy limit check
             try {
-                await (prisma as any).settings.upsert({
+                await prisma.settings.upsert({
                     where: { shop },
                     update: { currentPlan: FREE_PLAN },
                     create: { shop, currentPlan: FREE_PLAN },
@@ -123,7 +123,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (ALL_PAID_PLANS.includes(selectedPlan)) {
             // Sync currentPlan to Settings for proxy limit check
             try {
-                await (prisma as any).settings.upsert({
+                await prisma.settings.upsert({
                     where: { shop },
                     update: { currentPlan: selectedPlan },
                     create: { shop, currentPlan: selectedPlan },

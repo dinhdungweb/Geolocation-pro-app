@@ -86,7 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Sync currentPlan to Settings (ensure proxy.config can check plan limits)
   try {
-    await (prisma as any).settings.upsert({
+    await prisma.settings.upsert({
       where: { shop },
       update: { currentPlan },
       create: { shop, currentPlan },
@@ -98,7 +98,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Get current month usage
   const now = new Date();
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+  const monthlyUsage = await prisma.monthlyUsage.findUnique({
     where: {
       shop_yearMonth: {
         shop,
@@ -122,12 +122,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   // Get statistics
-  // Using (prisma as any) to bypass potential stale type definitions for new models
+  // Using prisma to bypass potential stale type definitions for new models
   const [
     countryStats,
     ruleStats
   ] = await Promise.all([
-    (prisma as any).analyticsCountry.groupBy({
+    prisma.analyticsCountry.groupBy({
       by: ['countryCode'],
       where: {
         shop,
@@ -140,7 +140,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         blocked: true,
       }
     }),
-    (prisma as any).analyticsRule.groupBy({
+    prisma.analyticsRule.groupBy({
       by: ['ruleName', 'ruleId'],
       where: {
         shop,

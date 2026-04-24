@@ -102,7 +102,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'popup_shown') action = 'popup_shown';
 
             try {
-                await (prisma as any).visitorLog.create({
+                await prisma.visitorLog.create({
                     data: {
                         shop,
                         ipAddress: visitorIP,
@@ -132,7 +132,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (type === 'blocked' || type === 'ip_blocked' || type === 'vpn_blocked') updateData.blocked = { increment: 1 };
 
             if (Object.keys(updateData).length > 0) {
-                await (prisma as any).analyticsCountry.upsert({
+                await prisma.analyticsCountry.upsert({
                     where: {
                         shop_date_countryCode: {
                             shop,
@@ -166,7 +166,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             // Note: vpn_blocked typically won't have a ruleId unless it's the "vpn-shield" virtual rule
 
             if (Object.keys(updateRuleData).length > 0) {
-                await (prisma as any).analyticsRule.upsert({
+                await prisma.analyticsRule.upsert({
                     where: {
                         shop_date_ruleId: {
                             shop,
@@ -215,7 +215,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 usageUpdateData.popupShown = { increment: 1 };
             }
 
-            await (prisma as any).monthlyUsage.upsert({
+            await prisma.monthlyUsage.upsert({
                 where: {
                     shop_yearMonth: {
                         shop,

@@ -22,7 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
     try {
-        const campaigns = await (prisma as any).campaign.findMany({
+        const campaigns = await prisma.campaign.findMany({
             orderBy: { createdAt: 'desc' }
         });
         return json({ campaigns });

@@ -117,7 +117,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = formData.get("pagePaths") as string || "";
 
-            await (prisma as any).redirectRule.create({
+            await prisma.redirectRule.create({
                 data: {
                     shop,
                     name,
@@ -131,7 +131,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     redirectMode,
                     pageTargetingType,
                     pagePaths,
-                } as any,
+                },
             });
             return json({ success: true, message: "IP Rule created successfully" });
         }
@@ -165,7 +165,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     redirectMode,
                     pageTargetingType,
                     pagePaths,
-                } as any,
+                },
             });
             return json({ success: true, message: "IP Rule updated successfully" });
         }
@@ -219,7 +219,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 if (!rule.name || !rule.ipAddresses) continue;
                 if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
 
-                await (prisma as any).redirectRule.create({
+                await prisma.redirectRule.create({
                     data: {
                         shop,
                         name: rule.name,
@@ -233,7 +233,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         matchType: "ip",
                         pageTargetingType: normalizeOption(rule.pageTargetingType, ["all", "include", "exclude"], "all"),
                         pagePaths: rule.pagePaths || null,
-                    } as any,
+                    },
                 });
                 created++;
             }

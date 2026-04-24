@@ -30,7 +30,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { id } = params;
 
     try {
-        const template = await (prisma as any).emailTemplate.findUnique({
+        const template = await prisma.emailTemplate.findUnique({
             where: { id }
         });
 
@@ -57,7 +57,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const config = formData.get("config") as string;
         const html = formData.get("html") as string;
 
-        await (prisma as any).emailTemplate.update({
+        await prisma.emailTemplate.update({
             where: { id },
             data: { name, subject, config, html }
         });
@@ -66,7 +66,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (action === "delete") {
-        await (prisma as any).emailTemplate.delete({
+        await prisma.emailTemplate.delete({
             where: { id }
         });
         return redirect("/admin/emails/templates");

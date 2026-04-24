@@ -13,12 +13,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Delete all app data for this shop
     await Promise.all([
       db.session.deleteMany({ where: { shop } }),
-      (db as any).settings.deleteMany({ where: { shop } }),
-      (db as any).redirectRule.deleteMany({ where: { shop } }),
-      (db as any).analyticsCountry.deleteMany({ where: { shop } }),
-      (db as any).analyticsRule.deleteMany({ where: { shop } }),
-      (db as any).monthlyUsage.deleteMany({ where: { shop } }),
-      (db as any).visitorLog.deleteMany({ where: { shop } }),
+      db.settings.deleteMany({ where: { shop } }),
+      db.redirectRule.deleteMany({ where: { shop } }),
+      db.analyticsCountry.deleteMany({ where: { shop } }),
+      db.analyticsRule.deleteMany({ where: { shop } }),
+      db.monthlyUsage.deleteMany({ where: { shop } }),
+      db.visitorLog.deleteMany({ where: { shop } }),
     ]);
     console.log(`[Uninstall] Cleaned up all data for ${shop}`);
   }

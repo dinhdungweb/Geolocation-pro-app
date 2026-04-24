@@ -19,7 +19,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     
     // Fetch all blacklisted shops
-    const blacklist = await (prisma as any).emailBlacklist.findMany({
+    const blacklist = await prisma.emailBlacklist.findMany({
         orderBy: { createdAt: 'desc' }
     });
 
@@ -45,7 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (!shop) return json({ error: "Shop domain is required" }, { status: 400 });
         
         try {
-            await (prisma as any).emailBlacklist.create({
+            await prisma.emailBlacklist.create({
                 data: { shop: shop.trim() }
             });
             return json({ success: true, message: "Shop added to blacklist" });
@@ -56,7 +56,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (action === "delete") {
         const id = formData.get("id") as string;
-        await (prisma as any).emailBlacklist.delete({
+        await prisma.emailBlacklist.delete({
             where: { id }
         });
         return json({ success: true, message: "Shop removed from blacklist" });

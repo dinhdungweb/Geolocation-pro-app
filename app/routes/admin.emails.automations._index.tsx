@@ -23,12 +23,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     try {
         // Fetch real automations
-        const automations = await (prisma as any).automation.findMany({
+        const automations = await prisma.automation.findMany({
             where: { shop: 'GLOBAL' }
         });
 
         // Fetch sent counts from log
-        const logs = await (prisma as any).adminEmailLog.groupBy({
+        const logs = await prisma.adminEmailLog.groupBy({
             by: ['type'],
             _count: { _all: true }
         });

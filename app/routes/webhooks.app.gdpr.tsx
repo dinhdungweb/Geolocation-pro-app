@@ -35,12 +35,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             console.log(`[GDPR] Shop Redact Request received for ${shop}. Deleting all shop data...`);
             try {
                 await Promise.all([
-                    (prisma as any).settings.deleteMany({ where: { shop } }),
-                    (prisma as any).redirectRule.deleteMany({ where: { shop } }),
-                    (prisma as any).analyticsCountry.deleteMany({ where: { shop } }),
-                    (prisma as any).analyticsRule.deleteMany({ where: { shop } }),
-                    (prisma as any).monthlyUsage.deleteMany({ where: { shop } }),
-                    (prisma as any).visitorLog.deleteMany({ where: { shop } }),
+                    prisma.settings.deleteMany({ where: { shop } }),
+                    prisma.redirectRule.deleteMany({ where: { shop } }),
+                    prisma.analyticsCountry.deleteMany({ where: { shop } }),
+                    prisma.analyticsRule.deleteMany({ where: { shop } }),
+                    prisma.monthlyUsage.deleteMany({ where: { shop } }),
+                    prisma.visitorLog.deleteMany({ where: { shop } }),
                     prisma.session.deleteMany({ where: { shop } }),
                 ]);
                 console.log(`[GDPR] All data deleted for ${shop}`);

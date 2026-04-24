@@ -38,12 +38,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     try {
         let currentAutomation = null;
         if (id && id !== 'new') {
-            currentAutomation = await (prisma as any).automation.findUnique({
-                where: id.includes('-') ? { id } : undefined,
-            });
+            if (id.includes('-')) {
+                currentAutomation = await prisma.automation.findUnique({
+                    where: { id },
+                });
+            }
             
-            if (!currentAutomation && !id.includes('-')) {
-                currentAutomation = await (prisma as any).automation.findFirst({
+            if (!currentAutomation) {
+                currentAutomation = await prisma.automation.findFirst({
                     where: { type: id }
                 });
             }
@@ -53,7 +55,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             return redirect("/admin/emails/automations");
         }
 
-        const templates = await (prisma as any).emailTemplate.findMany({
+        const templates = await prisma.emailTemplate.findMany({
             where: { shop: 'GLOBAL' },
             select: { id: true, name: true, html: true, config: true, subject: true }
         });
@@ -79,12 +81,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const isActive = formData.get("isActive") === "true";
 
         if (id && id !== 'new') {
-            await (prisma as any).automation.update({
+            await prisma.automation.update({
                 where: { id },
                 data: { name, config, isActive }
             });
         } else {
-            await (prisma as any).automation.upsert({
+            await prisma.automation.upsert({
                 where: { shop_type: { shop, type } },
                 update: { name, config, isActive },
                 create: { shop, type, name, config, isActive }
@@ -96,7 +98,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (action === "delete") {
         if (id) {
-            await (prisma as any).automation.delete({
+            await prisma.automation.delete({
                 where: { id }
             });
         }
@@ -105,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (action === "toggle") {
         const isActive = formData.get("isActive") === "true";
-        await (prisma as any).automation.update({
+        await prisma.automation.update({
             where: { id },
             data: { isActive }
         });

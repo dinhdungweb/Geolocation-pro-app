@@ -170,7 +170,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
             }
  
-            await (prisma as any).redirectRule.create({
+            await prisma.redirectRule.create({
                 data: {
                     shop,
                     name,
@@ -188,7 +188,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     timezone,
                     pageTargetingType,
                     pagePaths,
-                } as any,
+                },
             });
             return json({ success: true, message: "Rule created successfully" });
         }
@@ -232,7 +232,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     timezone,
                     pageTargetingType,
                     pagePaths,
-                } as any,
+                },
             });
             return json({ success: true, message: "Rule updated successfully" });
         }
@@ -292,7 +292,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 if (!rule.name || !rule.countryCodes) continue;
                 if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
 
-                await (prisma as any).redirectRule.create({
+                await prisma.redirectRule.create({
                     data: {
                         shop,
                         name: rule.name,
@@ -310,7 +310,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         timezone: rule.timezone || null,
                         pageTargetingType: normalizeOption(rule.pageTargetingType, ["all", "include", "exclude"], "all"),
                         pagePaths: rule.pagePaths || null,
-                    } as any,
+                    },
                 });
                 created++;
             }

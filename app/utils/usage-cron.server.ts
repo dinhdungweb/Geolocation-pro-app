@@ -49,7 +49,7 @@ export async function checkAllShopsUsage() {
         const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
 
         // Get monthly usage
-        const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+        const monthlyUsage = await prisma.monthlyUsage.findUnique({
             where: {
                 shop_yearMonth: { shop, yearMonth }
             }

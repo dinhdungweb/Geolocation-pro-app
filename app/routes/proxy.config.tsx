@@ -92,7 +92,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     try {
         // Fetch settings for the shop
-        const settings = await (prisma as any).settings.findUnique({
+        const settings = await prisma.settings.findUnique({
             where: { shop },
             select: {
                 isEnabled: true,
@@ -302,7 +302,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const pageFilteredIPRules = ipRulesRaw.filter((r: any) => checkPageTargeting(r, currentPath));
 
         // If no settings found, auto-create default settings so app works immediately
-        const effectiveSettings = settings ?? await (prisma as any).settings.create({
+        const effectiveSettings = settings ?? await prisma.settings.create({
             data: { shop },
             select: {
                 isEnabled: true,
@@ -326,7 +326,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const now = new Date();
         const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const monthlyUsage = await (prisma as any).monthlyUsage.findUnique({
+        const monthlyUsage = await prisma.monthlyUsage.findUnique({
             where: {
                 shop_yearMonth: { shop, yearMonth },
             },
