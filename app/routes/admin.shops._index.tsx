@@ -4,7 +4,7 @@ import { useLoaderData, Link } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { useState, useMemo } from "react";
-import { Search, ExternalLink, Filter, X } from "lucide-react";
+import { Search, ExternalLink, X } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);

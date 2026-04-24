@@ -135,6 +135,22 @@ model MonthlyUsage {
   @@index([shop])
 }
 
+model BillableUsageEvent {
+  id          String   @id @default(uuid())
+  shop        String
+  yearMonth   String
+  eventKey    String   @unique
+  ruleId      String?
+  action      String
+  countryCode String?
+  path        String?
+  ipHash      String
+  createdAt   DateTime @default(now())
+
+  @@index([shop, yearMonth])
+  @@index([shop, createdAt])
+}
+
 model VisitorLog {
   id          String   @id @default(uuid())
   shop        String

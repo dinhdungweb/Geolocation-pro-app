@@ -203,7 +203,7 @@ function PlanCard({ name, price, visitorLimit, features, isCurrentPlan, isFree, 
 }
 
 export default function PricingPage() {
-    const { hasActivePayment, currentPlan } = useLoaderData<typeof loader>();
+    const { currentPlan } = useLoaderData<typeof loader>();
     const submit = useSubmit();
 
     const handleSelectPlan = (plan: string) => {

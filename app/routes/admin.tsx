@@ -1,12 +1,11 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Outlet, useLoaderData, NavLink, Form, useLocation, useRouteError, isRouteErrorResponse } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
     Home, 
     Store, 
-    Users, 
     Rocket, 
     Mail,
     Globe, 
@@ -15,8 +14,6 @@ import {
     Activity,
     Menu,
     X,
-    History,
-    Zap,
     ChevronDown
 } from "lucide-react";
 
@@ -45,7 +42,7 @@ export default function AdminLayout() {
         setIsSidebarOpen(false);
     }, [location.pathname]);
 
-    const menuItems = [
+    const menuItems = useMemo(() => [
         { label: "Dashboard", to: "/admin", icon: <Home size={18} />, end: true },
         { label: "Shops", to: "/admin/shops", icon: <Store size={18} /> },
         { label: "Billing", to: "/admin/billing", icon: <Activity size={18} /> },
@@ -62,7 +59,7 @@ export default function AdminLayout() {
                 { label: "Settings", to: "/admin/emails/settings" },
             ]
         },
-    ];
+    ], []);
 
     const [openMenus, setOpenMenus] = useState<string[]>([]);
 
@@ -70,10 +67,10 @@ export default function AdminLayout() {
         const activeParent = menuItems.find(item => 
             item.children?.some(child => location.pathname === child.to)
         );
-        if (activeParent && !openMenus.includes(activeParent.label)) {
-            setOpenMenus(prev => [...prev, activeParent.label]);
+        if (activeParent) {
+            setOpenMenus(prev => prev.includes(activeParent.label) ? prev : [...prev, activeParent.label]);
         }
-    }, [location.pathname]);
+    }, [location.pathname, menuItems]);
 
     if (isLoginPage) {
         return <Outlet />;

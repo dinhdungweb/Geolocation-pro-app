@@ -11,7 +11,7 @@ import prisma from "../db.server";
  * 3. shop/redact: Request to delete shop data (48h after uninstall)
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { topic, shop, payload } = await authenticate.webhook(request);
+    const { topic, shop } = await authenticate.webhook(request);
 
     console.log(`[GDPR] Received ${topic} webhook for ${shop}`);
 

@@ -51,8 +51,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function VisitorLogs() {
-    const { logs, page, totalPages, totalLogs } = useLoaderData<typeof loader>();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const { logs, page, totalPages } = useLoaderData<typeof loader>();
+    const [, setSearchParams] = useSearchParams();
 
     const handleNextPage = () => {
         if (page < totalPages) {

@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 // Sample templates
-import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
+import { getWelcomeEmailHtml, getLimit80EmailHtml } from "../utils/email-templates";
 
 const PROMO_TEMPLATE = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e1e1e1; border-radius: 8px; overflow: hidden;">
     <div style="background-color: #6366f1; padding: 20px; text-align: center;">
@@ -153,7 +153,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function EmailComposer() {
-    const { shops } = useLoaderData<typeof loader>();
+    const { shops, templates } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     
     const [filterPlan, setFilterPlan] = useState("all");
@@ -188,7 +188,7 @@ export default function EmailComposer() {
             return;
         }
 
-        const customTemplate = (useLoaderData<typeof loader>().templates as any[]).find(t => t.id === selectedTemplate);
+        const customTemplate = templates.find(t => t.id === selectedTemplate);
         if (customTemplate) {
             setSubject(customTemplate.subject || "");
             setBody(customTemplate.html || "");
@@ -209,7 +209,7 @@ export default function EmailComposer() {
                 setBody(PROMO_TEMPLATE);
                 break;
         }
-    }, [selectedTemplate]);
+    }, [selectedTemplate, templates]);
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
@@ -662,7 +662,7 @@ export default function EmailComposer() {
                             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
                                 <option value="custom">Blank Canvas (Custom HTML)</option>
                                 <optgroup label="Custom Templates">
-                                    {(useLoaderData<typeof loader>().templates as any[]).map(t => (
+                                    {templates.map(t => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}
                                 </optgroup>

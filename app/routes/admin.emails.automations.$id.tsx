@@ -3,7 +3,7 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { 
     Zap, 
     MessageSquare, 
@@ -11,15 +11,12 @@ import {
     Plus, 
     Trash2, 
     RotateCcw, 
-    X, 
     Info, 
     ArrowLeft,
     CheckCircle2,
     Settings2,
     Mail,
     Eye,
-    ChevronRight,
-    Search,
     Type,
     Image as ImageIcon,
     Square,

@@ -79,7 +79,7 @@ export default function App() {
     // Đợi một chút để Crisp init hoàn toàn
     const timer = setTimeout(handleIdentify, 1500);
     return () => clearTimeout(timer);
-  }, []); // Empty deps: chỉ chạy 1 lần khi mount
+  }, [shopInfo]);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>

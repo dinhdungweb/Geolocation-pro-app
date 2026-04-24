@@ -3,8 +3,6 @@ import { json } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
-    Search, 
-    ArrowUpDown,
     MoreHorizontal,
     Plus,
     Mail

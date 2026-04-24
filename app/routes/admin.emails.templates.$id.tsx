@@ -6,7 +6,6 @@ import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
     Mail, 
     Save, 
-    X, 
     Type, 
     Image as ImageIcon, 
     Square, 
@@ -16,10 +15,7 @@ import {
     Trash2, 
     ArrowUp, 
     ArrowDown,
-    Plus,
     Edit3,
-    CheckCircle2,
-    RotateCcw,
     ChevronLeft
 } from "lucide-react";
 import { useState, useEffect } from "react";

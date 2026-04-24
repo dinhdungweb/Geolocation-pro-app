@@ -7,7 +7,6 @@ import {
     ShieldAlert, 
     Plus, 
     Trash2, 
-    Search, 
     Info,
     CheckCircle,
     XCircle,
@@ -69,7 +68,7 @@ export default function EmailBlacklist() {
     const { blacklist, knownShops } = useLoaderData<typeof loader>();
     const actionData = useActionData<{ success?: boolean; error?: string; message?: string }>();
     const navigation = useNavigation();
-    const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm] = useState("");
     const [selectedShop, setSelectedShop] = useState("");
     const [manualShop, setManualShop] = useState("");
 

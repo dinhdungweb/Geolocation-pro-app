@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
@@ -18,10 +18,7 @@ import {
     InlineStack,
     EmptyState,
     useBreakpoints,
-    Tag,
-    Autocomplete,
     Icon,
-    LegacyStack,
     Checkbox,
     ChoiceList,
     Select,
@@ -30,7 +27,7 @@ import {
     Banner,
     Tooltip,
 } from "@shopify/polaris";
-import { SearchIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
@@ -364,18 +361,6 @@ export default function RulesPage() {
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(rules);
 
-    // Filter countries based on search input
-    const filteredOptions = useMemo(() => {
-        if (!inputValue) return ALL_COUNTRIES.filter(c => !selectedCountries.includes(c.value));
-        const searchLower = inputValue.toLowerCase();
-        return ALL_COUNTRIES.filter(
-            (country) =>
-                !selectedCountries.includes(country.value) &&
-                (country.label.toLowerCase().includes(searchLower) ||
-                    country.value.toLowerCase().includes(searchLower))
-        );
-    }, [inputValue, selectedCountries]);
-
     // Get country label from code
     const getCountryLabel = (code: string) => {
         return COUNTRY_MAP[code] || code;
@@ -473,18 +458,6 @@ export default function RulesPage() {
         fetcher.submit(formData, { method: "POST" });
         clearSelection();
     }, [selectedResources, fetcher, clearSelection]);
-
-    const handleCountrySelect = useCallback((selected: string[]) => {
-        const newCountry = selected[0];
-        if (newCountry && !selectedCountries.includes(newCountry)) {
-            setSelectedCountries([...selectedCountries, newCountry]);
-        }
-        setInputValue("");
-    }, [selectedCountries]);
-
-    const removeCountry = useCallback((countryToRemove: string) => {
-        setSelectedCountries(selectedCountries.filter(c => c !== countryToRemove));
-    }, [selectedCountries]);
 
     const handleBulkSelect = (region: keyof typeof REGIONS | "ALL" | "CLEAR") => {
         if (region === "CLEAR") {
@@ -689,17 +662,6 @@ export default function RulesPage() {
                 <p>Set up rules to redirect customers based on their location.</p>
             </BlockStack>
         </EmptyState>
-    );
-
-    const textField = (
-        <Autocomplete.TextField
-            onChange={setInputValue}
-            label="Countries"
-            value={inputValue}
-            prefix={<Icon source={SearchIcon} />}
-            placeholder="Search countries..."
-            autoComplete="off"
-        />
     );
 
     return (

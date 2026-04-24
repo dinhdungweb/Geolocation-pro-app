@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import * as tar from 'tar';
 import { Readable } from 'stream';
-import { finished } from 'stream/promises';
 
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILENAME = 'GeoLite2-Country.mmdb';
@@ -33,30 +32,12 @@ export async function updateGeoIPDatabase() {
             throw new Error('Response body is empty');
         }
 
-        // 2. Extract the .mmdb file from the stream
-        // MaxMind tarball structure: GeoLite2-Country_YYYYMMDD/GeoLite2-Country.mmdb
-        let mmdbFound = false;
-
-        // Create a temporary path for the new DB
-        const tempDbPath = path.join(DB_DIR, `${DB_FILENAME}.new`);
-
         // Ensure data directory exists
         if (!fs.existsSync(DB_DIR)) {
             fs.mkdirSync(DB_DIR, { recursive: true });
         }
 
-        const extract = tar.x({
-            cwd: DB_DIR,
-            filter: (path: string) => path.endsWith('.mmdb'),
-            onentry: (entry: any) => {
-                if (entry.path.endsWith('.mmdb')) {
-                    mmdbFound = true;
-                }
-            }
-        });
-
-        // Since tar.x extracts preserving paths (e.g., subdir/file), we might need to find it after extraction.
-        // Let's use a simpler approach: Extract all to a temp folder, then move.
+        // Extract to a temporary folder, then atomically copy the .mmdb file into place.
         const tempExtractDir = path.join(DB_DIR, 'temp_extract');
         if (!fs.existsSync(tempExtractDir)) {
             fs.mkdirSync(tempExtractDir, { recursive: true });

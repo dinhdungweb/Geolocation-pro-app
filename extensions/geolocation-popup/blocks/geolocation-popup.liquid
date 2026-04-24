@@ -1,39 +1,37 @@
 {% comment %}
-  Geolocation Popup - Theme App Extension
-  This block injects the geolocation detection and popup script into the storefront.
-  
-  Uses App Proxy to fetch config: https://shop.myshopify.com/apps/geolocation/config
+  Geolocation Popup - Theme App Extension.
+  Storefront decisions are resolved by the app proxy. The browser only renders
+  the returned action and reports signed analytics events.
 {% endcomment %}
 
+{% if block.settings.enabled %}
 <div id="geolocation-app-container" style="display: none;"></div>
 
 <script>
 (function() {
   'use strict';
 
-  // Configuration - Use App Proxy URL and Shopify's native country detection
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
-    // App Proxy URL - Shopify routes /apps/geolocation/* to our app
     proxyUrl: '/apps/geolocation/config',
     analyticsUrl: '/apps/geolocation/analytics?shop={{ shop.permanent_domain }}',
-    // Country code detected by Shopify (official API, always available)
     visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
   };
 
-  // Debug mode - check URL for ?debug=true
   const urlParams = new URLSearchParams(window.location.search);
   const DEBUG = urlParams.get('debug') === 'true';
   const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
 
-  // Escape HTML to prevent XSS
-  const escapeHtml = (str) => {
+  const escapeHtml = (value) => {
     const div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
+    div.appendChild(document.createTextNode(value || ''));
     return div.innerHTML;
   };
 
-  // Cookie utilities
+  const safeColor = (value, fallback) => {
+    return /^#[0-9a-f]{3,8}$/i.test(value || '') ? value : fallback;
+  };
+
   const CookieManager = {
     set(name, value, days) {
       const expires = new Date(Date.now() + days * 864e5).toUTCString();
@@ -51,291 +49,143 @@
     }
   };
 
-  // Bot detection
-  const isBot = () => {
-    const botPatterns = /bot|crawl|spider|slurp|mediapartners|facebookexternalhit|bingpreview|linkedinbot|googlebot/i;
-    return botPatterns.test(navigator.userAgent);
-  };
-
-  // Get country - prioritize API detection over Shopify Liquid (which can be cached)
-  const getVisitorCountry = (config = null) => {
-    // 1. Check for test_country query param (for debugging)
-    const urlParams = new URLSearchParams(window.location.search);
-    const testCountry = urlParams.get('test_country');
-    if (testCountry) {
-        log('Test country forced:', testCountry);
-        return testCountry.toUpperCase();
-    }
-
-    // 2. Use detectedCountry from API (IP-based, bypasses CDN cache)
-    if (config && config.detectedCountry) {
-        log('Visitor country (from IP lookup):', config.detectedCountry);
-        return config.detectedCountry.toUpperCase();
-    }
-
-    // 3. Fallback to Shopify detection
-    const country = GEOLOCATION_CONFIG.visitorCountry.toUpperCase();
-    log('Visitor country (from Shopify):', country || 'Not detected');
-    return country || null;
-  };
-
-  // Fetch config from App Proxy
   const fetchConfig = async () => {
-    try {
-      // Use App Proxy URL - this is a stable URL that Shopify routes to our app
-      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
-      log('Fetching config from:', apiUrl);
-      
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      log('Config loaded:', data);
-      return data;
-    } catch (error) {
-      log('Could not fetch config:', error);
-      return null;
-    }
+    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
   };
-  
-  // Track analytics event
-  const trackEvent = async (type, data = {}) => {
-    try {
-      if (window.Shopify && window.Shopify.designMode) return; // Don't track in editor
 
-      // For 'visit', only track once per session
+  const getCountryCode = (config) => {
+    if (DEBUG && urlParams.get('test_country')) {
+      return urlParams.get('test_country').toUpperCase();
+    }
+    return (config.countryCode || GEOLOCATION_CONFIG.visitorCountry || '').toUpperCase();
+  };
+
+  const trackEvent = (type, config, extra = {}) => {
+    try {
+      if (window.Shopify && window.Shopify.designMode) return;
+
       if (type === 'visit') {
         if (sessionStorage.getItem('geo_visit_tracked')) return;
         sessionStorage.setItem('geo_visit_tracked', 'true');
       }
 
+      const rule = config.rule || {};
       const payload = {
-        shop: GEOLOCATION_CONFIG.shop,
         type,
         path: window.location.pathname,
-        ...data
+        countryCode: getCountryCode(config),
+        eventToken: config.eventToken || undefined,
+        ruleId: rule.ruleId || undefined,
+        ruleName: rule.name || undefined,
+        targetUrl: rule.targetUrl || undefined,
+        ...extra
       };
 
-      // Use beacon if available for all events to ensure reliable delivery
       if (navigator.sendBeacon) {
-         // Create blob with correct content type
-         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-         const success = navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob);
-         if (success) return;
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        if (navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob)) return;
       }
 
-      // Fallback to fetch if beacon fails or not supported
       fetch(GEOLOCATION_CONFIG.analyticsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        keepalive: true // Important for redirects
-      }).catch(err => log('Analytics error:', err));
-    } catch (e) {
-      log('Analytics failed:', e);
+        keepalive: true
+      }).catch((error) => log('Analytics error:', error));
+    } catch (error) {
+      log('Analytics failed:', error);
     }
   };
 
-  // Find matching rule for country
-  const findMatchingRule = (rules, countryCode) => {
-    if (!rules || !countryCode) return null;
-    
-    for (const rule of rules) {
-      if (rule.countries.includes(countryCode)) {
-        return rule;
-      }
+  const alreadyOnTarget = (targetUrl) => {
+    if (!targetUrl) return true;
+    try {
+      const target = new URL(targetUrl, window.location.origin);
+      return window.location.href === target.href || window.location.pathname === target.pathname;
+    } catch {
+      return window.location.href.includes(targetUrl);
     }
-    return null;
   };
 
-    // Create and show popup
-  const showPopup = (config, rule, countryCode) => {
+  const showPopup = (config) => {
+    const rule = config.rule || {};
     const popup = config.popup || {};
-    const template = popup.template || 'modal'; // 'modal', 'top_bar', 'bottom_bar'
+    const template = popup.template || 'modal';
     const container = document.getElementById('geolocation-app-container');
     if (!container) return;
 
-    // Get country name
-    const countryNames = { /* ... keep existing country map if needed, or assume it's global scope ... */ 
-        // Small compromise: re-using the existing map or moving it out would be cleaner, 
-        // but for now I'll just restore the map or rely on it being defined if I move it.
-        // wait, I can function-scope it again or just copy it. 
-        // To be safe and keep it clean, let's assume I replaced the *entire* function content
-        // which implies I need to re-declare variables.
-        // Actually, for brevity in this tool call, I will retain the country map logic 
-        // but since I am replacing the whole function block, I must include it.
-        // Start country map
-       AD: 'Andorra', AE: 'United Arab Emirates', AF: 'Afghanistan', AG: 'Antigua and Barbuda',
-       AI: 'Anguilla', AL: 'Albania', AM: 'Armenia', AO: 'Angola', AQ: 'Antarctica',
-       AR: 'Argentina', AS: 'American Samoa', AT: 'Austria', AU: 'Australia', AW: 'Aruba',
-       AX: 'Åland Islands', AZ: 'Azerbaijan',
-       BA: 'Bosnia and Herzegovina', BB: 'Barbados', BD: 'Bangladesh', BE: 'Belgium',
-       BF: 'Burkina Faso', BG: 'Bulgaria', BH: 'Bahrain', BI: 'Burundi', BJ: 'Benin',
-       BL: 'Saint Barthélemy', BM: 'Bermuda', BN: 'Brunei', BO: 'Bolivia',
-       BQ: 'Caribbean Netherlands', BR: 'Brazil', BS: 'Bahamas', BT: 'Bhutan',
-       BV: 'Bouvet Island', BW: 'Botswana', BY: 'Belarus', BZ: 'Belize',
-       CA: 'Canada', CC: 'Cocos Islands', CD: 'DR Congo', CF: 'Central African Republic',
-       CG: 'Congo', CH: 'Switzerland', CI: 'Ivory Coast', CK: 'Cook Islands', CL: 'Chile',
-       CM: 'Cameroon', CN: 'China', CO: 'Colombia', CR: 'Costa Rica', CU: 'Cuba',
-       CV: 'Cape Verde', CW: 'Curaçao', CX: 'Christmas Island', CY: 'Cyprus', CZ: 'Czechia',
-       DE: 'Germany', DJ: 'Djibouti', DK: 'Denmark', DM: 'Dominica', DO: 'Dominican Republic',
-       DZ: 'Algeria',
-       EC: 'Ecuador', EE: 'Estonia', EG: 'Egypt', EH: 'Western Sahara', ER: 'Eritrea',
-       ES: 'Spain', ET: 'Ethiopia',
-       FI: 'Finland', FJ: 'Fiji', FK: 'Falkland Islands', FM: 'Micronesia', FO: 'Faroe Islands',
-       FR: 'France',
-       GA: 'Gabon', GB: 'United Kingdom', GD: 'Grenada', GE: 'Georgia', GF: 'French Guiana',
-       GG: 'Guernsey', GH: 'Ghana', GI: 'Gibraltar', GL: 'Greenland', GM: 'Gambia',
-       GN: 'Guinea', GP: 'Guadeloupe', GQ: 'Equatorial Guinea', GR: 'Greece',
-       GS: 'South Georgia', GT: 'Guatemala', GU: 'Guam', GW: 'Guinea-Bissau', GY: 'Guyana',
-       HK: 'Hong Kong', HM: 'Heard Island', HN: 'Honduras', HR: 'Croatia', HT: 'Haiti',
-       HU: 'Hungary',
-       ID: 'Indonesia', IE: 'Ireland', IL: 'Israel', IM: 'Isle of Man', IN: 'India',
-       IO: 'British Indian Ocean Territory', IQ: 'Iraq', IR: 'Iran', IS: 'Iceland', IT: 'Italy',
-       JE: 'Jersey', JM: 'Jamaica', JO: 'Jordan', JP: 'Japan',
-       KE: 'Kenya', KG: 'Kyrgyzstan', KH: 'Cambodia', KI: 'Kiribati', KM: 'Comoros',
-       KN: 'Saint Kitts and Nevis', KP: 'North Korea', KR: 'South Korea', KW: 'Kuwait',
-       KY: 'Cayman Islands', KZ: 'Kazakhstan',
-       LA: 'Laos', LB: 'Lebanon', LC: 'Saint Lucia', LI: 'Liechtenstein', LK: 'Sri Lanka',
-       LR: 'Liberia', LS: 'Lesotho', LT: 'Lithuania', LU: 'Luxembourg', LV: 'Latvia',
-       LY: 'Libya',
-       MA: 'Morocco', MC: 'Monaco', MD: 'Moldova', ME: 'Montenegro', MF: 'Saint Martin',
-       MG: 'Madagascar', MH: 'Marshall Islands', MK: 'North Macedonia', ML: 'Mali',
-       MM: 'Myanmar', MN: 'Mongolia', MO: 'Macau', MP: 'Northern Mariana Islands',
-       MQ: 'Martinique', MR: 'Mauritania', MS: 'Montserrat', MT: 'Malta', MU: 'Mauritius',
-       MV: 'Maldives', MW: 'Malawi', MX: 'Mexico', MY: 'Malaysia', MZ: 'Mozambique',
-       NA: 'Namibia', NC: 'New Caledonia', NE: 'Niger', NF: 'Norfolk Island', NG: 'Nigeria',
-       NI: 'Nicaragua', NL: 'Netherlands', NO: 'Norway', NP: 'Nepal', NR: 'Nauru',
-       NU: 'Niue', NZ: 'New Zealand',
-       OM: 'Oman',
-       PA: 'Panama', PE: 'Peru', PF: 'French Polynesia', PG: 'Papua New Guinea',
-       PH: 'Philippines', PK: 'Pakistan', PL: 'Poland', PM: 'Saint Pierre and Miquelon',
-       PN: 'Pitcairn', PR: 'Puerto Rico', PS: 'Palestine', PT: 'Portugal', PW: 'Palau',
-       PY: 'Paraguay',
-       QA: 'Qatar',
-       RE: 'Réunion', RO: 'Romania', RS: 'Serbia', RU: 'Russia', RW: 'Rwanda',
-       SA: 'Saudi Arabia', SB: 'Solomon Islands', SC: 'Seychelles', SD: 'Sudan',
-       SE: 'Sweden', SG: 'Singapore', SH: 'Saint Helena', SI: 'Slovenia',
-       SJ: 'Svalbard and Jan Mayen', SK: 'Slovakia', SL: 'Sierra Leone', SM: 'San Marino',
-       SN: 'Senegal', SO: 'Somalia', SR: 'Suriname', SS: 'South Sudan',
-       ST: 'São Tomé and Príncipe', SV: 'El Salvador', SX: 'Sint Maarten', SY: 'Syria',
-       SZ: 'Eswatini',
-       TC: 'Turks and Caicos', TD: 'Chad', TF: 'French Southern Territories', TG: 'Togo',
-       TH: 'Thailand', TJ: 'Tajikistan', TK: 'Tokelau', TL: 'Timor-Leste', TM: 'Turkmenistan',
-       TN: 'Tunisia', TO: 'Tonga', TR: 'Turkey', TT: 'Trinidad and Tobago', TV: 'Tuvalu',
-       TW: 'Taiwan', TZ: 'Tanzania',
-       UA: 'Ukraine', UG: 'Uganda', UM: 'U.S. Minor Outlying Islands', US: 'United States',
-       UY: 'Uruguay', UZ: 'Uzbekistan',
-       VA: 'Vatican City', VC: 'Saint Vincent and the Grenadines', VE: 'Venezuela',
-       VG: 'British Virgin Islands', VI: 'U.S. Virgin Islands', VN: 'Việt Nam', VU: 'Vanuatu',
-       WF: 'Wallis and Futuna', WS: 'Samoa',
-       YE: 'Yemen', YT: 'Mayotte',
-       ZA: 'South Africa', ZM: 'Zambia', ZW: 'Zimbabwe' // End country map
-    };
-    const countryName = countryNames[countryCode] || countryCode;
-
-    // Parse target name from URL
-    let targetName = rule.targetUrl;
+    let targetName = rule.targetUrl || '';
     try {
-      targetName = new URL(rule.targetUrl).hostname;
-    } catch (e) {
-      // Keep original if not valid URL
-    }
+      targetName = new URL(rule.targetUrl, window.location.origin).hostname;
+    } catch {}
 
-    log('Showing popup for', countryName, '->', targetName, 'Template:', template);
-
-    // Default values
     const title = escapeHtml(popup.title || 'Redirect Available');
     const message = escapeHtml((popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
-      .replace('{country}', countryName)
-      .replace('{target}', targetName));
+      .replace('{country}', getCountryCode(config) || 'your region')
+      .replace('{target}', targetName || 'the recommended store'));
     const confirmBtn = escapeHtml(popup.confirmBtn || 'Go now');
     const cancelBtn = escapeHtml(popup.cancelBtn || 'Stay here');
-    const bgColor = popup.bgColor || '#ffffff';
-    const textColor = popup.textColor || '#333333';
-    const btnColor = popup.btnColor || '#007bff';
+    const bgColor = safeColor(popup.bgColor, '#ffffff');
+    const textColor = safeColor(popup.textColor, '#333333');
+    const btnColor = safeColor(popup.btnColor, '#007bff');
 
-    // Template Specific Styles
     let overlayStyle = '';
     let contentStyle = '';
-    
-    if (template === 'top_bar') {
-        overlayStyle = `
-            position: fixed; top: 0; left: 0; right: 0;
-            background: ${bgColor}; color: ${textColor};
-            padding: 12px 20px;
-            z-index: 999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 15px;
-            animation: geo-slide-down 0.3s ease;
-        `;
-        contentStyle = `display: flex; align-items: center; gap: 15px; flex: 1;`;
-    } else if (template === 'bottom_bar') {
-        overlayStyle = `
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: ${bgColor}; color: ${textColor};
-            padding: 12px 20px;
-            z-index: 999999;
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
-            display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 15px;
-            animation: geo-slide-up 0.3s ease;
-        `;
-        contentStyle = `display: flex; align-items: center; gap: 15px; flex: 1;`;
+    if (template === 'top_bar' || template === 'bottom_bar') {
+      const verticalPosition = template === 'top_bar' ? 'top: 0;' : 'bottom: 0;';
+      const animation = template === 'top_bar' ? 'geo-slide-down' : 'geo-slide-up';
+      overlayStyle = `
+        position: fixed; ${verticalPosition} left: 0; right: 0;
+        background: ${bgColor}; color: ${textColor};
+        padding: 12px 20px; z-index: 999999;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: 15px; animation: ${animation} 0.3s ease;
+      `;
+      contentStyle = 'display: flex; align-items: center; gap: 15px; flex: 1;';
     } else {
-        // Default Modal
-        overlayStyle = `
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999999;
-            display: flex; align-items: center; justify-content: center;
-            animation: geo-fade-in 0.3s ease;
-        `;
-        contentStyle = `
-            background: ${bgColor}; color: ${textColor};
-            padding: 24px; border-radius: 12px;
-            max-width: 400px; width: 90%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            text-align: center;
-            animation: geo-slide-up 0.3s ease;
-            position: relative;
-        `;
+      overlayStyle = `
+        position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+        z-index: 999999; display: flex; align-items: center; justify-content: center;
+        animation: geo-fade-in 0.3s ease;
+      `;
+      contentStyle = `
+        background: ${bgColor}; color: ${textColor};
+        padding: 24px; border-radius: 12px; max-width: 400px; width: 90%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        text-align: center; animation: geo-slide-up 0.3s ease; position: relative;
+      `;
     }
 
-    // HTML Construction based on template
-    let htmlContent = '';
-    
-    if (template === 'modal') {
-        htmlContent = `
-            <div id="geo-popup-modal" style="${contentStyle}">
-                <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">${title}</h3>
-                <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">${message}</p>
-                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                    <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
-                    <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
-                </div>
-            </div>
-        `;
-    } else {
-        // Bar Template (Top/Bottom)
-        htmlContent = `
-            <div id="geo-bar-content" style="${contentStyle}">
-                <span style="font-weight: 600; font-size: 14px;">${title}</span>
-                <span style="font-size: 14px; opacity: 0.9; margin-right: auto;">${message}</span>
-                <div style="display: flex; gap: 10px;">
-                     <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;">${confirmBtn}</button>
-                     <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;">${cancelBtn}</button>
-                </div>
-            </div>
-        `;
-    }
+    const buttonsHtml = `
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
+        <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
+      </div>
+    `;
+
+    const contentHtml = template === 'modal'
+      ? `
+        <div id="geo-popup-modal" style="${contentStyle}">
+          <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">${title}</h3>
+          <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">${message}</p>
+          ${buttonsHtml}
+        </div>
+      `
+      : `
+        <div id="geo-bar-content" style="${contentStyle}">
+          <span style="font-weight: 600; font-size: 14px;">${title}</span>
+          <span style="font-size: 14px; opacity: 0.9; margin-right: auto;">${message}</span>
+          ${buttonsHtml}
+        </div>
+      `;
 
     container.innerHTML = `
       <div id="geo-popup-overlay" style="${overlayStyle}">
-        ${htmlContent}
+        ${contentHtml}
       </div>
       <style>
         @keyframes geo-fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -343,421 +193,133 @@
         @keyframes geo-slide-down { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       </style>
     `;
-
     container.style.display = 'block';
 
-    // Event listeners
     document.getElementById('geo-confirm-btn').addEventListener('click', () => {
-      CookieManager.set('geo_choice', 'redirected', config.cookieDuration || 7);
-      trackEvent('redirected', { visitorIP: config.visitorIP, countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+      CookieManager.set('geo_choice', 'redirected', config.popup?.cookieDuration || 7);
+      trackEvent('redirected', config);
       window.location.href = rule.targetUrl;
     });
 
     document.getElementById('geo-cancel-btn').addEventListener('click', () => {
-      CookieManager.set('geo_choice', 'stayed', config.cookieDuration || 7);
-      trackEvent('clicked_no', { visitorIP: config.visitorIP, countryCode, ruleId: rule.ruleId, ruleName: rule.name });
+      CookieManager.set('geo_choice', 'stayed', config.popup?.cookieDuration || 7);
+      trackEvent('clicked_no', config);
       container.style.display = 'none';
     });
-    
-    // Only close on overlay click for Modal
-    if (template === 'modal') {
-        document.getElementById('geo-popup-overlay').addEventListener('click', (e) => {
-          if (e.target.id === 'geo-popup-overlay') {
-            trackEvent('dismissed', { visitorIP: config.visitorIP, countryCode, ruleId: rule.ruleId, ruleName: rule.name });
-            container.style.display = 'none';
-          }
-        });
-    }
 
+    if (template === 'modal') {
+      document.getElementById('geo-popup-overlay').addEventListener('click', (event) => {
+        if (event.target.id === 'geo-popup-overlay') {
+          trackEvent('dismissed', config);
+          container.style.display = 'none';
+        }
+      });
+    }
   };
 
-  // Create and show Block Screen
-  const showBlockScreen = (config, rule, countryCode) => {
+  const showBlockScreen = (config) => {
     const blockedSettings = config.blocked || {};
-    const title = escapeHtml(blockedSettings.title || 'Access Denied');
-    const message = escapeHtml(blockedSettings.message || 'We do not offer services in your country/region.');
+    const isVpn = config.rule && config.rule.source === 'vpn';
+    const title = escapeHtml(isVpn ? 'Security Alert' : (blockedSettings.title || 'Access Denied'));
+    const message = escapeHtml(isVpn ? 'Access via VPN or proxy is not allowed for this store.' : (blockedSettings.message || 'We do not offer services in your country/region.'));
 
-    // Create blocking overlay
     const overlay = document.createElement('div');
     overlay.id = 'geo-block-screen';
     overlay.style.cssText = `
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%) !important;
-        color: #fff !important;
-        z-index: 2147483647 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-        padding: 20px !important;
-        visibility: visible !important;
+      position: fixed !important; inset: 0 !important;
+      background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%) !important;
+      color: #fff !important; z-index: 2147483647 !important;
+      display: flex !important; align-items: center !important; justify-content: center !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      padding: 20px !important; visibility: visible !important;
     `;
 
     overlay.innerHTML = `
-        <div style="
-            background: rgba(255, 255, 255, 0.05) !important;
-            backdrop-filter: blur(10px) !important;
-            -webkit-backdrop-filter: blur(10px) !important;
-            padding: 40px !important;
-            border-radius: 16px !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            text-align: center !important;
-            max-width: 500px !important;
-            width: 100% !important;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important;
-            animation: geo-fade-in 0.5s ease-out !important;
-            color: #ffffff !important;
-        ">
-            <div style="margin-bottom: 24px !important;">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="fill: none !important; color: #ffffff !important; stroke: #ffffff !important; width: 64px !important; height: 64px !important; display: block !important; margin: 0 auto !important;">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                    <path d="m9 9 6 6"></path>
-                    <path d="m15 9-6 6"></path>
-                </svg>
-            </div>
-            <h1 style="
-                font-size: 24px !important;
-                font-weight: 600 !important;
-                margin: 0 0 16px !important;
-                letter-spacing: -0.5px !important;
-                color: #ffffff !important;
-                display: block !important;
-            ">${title}</h1>
-            <p style="
-                font-size: 16px !important;
-                line-height: 1.6 !important;
-                color: rgba(255, 255, 255, 0.8) !important;
-                margin: 0 !important;
-                display: block !important;
-            ">${message}</p>
-        </div>
-        <style id="geo-block-overrides">
-            html.geo-blocked {
-                overflow: hidden !important;
-                height: 100% !important;
-            }
-            html.geo-blocked body {
-                overflow: hidden !important;
-                height: 100% !important;
-                position: fixed !important;
-                width: 100% !important;
-            }
-            /* Hide other common floating elements and popups */
-            html.geo-blocked body > *:not(#geolocation-app-container):not(#geo-block-screen) {
-                display: none !important;
-                visibility: hidden !important;
-                opacity: 0 !important;
-                pointer-events: none !important;
-                z-index: -1 !important;
-            }
-            @keyframes geo-fade-in {
-                from { opacity: 0; transform: scale(0.95); }
-                to { opacity: 1; transform: scale(1); }
-            }
-        </style>
+      <div style="background: rgba(255,255,255,0.05) !important; padding: 40px !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.1) !important; text-align: center !important; max-width: 500px !important; width: 100% !important; box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important; color: #ffffff !important;">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block !important; margin:0 auto 24px !important;">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 9 6 6"></path>
+          <path d="m15 9-6 6"></path>
+        </svg>
+        <h1 style="font-size: 24px !important; font-weight: 600 !important; margin: 0 0 16px !important; color: #ffffff !important;">${title}</h1>
+        <p style="font-size: 16px !important; line-height: 1.6 !important; color: rgba(255,255,255,0.8) !important; margin: 0 !important;">${message}</p>
+      </div>
+      <style id="geo-block-overrides">
+        html.geo-blocked, html.geo-blocked body { overflow: hidden !important; height: 100% !important; }
+        html.geo-blocked body { position: fixed !important; width: 100% !important; }
+        html.geo-blocked body > *:not(#geolocation-app-container):not(#geo-block-screen) {
+          display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;
+        }
+      </style>
     `;
 
     document.documentElement.classList.add('geo-blocked');
     document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden'; // Disable scrolling
-
-    log('Access blocked for country:', countryCode);
   };
 
-  // Check if IP matches a pattern (supports IPv4, IPv6, exact match, and CIDR)
-  const isIPMatch = (visitorIP, ipPattern) => {
-    if (!visitorIP || !ipPattern) return false;
-    
-    const trimmedPattern = ipPattern.trim();
-    const trimmedIP = visitorIP.trim();
-    
-    // Exact match (works for both IPv4 and IPv6)
-    if (trimmedIP === trimmedPattern) return true;
-    
-    // Lowercase comparison for IPv6 (IPv6 is case-insensitive)
-    if (trimmedIP.toLowerCase() === trimmedPattern.toLowerCase()) return true;
-    
-    // Check if it's IPv6
-    const isIPv6 = trimmedIP.includes(':');
-    const isPatternIPv6 = trimmedPattern.includes(':');
-    
-    // IPv6 prefix match (e.g., "2a06:98c0::" matches "2a06:98c0:3600::103")
-    if (isIPv6 && isPatternIPv6) {
-      // Remove trailing :: for prefix comparison
-      const patternPrefix = trimmedPattern.replace(/::$/, '').toLowerCase();
-      if (trimmedIP.toLowerCase().startsWith(patternPrefix)) {
-        return true;
-      }
-      
-      // CIDR notation for IPv6 (e.g., 2a06:98c0::/32)
-      if (trimmedPattern.includes('/')) {
-        const [network] = trimmedPattern.split('/');
-        const networkPrefix = network.replace(/::$/, '').toLowerCase();
-        if (trimmedIP.toLowerCase().startsWith(networkPrefix)) {
-          return true;
-        }
-      }
-    }
-    
-    // IPv4 CIDR notation support (any mask from /1 to /32)
-    if (!isIPv6 && !isPatternIPv6 && trimmedPattern.includes('/')) {
-      const [network, bits] = trimmedPattern.split('/');
-      const maskBits = parseInt(bits, 10);
-      
-      if (isNaN(maskBits) || maskBits < 0 || maskBits > 32) return false;
-      
-      const ipParts = trimmedIP.split('.').map(Number);
-      const networkParts = network.split('.').map(Number);
-      
-      if (ipParts.length === 4 && networkParts.length === 4) {
-        // Convert IP and network to 32-bit integers
-        const ipInt = (ipParts[0] << 24) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
-        const netInt = (networkParts[0] << 24) + (networkParts[1] << 16) + (networkParts[2] << 8) + networkParts[3];
-        
-        // Create subnet mask (e.g., /24 = 0xFFFFFF00)
-        const mask = maskBits === 0 ? 0 : (~0 << (32 - maskBits)) >>> 0;
-        
-        // Compare masked values
-        return ((ipInt >>> 0) & mask) === ((netInt >>> 0) & mask);
-      }
-    }
-    
-    return false;
-  };
-
-  // Find matching IP rule
-  const findMatchingIPRule = (ipRules, visitorIP) => {
-    if (!ipRules || !visitorIP || visitorIP === '0.0.0.0') return null;
-    
-    for (const rule of ipRules) {
-      for (const ipPattern of rule.ips) {
-        if (isIPMatch(visitorIP, ipPattern)) {
-          return rule;
-        }
-      }
-    }
-    return null;
-  };
-
-  // Main function
   const init = async () => {
-    log('Initializing...');
+    if (window.Shopify && window.Shopify.designMode) return;
+    if (window.location.search.includes('preview_theme_id') || window.location.pathname.includes('/editor')) return;
 
-    // Skip in Theme Editor / Preview mode - let merchants work in peace
-    if (window.Shopify && window.Shopify.designMode) {
-      log('Theme Editor detected, skipping redirect');
-      return;
-    }
-    
-    // Also skip if in preview/customize mode via URL
-    if (window.location.search.includes('preview_theme_id') || 
-        window.location.pathname.includes('/editor')) {
-      log('Theme preview mode detected, skipping redirect');
+    let config;
+    try {
+      config = await fetchConfig();
+    } catch (error) {
+      log('Could not fetch config:', error);
       return;
     }
 
-    // Fetch config from App Proxy FIRST - we need detectedCountry from it
-    const fetchConfigData = async () => {
-      try {
-        const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.json();
-      } catch (error) {
-        log('Could not fetch config:', error);
-        return null;
-      }
-    };
+    trackEvent('visit', config);
 
-    const config = await fetchConfigData();
-    
-    if (!config) {
-      log('Could not fetch config - App Proxy may not be configured yet');
+    if (!config || config.action === 'none' || config.limitExceeded) {
+      log('No storefront action required', config);
       return;
     }
 
-    // Check if app is disabled FIRST - this takes priority over everything
-    if (!config.enabled || config.mode === 'disabled') {
-      log('App disabled in settings');
-      return;
-    }
-
-    // Get visitor IP from config (already extracted from x-shopify-client-ip header)
-    const visitorIP = config.visitorIP || '0.0.0.0';
-    log('Visitor IP:', visitorIP);
-
-    // Get country code - prioritize IP-based detection from API over cached Shopify value
-    const countryCode = getVisitorCountry(config);
-
-    // Track visit FIRST - before any other checks (cookies, rules, etc.)
-    trackEvent('visit', { countryCode, visitorIP });
-
-    // Check bot exclusion
-    if (config.excludeBots && isBot()) {
-      log('Bot detected, skipping');
-      return;
-    }
-
-    // Check if IP is in the global exclusion list
-    if (config.isIPExcluded) {
-      log('IP is in exclusion list, skipping all rules');
-      return;
-    }
-
-    // ========== PRIORITY 0: VPN/PROXY SHIELD ==========
-    if (config.vpnBlocked) {
-      log('Access blocked due to Proxy/VPN');
-      trackEvent('vpn_blocked', { visitorIP, countryCode });
-      showBlockScreen(config, { targetUrl: '', ruleId: 'vpn-shield', name: 'Anti-Fraud Shield' }, countryCode);
-      // Wait for DOM
-      setTimeout(() => {
-        const titleEl = document.querySelector('#geo-block-screen h1');
-        const msgEl = document.querySelector('#geo-block-screen p');
-        if (titleEl) titleEl.textContent = 'Security Alert';
-        if (msgEl) msgEl.textContent = 'Access via VPN or Proxy is not allowed for this store.';
-      }, 100);
-      return;
-    }
-
-    // ========== IP RULES CHECK (PRIORITY 1) ==========
-    // IP rules are checked FIRST and have highest priority
-    if (config.ipRules && config.ipRules.length > 0) {
-      log('Checking IP rules for:', visitorIP);
-      log('Available IP rules:', config.ipRules);
-      
-      const matchingIPRule = findMatchingIPRule(config.ipRules, visitorIP);
-      
-      if (matchingIPRule) {
-        log('Matching IP rule found:', matchingIPRule);
-        
-        // Handle IP rule - Block
-        if (matchingIPRule.ruleType === 'block') {
-          log('Blocking access due to IP rule:', matchingIPRule.name);
-          trackEvent('ip_blocked', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
-          showBlockScreen(config, matchingIPRule, visitorIP);
-          return;
-        }
-        
-        // Handle IP rule - Redirect
-        if (matchingIPRule.ruleType === 'redirect') {
-          // Check if already on target
-          if (matchingIPRule.targetUrl && window.location.href.includes(matchingIPRule.targetUrl)) {
-            log('Already on target URL for IP rule');
-            return;
-          }
-          
-          // Determine effective mode - favor rule setting, fallback to global mode
-          const effectiveMode = matchingIPRule.redirectMode || config.mode || 'popup';
-          log('Effective IP redirect mode:', effectiveMode);
-
-          // Check cookie - ONLY for popup mode
-          if (effectiveMode === 'popup' && CookieManager.has('geo_choice')) {
-            log('User preference found, skipping IP popup');
-            return;
-          }
-
-          if (effectiveMode === 'auto_redirect') {
-            log('Redirecting due to IP rule:', matchingIPRule.name);
-            trackEvent('ip_redirected', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
-            window.location.href = matchingIPRule.targetUrl;
-            return;
-          } else {
-            log('Showing popup for IP rule');
-            trackEvent('popup_shown', { countryCode, visitorIP, ruleId: matchingIPRule.ruleId, ruleName: matchingIPRule.name });
-            showPopup(config, matchingIPRule, countryCode);
-            return;
-          }
-        }
-      }
-    }
-
-    // ========== COUNTRY RULES CHECK (PRIORITY 2) ==========
-    if (!countryCode) {
-      log('Could not detect country - Shopify may not provide country info');
-      return;
-    }
-
-    log('Looking for country rule matching:', countryCode);
-
-    // Find matching country rule
-    const matchingRule = findMatchingRule(config.rules, countryCode);
-    if (!matchingRule) {
-      log('No matching rule for country:', countryCode);
-      return;
-    }
-
-    log('Matching country rule found:', matchingRule);
-
-    // Handle based on rule type - Check BLOCK FIRST
-    if (matchingRule.ruleType === 'block') {
-        log('Blocking access due to country rule:', matchingRule.name);
-        trackEvent('blocked', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
-        showBlockScreen(config, matchingRule, countryCode);
-        return;
-    }
-
-    // Check if already on target (only for redirects)
-    if (matchingRule.targetUrl && window.location.href.includes(matchingRule.targetUrl)) {
+    const rule = config.rule || {};
+    if ((config.action === 'popup' || config.action === 'auto_redirect') && alreadyOnTarget(rule.targetUrl)) {
       log('Already on target URL');
       return;
     }
 
-    // Determine effective mode - favor rule setting, fallback to global mode
-    const effectiveMode = matchingRule.redirectMode || config.mode || 'popup';
-    log('Effective redirect mode:', effectiveMode);
-
-    // Check cookie - ONLY for popup mode (auto_redirect ignores cookies)
-    if (effectiveMode === 'popup' && CookieManager.has('geo_choice')) {
-      log('User preference found, skipping popup. Use GeolocationDebug.clearPreference() to reset.');
+    if (config.action === 'block') {
+      trackEvent(config.analyticsEvent || 'blocked', config);
+      showBlockScreen(config);
       return;
     }
 
-    // Handle based on effective mode
-    if (effectiveMode === 'auto_redirect') {
-      // Force redirect - no cookie, always redirect
-      log('Force redirecting to:', matchingRule.targetUrl);
-      trackEvent('auto_redirected', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
-      window.location.href = matchingRule.targetUrl;
-    } else {
-      // Popup mode - will set cookie when user makes choice
-      log('Showing popup');
-      trackEvent('popup_shown', { visitorIP, countryCode, ruleId: matchingRule.ruleId, ruleName: matchingRule.name });
-      showPopup(config, matchingRule, countryCode);
+    if (config.action === 'auto_redirect') {
+      trackEvent(config.analyticsEvent || 'auto_redirected', config);
+      window.location.href = rule.targetUrl;
+      return;
+    }
+
+    if (config.action === 'popup') {
+      if (CookieManager.has('geo_choice')) {
+        log('User preference found, skipping popup');
+        return;
+      }
+      trackEvent('popup_shown', config);
+      showPopup(config);
     }
   };
 
-  // Expose debug functions globally
   window.GeolocationDebug = {
     clearPreference: () => {
       CookieManager.remove('geo_choice');
-      console.log('Cleared! Refresh the page to test again.');
+      console.log('Cleared geolocation preference. Refresh the page to test again.');
     },
-    testPopup: async () => {
-      CookieManager.remove('geo_choice');
-      await init();
-    },
-    getConfig: async () => {
-      // Need to re-define fetchConfig or access it via init if scoped, for this debug simple version:
-      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
-      const response = await fetch(apiUrl);
-      return response.json();
-    }
+    getConfig: fetchConfig
   };
 
-  // Run when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-
-  log('Script loaded. Debug: GeolocationDebug.clearPreference(), GeolocationDebug.getConfig()');
 })();
 </script>
+{% endif %}
 
 {% schema %}
 {

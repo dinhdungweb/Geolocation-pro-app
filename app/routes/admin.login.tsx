@@ -8,12 +8,13 @@ import {
     checkRateLimit,
     clearAttempts,
     getClientIP,
+    getAdminSession,
     recordFailedAttempt,
     validateCredentials,
 } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const session = await adminSessionStorage.getSession(request.headers.get("Cookie"));
+    const session = await getAdminSession(request);
     if (session.get("admin_logged_in")) {
         return redirect("/admin");
     }
@@ -34,7 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const username = formData.get("username")?.toString() ?? "";
     const password = formData.get("password")?.toString() ?? "";
 
-    if (!validateCredentials(username, password)) {
+    if (!(await validateCredentials(username, password))) {
         recordFailedAttempt(ip);
         const newCheck = checkRateLimit(ip);
         const remaining = newCheck.remaining;
@@ -47,7 +48,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     clearAttempts(ip);
     const url = new URL(request.url);
-    const redirectTo = url.searchParams.get("redirect") || "/admin";
+    const requestedRedirect = url.searchParams.get("redirect") || "/admin";
+    const redirectTo =
+        requestedRedirect.startsWith("/admin") && !requestedRedirect.startsWith("//")
+            ? requestedRedirect
+            : "/admin";
 
     const session = await adminSessionStorage.getSession(request.headers.get("Cookie"));
     session.set("admin_logged_in", true);

@@ -11,7 +11,8 @@
     "env": "shopify app env",
     "start": "remix-serve ./build/server/index.js | grep --line-buffered -v \"/proxy/\"",
     "docker-start": "npm run setup && npm run start",
-    "setup": "prisma generate && prisma db push",
+    "setup": "prisma generate && prisma migrate deploy",
+    "setup:dev": "prisma generate && prisma db push",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "shopify": "shopify",
     "prisma": "prisma",
@@ -23,46 +24,46 @@
     "node": "^18.20 || ^20.10 || >=21.0.0"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.1",
-    "@remix-run/dev": "^2.16.1",
-    "@remix-run/fs-routes": "^2.16.1",
-    "@remix-run/node": "^2.16.1",
-    "@remix-run/react": "^2.16.1",
-    "@remix-run/serve": "^2.16.1",
-    "@shopify/app-bridge-react": "^4.1.6",
-    "@shopify/polaris": "^12.0.0",
-    "@shopify/shopify-app-remix": "^4.1.0",
-    "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
-    "@types/node-cron": "^3.0.11",
-    "@types/nodemailer": "^8.0.0",
-    "@types/tar": "^6.1.13",
+    "@prisma/client": "6.19.3",
+    "@remix-run/node": "2.17.4",
+    "@remix-run/react": "2.17.4",
+    "@remix-run/serve": "2.17.4",
+    "@shopify/app-bridge-react": "4.2.10",
+    "@shopify/polaris": "12.27.0",
+    "@shopify/shopify-app-remix": "4.2.0",
+    "@shopify/shopify-app-session-storage-prisma": "9.0.0",
     "dotenv": "^16.6.1",
     "isbot": "^5.1.0",
-    "lucide-react": "^1.7.0",
-    "maxmind": "^5.0.3",
+    "lucide-react": "1.9.0",
+    "maxmind": "5.0.6",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
-    "prisma": "^6.2.1",
+    "prisma": "6.19.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "resend": "^6.10.0",
-    "tar": "^7.5.7",
-    "vite-tsconfig-paths": "^5.0.1"
+    "resend": "6.12.2",
+    "tar": "7.5.13"
   },
   "devDependencies": {
-    "@remix-run/eslint-config": "^2.16.1",
-    "@remix-run/route-config": "^2.16.1",
+    "@remix-run/dev": "2.17.4",
+    "@remix-run/eslint-config": "2.17.4",
+    "@remix-run/fs-routes": "2.17.4",
+    "@remix-run/route-config": "2.17.4",
     "@shopify/api-codegen-preset": "^1.1.1",
-    "@shopify/cli": "^3.88.1",
+    "@shopify/cli": "3.93.2",
     "@types/eslint": "^9.6.1",
     "@types/node": "^22.2.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^18.2.31",
     "@types/react-dom": "^18.2.14",
+    "@types/tar": "^6.1.13",
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^10.0.1",
     "prettier": "^3.2.4",
     "typescript": "^5.2.2",
-    "vite": "^6.2.2"
+    "vite": "6.4.2",
+    "vite-tsconfig-paths": "^5.0.1"
   },
   "workspaces": [
     "extensions/*"
@@ -74,15 +75,23 @@
     "@graphql-tools/url-loader": "8.0.16",
     "@graphql-codegen/client-preset": "4.7.0",
     "@graphql-codegen/typescript-operations": "4.5.0",
-    "minimatch": "9.0.5",
-    "vite": "^6.2.2"
+    "minimatch": "9.0.7",
+    "svix": "1.92.2",
+    "vite": "6.4.2"
   },
   "overrides": {
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
     "@graphql-tools/url-loader": "8.0.16",
     "@graphql-codegen/client-preset": "4.7.0",
     "@graphql-codegen/typescript-operations": "4.5.0",
-    "minimatch": "9.0.5",
-    "vite": "^6.2.2"
+    "minimatch": "9.0.7",
+    "readdirp": {
+      "picomatch": "2.3.2"
+    },
+    "svix": "1.92.2",
+    "vite": "6.4.2"
   },
   "author": "admin",
   "description": "Geo Redirect & Country Blocker with 401 VPS fix"

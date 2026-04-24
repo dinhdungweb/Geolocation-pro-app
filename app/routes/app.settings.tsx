@@ -8,7 +8,6 @@ import {
     Card,
     Text,
     BlockStack,
-    Button,
     TextField,
     Select,
     Checkbox,
@@ -184,7 +183,7 @@ export default function SettingsPage() {
 
     // Form state
     const [isEnabled, setIsEnabled] = useState(settings.isEnabled);
-    const [mode, setMode] = useState(settings.mode);
+    const [mode] = useState(settings.mode);
     const [template, setTemplate] = useState(settings.template || "modal");
     const [popupTitle, setPopupTitle] = useState(settings.popupTitle);
     const [popupMessage, setPopupMessage] = useState(settings.popupMessage);

@@ -5,7 +5,7 @@ import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
 import { PLAN_LIMITS, FREE_PLAN, OVERAGE_RATE } from "../billing.config";
 import { useState, useMemo } from "react";
-import { Search, X, DollarSign, AlertTriangle, Users, TrendingUp, CheckCircle, Clock } from "lucide-react";
+import { Search, X, DollarSign, AlertTriangle, Users, Clock } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);

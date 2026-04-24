@@ -8,17 +8,11 @@ import {
     Zap, 
     MoreHorizontal,
     Plus,
-    Calendar,
     ArrowUpRight,
     ArrowDownRight,
-    Filter,
-    ArrowUpDown,
-    Search,
     Rocket,
     Eye,
-    X,
-    Info,
-    CheckCircle2
+    X
 } from "lucide-react";
 
 import prisma from "../db.server";

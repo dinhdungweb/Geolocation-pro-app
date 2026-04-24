@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import prisma from '../db.server';
 import { replaceEmailVariables } from './email-parser';
+import { decryptSecret } from './secret-crypto.server';
 
 const resend = process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_your_api_key_here' 
     ? new Resend(process.env.RESEND_API_KEY) 
@@ -94,7 +95,7 @@ export async function sendAdminEmail({
                 secure: settings.smtpSecure,
                 auth: {
                     user: settings.smtpUser,
-                    pass: settings.smtpPass,
+                    pass: decryptSecret(settings.smtpPass),
                 },
             } as nodemailer.TransportOptions);
 

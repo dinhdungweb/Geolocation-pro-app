@@ -6,16 +6,6 @@ import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
     Zap, 
     MoreHorizontal,
-    Plus,
-    Search,
-    ArrowUpDown,
-    Filter,
-    ArrowUpRight,
-    ArrowDownRight,
-    Calendar,
-    Info,
-    X,
-    Rocket
 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

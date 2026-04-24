@@ -1,4 +1,5 @@
-import maxmind, { CountryResponse, Reader } from 'maxmind';
+import maxmind from 'maxmind';
+import type { CountryResponse, Reader } from 'maxmind';
 import path from 'path';
 import fs from 'fs';
 import { checkAndRunLiteUpdate } from '../services/geoip-updater.server';

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import "@shopify/shopify-app-remix/adapters/node";
+import type { ApiVersion } from "@shopify/shopify-app-remix/server";
 import {
-  ApiVersion,
   AppDistribution,
   BillingInterval,
   LogSeverity,
@@ -14,11 +14,16 @@ import { PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN } from "./billing.config";
 import { sendAdminEmail, hasSentEmail } from "./utils/email.server";
 import { getWelcomeEmailHtml } from "./utils/email-templates";
 
+const shopifyScopes = (process.env.SCOPES || "")
+  .split(",")
+  .map((scope) => scope.trim())
+  .filter(Boolean);
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: ApiVersion.January25,
-  scopes: process.env.SCOPES?.split(","),
+  apiVersion: "2026-04" as ApiVersion,
+  scopes: shopifyScopes,
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
@@ -130,7 +135,7 @@ const shopify = shopifyApp({
 });
 
 export default shopify;
-export const apiVersion = ApiVersion.January25;
+export const apiVersion = "2026-04" as ApiVersion;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;

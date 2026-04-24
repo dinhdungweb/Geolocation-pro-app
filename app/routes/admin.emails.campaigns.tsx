@@ -4,10 +4,7 @@ import { useLoaderData, Link } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { 
-    Send, 
-    Calendar, 
     BarChart3, 
-    ExternalLink, 
     Plus,
     Search,
     Filter,

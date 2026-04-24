@@ -8,7 +8,6 @@ import {
     Eye, 
     X, 
     Filter, 
-    ChevronRight,
     Mail,
     AlertCircle,
     CheckCircle2,

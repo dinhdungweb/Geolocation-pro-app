@@ -1,434 +1,582 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { authenticate } from "../shopify.server";
+import { isbot } from "isbot";
+import { FREE_PLAN, PLAN_LIMITS } from "../billing.config";
 import prisma from "../db.server";
+import { authenticate } from "../shopify.server";
+import {
+  createAnalyticsToken,
+  getYearMonth,
+  hashIP,
+  type RuleSource,
+  type StorefrontAction,
+} from "../utils/analytics-token.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
-import { PLAN_LIMITS, FREE_PLAN } from "../billing.config";
 
-/**
- * App Proxy endpoint for geolocation config
- * 
- * This route handles requests from the storefront via Shopify App Proxy.
- * URL format: https://shop.myshopify.com/apps/geolocation/config
- * 
- * Shopify adds query params: shop, logged_in_customer_id, path_prefix, timestamp, signature
- */
+type ProxyRule = {
+  id: string;
+  name: string;
+  countryCodes?: string;
+  ipAddresses?: string;
+  targetUrl: string;
+  priority: number;
+  ruleType: string;
+  redirectMode: string;
+  scheduleEnabled?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  daysOfWeek?: string | null;
+  timezone?: string | null;
+  pageTargetingType: string;
+  pagePaths?: string | null;
+};
+
+const corsHeaders = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+};
+
+const vpnCache = new Map<string, { blocked: boolean; expiresAt: number }>();
+const VPN_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function getVisitorIP(request: Request): string {
+  return (
+    request.headers.get("x-shopify-client-ip") ||
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("true-client-ip") ||
+    request.headers.get("x-client-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    "0.0.0.0"
+  );
+}
+
+function isLocalOrUnknownIP(ip: string) {
+  return ip === "0.0.0.0" || ip === "127.0.0.1" || ip === "::1";
+}
+
+function isIPMatch(visitorIP: string, ipPattern: string) {
+  if (!visitorIP || !ipPattern) return false;
+
+  const trimmedIP = visitorIP.trim();
+  const trimmedPattern = ipPattern.trim();
+  if (!trimmedIP || !trimmedPattern) return false;
+  if (trimmedIP === trimmedPattern) return true;
+  if (trimmedIP.toLowerCase() === trimmedPattern.toLowerCase()) return true;
+
+  const isIPv6 = trimmedIP.includes(":");
+  const isPatternIPv6 = trimmedPattern.includes(":");
+
+  if (isIPv6 && isPatternIPv6) {
+    const patternPrefix = trimmedPattern.replace(/::$/, "").toLowerCase();
+    if (trimmedIP.toLowerCase().startsWith(patternPrefix)) return true;
+
+    if (trimmedPattern.includes("/")) {
+      const [network] = trimmedPattern.split("/");
+      const networkPrefix = network.replace(/::$/, "").toLowerCase();
+      return trimmedIP.toLowerCase().startsWith(networkPrefix);
+    }
+  }
+
+  if (!isIPv6 && !isPatternIPv6 && trimmedPattern.includes("/")) {
+    const [network, bits] = trimmedPattern.split("/");
+    const maskBits = Number.parseInt(bits, 10);
+    if (Number.isNaN(maskBits) || maskBits < 0 || maskBits > 32) return false;
+
+    const ipParts = trimmedIP.split(".").map(Number);
+    const networkParts = network.split(".").map(Number);
+    if (
+      ipParts.length !== 4 ||
+      networkParts.length !== 4 ||
+      ipParts.some((part) => Number.isNaN(part) || part < 0 || part > 255) ||
+      networkParts.some((part) => Number.isNaN(part) || part < 0 || part > 255)
+    ) {
+      return false;
+    }
+
+    const ipInt =
+      ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>>
+      0;
+    const networkInt =
+      ((networkParts[0] << 24) |
+        (networkParts[1] << 16) |
+        (networkParts[2] << 8) |
+        networkParts[3]) >>>
+      0;
+    const mask = maskBits === 0 ? 0 : (~0 << (32 - maskBits)) >>> 0;
+    return (ipInt & mask) === (networkInt & mask);
+  }
+
+  return false;
+}
+
+function isRuleInSchedule(rule: ProxyRule) {
+  if (!rule.scheduleEnabled) return true;
+
+  try {
+    const timezone = rule.timezone || "UTC";
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "short",
+      hour12: false,
+    }).formatToParts(now);
+
+    const currentHour = Number.parseInt(parts.find((part) => part.type === "hour")?.value ?? "0", 10) % 24;
+    const currentMinute = Number.parseInt(parts.find((part) => part.type === "minute")?.value ?? "0", 10);
+    const currentMinutes = currentHour * 60 + currentMinute;
+    const targetDate = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+    const currentDay = targetDate.getDay().toString();
+
+    if (rule.daysOfWeek && !rule.daysOfWeek.split(",").includes(currentDay)) {
+      return false;
+    }
+
+    if (rule.startTime && rule.endTime) {
+      const [startH, startM] = rule.startTime.split(":").map(Number);
+      const [endH, endM] = rule.endTime.split(":").map(Number);
+      const startMinutes = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+
+      if (startMinutes <= endMinutes) {
+        return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+      }
+      return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[Proxy] Error checking schedule for rule ${rule.name}:`, error);
+    return true;
+  }
+}
+
+function isRuleOnPage(rule: ProxyRule, path: string) {
+  const type = rule.pageTargetingType || "all";
+  if (type === "all") return true;
+
+  const paths = (rule.pagePaths || "")
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (paths.length === 0) return type === "exclude";
+
+  const isMatch = paths.some((configuredPath) => {
+    if (configuredPath.endsWith("*")) {
+      return path.startsWith(configuredPath.slice(0, -1));
+    }
+    return path === configuredPath;
+  });
+
+  return type === "include" ? isMatch : !isMatch;
+}
+
+function getActionForRule(rule: ProxyRule): StorefrontAction {
+  if (rule.ruleType === "block") return "block";
+  return rule.redirectMode === "auto_redirect" ? "auto_redirect" : "popup";
+}
+
+function getAnalyticsEvent(action: StorefrontAction, source: RuleSource) {
+  if (action === "popup") return "popup_shown";
+  if (action === "auto_redirect") return source === "ip" ? "ip_redirected" : "auto_redirected";
+  if (action === "block") {
+    if (source === "ip") return "ip_blocked";
+    if (source === "vpn") return "vpn_blocked";
+    return "blocked";
+  }
+  return null;
+}
+
+function buildPopup(settings: any) {
+  return {
+    title: settings.popupTitle,
+    message: settings.popupMessage,
+    confirmBtn: settings.confirmBtnText,
+    cancelBtn: settings.cancelBtnText,
+    bgColor: settings.popupBgColor,
+    textColor: settings.popupTextColor,
+    btnColor: settings.popupBtnColor,
+    template: settings.template || "modal",
+    cookieDuration: settings.cookieDuration,
+  };
+}
+
+function buildBlocked(settings: any) {
+  return {
+    title: settings.blockedTitle,
+    message: settings.blockedMessage,
+  };
+}
+
+async function checkVpnBlocked(visitorIP: string, ipHash: string) {
+  const providerUrl = process.env.VPN_CHECK_API_URL;
+  if (!providerUrl || !providerUrl.startsWith("https://") || isLocalOrUnknownIP(visitorIP)) {
+    return false;
+  }
+
+  const now = Date.now();
+  const cached = vpnCache.get(ipHash);
+  if (cached && cached.expiresAt > now) return cached.blocked;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+  try {
+    const url = providerUrl.includes("{ip}")
+      ? new URL(providerUrl.replace("{ip}", encodeURIComponent(visitorIP)))
+      : new URL(providerUrl);
+    if (!providerUrl.includes("{ip}")) {
+      url.searchParams.set("ip", visitorIP);
+    }
+
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return false;
+
+    const data = await response.json();
+    const blocked = Boolean(
+      data.proxy ||
+        data.hosting ||
+        data.vpn ||
+        data.tor ||
+        data.is_proxy ||
+        data.is_vpn ||
+        data.security?.proxy ||
+        data.security?.vpn ||
+        data.security?.tor ||
+        ((data.isp || "").includes("iCloud Private Relay") ||
+          ((data.org || "").includes("Apple Inc.") && data.proxy))
+    );
+
+    vpnCache.set(ipHash, { blocked, expiresAt: now + VPN_CACHE_TTL_MS });
+    return blocked;
+  } catch (error: any) {
+    if (error?.name !== "AbortError") {
+      console.error("[Proxy VPN Check] Error resolving proxy status:", error);
+    }
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function buildRulePayload(rule: ProxyRule, source: RuleSource) {
+  return {
+    ruleId: rule.id,
+    name: rule.name,
+    targetUrl: rule.targetUrl,
+    ruleType: rule.ruleType,
+    redirectMode: rule.redirectMode,
+    source,
+  };
+}
+
+function buildActionResponse({
+  action,
+  analyticsEvent,
+  blocked,
+  countryCode,
+  currentPath,
+  currentPlan,
+  eventToken,
+  limitExceeded = false,
+  planLimit,
+  popup,
+  rule,
+  usage,
+}: {
+  action: StorefrontAction;
+  analyticsEvent: string | null;
+  blocked: any;
+  countryCode: string;
+  currentPath: string;
+  currentPlan: string;
+  eventToken: string | null;
+  limitExceeded?: boolean;
+  planLimit: number;
+  popup: any;
+  rule: ReturnType<typeof buildRulePayload> | null;
+  usage: number;
+}) {
+  return {
+    enabled: !limitExceeded && action !== "none",
+    action,
+    analyticsEvent,
+    blocked,
+    countryCode,
+    currentPath,
+    currentPlan,
+    eventToken,
+    limitExceeded,
+    planLimit,
+    popup,
+    rule,
+    usage,
+  };
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const url = new URL(request.url);
-    const shop = url.searchParams.get("shop");
-    const currentPath = url.searchParams.get("path") || "/"; // Current path from storefront
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
+  const currentPath = url.searchParams.get("path") || "/";
 
-    // CORS headers for cross-origin requests
-    const headers = {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Cache-Control": "no-store, no-cache, must-revalidate", // No caching - settings apply immediately
-    };
+  if (!shop) {
+    return json({ error: "Missing shop parameter", enabled: false, action: "none" }, { status: 400, headers: corsHeaders });
+  }
 
-    if (!shop) {
-        return json(
-            { error: "Missing shop parameter", enabled: false },
-            { status: 400, headers }
-        );
+  try {
+    await authenticate.public.appProxy(request);
+  } catch {
+    return json({ error: "Unauthorized: Invalid signature", enabled: false, action: "none" }, { status: 401, headers: corsHeaders });
+  }
+
+  const visitorIP = getVisitorIP(request);
+  const ipHash = hashIP(visitorIP);
+  let countryCode = "";
+
+  try {
+    countryCode = await getCountryFromIP(visitorIP);
+  } catch (error: any) {
+    console.error(`[Proxy] MaxMind lookup error:`, error.message);
+  }
+
+  try {
+    const settings =
+      (await prisma.settings.findUnique({ where: { shop } })) ??
+      (await prisma.settings.create({ data: { shop } }));
+
+    const currentPlan = settings.currentPlan || FREE_PLAN;
+    const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+    const yearMonth = getYearMonth();
+    const monthlyUsage = await prisma.monthlyUsage.findUnique({
+      where: { shop_yearMonth: { shop, yearMonth } },
+    });
+    const currentUsage = monthlyUsage?.totalVisitors || 0;
+    const popup = buildPopup(settings);
+    const blocked = buildBlocked(settings);
+
+    if (!settings.isEnabled || settings.mode === "disabled") {
+      return json(
+        buildActionResponse({
+          action: "none",
+          analyticsEvent: null,
+          blocked,
+          countryCode,
+          currentPath,
+          currentPlan,
+          eventToken: null,
+          planLimit,
+          popup,
+          rule: null,
+          usage: currentUsage,
+        }),
+        { headers: corsHeaders }
+      );
     }
 
-    // Get visitor IP from request headers
-    // Priority: x-shopify-client-ip > cf-connecting-ip > x-forwarded-for
-    const getVisitorIP = (): string => {
-        // 1. X-Shopify-Client-IP - This is the REAL visitor IP forwarded by Shopify
-        const shopifyClientIP = request.headers.get("x-shopify-client-ip");
-        if (shopifyClientIP) return shopifyClientIP;
-
-        // 2. Cloudflare
-        const cfIP = request.headers.get("cf-connecting-ip");
-        if (cfIP) return cfIP;
-
-        // 3. X-Real-IP
-        const realIP = request.headers.get("x-real-ip");
-        if (realIP) return realIP;
-
-        // 4. True-Client-IP
-        const trueClientIP = request.headers.get("true-client-ip");
-        if (trueClientIP) return trueClientIP;
-
-        // 5. X-Client-IP
-        const clientIP = request.headers.get("x-client-ip");
-        if (clientIP) return clientIP;
-
-        // 6. X-Forwarded-For (first IP is original client)
-        const forwardedFor = request.headers.get("x-forwarded-for");
-        if (forwardedFor) {
-            return forwardedFor.split(",")[0].trim();
-        }
-
-        return "0.0.0.0";
-    };
-
-    const visitorIP = getVisitorIP();
-
-    // Lookup country from IP using MaxMind GeoLite2 database (local, fast, no limits)
-    let detectedCountry = "";
-    try {
-        detectedCountry = await getCountryFromIP(visitorIP);
-        /* 
-        if (detectedCountry) {
-            console.log(`[Proxy] Country detected from IP ${visitorIP}: ${detectedCountry}`);
-        } else {
-            console.log(`[Proxy] Could not detect country for IP ${visitorIP}`);
-        }
-        */
-    } catch (error: any) {
-        console.error(`[Proxy] MaxMind lookup error for IP ${visitorIP}:`, error.message);
+    if (currentPlan === FREE_PLAN && currentUsage >= planLimit) {
+      return json(
+        buildActionResponse({
+          action: "none",
+          analyticsEvent: null,
+          blocked,
+          countryCode,
+          currentPath,
+          currentPlan,
+          eventToken: null,
+          limitExceeded: true,
+          planLimit,
+          popup,
+          rule: null,
+          usage: currentUsage,
+        }),
+        { headers: corsHeaders }
+      );
     }
 
-    // Verify App Proxy Signature
-    try {
-        await authenticate.public.appProxy(request);
-    } catch (error) {
-        return json({ error: "Unauthorized: Invalid signature" }, { status: 401, headers });
+    if (settings.excludeBots && isbot(request.headers.get("user-agent") || "")) {
+      return json(
+        buildActionResponse({
+          action: "none",
+          analyticsEvent: null,
+          blocked,
+          countryCode,
+          currentPath,
+          currentPlan,
+          eventToken: null,
+          planLimit,
+          popup,
+          rule: null,
+          usage: currentUsage,
+        }),
+        { headers: corsHeaders }
+      );
     }
 
-    try {
-        // Fetch settings for the shop
-        const settings = await prisma.settings.findUnique({
-            where: { shop },
-            select: {
-                isEnabled: true,
-                mode: true,
-                popupTitle: true,
-                popupMessage: true,
-                confirmBtnText: true,
-                cancelBtnText: true,
-                popupBgColor: true,
-                popupTextColor: true,
-                popupBtnColor: true,
-                excludeBots: true,
-                excludedIPs: true,
-                cookieDuration: true,
-                blockedTitle: true,
-                blockedMessage: true,
-                template: true,
-                currentPlan: true,
-                blockVpn: true,
-            },
-        });
+    const isIPExcluded = settings.excludedIPs
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean)
+      .some((excludedIP) => isIPMatch(visitorIP, excludedIP));
 
-        // Fetch active COUNTRY rules for the shop
-        const countryRules = await prisma.redirectRule.findMany({
-            where: {
-                shop,
-                isActive: true,
-                matchType: "country",
-            },
-            orderBy: { priority: "desc" },
-            select: {
-                id: true,
-                name: true,
-                countryCodes: true,
-                targetUrl: true,
-                priority: true,
-                scheduleEnabled: true,
-                startTime: true,
-                endTime: true,
-                daysOfWeek: true,
-                timezone: true,
-                ruleType: true,
-                redirectMode: true,
-                pageTargetingType: true,
-                pagePaths: true,
-            },
-        });
-
-        // Fetch active IP rules for the shop
-        const ipRulesRaw = await prisma.redirectRule.findMany({
-            where: {
-                shop,
-                isActive: true,
-                matchType: "ip",
-            },
-            orderBy: { priority: "desc" },
-            select: {
-                id: true,
-                name: true,
-                ipAddresses: true,
-                targetUrl: true,
-                priority: true,
-                ruleType: true,
-                redirectMode: true,
-                pageTargetingType: true,
-                pagePaths: true,
-            },
-        });
-
-        // VPN/Proxy & Apple Private Relay Detection
-        let vpnBlocked = false;
-        
-        // If settings not found yet, we'll check it after auto-creation if needed, 
-        // but for now let's use the loaded settings or sensible defaults.
-        const blockVpnEnabled = settings?.blockVpn ?? false;
-        const excludedIPs = settings?.excludedIPs ?? "";
-        const isIPExcluded = excludedIPs.split(",").map((ip: string) => ip.trim()).includes(visitorIP);
-
-        if (blockVpnEnabled && !isIPExcluded && visitorIP !== "0.0.0.0" && visitorIP !== "127.0.0.1" && visitorIP !== "::1") {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-
-            try {
-                const proxyResponse = await fetch(
-                    `http://ip-api.com/json/${visitorIP}?fields=status,message,proxy,hosting,isp,org`,
-                    { signal: controller.signal }
-                );
-                
-                if (proxyResponse.ok) {
-                    const data = await proxyResponse.json();
-                    
-                    if (data.status === "success") {
-                        const isProxyOrHosting = data.proxy || data.hosting;
-                        const isAppleRelay = (data.isp && data.isp.includes('iCloud Private Relay')) || 
-                                           (data.org && data.org.includes('Apple Inc.') && data.proxy);
-                        
-                        if (isProxyOrHosting || isAppleRelay) {
-                            vpnBlocked = true;
-                            console.log(`[Proxy VPN Block] Blocked IP: ${visitorIP} | Reason: ${isAppleRelay ? 'Apple Private Relay' : 'VPN/Proxy/Hosting'}`);
-                        }
-                    } else {
-                        console.warn(`[Proxy VPN Check] API returned error for ${visitorIP}: ${data.message}`);
-                    }
-                }
-            } catch (err: any) {
-                if (err.name === 'AbortError') {
-                    console.warn(`[Proxy VPN Check] API timeout for IP ${visitorIP} (2s reached)`);
-                } else {
-                    console.error("[Proxy VPN Check] Error resolving proxy for IP", visitorIP, err);
-                }
-            } finally {
-                clearTimeout(timeoutId);
-            }
-        }
-
-        // Filter country rules based on schedule
-        const activeCountryRules = countryRules.filter(rule => {
-            if (!rule.scheduleEnabled) return true;
-
-            const timezone = rule.timezone || "UTC";
-            try {
-                const now = new Date();
-
-                // Get current time parts in the target timezone using Intl.DateTimeFormat
-                // Use numeric types to avoid string parsing issues (e.g. "24" vs "00")
-                const parts = new Intl.DateTimeFormat('en-US', {
-                    timeZone: timezone,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    weekday: 'short',
-                    hour12: false,
-                }).formatToParts(now);
-
-                const hourStr = parts.find(p => p.type === 'hour')?.value ?? '0';
-                const minuteStr = parts.find(p => p.type === 'minute')?.value ?? '0';
-                // Normalize "24" → "00" (some systems return 24 for midnight)
-                const currentHour = parseInt(hourStr, 10) % 24;
-                const currentMinute = parseInt(minuteStr, 10);
-                // Convert to minutes-from-midnight for reliable numeric comparison
-                const currentMinutes = currentHour * 60 + currentMinute;
-
-                // Get day of week in target timezone (0=Sun, 1=Mon…6=Sat)
-                const targetTimeStr = now.toLocaleString("en-US", { timeZone: timezone });
-                const targetDate = new Date(targetTimeStr);
-                const currentDay = targetDate.getDay().toString();
-
-                // Check Day of week
-                if (rule.daysOfWeek && !rule.daysOfWeek.split(",").includes(currentDay)) {
-                    console.log(`[Proxy] Rule "${rule.name}" skipped: day ${currentDay} not in [${rule.daysOfWeek}]`);
-                    return false;
-                }
-
-                // Check Time window
-                if (rule.startTime && rule.endTime) {
-                    const [startH, startM] = rule.startTime.split(":").map(Number);
-                    const [endH, endM] = rule.endTime.split(":").map(Number);
-                    const startMinutes = startH * 60 + startM;
-                    const endMinutes = endH * 60 + endM;
-
-                    if (startMinutes <= endMinutes) {
-                        // Normal range: e.g. 09:00–17:00
-                        if (currentMinutes < startMinutes || currentMinutes > endMinutes) {
-                            console.log(`[Proxy] Rule "${rule.name}" skipped: time ${currentHour}:${currentMinute} not in ${rule.startTime}–${rule.endTime}`);
-                            return false;
-                        }
-                    } else {
-                        // Overnight range: e.g. 22:00–06:00
-                        if (currentMinutes < startMinutes && currentMinutes > endMinutes) {
-                            console.log(`[Proxy] Rule "${rule.name}" skipped: time ${currentHour}:${currentMinute} not in overnight ${rule.startTime}–${rule.endTime}`);
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
-            } catch (e) {
-                console.error(`[Proxy] Error checking schedule for rule ${rule.name}:`, e);
-                return true; // Fail safe: active if check fails
-            }
-        });
-
-        // --- NEW: Filter rules based on Page Targeting ---
-        const checkPageTargeting = (rule: any, path: string) => {
-            const type = rule.pageTargetingType || "all";
-            if (type === "all") return true;
-
-            const paths = (rule.pagePaths || "")
-                .split(/[\n,]+/)
-                .map((p: string) => p.trim())
-                .filter(Boolean);
-            
-            if (paths.length === 0) return type === "exclude"; // If empty, include: none matches (false) / exclude: none matches (true)
-
-            const isMatch = paths.some((p: string) => {
-                // Support simple wildcard like /products/*
-                if (p.endsWith("*")) {
-                    const prefix = p.slice(0, -1);
-                    return path.startsWith(prefix);
-                }
-                return path === p;
-            });
-
-            return type === "include" ? isMatch : !isMatch;
-        };
-
-        const pageFilteredCountryRules = activeCountryRules.filter((r: any) => checkPageTargeting(r, currentPath));
-        const pageFilteredIPRules = ipRulesRaw.filter((r: any) => checkPageTargeting(r, currentPath));
-
-        // If no settings found, auto-create default settings so app works immediately
-        const effectiveSettings = settings ?? await prisma.settings.create({
-            data: { shop },
-            select: {
-                isEnabled: true,
-                mode: true,
-                popupTitle: true, popupMessage: true,
-                confirmBtnText: true, cancelBtnText: true,
-                popupBgColor: true, popupTextColor: true, popupBtnColor: true,
-                excludeBots: true, excludedIPs: true, cookieDuration: true,
-                blockedTitle: true, blockedMessage: true, template: true,
-                currentPlan: true,
-                blockVpn: true,
-            },
-        });
-        // console.log(`[Proxy] ${settings ? 'Settings loaded' : 'Auto-created default settings'} for ${shop}`);
-
-        // === PLAN LIMIT CHECK ===
-        // Only enforce limits when plan is explicitly "free"
-        // If currentPlan is null/empty (not yet synced), allow traffic through
-        const currentPlan = (effectiveSettings as any).currentPlan || null;
-        const planLimit = currentPlan ? (PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN]) : PLAN_LIMITS[FREE_PLAN];
-
-        const now = new Date();
-        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const monthlyUsage = await prisma.monthlyUsage.findUnique({
-            where: {
-                shop_yearMonth: { shop, yearMonth },
-            },
-        });
-        const currentUsage = monthlyUsage?.totalVisitors || 0;
-
-        if (currentPlan === FREE_PLAN && currentUsage >= planLimit) {
-            // console.log(`[Proxy] Free plan limit exceeded for ${shop}: ${currentUsage}/${planLimit}`);
-            return json({
-                enabled: false,
-                limitExceeded: true,
-                currentUsage,
-                planLimit,
-                currentPlan,
-                message: `Monthly usage limit reached (${currentUsage}/${planLimit}). Please upgrade your plan.`,
-            }, { headers });
-        }
-
-        // Filter country rules based on plan (Block Access is Pro)
-        const countryRulesToServe = (currentPlan === FREE_PLAN)
-            ? pageFilteredCountryRules.filter(r => r.ruleType !== 'block')
-            : pageFilteredCountryRules;
-
-        // Filter IP rules based on plan (IP Rules is Pro)
-        const ipRulesToServe = (currentPlan === FREE_PLAN)
-            ? [] // No IP rules for free plan
-            : pageFilteredIPRules;
-
-        // Transform country rules to a simpler format for frontend
-        const transformedCountryRules = countryRulesToServe.map((rule) => ({
-            ruleId: rule.id,
-            name: rule.name,
-            countries: rule.countryCodes.split(",").map((c) => c.trim().toUpperCase()),
-            targetUrl: rule.targetUrl,
-            ruleType: rule.ruleType,
-            redirectMode: rule.redirectMode,
-            priority: rule.priority,
-        }));
-
-        // Transform IP rules for frontend
-        const transformedIPRules = ipRulesToServe.map((rule) => ({
-            ruleId: rule.id,
-            name: rule.name,
-            ips: rule.ipAddresses.split(",").map((ip) => ip.trim()),
-            targetUrl: rule.targetUrl,
-            ruleType: rule.ruleType,
-            redirectMode: rule.redirectMode,
-            priority: rule.priority,
-        }));
-
-        const response = {
-            enabled: (effectiveSettings as any).isEnabled ?? (effectiveSettings.mode !== "disabled"),
-            mode: effectiveSettings.mode,
-            visitorIP, // Send visitor IP to frontend
-            detectedCountry, // Country detected from IP (bypasses CDN cache)
-            isIPExcluded, // Whether this IP is in the exclusion list
-            popup: {
-                title: effectiveSettings.popupTitle,
-                message: effectiveSettings.popupMessage,
-                confirmBtn: effectiveSettings.confirmBtnText,
-                cancelBtn: effectiveSettings.cancelBtnText,
-                bgColor: effectiveSettings.popupBgColor,
-                textColor: effectiveSettings.popupTextColor,
-                btnColor: effectiveSettings.popupBtnColor,
-                template: effectiveSettings.template || "modal",
-            },
-            excludeBots: effectiveSettings.excludeBots,
-            cookieDuration: effectiveSettings.cookieDuration,
-            blocked: {
-                title: effectiveSettings.blockedTitle,
-                message: effectiveSettings.blockedMessage,
-            },
-            rules: transformedCountryRules, // Country rules
-            ipRules: transformedIPRules, // IP rules
-            currentPath, // Feedback path
-            vpnBlocked, // Send VPN block status
-        };
-
-        // console.log(`[Proxy] Config for ${shop}, IP: ${visitorIP}, country: ${detectedCountry}, path: ${currentPath}, rules: ${transformedCountryRules.length}+${transformedIPRules.length}`);
-
-        return json(response, { headers });
-    } catch (error) {
-        console.error("[Proxy] Error fetching config:", error);
-        return json(
-            { error: "Internal server error", enabled: false },
-            { status: 500, headers }
-        );
+    if (isIPExcluded) {
+      return json(
+        buildActionResponse({
+          action: "none",
+          analyticsEvent: null,
+          blocked,
+          countryCode,
+          currentPath,
+          currentPlan,
+          eventToken: null,
+          planLimit,
+          popup,
+          rule: null,
+          usage: currentUsage,
+        }),
+        { headers: corsHeaders }
+      );
     }
+
+    let selectedRule: ProxyRule | null = null;
+    let source: RuleSource | null = null;
+    let action: StorefrontAction = "none";
+
+    if (settings.blockVpn && (await checkVpnBlocked(visitorIP, ipHash))) {
+      source = "vpn";
+      action = "block";
+      selectedRule = {
+        id: "vpn-shield",
+        name: "Anti-Fraud Shield",
+        targetUrl: "",
+        priority: Number.MAX_SAFE_INTEGER,
+        ruleType: "block",
+        redirectMode: "block",
+        pageTargetingType: "all",
+      };
+    }
+
+    if (!selectedRule && currentPlan !== FREE_PLAN) {
+      const ipRules = await prisma.redirectRule.findMany({
+        where: { shop, isActive: true, matchType: "ip" },
+        orderBy: { priority: "desc" },
+        select: {
+          id: true,
+          name: true,
+          ipAddresses: true,
+          targetUrl: true,
+          priority: true,
+          ruleType: true,
+          redirectMode: true,
+          pageTargetingType: true,
+          pagePaths: true,
+        },
+      });
+
+      selectedRule =
+        ipRules
+          .filter((rule) => isRuleOnPage(rule, currentPath))
+          .find((rule) =>
+            rule.ipAddresses
+              .split(",")
+              .map((ip) => ip.trim())
+              .filter(Boolean)
+              .some((ip) => isIPMatch(visitorIP, ip))
+          ) || null;
+
+      if (selectedRule) {
+        source = "ip";
+        action = getActionForRule(selectedRule);
+      }
+    }
+
+    if (!selectedRule && countryCode) {
+      const countryRules = await prisma.redirectRule.findMany({
+        where: { shop, isActive: true, matchType: "country" },
+        orderBy: { priority: "desc" },
+        select: {
+          id: true,
+          name: true,
+          countryCodes: true,
+          targetUrl: true,
+          priority: true,
+          scheduleEnabled: true,
+          startTime: true,
+          endTime: true,
+          daysOfWeek: true,
+          timezone: true,
+          ruleType: true,
+          redirectMode: true,
+          pageTargetingType: true,
+          pagePaths: true,
+        },
+      });
+
+      const eligibleCountryRules = countryRules
+        .filter((rule) => isRuleInSchedule(rule))
+        .filter((rule) => isRuleOnPage(rule, currentPath))
+        .filter((rule) => currentPlan !== FREE_PLAN || rule.ruleType !== "block");
+
+      selectedRule =
+        eligibleCountryRules.find((rule) =>
+          rule.countryCodes
+            .split(",")
+            .map((code) => code.trim().toUpperCase())
+            .includes(countryCode.toUpperCase())
+        ) || null;
+
+      if (selectedRule) {
+        source = "country";
+        action = getActionForRule(selectedRule);
+      }
+    }
+
+    const rulePayload = selectedRule && source ? buildRulePayload(selectedRule, source) : null;
+    const analyticsEvent = source ? getAnalyticsEvent(action, source) : null;
+    const eventToken =
+      selectedRule && source && action !== "none"
+        ? createAnalyticsToken({
+            shop,
+            yearMonth,
+            ruleId: selectedRule.id,
+            action,
+            source,
+            path: currentPath,
+            countryCode,
+            ipHash,
+          })
+        : null;
+
+    return json(
+      buildActionResponse({
+        action,
+        analyticsEvent,
+        blocked,
+        countryCode,
+        currentPath,
+        currentPlan,
+        eventToken,
+        planLimit,
+        popup,
+        rule: rulePayload,
+        usage: currentUsage,
+      }),
+      { headers: corsHeaders }
+    );
+  } catch (error) {
+    console.error("[Proxy] Error resolving storefront action:", error);
+    return json({ error: "Internal server error", enabled: false, action: "none" }, { status: 500, headers: corsHeaders });
+  }
 };
 
-// Handle OPTIONS request for CORS preflight
 export const action = async ({ request }: LoaderFunctionArgs) => {
-    if (request.method === "OPTIONS") {
-        return new Response(null, {
-            status: 204,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-            },
-        });
-    }
-    return json({ error: "Method not allowed" }, { status: 405 });
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
 };
-

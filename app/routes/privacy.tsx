@@ -4,7 +4,7 @@ export default function PrivacyPolicy() {
             <h1 style={{ fontSize: "28px", marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>Privacy Policy</h1>
 
             <p style={{ marginBottom: "20px", color: "#666" }}>
-                Last updated: {new Date().toLocaleDateString()}
+                Last updated: April 24, 2026
             </p>
 
             <div style={{ marginBottom: "30px" }}>
@@ -31,25 +31,33 @@ export default function PrivacyPolicy() {
                     <li>To provide the geolocation redirection and blocking services.</li>
                     <li>To provide analytics on redirection and blocking events.</li>
                     <li>To improve and optimize our App's performance.</li>
+                    <li>When anti-fraud protection is enabled by the merchant, to check whether a visitor appears to be using a VPN, proxy, hosting provider, or similar anonymizing service.</li>
                 </ul>
             </section>
 
             <section style={{ marginBottom: "30px" }}>
                 <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>3. Data Retention</h2>
                 <p>
-                    We retain IP address logs for a limited period (typically 30 days) solely for the purpose of providing analytics and troubleshooting. After this period, data is automatically anonymized or deleted.
+                    We retain raw IP address logs for up to 30 days solely for analytics and troubleshooting. After this period, these logs are automatically deleted.
                 </p>
             </section>
 
             <section style={{ marginBottom: "30px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>4. Changes</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>4. Third-Party Processors</h2>
+                <p>
+                    Geolocation lookups are performed using the MaxMind GeoLite2 database. If the merchant enables anti-fraud protection and configures a VPN/proxy checking provider, visitor IP addresses may be sent to that configured provider for fraud and security checks.
+                </p>
+            </section>
+
+            <section style={{ marginBottom: "30px" }}>
+                <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>5. Changes</h2>
                 <p>
                     We may update this Privacy Policy from time to time in order to reflect, for example, changes to our practices or for other operational, legal, or regulatory reasons.
                 </p>
             </section>
 
             <section style={{ marginBottom: "30px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>5. Contact Us</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>6. Contact Us</h2>
                 <p>
                     For more information about our privacy practices, if you have questions, or if you would like to make a complaint, please contact us by e-mail at <a href="mailto:support@bluepeaks.top" style={{ color: "#008060", textDecoration: "none" }}>support@bluepeaks.top</a>.
                 </p>

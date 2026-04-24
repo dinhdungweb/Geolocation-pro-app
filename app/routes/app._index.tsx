@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -8,25 +8,21 @@ import {
   Text,
   BlockStack,
   InlineStack,
-  Icon,
   Badge,
   CalloutCard,
   IndexTable,
   Button,
   Banner,
   ProgressBar,
-  useIndexResourceState,
   useBreakpoints,
   List,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN } from "../billing.config";
+import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PLUS_PLAN } from "../billing.config";
 // checkAndChargeOverage is called in the parent layout (app.tsx), not here
 import prisma from "../db.server";
-import { COUNTRY_MAP, getCountryFlag } from "../utils/countries";
-import { sendAdminEmail, hasSentEmail } from "../utils/email.server";
-import { getWelcomeEmailHtml, getLimit80EmailHtml, getLimit100EmailHtml } from "../utils/email-templates";
+import { COUNTRY_MAP } from "../utils/countries";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -48,15 +44,6 @@ interface VisitsDataItem {
   popup: number;
   redirected: string;
   blocked: number;
-}
-
-interface BannersDataItem {
-  id: string;
-  rule: string;
-  seen: number;
-  clickedYes: number;
-  clickedNo: number;
-  dismissed: number;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -107,7 +94,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
   const currentUsage = monthlyUsage?.totalVisitors || 0;
-  const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
   // Overage charging is handled by the parent layout (app.tsx) on every page load.
   // Do NOT call checkAndChargeOverage() here to avoid double-charging race conditions.
@@ -222,7 +208,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 export default function Index() {
-  const { shop, hasProPlan, currentPlan, planLimit, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
+  const { shop, currentPlan, planLimit, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
   const { smUp } = useBreakpoints();
 
   // Calculate usage percentage

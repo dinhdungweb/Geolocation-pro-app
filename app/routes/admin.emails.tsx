@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { Outlet, NavLink } from "@remix-run/react";
+import { Outlet } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

@@ -50,12 +50,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             'PREMIUM': 4.99,
             'FREE': 0
         };
-        const planLimits: Record<string, number> = {
-            'ELITE': 6000,
-            'PLUS': 2500,
-            'PREMIUM': 1000,
-            'FREE': 100
-        };
         const OVERAGE_RATE = 100 / 50000; // $0.002
 
         const subscriptionRevenue = settings.reduce((sum, s) => {
@@ -69,7 +63,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             const planKey = (s.currentPlan || 'FREE').toUpperCase();
             if (planKey === 'FREE') return sum;
 
-            const limit = planLimits[planKey] || 100;
             const usage = usageMap.get(s.shop);
             if (!usage) return sum;
 

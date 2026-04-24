@@ -3,8 +3,8 @@ import { json } from "@remix-run/node";
 import { useLoaderData, Form, useActionData } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
+import { encryptSecret } from "../utils/secret-crypto.server";
 import { 
-    Settings as SettingsIcon,
     Mail,
     Shield,
     Bell,
@@ -15,9 +15,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
     let settings = null;
     try {
-        settings = await prisma.settings.findUnique({
+        const dbSettings = await prisma.settings.findUnique({
             where: { shop: 'GLOBAL' }
         });
+        settings = dbSettings
+            ? { ...dbSettings, smtpPass: undefined, hasSmtpPass: Boolean(dbSettings.smtpPass) }
+            : null;
     } catch (e) {
         console.error("Prisma error in Settings loader:", e);
     }
@@ -32,38 +35,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const smtpHost = formData.get("smtpHost") as string;
     const smtpPort = parseInt(formData.get("smtpPort") as string) || 587;
     const smtpUser = formData.get("smtpUser") as string;
-    const smtpPass = formData.get("smtpPass") as string;
+    const smtpPass = ((formData.get("smtpPass") as string) || "").trim();
     const smtpSecure = formData.get("smtpSecure") === "true";
 
-    await prisma.settings.upsert({
-        where: { shop: 'GLOBAL' },
-        update: { 
-            emailSenderName: name,
-            emailSenderEmail: email,
-            smtpHost,
-            smtpPort,
-            smtpUser,
-            smtpPass,
-            smtpSecure
-        },
-        create: {
-            shop: 'GLOBAL',
-            emailSenderName: name,
-            emailSenderEmail: email,
-            smtpHost,
-            smtpPort,
-            smtpUser,
-            smtpPass,
-            smtpSecure
-        }
-    });
+    try {
+        const existing = await prisma.settings.findUnique({
+            where: { shop: 'GLOBAL' },
+            select: { smtpPass: true },
+        });
+        const encryptedSmtpPass = smtpPass ? encryptSecret(smtpPass) : existing?.smtpPass ?? null;
 
-    return json({ success: true });
+        await prisma.settings.upsert({
+            where: { shop: 'GLOBAL' },
+            update: {
+                emailSenderName: name,
+                emailSenderEmail: email,
+                smtpHost,
+                smtpPort,
+                smtpUser,
+                smtpPass: encryptedSmtpPass,
+                smtpSecure
+            },
+            create: {
+                shop: 'GLOBAL',
+                emailSenderName: name,
+                emailSenderEmail: email,
+                smtpHost,
+                smtpPort,
+                smtpUser,
+                smtpPass: encryptedSmtpPass,
+                smtpSecure
+            }
+        });
+
+        return json({ success: true });
+    } catch (error: any) {
+        console.error("Failed to save email settings:", error);
+        return json({ success: false, error: error.message || "Failed to save settings" }, { status: 500 });
+    }
 };
 
 export default function EmailSettings() {
     const { settings } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
+    const actionError = actionData && "error" in actionData ? String(actionData.error ?? "") : "";
 
     return (
         <div className="settings-dashboard-v2">
@@ -190,6 +205,11 @@ export default function EmailSettings() {
                             <CheckCircle size={20} /> Settings saved successfully!
                         </div>
                     )}
+                    {actionError && (
+                        <div className="success-banner" style={{ background: '#fef2f2', borderColor: '#ef4444', color: '#dc2626' }}>
+                            {actionError}
+                        </div>
+                    )}
                     <div className="title">Sender profile</div>
                     <div className="form-group-v2">
                         <label>Display name</label>
@@ -221,7 +241,7 @@ export default function EmailSettings() {
                         </div>
                         <div className="form-group-v2">
                             <label>SMTP Password</label>
-                            <input type="password" name="smtpPass" className="input-premium" defaultValue={(settings as any)?.smtpPass || ""} />
+                            <input type="password" name="smtpPass" className="input-premium" defaultValue="" placeholder={(settings as any)?.hasSmtpPass ? "Leave blank to keep current password" : ""} />
                         </div>
                         
                         <div className="form-group-v2" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
