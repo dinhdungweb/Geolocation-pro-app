@@ -200,6 +200,41 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
 }
 
 /**
+ * Query the REAL active plan from Shopify API for a shop.
+ * Returns the plan name (e.g., "premium", "plus", "elite") or FREE_PLAN if no subscription.
+ * Returns null if unable to determine (session error, API failure, etc.)
+ */
+export async function getShopActivePlan(shop: string): Promise<string | null> {
+    try {
+        const context = await unauthenticated.admin(shop);
+        const admin = context.admin;
+        if (!admin) return null;
+
+        const subResponse = await admin.graphql(`
+            #graphql
+            query {
+                currentAppInstallation {
+                    activeSubscriptions {
+                        name
+                        status
+                    }
+                }
+            }
+        `);
+
+        const subData = await subResponse.json();
+        const activeSubscriptions = subData?.data?.currentAppInstallation?.activeSubscriptions;
+
+        if (!activeSubscriptions || activeSubscriptions.length === 0) return FREE_PLAN;
+
+        return activeSubscriptions[0].name || FREE_PLAN;
+    } catch (error: any) {
+        // Session not found, shop deleted, etc. - return null to signal "use fallback"
+        return null;
+    }
+}
+
+/**
  * Background Auto-Billing: Check and charge overage for a shop via GraphQL Admin API.
  * This is designed to be called by a cron job without an active HTTP request session.
  */

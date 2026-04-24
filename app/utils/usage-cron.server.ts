@@ -3,7 +3,7 @@ import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml } from './email-templates';
 import { PLAN_LIMITS, FREE_PLAN } from '../billing.config';
-import { checkAndChargeOverageBackground } from './billing.server';
+import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 
 /**
  * Checks usage for all shops and sends warning emails if needed.
@@ -23,7 +23,29 @@ export async function checkAllShopsUsage() {
 
     for (const settings of allSettings) {
         const shop = settings.shop;
-        const currentPlan = settings.currentPlan || FREE_PLAN;
+        let currentPlan = settings.currentPlan || FREE_PLAN;
+
+        // For paid shops: query Shopify API for the REAL active plan to avoid stale DB data
+        if (currentPlan !== FREE_PLAN) {
+            const actualPlan = await getShopActivePlan(shop);
+            if (actualPlan !== null && actualPlan !== currentPlan) {
+                console.log(`[Cron] Plan sync for ${shop}: DB="${currentPlan}" → Shopify="${actualPlan}"`);
+                currentPlan = actualPlan;
+                // Sync corrected plan back to DB so proxy.config uses the right limit
+                try {
+                    await prisma.settings.update({
+                        where: { shop },
+                        data: { currentPlan: actualPlan },
+                    });
+                } catch (err) {
+                    console.error(`[Cron] Failed to sync plan for ${shop}:`, err);
+                }
+            } else if (actualPlan !== null) {
+                currentPlan = actualPlan; // Use Shopify's value even if same, to be safe
+            }
+            // If actualPlan is null (API failed), fall back to DB value
+        }
+
         const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
 
         // Get monthly usage
