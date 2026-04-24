@@ -4,20 +4,21 @@
   the returned action and reports signed analytics events.
 {% endcomment %}
 
-{% if block.settings.enabled %}
 <div id="geolocation-app-container" style="display: none;"></div>
 
 <script>
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-04-24-cookie-popup-only';
+  const SCRIPT_VERSION = '2026-04-24-theme-debug';
+  const THEME_BLOCK_ENABLED = {{ block.settings.enabled | json }};
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
     proxyUrl: '/apps/geolocation/config',
     analyticsUrl: '/apps/geolocation/analytics?shop={{ shop.permanent_domain }}',
-    visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
+    visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}',
+    themeBlockEnabled: THEME_BLOCK_ENABLED
   };
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -266,6 +267,10 @@
   const init = async () => {
     if (window.Shopify && window.Shopify.designMode) return;
     if (window.location.search.includes('preview_theme_id') || window.location.pathname.includes('/editor')) return;
+    if (!THEME_BLOCK_ENABLED) {
+      log('Theme block is disabled');
+      return;
+    }
 
     let config;
     try {
@@ -314,6 +319,7 @@
 
   window.GeolocationDebug = {
     version: SCRIPT_VERSION,
+    themeBlockEnabled: THEME_BLOCK_ENABLED,
     clearPreference: () => {
       CookieManager.remove('geo_choice');
       console.log('Cleared geolocation preference. Refresh the page to test again.');
@@ -329,7 +335,6 @@
   }
 })();
 </script>
-{% endif %}
 
 {% schema %}
 {
