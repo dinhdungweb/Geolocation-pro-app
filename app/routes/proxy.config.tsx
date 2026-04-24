@@ -72,6 +72,11 @@ function isLocalOrUnknownIP(ip: string) {
   return ip === "0.0.0.0" || ip === "127.0.0.1" || ip === "::1";
 }
 
+function normalizeCountryCode(country: string | null) {
+  const normalized = country?.trim().toUpperCase() || "";
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : "";
+}
+
 function isIPMatch(visitorIP: string, ipPattern: string) {
   if (!visitorIP || !ipPattern) return false;
 
@@ -359,6 +364,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const currentPath = url.searchParams.get("path") || "/";
+  const shopifyCountryCode = normalizeCountryCode(url.searchParams.get("country"));
 
   if (!shop) {
     return json({ error: "Missing shop parameter", enabled: false, action: "none" }, { status: 400, headers: corsHeaders });
@@ -372,12 +378,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const visitorIP = getVisitorIP(request);
   const ipHash = hashIP(visitorIP);
-  let countryCode = "";
+  let countryCode = shopifyCountryCode;
 
-  try {
-    countryCode = await getCountryFromIP(visitorIP);
-  } catch (error: any) {
-    console.error(`[Proxy] MaxMind lookup error:`, error.message);
+  if (!countryCode) {
+    try {
+      countryCode = await getCountryFromIP(visitorIP);
+    } catch (error: any) {
+      console.error(`[Proxy] MaxMind lookup error:`, error.message);
+    }
+  }
+
+  if (process.env.GEO_DEBUG_IP === "true") {
+    console.log("[Proxy IP Debug]", {
+      countryCode,
+      forwardedFor: request.headers.get("x-forwarded-for"),
+      shopifyClientIp: request.headers.get("x-shopify-client-ip"),
+      shopifyCountryCode,
+      visitorIP,
+    });
   }
 
   try {

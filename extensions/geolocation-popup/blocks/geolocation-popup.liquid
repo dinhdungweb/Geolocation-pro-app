@@ -50,7 +50,7 @@
   };
 
   const fetchConfig = async () => {
-    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}`;
+    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}`;
     const response = await fetch(apiUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
