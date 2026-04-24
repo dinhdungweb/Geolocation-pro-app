@@ -323,6 +323,7 @@ function buildActionResponse({
   countryCode,
   currentPath,
   currentPlan,
+  debug,
   eventToken,
   limitExceeded = false,
   planLimit,
@@ -336,6 +337,7 @@ function buildActionResponse({
   countryCode: string;
   currentPath: string;
   currentPlan: string;
+  debug?: Record<string, string | null>;
   eventToken: string | null;
   limitExceeded?: boolean;
   planLimit: number;
@@ -351,6 +353,7 @@ function buildActionResponse({
     countryCode,
     currentPath,
     currentPlan,
+    ...(debug ? { debug } : {}),
     eventToken,
     limitExceeded,
     planLimit,
@@ -365,6 +368,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = url.searchParams.get("shop");
   const currentPath = url.searchParams.get("path") || "/";
   const shopifyCountryCode = normalizeCountryCode(url.searchParams.get("country"));
+  const debugRequested = url.searchParams.get("debug") === "true" || url.searchParams.get("geo_debug") === "true";
 
   if (!shop) {
     return json({ error: "Missing shop parameter", enabled: false, action: "none" }, { status: 400, headers: corsHeaders });
@@ -378,20 +382,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const visitorIP = getVisitorIP(request);
   const ipHash = hashIP(visitorIP);
+  let maxmindCountryCode = "";
   let countryCode = "";
 
   try {
-    countryCode = await getCountryFromIP(visitorIP);
+    maxmindCountryCode = await getCountryFromIP(visitorIP);
+    countryCode = maxmindCountryCode;
   } catch (error: any) {
     console.error(`[Proxy] MaxMind lookup error:`, error.message);
   }
 
   if (!countryCode) countryCode = shopifyCountryCode;
+  const debug = debugRequested
+    ? {
+        cfConnectingIp: request.headers.get("cf-connecting-ip"),
+        countryCode,
+        forwardedFor: request.headers.get("x-forwarded-for"),
+        maxmindCountryCode,
+        realIp: request.headers.get("x-real-ip"),
+        shopifyClientIp: request.headers.get("x-shopify-client-ip"),
+        shopifyCountryCode,
+        visitorIP,
+      }
+    : undefined;
 
   if (process.env.GEO_DEBUG_IP === "true") {
-    console.log("[Proxy IP Debug]", {
+    console.log("[Proxy IP Debug]", debug ?? {
       countryCode,
       forwardedFor: request.headers.get("x-forwarded-for"),
+      maxmindCountryCode,
       shopifyClientIp: request.headers.get("x-shopify-client-ip"),
       shopifyCountryCode,
       visitorIP,
@@ -422,6 +441,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           countryCode,
           currentPath,
           currentPlan,
+          debug,
           eventToken: null,
           planLimit,
           popup,
@@ -441,6 +461,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           countryCode,
           currentPath,
           currentPlan,
+          debug,
           eventToken: null,
           limitExceeded: true,
           planLimit,
@@ -461,6 +482,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           countryCode,
           currentPath,
           currentPlan,
+          debug,
           eventToken: null,
           planLimit,
           popup,
@@ -486,6 +508,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           countryCode,
           currentPath,
           currentPlan,
+          debug,
           eventToken: null,
           planLimit,
           popup,
@@ -613,6 +636,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         countryCode,
         currentPath,
         currentPlan,
+        debug,
         eventToken,
         planLimit,
         popup,
