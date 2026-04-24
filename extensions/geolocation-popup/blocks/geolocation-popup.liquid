@@ -307,7 +307,7 @@
     if (config.action === 'auto_redirect') {
       CookieManager.remove('geo_choice');
       trackEvent(config.analyticsEvent || 'auto_redirected', config);
-      window.location.replace(rule.targetUrl);
+      window.location.href = rule.targetUrl;
       return;
     }
 
