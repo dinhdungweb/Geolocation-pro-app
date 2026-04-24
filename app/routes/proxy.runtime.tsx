@@ -1,10 +1,14 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { authenticate } from "../shopify.server";
 
 const RUNTIME_VERSION = "2026-04-24-runtime-enforcer";
 
-const runtimeHeaders = {
+const noStoreHeaders = {
   "Content-Type": "application/javascript; charset=utf-8",
-  "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+  "Surrogate-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
 };
 
@@ -330,11 +334,20 @@ const runtimeScript = `
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method !== "GET") {
-    return new Response("", { status: 405, headers: runtimeHeaders });
+    return new Response("", { status: 405, headers: noStoreHeaders });
+  }
+
+  try {
+    await authenticate.public.appProxy(request);
+  } catch {
+    return new Response("console.warn('[Geolocation] Runtime request was not authorized.');", {
+      status: 200,
+      headers: noStoreHeaders,
+    });
   }
 
   return new Response(runtimeScript, {
     status: 200,
-    headers: runtimeHeaders,
+    headers: noStoreHeaders,
   });
 };
