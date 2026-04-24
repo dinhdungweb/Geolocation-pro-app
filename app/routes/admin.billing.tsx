@@ -380,7 +380,7 @@ export default function AdminBilling() {
                                             <td>
                                                 <span className={`plan-tag ${s.plan}`}>{s.plan}</span>
                                             </td>
-                                            <td className="mono">{s.limit.toLocaleString()}</td>
+                                            <td className="mono text-right">{s.limit.toLocaleString()}</td>
                                             <td className="mono text-right">
                                                 <b>{s.totalVisitors.toLocaleString()}</b>
                                                 {s.prevTotal > 0 && (
