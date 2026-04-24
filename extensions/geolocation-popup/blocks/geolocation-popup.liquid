@@ -53,8 +53,12 @@
   };
 
   const fetchConfig = async () => {
-    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}${DEBUG ? '&debug=true' : ''}`;
-    const response = await fetch(apiUrl);
+    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}&_geo_ts=${Date.now()}${DEBUG ? '&debug=true' : ''}`;
+    const response = await fetch(apiUrl, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   };
@@ -303,7 +307,7 @@
     if (config.action === 'auto_redirect') {
       CookieManager.remove('geo_choice');
       trackEvent(config.analyticsEvent || 'auto_redirected', config);
-      window.location.href = rule.targetUrl;
+      window.location.replace(rule.targetUrl);
       return;
     }
 
@@ -333,6 +337,10 @@
   } else {
     init();
   }
+
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) init();
+  });
 })();
 </script>
 
