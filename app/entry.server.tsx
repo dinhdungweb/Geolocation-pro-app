@@ -10,12 +10,27 @@ import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
+let backgroundJobsStarted = false;
+
+function startBackgroundJobs() {
+  if (backgroundJobsStarted || process.env.NODE_ENV === "test") return;
+
+  backgroundJobsStarted = true;
+  import("./utils/usage-cron.server")
+    .then(({ initUsageCron }) => initUsageCron())
+    .catch((error) => {
+      backgroundJobsStarted = false;
+      console.error("[Runtime] Failed to initialize background jobs:", error);
+    });
+}
+
 export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
+  startBackgroundJobs();
   addDocumentResponseHeaders(request, responseHeaders);
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')

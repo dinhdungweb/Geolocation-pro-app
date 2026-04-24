@@ -10,6 +10,20 @@ const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
 const MAX_ATTEMPTS = 5;
 const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+function assertAdminEnvConfigured() {
+    if (process.env.NODE_ENV !== "production") return;
+
+    const missing = [
+        ["ADMIN_SESSION_SECRET", process.env.ADMIN_SESSION_SECRET],
+        ["ADMIN_USERNAME", process.env.ADMIN_USERNAME],
+        ["ADMIN_PASSWORD", process.env.ADMIN_PASSWORD],
+    ].filter(([, value]) => !value);
+
+    if (missing.length > 0) {
+        throw new Error(`Missing required admin environment variables: ${missing.map(([key]) => key).join(", ")}`);
+    }
+}
+
 export const adminSessionStorage = createCookieSessionStorage({
     cookie: {
         name: "__geo_admin_session",
@@ -23,10 +37,12 @@ export const adminSessionStorage = createCookieSessionStorage({
 });
 
 export async function getAdminSession(request: Request) {
+    assertAdminEnvConfigured();
     return adminSessionStorage.getSession(request.headers.get("Cookie"));
 }
 
 export async function requireAdminAuth(request: Request) {
+    assertAdminEnvConfigured();
     const session = await getAdminSession(request);
     const isLoggedIn = session.get("admin_logged_in");
     if (!isLoggedIn) {
@@ -74,6 +90,7 @@ export function clearAttempts(ip: string): void {
 }
 
 export function validateCredentials(username: string, password: string): boolean {
+    assertAdminEnvConfigured();
     return username === ADMIN_USERNAME && password === ADMIN_PASSWORD;
 }
 

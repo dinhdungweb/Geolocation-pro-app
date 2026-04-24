@@ -93,6 +93,24 @@ interface RedirectRule {
     pagePaths: string | null;
 }
 
+function normalizeOption(value: string | null, allowed: string[], fallback: string) {
+    return value && allowed.includes(value) ? value : fallback;
+}
+
+function validateUrl(url: string) {
+    if (!url) return true; // Empty is OK (for block rules)
+    const dangerous = /^(javascript|data|vbscript):/i;
+    return !dangerous.test(url.trim());
+}
+
+function isPaidBillingConfig(billingConfig: any) {
+    return billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+}
+
+function isFreePlanFeatureRequest(ruleType: string, pageTargetingType: string) {
+    return ruleType === "block" || pageTargetingType !== "all";
+}
+
 // Loader: Fetch all rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, billing } = await authenticate.admin(request);
@@ -124,13 +142,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const intent = formData.get("intent") as string;
 
     try {
-        // Validate targetUrl to prevent XSS
-        const validateUrl = (url: string) => {
-            if (!url) return true; // Empty is OK (for block rules)
-            const dangerous = /^(javascript|data|vbscript):/i;
-            if (dangerous.test(url.trim())) return false;
-            return true;
-        };
+        const billingConfig = await billing.check({
+            plans: ALL_PAID_PLANS as any,
+            isTest: false,
+        });
+        const hasProPlan = isPaidBillingConfig(billingConfig);
 
         if (intent === "create") {
             const name = formData.get("name") as string;
@@ -140,15 +156,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return json({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
-            const ruleType = formData.get("ruleType") as string || "redirect";
-            const redirectMode = formData.get("redirectMode") as string || "popup";
+            const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
+            const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
             const daysOfWeek = formData.get("daysOfWeek") as string;
             const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
-            const pageTargetingType = formData.get("pageTargetingType") as string || "all";
+            const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = formData.get("pagePaths") as string || "";
+
+            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType)) {
+                return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
+            }
  
             await (prisma as any).redirectRule.create({
                 data: {
@@ -182,15 +202,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return json({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
-            const ruleType = formData.get("ruleType") as string || "redirect";
-            const redirectMode = formData.get("redirectMode") as string || "popup";
+            const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
+            const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
             const daysOfWeek = formData.get("daysOfWeek") as string;
             const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
-            const pageTargetingType = formData.get("pageTargetingType") as string || "all";
+            const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = formData.get("pagePaths") as string || "";
+
+            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType)) {
+                return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
+            }
 
             await prisma.redirectRule.update({
                 where: { id, shop },
@@ -217,6 +241,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const id = formData.get("id") as string;
             const isActive = formData.get("isActive") === "true";
 
+            if (!hasProPlan && !isActive) {
+                const rule = await prisma.redirectRule.findFirst({
+                    where: { id, shop, matchType: "country" },
+                    select: { ruleType: true, pageTargetingType: true },
+                });
+                if (rule && isFreePlanFeatureRequest(rule.ruleType, rule.pageTargetingType || "all")) {
+                    return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
+                }
+            }
+
             await prisma.redirectRule.update({
                 where: { id, shop },
                 data: { isActive: !isActive },
@@ -234,11 +268,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (intent === "import") {
             // Server-side plan check: Pro (Premium), Plus and Elite can import
-            const billingConfig = await billing.check({
-                plans: ALL_PAID_PLANS as any,
-                isTest: false,
-            });
-            const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
             if (!hasProPlan) {
                 return json({ success: false, message: "Import is only available on Pro plan and above" }, { status: 403 });
             }
@@ -271,15 +300,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         targetUrl: rule.targetUrl || "",
                         priority: parseInt(rule.priority) || 0,
                         isActive: rule.isActive !== false,
-                        ruleType: rule.ruleType || "redirect",
-                        redirectMode: rule.redirectMode || "popup",
+                        ruleType: normalizeOption(rule.ruleType, ["redirect", "block"], "redirect"),
+                        redirectMode: normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
                         matchType: "country",
                         scheduleEnabled: rule.scheduleEnabled || false,
                         startTime: rule.startTime || null,
                         endTime: rule.endTime || null,
                         daysOfWeek: rule.daysOfWeek || null,
                         timezone: rule.timezone || null,
-                        pageTargetingType: rule.pageTargetingType || "all",
+                        pageTargetingType: normalizeOption(rule.pageTargetingType, ["all", "include", "exclude"], "all"),
                         pagePaths: rule.pagePaths || null,
                     } as any,
                 });

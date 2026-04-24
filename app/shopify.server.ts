@@ -11,7 +11,6 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 
 import { PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN } from "./billing.config";
-import { initUsageCron } from "./utils/usage-cron.server";
 import { sendAdminEmail, hasSentEmail } from "./utils/email.server";
 import { getWelcomeEmailHtml } from "./utils/email-templates";
 
@@ -138,8 +137,3 @@ export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;
-
-// Initialize Automated Usage Monitoring
-if (process.env.NODE_ENV !== "test") {
-  initUsageCron();
-}

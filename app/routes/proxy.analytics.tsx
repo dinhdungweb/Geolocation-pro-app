@@ -4,6 +4,18 @@ import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { cleanupOldLogs } from "../utils/cleanup.server";
 
+function getVisitorIP(request: Request): string {
+    return (
+        request.headers.get("x-shopify-client-ip") ||
+        request.headers.get("cf-connecting-ip") ||
+        request.headers.get("x-real-ip") ||
+        request.headers.get("true-client-ip") ||
+        request.headers.get("x-client-ip") ||
+        request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+        "0.0.0.0"
+    );
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
     // Lazy cleanup: ensure old logs are deleted even if admin doesn't visit the app
     // This runs at most once per day due to internal logic in cleanupOldLogs
@@ -26,8 +38,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
+        await authenticate.public.appProxy(request);
+    } catch (error) {
+        return json({ error: "Unauthorized: Invalid signature" }, { status: 401, headers: corsHeaders });
+    }
+
+    try {
         const url = new URL(request.url);
         const shop = url.searchParams.get("shop");
+        const visitorIP = getVisitorIP(request);
 
         // Safely parse JSON body (may be empty from sendBeacon edge cases)
         let data;
@@ -35,15 +54,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const text = await request.text();
             if (!text || text.trim() === '') {
                 console.log('[Analytics] Empty request body received');
-                return json({ error: "Empty body" }, { status: 400 });
+                return json({ error: "Empty body" }, { status: 400, headers: corsHeaders });
             }
             data = JSON.parse(text);
         } catch (parseError) {
             console.error('[Analytics] JSON parse error:', parseError);
-            return json({ error: "Invalid JSON" }, { status: 400 });
+            return json({ error: "Invalid JSON" }, { status: 400, headers: corsHeaders });
         }
 
-        const { type, countryCode, ruleId, ruleName, visitorIP, path } = data;
+        const { type, countryCode, ruleId, ruleName, path } = data;
 
         if (!shop || !type) {
             console.log(`[Analytics] Missing required fields: shop=${shop}, type=${type}`);
@@ -64,7 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Validate event type against whitelist
         const VALID_TYPES = ['visit', 'popup_shown', 'redirected', 'auto_redirected', 'blocked', 'ip_redirected', 'ip_blocked', 'clicked_no', 'dismissed', 'vpn_blocked'];
         if (!VALID_TYPES.includes(type)) {
-            return json({ error: "Invalid event type" }, { status: 400 });
+            return json({ error: "Invalid event type" }, { status: 400, headers: corsHeaders });
         }
 
         // 0. Save Detailed Visitor Log
@@ -215,10 +234,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
         }
 
-        return json({ success: true });
+        return json({ success: true }, { headers: corsHeaders });
     } catch (error) {
         console.error("Analytics Error:", error);
-        return json({ error: "Internal Server Error" }, { status: 500 });
+        return json({ error: "Internal Server Error" }, { status: 500, headers: corsHeaders });
     }
 };
 

@@ -61,6 +61,10 @@ const defaultSettings: Omit<Settings, "id"> = {
     blockVpn: false,
 };
 
+function normalizeOption(value: string | null, allowed: string[], fallback: string) {
+    return value && allowed.includes(value) ? value : fallback;
+}
+
 // Loader: Fetch settings for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, billing } = await authenticate.admin(request);
@@ -95,13 +99,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // Action: Update settings
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const formData = await request.formData();
 
     try {
+        const billingCheck = await billing.check({
+            plans: ALL_PAID_PLANS as any,
+            isTest: false,
+        });
+        const activeSubscription = billingCheck.appSubscriptions[0];
+        const currentPlan = activeSubscription ? activeSubscription.name : FREE_PLAN;
+        const isFreePlan = currentPlan === FREE_PLAN;
+
         const isEnabled = formData.get("isEnabled") === "true";
-        const mode = formData.get("mode") as string || "popup";
+        const mode = normalizeOption(formData.get("mode") as string | null, ["popup", "auto_redirect", "disabled"], "popup");
         const popupTitle = formData.get("popupTitle") as string;
         const popupMessage = formData.get("popupMessage") as string;
         const confirmBtnText = formData.get("confirmBtnText") as string;
@@ -114,14 +126,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const cookieDuration = parseInt(formData.get("cookieDuration") as string) || 7;
         const blockedTitle = formData.get("blockedTitle") as string;
         const blockedMessage = formData.get("blockedMessage") as string;
-        const template = formData.get("template") as string || "modal";
-        const blockVpn = formData.get("blockVpn") === "true";
+        const template = normalizeOption(formData.get("template") as string | null, ["modal", "top_bar", "bottom_bar"], "modal");
+        const blockVpn = !isFreePlan && formData.get("blockVpn") === "true";
 
         await prisma.settings.upsert({
             where: { shop },
             update: {
                 isEnabled,
                 mode,
+                template,
                 popupTitle,
                 popupMessage,
                 confirmBtnText,
