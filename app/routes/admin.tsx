@@ -48,6 +48,7 @@ export default function AdminLayout() {
     const menuItems = [
         { label: "Dashboard", to: "/admin", icon: <Home size={18} />, end: true },
         { label: "Shops", to: "/admin/shops", icon: <Store size={18} /> },
+        { label: "Billing", to: "/admin/billing", icon: <Activity size={18} /> },
         { label: "Campaigns", to: "/admin/campaigns", icon: <Rocket size={18} /> },
         { 
             label: "Messaging", 
