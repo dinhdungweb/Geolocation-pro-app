@@ -88,8 +88,8 @@ export async function checkAllShopsUsage() {
         }
 
         // 3. Auto-bill any accumulated overage in the background
-        // Skip Free plan shops and shops that reached the 70k hard limit
-        if (currentPlan !== FREE_PLAN && currentUsage < 70000) {
+        // Skip Free plan shops - they have no subscription, so billing API calls would be wasted
+        if (currentPlan !== FREE_PLAN) {
             await checkAndChargeOverageBackground(shop);
         }
     }

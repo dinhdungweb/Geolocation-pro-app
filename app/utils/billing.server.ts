@@ -293,16 +293,20 @@ export async function checkAndChargeOverageBackground(shop: string) {
         const currentUsage = monthlyUsage?.totalVisitors || 0;
         const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
-        // Hard cap at visitors as per requirement
-        if (currentUsage >= OVERAGE_HARD_LIMIT) {
-            console.log(`[Billing] Shop ${shop} reached hard limit of ${OVERAGE_HARD_LIMIT} visitors. Overage charging halted.`);
-            return;
+        // Calculate usage capped at the hard limit (e.g., 70,000)
+        // This ensures we charge for all visitors UP TO the limit, but not beyond.
+        const effectiveUsage = Math.min(currentUsage, OVERAGE_HARD_LIMIT);
+
+        if (effectiveUsage <= planLimit) return; // Within limits (or no overage yet)
+
+        const overageVisitors = effectiveUsage - planLimit - chargedVisitors;
+        
+        if (overageVisitors <= 0) {
+            if (currentUsage >= OVERAGE_HARD_LIMIT) {
+                console.log(`[Billing] Shop ${shop} reached hard limit of ${OVERAGE_HARD_LIMIT}. Overage charging completed.`);
+            }
+            return; 
         }
-
-        if (currentUsage <= planLimit) return; // Within limits
-
-        const overageVisitors = currentUsage - planLimit - chargedVisitors;
-        if (overageVisitors <= 0) return; // Already charged
 
         const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
         
