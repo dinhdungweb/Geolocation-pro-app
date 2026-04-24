@@ -22,7 +22,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN } from "../billing.config";
-import { checkAndChargeOverage } from "../utils/billing.server";
+// checkAndChargeOverage is called in the parent layout (app.tsx), not here
 import prisma from "../db.server";
 import { COUNTRY_MAP, getCountryFlag } from "../utils/countries";
 import { sendAdminEmail, hasSentEmail } from "../utils/email.server";
@@ -109,8 +109,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const currentUsage = monthlyUsage?.totalVisitors || 0;
   const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
-  // Calculate and charge overage if applicable (only for paid plans)
-  await checkAndChargeOverage(shop, billing, isTest);
+  // Overage charging is handled by the parent layout (app.tsx) on every page load.
+  // Do NOT call checkAndChargeOverage() here to avoid double-charging race conditions.
 
   // --------------------------------
 

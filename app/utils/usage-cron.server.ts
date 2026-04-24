@@ -64,7 +64,10 @@ export async function checkAllShopsUsage() {
         }
 
         // 3. Auto-bill any accumulated overage in the background
-        await checkAndChargeOverageBackground(shop);
+        // Skip Free plan shops - they have no subscription, so billing API calls would be wasted
+        if (currentPlan !== FREE_PLAN) {
+            await checkAndChargeOverageBackground(shop);
+        }
     }
     
     console.log('[Cron] Usage check completed.');

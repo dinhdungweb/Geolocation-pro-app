@@ -49,7 +49,8 @@ export async function checkAndChargeOverage(
         // Reserve the charge by updating the database FIRST using optimistic locking
         const updateResult = await (prisma as any).monthlyUsage.updateMany({
             where: { 
-                shop_yearMonth: { shop, yearMonth },
+                shop,
+                yearMonth,
                 chargedVisitors: chargedVisitors // Optimistic lock: ensure no one else modified it
             },
             data: {
@@ -87,7 +88,7 @@ export async function checkAndChargeOverage(
             // For other errors (like network failures), rollback the DB reservation so we can try again later.
             console.log(`[Billing] Rolling back DB reservation for ${shop}`);
             await (prisma as any).monthlyUsage.updateMany({
-                where: { shop_yearMonth: { shop, yearMonth } },
+                where: { shop, yearMonth },
                 data: {
                     chargedVisitors: chargedVisitors // Revert back to the original value
                 }
@@ -270,7 +271,8 @@ export async function checkAndChargeOverageBackground(shop: string) {
         // Reserve the charge by updating the database FIRST using optimistic locking
         const updateResult = await (prisma as any).monthlyUsage.updateMany({
             where: { 
-                shop_yearMonth: { shop, yearMonth },
+                shop,
+                yearMonth,
                 chargedVisitors: chargedVisitors
             },
             data: {
@@ -302,7 +304,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
                 variables: {
                     description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
                     price: {
-                        amount: chargeAmount,
+                        amount: chargeAmount.toFixed(2),
                         currencyCode: "USD"
                     },
                     subscriptionLineItemId: usageLineItem.id
@@ -330,7 +332,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
             // Rollback the DB reservation on network/temporary errors
             console.log(`[Cron Billing] Rolling back DB reservation for ${shop}`);
             await (prisma as any).monthlyUsage.updateMany({
-                where: { shop_yearMonth: { shop, yearMonth } },
+                where: { shop, yearMonth },
                 data: {
                     chargedVisitors: chargedVisitors
                 }

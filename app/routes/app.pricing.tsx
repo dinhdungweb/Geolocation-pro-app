@@ -74,20 +74,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 if (monthlyUsage) {
                     const overageVisitors = monthlyUsage.totalVisitors - planLimit - monthlyUsage.chargedVisitors;
                     if (overageVisitors > 0) {
-                        const chargeAmount = overageVisitors * OVERAGE_RATE;
-                        try {
-                            await billing.createUsageRecord({
-                                description: `Final overage before downgrade: ${overageVisitors} visitors beyond ${planLimit} limit`,
-                                price: { amount: chargeAmount, currencyCode: "USD" },
-                                isTest,
-                            });
-                            await (prisma as any).monthlyUsage.update({
-                                where: { shop_yearMonth: { shop, yearMonth } },
-                                data: { chargedVisitors: { increment: overageVisitors } },
-                            });
-                            console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
-                        } catch (error) {
-                            console.error("[Billing] Failed to charge final overage:", error);
+                        const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+                        // Skip if charge amount is too small (< $0.50) to avoid Shopify API issues
+                        if (chargeAmount >= 0.50) {
+                            try {
+                                await billing.createUsageRecord({
+                                    description: `Final overage before downgrade: ${overageVisitors} visitors beyond ${planLimit} limit`,
+                                    price: { amount: chargeAmount, currencyCode: "USD" },
+                                    isTest,
+                                });
+                                await (prisma as any).monthlyUsage.update({
+                                    where: { shop_yearMonth: { shop, yearMonth } },
+                                    data: { chargedVisitors: { increment: overageVisitors } },
+                                });
+                                console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
+                            } catch (error) {
+                                console.error("[Billing] Failed to charge final overage:", error);
+                            }
+                        } else {
+                            console.log(`[Billing] Skipping final overage for ${shop}: $${chargeAmount.toFixed(2)} below minimum threshold`);
                         }
                     }
                 }

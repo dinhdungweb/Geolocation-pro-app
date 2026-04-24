@@ -13,7 +13,7 @@ import { cleanupOldLogs } from "../utils/cleanup.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, billing, admin } = await authenticate.admin(request);
   const isTest = false;
 
   // Check and charge overage on every admin page load
@@ -23,7 +23,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   cleanupOldLogs().catch(() => { });
 
   // Lấy thông tin shop để hiển thị trong Crisp
-  const { admin } = await authenticate.admin(request);
   const response = await admin.graphql(`
     #graphql
     query getShopInfo {
