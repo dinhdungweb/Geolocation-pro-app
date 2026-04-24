@@ -103,8 +103,12 @@
   const alreadyOnTarget = (targetUrl) => {
     if (!targetUrl) return true;
     try {
-      const target = new URL(targetUrl, window.location.origin);
-      return window.location.href === target.href || window.location.pathname === target.pathname;
+      const current = new URL(window.location.href);
+      const target = new URL(targetUrl, current.origin);
+      if (current.origin !== target.origin) return false;
+
+      const normalizePath = (path) => path.replace(/\/+$/, '') || '/';
+      return normalizePath(current.pathname) === normalizePath(target.pathname);
     } catch {
       return window.location.href.includes(targetUrl);
     }
