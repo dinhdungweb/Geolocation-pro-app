@@ -11,6 +11,7 @@ import {
   type AnalyticsTokenPayload,
 } from "../utils/analytics-token.server";
 import { cleanupOldLogs } from "../utils/cleanup.server";
+import { getVisitorIP } from "../utils/request-ip.server";
 
 const MAX_BODY_BYTES = 8 * 1024;
 const VALID_TYPES = [
@@ -31,18 +32,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
-
-function getVisitorIP(request: Request): string {
-  return (
-    request.headers.get("x-shopify-client-ip") ||
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("true-client-ip") ||
-    request.headers.get("x-client-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-    "0.0.0.0"
-  );
-}
 
 function asSafeString(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.slice(0, maxLength) : "";

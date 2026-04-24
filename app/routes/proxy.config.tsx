@@ -12,6 +12,7 @@ import {
   type StorefrontAction,
 } from "../utils/analytics-token.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
+import { getVisitorIP } from "../utils/request-ip.server";
 
 type ProxyRule = {
   id: string;
@@ -66,18 +67,6 @@ function vpnCacheSet(key: string, value: { blocked: boolean; expiresAt: number }
   vpnCache.set(key, value);
 }
 
-
-function getVisitorIP(request: Request): string {
-  return (
-    request.headers.get("x-shopify-client-ip") ||
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("true-client-ip") ||
-    request.headers.get("x-client-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-    "0.0.0.0"
-  );
-}
 
 function isLocalOrUnknownIP(ip: string) {
   return ip === "0.0.0.0" || ip === "127.0.0.1" || ip === "::1";
