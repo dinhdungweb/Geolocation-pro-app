@@ -114,11 +114,11 @@ export default function AdminBilling() {
     }, [shops, searchQuery, statusFilter, planFilter]);
 
     const statusConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
-        ok: { label: '✅ OK', color: '#10b981', bg: '#ecfdf5', border: '#a7f3d0' },
-        waiting: { label: '⏳ < $1.00', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-        pending: { label: '⚠️ Pending', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
-        overcharged: { label: '🔴 Overcharged', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
-        free_exceeded: { label: '🚫 Free Exceeded', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
+        ok: { label: 'OK', color: '#10b981', bg: '#ecfdf5', border: '#a7f3d0' },
+        waiting: { label: 'Waiting (< $1)', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+        pending: { label: 'Pending Charge', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
+        overcharged: { label: 'Overcharged', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
+        free_exceeded: { label: 'Free Exceeded', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
     };
 
     return (
@@ -160,11 +160,15 @@ export default function AdminBilling() {
                 .stat-value { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
 
                 .billing-toolbar {
-                    display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center;
+                    display: grid;
+                    grid-template-columns: 1fr auto auto auto;
+                    gap: 12px;
+                    margin-bottom: 24px;
+                    align-items: center;
                 }
                 .billing-search {
                     background: white; border: 1px solid var(--border); border-radius: 12px;
-                    padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;
+                    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
                     transition: all 0.2s;
                 }
                 .billing-search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1); }
@@ -173,7 +177,7 @@ export default function AdminBilling() {
                 .b-filter {
                     appearance: none; background: white; border: 1px solid var(--border);
                     border-radius: 12px; padding: 12px 36px 12px 16px; font-size: 13px; font-weight: 600;
-                    cursor: pointer; color: var(--text);
+                    cursor: pointer; color: var(--text); min-width: 140px;
                     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
                     background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
                 }
@@ -236,10 +240,20 @@ export default function AdminBilling() {
                     color: var(--text); margin-bottom: 24px;
                 }
 
+                @media (max-width: 1024px) {
+                    .billing-toolbar {
+                        grid-template-columns: 1fr 1fr;
+                    }
+                    .billing-search { grid-column: span 2; }
+                }
+
                 @media (max-width: 768px) {
                     .billing-cards { grid-template-columns: repeat(2, 1fr); }
-                    .billing-toolbar { flex-direction: column; }
-                    .billing-search { min-width: 100%; }
+                    .billing-toolbar { 
+                        grid-template-columns: 1fr;
+                    }
+                    .billing-search { grid-column: span 1; }
+                    .shops-count { text-align: left !important; margin-top: 8px; }
                 }
             `}</style>
 
@@ -300,11 +314,11 @@ export default function AdminBilling() {
                 </div>
                 <select className="b-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                     <option value="all">All Status</option>
-                    <option value="ok">✅ OK</option>
-                    <option value="waiting">⏳ Waiting (&lt; $1)</option>
-                    <option value="pending">⚠️ Pending</option>
-                    <option value="overcharged">🔴 Overcharged</option>
-                    <option value="free_exceeded">🚫 Free Exceeded</option>
+                    <option value="ok">OK</option>
+                    <option value="waiting">Waiting (&lt; $1)</option>
+                    <option value="pending">Pending Charge</option>
+                    <option value="overcharged">Overcharged</option>
+                    <option value="free_exceeded">Free Exceeded</option>
                 </select>
                 <select className="b-filter" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
                     <option value="all">All Plans</option>
@@ -318,9 +332,9 @@ export default function AdminBilling() {
                         <X size={14} /> Clear
                     </button>
                 )}
-                <div style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600 }}>
-                    {filtered.length} / {(shops as any[]).length} shops
-                </div>
+            </div>
+            <div className="shops-count" style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600, marginBottom: '16px', textAlign: 'right' }}>
+                {filtered.length} / {(shops as any[]).length} shops
             </div>
 
             {/* Table */}
