@@ -390,16 +390,16 @@ function PlanCard({
                             </InlineStack>
 
                             <BlockStack gap="100">
-                                <InlineStack gap="100" blockAlign="end">
+                                <div className="pricing-price-row">
                                     <Text as="p" variant="headingXl">
                                         {isFree ? "Free" : `$${price}`}
                                     </Text>
                                     {!isFree && (
-                                        <Text as="span" variant="bodySm" tone="subdued">
+                                        <span className="pricing-plan-period">
                                             USD / month
-                                        </Text>
+                                        </span>
                                     )}
-                                </InlineStack>
+                                </div>
                                 <Text as="p" variant="bodySm" tone="subdued">
                                     {isFree
                                         ? "No monthly charge"
@@ -656,6 +656,18 @@ export default function PricingPage() {
                         gap: 16px;
                         padding: 18px 14px 16px;
                         min-height: 0;
+                    }
+                    .pricing-price-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                    }
+                    .pricing-plan-period {
+                        color: var(--p-color-text-secondary, #6d7175);
+                        font-size: 12px;
+                        line-height: 16px;
+                        font-weight: 500;
+                        transform: translateY(-2px);
                     }
                     .pricing-feature-list {
                         margin: 0;
