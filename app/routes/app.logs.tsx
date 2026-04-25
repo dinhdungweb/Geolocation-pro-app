@@ -143,14 +143,9 @@ export default function VisitorLogs() {
                     )}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
-                    <Text as="span" variant="bodyMd">
+                    <Text as="span" variant="bodyMd" truncate>
                         {log.ruleName || "-"}
                     </Text>
-                    {log.targetUrl && (
-                        <div className="visitor-log-target" title={log.targetUrl}>
-                            {log.targetUrl}
-                        </div>
-                    )}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
                     <div className="visitor-log-user-agent" title={log.userAgent || ""}>
@@ -181,7 +176,6 @@ export default function VisitorLogs() {
                         box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
                     }
                     .visitor-log-path,
-                    .visitor-log-target,
                     .visitor-log-user-agent {
                         overflow: hidden;
                         text-overflow: ellipsis;
@@ -190,11 +184,6 @@ export default function VisitorLogs() {
                     }
                     .visitor-log-path {
                         max-width: 220px;
-                        font-size: 12px;
-                    }
-                    .visitor-log-target {
-                        max-width: 260px;
-                        margin-top: 2px;
                         font-size: 12px;
                     }
                     .visitor-log-user-agent {
