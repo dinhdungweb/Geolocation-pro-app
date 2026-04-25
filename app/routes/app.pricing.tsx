@@ -300,6 +300,19 @@ export default function PricingPage() {
         submit({ plan, currentPlan }, { method: "POST" });
     };
 
+    const openLiveChat = () => {
+        if (typeof window === "undefined") return;
+
+        const crisp = (window as any).$crisp;
+        if (crisp?.push) {
+            crisp.push(["do", "chat:show"]);
+            crisp.push(["do", "chat:open"]);
+            return;
+        }
+
+        window.location.href = "/app/support";
+    };
+
     const plans = [
         {
             name: FREE_PLAN,
@@ -526,7 +539,10 @@ export default function PricingPage() {
                                             High-volume stores can request a private unlimited plan with predictable monthly billing and no overage charges.
                                         </Text>
                                     </BlockStack>
-                                    <Button url="/app/support" variant="primary">Contact support</Button>
+                                    <InlineStack gap="200" blockAlign="center">
+                                        <Button url="/app/support">Contact support</Button>
+                                        <Button variant="primary" onClick={openLiveChat}>Open live chat</Button>
+                                    </InlineStack>
                                 </InlineStack>
                             </Box>
                         </div>
