@@ -330,17 +330,83 @@ export default function AdminLayout() {
                     .btn-close-sidebar { display: block; }
 
                     .main-container { margin-left: 0; }
-                    .topbar { padding: 0 20px; height: 70px; }
-                    .btn-menu-toggle { display: flex; }
-                    .page-content { padding: 20px; }
+                    .topbar { padding: 0 12px; height: 58px; }
+                    .btn-menu-toggle { display: flex; padding: 8px; border-radius: 8px; }
+                    .global-search { display: none; }
+                    .page-content {
+                        padding: 14px 10px 24px;
+                        max-width: none;
+                        margin: 0;
+                    }
+                    .page-content > div:first-child {
+                        margin-bottom: 16px !important;
+                    }
+                    .page-content h1 {
+                        font-size: 22px !important;
+                        line-height: 1.15 !important;
+                        letter-spacing: 0 !important;
+                    }
+                    .page-content h2,
+                    .page-content h3 {
+                        font-size: 15px !important;
+                        line-height: 1.25 !important;
+                    }
+                    .page-content p,
+                    .page-content td,
+                    .page-content input,
+                    .page-content select,
+                    .page-content button {
+                        font-size: 12px !important;
+                    }
+                    .page-content th {
+                        font-size: 10px !important;
+                        letter-spacing: 0.03em !important;
+                    }
+                    .page-content table {
+                        min-width: 760px !important;
+                    }
+                    .page-content th,
+                    .page-content td {
+                        padding: 10px 12px !important;
+                    }
+                    .page-content .premium-card,
+                    .page-content .card-v3,
+                    .page-content .shops-table-card,
+                    .page-content .billing-table-card {
+                        border-radius: 14px !important;
+                    }
+                    .page-content .premium-card,
+                    .page-content .stat-card,
+                    .page-content .card-v3-body {
+                        padding: 16px !important;
+                    }
+                    .page-content .grid-stats,
+                    .page-content .stats-grid-v3,
+                    .page-content .billing-cards,
+                    .page-content .section-grid {
+                        gap: 12px !important;
+                        margin-bottom: 18px !important;
+                    }
                     .topbar h2 { font-size: 16px; }
                     .status-badge span { display: none; }
-                    .topbar-right { gap: 12px; }
+                    .topbar-right { gap: 8px; }
                 }
 
                 @media (max-width: 480px) {
                     .topbar-actions .topbar-date { display: none; }
                     .topbar-left { gap: 8px; }
+                    .topbar { padding: 0 8px; }
+                    .page-content { padding: 10px 6px 20px; }
+                    .page-content table { min-width: 700px !important; }
+                    .page-content th,
+                    .page-content td {
+                        padding: 8px 10px !important;
+                    }
+                    .page-content .premium-card,
+                    .page-content .stat-card,
+                    .page-content .card-v3-body {
+                        padding: 14px !important;
+                    }
                 }
             `}</style>
             
