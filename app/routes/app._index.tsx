@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { useEffect, useState } from "react";
 import {
   Page,
   Layout,
@@ -10,6 +9,7 @@ import {
   BlockStack,
   InlineStack,
   Badge,
+  CalloutCard,
   IndexTable,
   Button,
   Banner,
@@ -23,10 +23,6 @@ import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PLUS_PLAN } from "../billing.co
 // checkAndChargeOverage is called in the parent layout (app.tsx), not here
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
-
-const REVIEW_URL = "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal";
-const REVIEW_PROMPT_STORAGE_KEY = "geo_review_prompt_state";
-const REVIEW_PROMPT_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -48,28 +44,6 @@ interface VisitsDataItem {
   popup: number;
   redirected: string;
   blocked: number;
-}
-
-function parseDashboardMetric(value: string | number) {
-  return Number.parseInt(String(value).replace(/,/g, ''), 10) || 0;
-}
-
-function shouldShowStoredReviewPrompt() {
-  const storedState = window.localStorage.getItem(REVIEW_PROMPT_STORAGE_KEY);
-  if (!storedState) {
-    return true;
-  }
-
-  if (storedState === "dismissed") {
-    return false;
-  }
-
-  try {
-    const parsedState = JSON.parse(storedState) as { snoozedUntil?: number };
-    return !parsedState.snoozedUntil || Date.now() >= parsedState.snoozedUntil;
-  } catch {
-    return true;
-  }
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -236,45 +210,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Index() {
   const { shop, currentPlan, planLimit, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
   const { smUp } = useBreakpoints();
-  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
 
   // Calculate usage percentage
   const usagePercent = Math.min(100, Math.round((currentUsage / planLimit) * 100));
   const isNearLimit = usagePercent >= 80;
   const isOverLimit = currentUsage > planLimit;
-  const redirectedCount = parseDashboardMetric(stats.totalRedirected);
-  const blockedCount = parseDashboardMetric(stats.totalBlocked);
-  const hasReviewWorthyActivity = stats.activeRules > 0 && redirectedCount + blockedCount > 0;
-
-  useEffect(() => {
-    if (!hasReviewWorthyActivity) {
-      setShowReviewPrompt(false);
-      return;
-    }
-
-    setShowReviewPrompt(shouldShowStoredReviewPrompt());
-  }, [hasReviewWorthyActivity]);
 
   const handleOpenThemeEditor = () => {
     const shopName = shop.replace('.myshopify.com', '');
     window.open(`https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps`, '_blank');
-  };
-
-  const handleOpenReview = () => {
-    window.open(REVIEW_URL, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleSnoozeReviewPrompt = () => {
-    window.localStorage.setItem(
-      REVIEW_PROMPT_STORAGE_KEY,
-      JSON.stringify({ snoozedUntil: Date.now() + REVIEW_PROMPT_SNOOZE_MS }),
-    );
-    setShowReviewPrompt(false);
-  };
-
-  const handleDismissReviewPrompt = () => {
-    window.localStorage.setItem(REVIEW_PROMPT_STORAGE_KEY, "dismissed");
-    setShowReviewPrompt(false);
   };
 
   // Removed IndexTable state for visits - using plain HTML table now
@@ -370,94 +314,18 @@ export default function Index() {
           .traffic-table .country-cell span {
             font-weight: 600;
           }
-          .dashboard-summary-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 24px;
-            padding: 20px 24px;
-            min-height: 124px;
-          }
-          .dashboard-summary-main {
-            flex: 1;
-            min-width: 0;
-          }
-          .dashboard-summary-illustration {
-            width: 88px;
-            height: 88px;
-            object-fit: contain;
-            flex: 0 0 auto;
-          }
-          .dashboard-review-prompt {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 10px 12px;
-            background: var(--p-color-bg-surface-secondary, #f7f7f7);
-            border-radius: 8px;
-          }
-          .dashboard-review-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-          }
-          @media (max-width: 47.9975em) {
-            .dashboard-summary-card {
-              align-items: flex-start;
-              padding: 16px;
-            }
-            .dashboard-summary-illustration {
-              display: none;
-            }
-            .dashboard-review-prompt {
-              align-items: flex-start;
-              flex-direction: column;
-            }
-          }
         `}
       </style>
       <BlockStack gap="500">
 
         {/* Banner */}
-        <Card padding="0">
-          <div className="dashboard-summary-card">
-            <div className="dashboard-summary-main">
-              <BlockStack gap="300">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingSm">
-                    Visitors: {stats.totalRedirected} redirected, {stats.totalBlocked} blocked
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.
-                  </Text>
-                </BlockStack>
-                {showReviewPrompt && (
-                  <div className="dashboard-review-prompt">
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Your honest feedback helps us improve Geo: Redirect &amp; Country Block for merchants like you.
-                    </Text>
-                    <div className="dashboard-review-actions">
-                      <Button onClick={handleOpenReview}>Rate Us</Button>
-                      <Button variant="plain" onClick={handleSnoozeReviewPrompt}>
-                        Maybe later
-                      </Button>
-                      <Button variant="plain" onClick={handleDismissReviewPrompt}>
-                        Don&apos;t ask again
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </BlockStack>
-            </div>
-            <img
-              className="dashboard-summary-illustration"
-              src="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
-              alt=""
-            />
-          </div>
-        </Card>
+        <CalloutCard
+          title={`Visitors: ${stats.totalRedirected} redirected, ${stats.totalBlocked} blocked`}
+          illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
+          primaryAction={{ content: 'Rate Us', onAction: () => window.open('https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal', '_blank') }}
+        >
+          <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
+        </CalloutCard>
 
         {/* Usage Progress Bar */}
         <Card>
