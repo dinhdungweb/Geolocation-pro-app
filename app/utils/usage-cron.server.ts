@@ -1,8 +1,8 @@
 import cron from 'node-cron';
 import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
-import { getLimit80EmailHtml, getLimit100EmailHtml } from './email-templates';
-import { PLAN_LIMITS, FREE_PLAN } from '../billing.config';
+import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
+import { PLAN_LIMITS, FREE_PLAN, OVERAGE_HARD_LIMIT } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 
 /**
@@ -58,8 +58,22 @@ export async function checkAllShopsUsage() {
         const currentUsage = monthlyUsage?.totalVisitors || 0;
         const usagePercent = (currentUsage / planLimit) * 100;
 
+        // 0. Check for Hard Limit (Unlimited Reward)
+        if (currentUsage >= OVERAGE_HARD_LIMIT) {
+            const sentUnlimited = await hasSentEmail(shop, 'limit_unlimited', yearMonth);
+            if (!sentUnlimited) {
+                console.log(`[Cron] Sending Unlimited Reward email to ${shop}`);
+                await sendAdminEmail({
+                    shop,
+                    type: 'limit_unlimited',
+                    subject: `CONGRATULATIONS: ${shop} granted UNLIMITED usage this month!`,
+                    html: getLimitUnlimitedEmailHtml(shop, currentUsage),
+                    dedupeKey: yearMonth,
+                });
+            }
+        } 
         // 1. Check for 100% threshold
-        if (usagePercent >= 100) {
+        else if (usagePercent >= 100) {
             const sent100 = await hasSentEmail(shop, 'limit_100', yearMonth);
             if (!sent100) {
                 console.log(`[Cron] Sending 100% usage email to ${shop}`);

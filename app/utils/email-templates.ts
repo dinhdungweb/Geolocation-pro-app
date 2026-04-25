@@ -72,3 +72,25 @@ export const getLimit100EmailHtml = (shop: string, usage: number, limit: number)
     </div>
 </div>
 `;
+
+export const getLimitUnlimitedEmailHtml = (shop: string, usage: number) => `
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #28a745; border-radius: 8px; overflow: hidden;">
+    <div style="background-color: #d4edda; padding: 20px; text-align: center; border-bottom: 2px solid #28a745;">
+        <h1 style="color: #155724; margin: 0;">Unlimited Usage Granted!</h1>
+    </div>
+    <div style="padding: 30px; line-height: 1.6; color: #333;">
+        <p>Hi there,</p>
+        <p>Congratulations! Your shop <strong>${shop}</strong> has reached <strong>${usage.toLocaleString()}</strong> visitors this month.</p>
+        <p>As a token of our appreciation for your high traffic, we have granted you <strong>Unlimited Usage</strong> for the remainder of this month. You will not be charged any further overage fees for additional visitors until the next billing cycle begins.</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 5px 0;">Current Usage: <strong>${usage.toLocaleString()}</strong> visitors</p>
+            <p style="margin: 5px 0;">Status: <strong>Unlimited (Free for the rest of the month)</strong></p>
+        </div>
+        <p>Keep up the great work with your store!</p>
+        <p>Best regards,<br>The Geo Support Team</p>
+    </div>
+    <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777;">
+        &copy; ${new Date().getFullYear()} Geo: Redirect & Country Block. All rights reserved.
+    </div>
+</div>
+`;
