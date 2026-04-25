@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { isbot } from "isbot";
-import { FREE_PLAN, PLAN_LIMITS } from "../billing.config";
+import { FREE_PLAN, getPlanLimit } from "../billing.config";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -423,7 +423,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       (await prisma.settings.create({ data: { shop } }));
 
     const currentPlan = settings.currentPlan || FREE_PLAN;
-    const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+    const planLimit = getPlanLimit(currentPlan, settings);
     const yearMonth = getYearMonth();
     const monthlyUsage = await prisma.monthlyUsage.findUnique({
       where: { shop_yearMonth: { shop, yearMonth } },

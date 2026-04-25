@@ -10,7 +10,7 @@ import {
     Badge,
 } from "@shopify/polaris";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -21,10 +21,37 @@ import {
     PLUS_PLAN,
     ELITE_PLAN,
     UNLIMITED_PLAN,
+    CUSTOM_PLAN,
     ALL_PAID_PLANS,
     PLAN_LIMITS,
     OVERAGE_RATE,
+    getPlanLimit,
 } from "../billing.config";
+
+function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
+    const requestUrl = new URL(request.url);
+
+    if (request.headers.get("authorization")) {
+        throw new Response(undefined, {
+            status: 401,
+            statusText: "Unauthorized",
+            headers: {
+                "X-Shopify-API-Request-Failure-Reauthorize-Url": confirmationUrl,
+            },
+        });
+    }
+
+    if (requestUrl.searchParams.get("embedded") === "1" && requestUrl.searchParams.get("host")) {
+        const params = new URLSearchParams({
+            shop,
+            host: requestUrl.searchParams.get("host")!,
+            exitIframe: confirmationUrl,
+        });
+        throw redirect(`/auth/exit-iframe?${params.toString()}`);
+    }
+
+    throw redirect(confirmationUrl);
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing, session } = await authenticate.admin(request);
@@ -37,20 +64,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     const currentPlan = billingCheck.appSubscriptions[0]?.name || FREE_PLAN;
-    const settings = await prisma.settings.findUnique({
+    const settings = await prisma.settings.upsert({
         where: { shop: session.shop },
-        select: { allowUnlimitedPlan: true },
+        update: { currentPlan },
+        create: { shop: session.shop, currentPlan },
+        select: {
+            allowUnlimitedPlan: true,
+            customPlanEnabled: true,
+            customPlanName: true,
+            customPlanPrice: true,
+            customPlanVisitorLimit: true,
+            customPlanNoOverage: true,
+            customPlanTrialDays: true,
+        },
     });
 
     return json({
         canUseUnlimitedPlan: Boolean(settings?.allowUnlimitedPlan) || currentPlan === UNLIMITED_PLAN,
+        canUseCustomPlan: Boolean(settings?.customPlanEnabled) || currentPlan === CUSTOM_PLAN,
+        customPlan: settings ? {
+            enabled: settings.customPlanEnabled,
+            name: settings.customPlanName,
+            price: Number(settings.customPlanPrice),
+            visitorLimit: settings.customPlanVisitorLimit,
+            noOverage: settings.customPlanNoOverage,
+            trialDays: settings.customPlanTrialDays,
+        } : null,
         hasActivePayment: billingCheck.hasActivePayment,
         currentPlan,
     });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { billing, session } = await authenticate.admin(request);
+    const { billing, session, admin } = await authenticate.admin(request);
     const shop = session.shop;
     const isTest = false;
     const formData = await request.formData();
@@ -69,6 +115,112 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         }
 
+        if (selectedPlan === CUSTOM_PLAN) {
+            const settings = await prisma.settings.findUnique({
+                where: { shop },
+                select: {
+                    customPlanEnabled: true,
+                    customPlanName: true,
+                    customPlanPrice: true,
+                    customPlanVisitorLimit: true,
+                    customPlanNoOverage: true,
+                    customPlanTrialDays: true,
+                },
+            });
+
+            if (!settings?.customPlanEnabled) {
+                throw new Response("Custom plan is not available for this shop", { status: 403 });
+            }
+
+            const customPrice = Number(settings.customPlanPrice);
+            if (!Number.isFinite(customPrice) || customPrice <= 0) {
+                return json({ error: "Custom plan price is invalid" }, { status: 400 });
+            }
+
+            if (!settings.customPlanNoOverage && !settings.customPlanVisitorLimit) {
+                return json({ error: "Custom plan visitor limit is required for overage billing" }, { status: 400 });
+            }
+
+            const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
+            const returnUrl = new URL("/app/pricing", appUrl).toString();
+            const lineItems: any[] = [
+                {
+                    plan: {
+                        appRecurringPricingDetails: {
+                            price: {
+                                amount: customPrice,
+                                currencyCode: "USD",
+                            },
+                            interval: "EVERY_30_DAYS",
+                        },
+                    },
+                },
+            ];
+
+            if (!settings.customPlanNoOverage) {
+                lineItems.push({
+                    plan: {
+                        appUsagePricingDetails: {
+                            cappedAmount: {
+                                amount: 100,
+                                currencyCode: "USD",
+                            },
+                            terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
+                        },
+                    },
+                });
+            }
+
+            const response = await admin.graphql(
+                `#graphql
+                mutation AppSubscriptionCreate(
+                    $name: String!,
+                    $returnUrl: URL!,
+                    $lineItems: [AppSubscriptionLineItemInput!]!,
+                    $test: Boolean!,
+                    $trialDays: Int,
+                    $replacementBehavior: AppSubscriptionReplacementBehavior
+                ) {
+                    appSubscriptionCreate(
+                        name: $name,
+                        returnUrl: $returnUrl,
+                        lineItems: $lineItems,
+                        test: $test,
+                        trialDays: $trialDays,
+                        replacementBehavior: $replacementBehavior
+                    ) {
+                        confirmationUrl
+                        userErrors {
+                            field
+                            message
+                        }
+                    }
+                }`,
+                {
+                    variables: {
+                        name: CUSTOM_PLAN,
+                        returnUrl,
+                        lineItems,
+                        test: isTest,
+                        trialDays: settings.customPlanTrialDays,
+                        replacementBehavior: "APPLY_IMMEDIATELY",
+                    },
+                },
+            );
+            const data = await response.json();
+            const userErrors = data?.data?.appSubscriptionCreate?.userErrors || [];
+            if (userErrors.length > 0) {
+                return json({ error: userErrors[0].message }, { status: 400 });
+            }
+
+            const confirmationUrl = data?.data?.appSubscriptionCreate?.confirmationUrl;
+            if (!confirmationUrl) {
+                return json({ error: "Shopify did not return a billing confirmation URL" }, { status: 500 });
+            }
+
+            redirectToBillingConfirmation(request, shop, confirmationUrl);
+        }
+
         // Handling Downgrade to Free Plan
         if (selectedPlan === FREE_PLAN) {
             // Get active subscription to cancel it
@@ -81,7 +233,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (subscription) {
                 // Bug #1 fix: Charge remaining overage BEFORE cancelling subscription
                 const activePlan = subscription.name || currentPlan;
-                const planLimit = PLAN_LIMITS[activePlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+                const settings = await prisma.settings.findUnique({
+                    where: { shop },
+                    select: {
+                        customPlanVisitorLimit: true,
+                        customPlanNoOverage: true,
+                    },
+                });
+                const planLimit = getPlanLimit(activePlan, settings);
                 const now = new Date();
                 const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                 const monthlyUsage = await prisma.monthlyUsage.findUnique({
@@ -137,7 +296,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // Handling Paid Plans
-        if (ALL_PAID_PLANS.includes(selectedPlan)) {
+        if (ALL_PAID_PLANS.includes(selectedPlan) && selectedPlan !== CUSTOM_PLAN) {
             // Sync currentPlan to Settings for proxy limit check
             try {
                 await prisma.settings.upsert({
@@ -167,6 +326,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 interface PlanCardProps {
     name: string;
+    displayName?: string;
     subtitle: string;
     price: string;
     visitorLimit?: number;
@@ -176,6 +336,7 @@ interface PlanCardProps {
     isFree?: boolean;
     isRecommended?: boolean;
     hasTrial?: boolean;
+    trialDays?: number;
     noOverage?: boolean;
     ribbon: string;
     ribbonTone?: "green" | "blue";
@@ -188,6 +349,7 @@ function formatPlanName(name: string) {
 
 function PlanCard({
     name,
+    displayName,
     subtitle,
     price,
     visitorLimit,
@@ -197,6 +359,7 @@ function PlanCard({
     isFree,
     isRecommended,
     hasTrial,
+    trialDays,
     noOverage,
     ribbon,
     ribbonTone = "green",
@@ -214,7 +377,7 @@ function PlanCard({
                         <BlockStack gap="400">
                             <InlineStack align="space-between" blockAlign="start" gap="200" wrap={false}>
                                 <BlockStack gap="100">
-                                    <Text as="h2" variant="headingLg">{formatPlanName(name)}</Text>
+                                    <Text as="h2" variant="headingLg">{displayName || formatPlanName(name)}</Text>
                                     <Text as="p" variant="bodySm" tone="subdued">
                                         {subtitle}
                                     </Text>
@@ -241,7 +404,7 @@ function PlanCard({
                                     {isFree
                                         ? "No monthly charge"
                                         : hasTrial
-                                            ? "7-day free trial included"
+                                            ? `${trialDays ?? 7}-day free trial included`
                                             : "Monthly Shopify billing"}
                                 </Text>
                             </BlockStack>
@@ -292,7 +455,7 @@ function PlanCard({
 }
 
 export default function PricingPage() {
-    const { canUseUnlimitedPlan, currentPlan } = useLoaderData<typeof loader>();
+    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan } = useLoaderData<typeof loader>();
     const submit = useSubmit();
 
     const handleSelectPlan = (plan: string) => {
@@ -312,6 +475,13 @@ export default function PricingPage() {
 
         window.location.href = "/app/support";
     };
+
+    const customVisitorLimit = customPlan?.visitorLimit ?? null;
+    const customNoOverage = customPlan?.noOverage ?? true;
+    const customLimit = getPlanLimit(CUSTOM_PLAN, {
+        customPlanVisitorLimit: customVisitorLimit,
+        customPlanNoOverage: customNoOverage,
+    });
 
     const plans = [
         {
@@ -389,8 +559,33 @@ export default function PricingPage() {
             ribbon: "Unlimited usage",
             ribbonTone: "blue" as const,
         },
+        {
+            name: CUSTOM_PLAN,
+            displayName: customPlan?.name || "Custom plan",
+            subtitle: "Private plan configured for your store",
+            price: (customPlan?.price ?? 79.99).toFixed(2),
+            visitorLimit: customLimit,
+            visitorLimitLabel: customLimit >= Number.MAX_SAFE_INTEGER
+                ? "Unlimited visitors included"
+                : `${customLimit.toLocaleString()} visitors included`,
+            features: [
+                "Private pricing for your store",
+                customLimit >= Number.MAX_SAFE_INTEGER ? "Unlimited monthly visitors" : "Custom monthly visitor limit",
+                customNoOverage ? "No overage charges" : "Overage billing after limit",
+                "Priority support",
+            ],
+            hasTrial: (customPlan?.trialDays ?? 7) > 0,
+            trialDays: customPlan?.trialDays ?? 7,
+            noOverage: customNoOverage,
+            ribbon: "Private plan",
+            ribbonTone: "blue" as const,
+        },
     ];
-    const visiblePlans = plans.filter((plan) => plan.name !== UNLIMITED_PLAN || canUseUnlimitedPlan);
+    const visiblePlans = plans.filter((plan) => {
+        if (plan.name === UNLIMITED_PLAN) return currentPlan === UNLIMITED_PLAN && canUseUnlimitedPlan;
+        if (plan.name === CUSTOM_PLAN) return canUseCustomPlan;
+        return true;
+    });
 
     return (
         <Page
@@ -525,18 +720,18 @@ export default function PricingPage() {
                 `}
             </style>
             <BlockStack gap="500">
-                {!canUseUnlimitedPlan && (
+                {!canUseCustomPlan && (
                     <Card>
                         <div className="pricing-custom-plan-card">
                             <Box padding="400">
                                 <InlineStack align="space-between" blockAlign="center" gap="400">
                                     <BlockStack gap="150">
                                         <InlineStack gap="200" blockAlign="center">
-                                            <Text as="h2" variant="headingMd">Need unlimited traffic?</Text>
+                                            <Text as="h2" variant="headingMd">Need a custom plan?</Text>
                                             <Badge tone="info">Custom plan</Badge>
                                         </InlineStack>
                                         <Text as="p" tone="subdued">
-                                            High-volume stores can request a private unlimited plan with predictable monthly billing and no overage charges.
+                                            High-volume stores can request private pricing, custom visitor limits and predictable monthly billing.
                                         </Text>
                                     </BlockStack>
                                     <InlineStack gap="200" blockAlign="center">
@@ -554,6 +749,7 @@ export default function PricingPage() {
                         <PlanCard
                             key={plan.name}
                             name={plan.name}
+                            displayName={plan.displayName}
                             subtitle={plan.subtitle}
                             price={plan.price}
                             visitorLimit={plan.visitorLimit}
@@ -563,6 +759,7 @@ export default function PricingPage() {
                             isFree={plan.isFree}
                             isRecommended={plan.isRecommended}
                             hasTrial={plan.hasTrial}
+                            trialDays={plan.trialDays}
                             noOverage={plan.noOverage}
                             ribbon={plan.ribbon}
                             ribbonTone={plan.ribbonTone}
@@ -591,8 +788,8 @@ export default function PricingPage() {
                                 <BlockStack gap="100">
                                     <Text as="p" fontWeight="semibold">Overage</Text>
                                     <Text as="p" tone="subdued">
-                                        {canUseUnlimitedPlan
-                                            ? "Premium, Plus and Elite can charge extra visitors when limits are exceeded. Unlimited has no overage charges."
+                                        {canUseCustomPlan && customNoOverage
+                                            ? "Standard paid plans can charge extra visitors when limits are exceeded. Your custom plan has no overage charges."
                                             : "Paid plans can charge extra visitors through Shopify billing when limits are exceeded."}
                                     </Text>
                                 </BlockStack>

@@ -158,6 +158,7 @@ export default function AdminShops() {
                 .plan-free { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
                 .plan-premium { background: #eef2ff; color: #6366f1; border: 1px solid #c7d2fe; }
                 .plan-plus { background: #ecfdf5; color: #10b981; border: 1px solid #a7f3d0; }
+                .plan-custom { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
                 .plan-elite { 
                     background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); 
                     color: #a855f7; 
@@ -312,6 +313,7 @@ export default function AdminShops() {
                                                 if (plan === 'PREMIUM') badgeClass = 'plan-premium';
                                                 if (plan === 'PLUS') badgeClass = 'plan-plus';
                                                 if (plan === 'ELITE') badgeClass = 'plan-elite';
+                                                if (plan === 'CUSTOM') badgeClass = 'plan-custom';
                                                 
                                                 return (
                                                     <span className={`plan-badge ${badgeClass}`}>

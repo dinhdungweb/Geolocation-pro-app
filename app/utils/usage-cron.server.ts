@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
-import { PLAN_LIMITS, FREE_PLAN, OVERAGE_HARD_LIMIT, UNLIMITED_PLAN } from '../billing.config';
+import { FREE_PLAN, OVERAGE_HARD_LIMIT, getPlanLimit, hasUnlimitedUsage } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 
 /**
@@ -46,7 +46,7 @@ export async function checkAllShopsUsage() {
             // If actualPlan is null (API failed), fall back to DB value
         }
 
-        const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+        const planLimit = getPlanLimit(currentPlan, settings);
 
         // Get monthly usage
         const monthlyUsage = await prisma.monthlyUsage.findUnique({
@@ -56,7 +56,7 @@ export async function checkAllShopsUsage() {
         });
 
         const currentUsage = monthlyUsage?.totalVisitors || 0;
-        const isUnlimitedPlan = currentPlan === UNLIMITED_PLAN;
+        const isUnlimitedPlan = hasUnlimitedUsage(currentPlan, settings);
         const usagePercent = isUnlimitedPlan ? 0 : (currentUsage / planLimit) * 100;
 
         // 0. Check for Hard Limit (Unlimited Reward)

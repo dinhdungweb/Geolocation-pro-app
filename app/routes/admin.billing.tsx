@@ -3,7 +3,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
-import { PLAN_LIMITS, FREE_PLAN, OVERAGE_RATE } from "../billing.config";
+import { FREE_PLAN, OVERAGE_RATE, getPlanLimit, hasUnlimitedUsage } from "../billing.config";
 import { useState, useMemo } from "react";
 import { Search, X, DollarSign, AlertTriangle, Users, Clock } from "lucide-react";
 
@@ -28,20 +28,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const shops = allSettings.map((s: any) => {
         const plan = s.currentPlan || FREE_PLAN;
-        const limit = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+        const limit = getPlanLimit(plan, s);
+        const unlimitedUsage = hasUnlimitedUsage(plan, s);
         const usage = usageMap.get(s.shop);
         const prev = prevUsageMap.get(s.shop);
 
         const totalVisitors = usage?.totalVisitors || 0;
         const chargedVisitors = usage?.chargedVisitors || 0;
-        const overage = Math.max(0, totalVisitors - limit);
-        const uncharged = Math.max(0, totalVisitors - limit - chargedVisitors);
+        const overage = unlimitedUsage ? 0 : Math.max(0, totalVisitors - limit);
+        const uncharged = unlimitedUsage ? 0 : Math.max(0, totalVisitors - limit - chargedVisitors);
         const chargedAmount = Number((chargedVisitors * OVERAGE_RATE).toFixed(2));
         const unchargedAmount = Number((uncharged * OVERAGE_RATE).toFixed(2));
         const prevTotal = prev?.totalVisitors || 0;
 
         // Detect overcharge: chargedVisitors > actual overage
-        const actualOverage = Math.max(0, totalVisitors - limit);
+        const actualOverage = unlimitedUsage ? 0 : Math.max(0, totalVisitors - limit);
         const overcharged = chargedVisitors > actualOverage ? chargedVisitors - actualOverage : 0;
         const overchargedAmount = Number((overcharged * OVERAGE_RATE).toFixed(2));
 
@@ -217,6 +218,8 @@ export default function AdminBilling() {
                 .plan-tag.premium { background: #eef2ff; color: #6366f1; }
                 .plan-tag.plus { background: #ecfdf5; color: #10b981; }
                 .plan-tag.elite { background: #faf5ff; color: #a855f7; }
+                .plan-tag.custom { background: #eff6ff; color: #2563eb; }
+                .plan-tag.unlimited { background: #eff6ff; color: #2563eb; }
 
                 .status-tag {
                     padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
@@ -329,6 +332,7 @@ export default function AdminBilling() {
                     <option value="premium">Premium</option>
                     <option value="plus">Plus</option>
                     <option value="elite">Elite</option>
+                    <option value="custom">Custom</option>
                     <option value="unlimited">Unlimited</option>
                 </select>
                 {(searchQuery || statusFilter !== "all" || planFilter !== "all") && (
@@ -369,7 +373,8 @@ export default function AdminBilling() {
                             ) : (
                                 (filtered as any[]).map((s) => {
                                     const sc = statusConfig[s.status] || statusConfig.ok;
-                                    const usagePercent = Math.min(100, Math.round((s.totalVisitors / s.limit) * 100));
+                                    const isUnlimited = s.limit >= Number.MAX_SAFE_INTEGER;
+                                    const usagePercent = isUnlimited ? 100 : Math.min(100, Math.round((s.totalVisitors / s.limit) * 100));
                                     const barColor = usagePercent >= 100 ? '#ef4444' : usagePercent >= 80 ? '#f59e0b' : '#10b981';
 
                                     return (
@@ -381,7 +386,7 @@ export default function AdminBilling() {
                                             <td>
                                                 <span className={`plan-tag ${s.plan}`}>{s.plan}</span>
                                             </td>
-                                            <td className="mono text-right">{s.limit.toLocaleString()}</td>
+                                            <td className="mono text-right">{isUnlimited ? "Unlimited" : s.limit.toLocaleString()}</td>
                                             <td className="mono text-right">
                                                 <b>{s.totalVisitors.toLocaleString()}</b>
                                                 {s.prevTotal > 0 && (
@@ -420,7 +425,7 @@ export default function AdminBilling() {
                                                 )}
                                             </td>
                                             <td style={{ minWidth: '100px' }}>
-                                                <div style={{ fontSize: '11px', fontWeight: 700, color: barColor }}>{usagePercent}%</div>
+                                                <div style={{ fontSize: '11px', fontWeight: 700, color: barColor }}>{isUnlimited ? "Unlimited" : `${usagePercent}%`}</div>
                                                 <div className="progress-bar">
                                                     <div className="progress-fill" style={{ width: `${usagePercent}%`, background: barColor }} />
                                                 </div>

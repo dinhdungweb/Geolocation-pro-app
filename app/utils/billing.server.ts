@@ -1,5 +1,5 @@
 import prisma from "../db.server";
-import { ALL_PAID_PLANS, FREE_PLAN, PLAN_LIMITS, OVERAGE_RATE, OVERAGE_HARD_LIMIT } from "../billing.config";
+import { ALL_PAID_PLANS, FREE_PLAN, OVERAGE_RATE, OVERAGE_HARD_LIMIT, getPlanLimit, hasUnlimitedUsage } from "../billing.config";
 import { unauthenticated } from "../shopify.server";
 
 /**
@@ -23,7 +23,16 @@ export async function checkAndChargeOverage(
         if (!hasProPlan) return; // No overage for free plans
 
         const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
-        const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+        const settings = await prisma.settings.findUnique({
+            where: { shop },
+            select: {
+                customPlanVisitorLimit: true,
+                customPlanNoOverage: true,
+            },
+        });
+        if (hasUnlimitedUsage(currentPlan, settings)) return;
+
+        const planLimit = getPlanLimit(currentPlan, settings);
 
         // Get current month usage
         const now = new Date();
@@ -281,7 +290,16 @@ export async function checkAndChargeOverageBackground(shop: string) {
         
         if (!usageLineItem) return; // No usage pricing attached to this plan
 
-        const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+        const settings = await prisma.settings.findUnique({
+            where: { shop },
+            select: {
+                customPlanVisitorLimit: true,
+                customPlanNoOverage: true,
+            },
+        });
+        if (hasUnlimitedUsage(currentPlan, settings)) return;
+
+        const planLimit = getPlanLimit(currentPlan, settings);
 
         // 2. Get current month usage from DB
         const now = new Date();

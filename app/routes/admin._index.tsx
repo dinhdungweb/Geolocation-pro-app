@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 orderBy: { _sum: { visitors: 'desc' } },
                 take: 5
             }),
-            prisma.settings.findMany({ select: { shop: true, currentPlan: true, mode: true } }),
+            prisma.settings.findMany({ select: { shop: true, currentPlan: true, mode: true, customPlanPrice: true } }),
             prisma.monthlyUsage.groupBy({
                 by: ['yearMonth'],
                 _sum: { totalVisitors: true, redirected: true },
@@ -54,6 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const subscriptionRevenue = settings.reduce((sum, s) => {
             const planKey = (s.currentPlan || 'FREE').toUpperCase();
+            if (planKey === 'CUSTOM') return sum + Number(s.customPlanPrice || 0);
             return sum + (planPrices[planKey] || 0);
         }, 0);
 
@@ -76,7 +77,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             const planKey = (s.currentPlan || 'FREE').toUpperCase();
             acc[planKey] = (acc[planKey] || 0) + 1;
             return acc;
-        }, { 'FREE': 0, 'PREMIUM': 0, 'PLUS': 0, 'ELITE': 0 });
+        }, { 'FREE': 0, 'PREMIUM': 0, 'PLUS': 0, 'ELITE': 0, 'CUSTOM': 0 });
 
         const modes = settings.reduce((acc: any, s) => {
             const modeKey = s.mode || 'popup';

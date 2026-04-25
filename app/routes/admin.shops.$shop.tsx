@@ -58,20 +58,59 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
     }
 
-    if (intent === "toggle_unlimited_plan") {
-        const allowUnlimitedPlan = formData.get("allowUnlimitedPlan") === "true";
+    if (intent === "save_custom_plan") {
+        const customPlanEnabled = formData.get("customPlanEnabled") === "true";
+        const customPlanName = ((formData.get("customPlanName") as string) || "Custom plan").trim() || "Custom plan";
+        const customPlanPrice = Number(formData.get("customPlanPrice"));
+        const visitorLimitInput = ((formData.get("customPlanVisitorLimit") as string) || "").trim();
+        const customPlanVisitorLimit = visitorLimitInput ? Number.parseInt(visitorLimitInput, 10) : null;
+        const customPlanNoOverage = formData.get("customPlanNoOverage") === "true";
+        const customPlanTrialDays = Number.parseInt((formData.get("customPlanTrialDays") as string) || "7", 10);
+
+        if (customPlanEnabled && (!Number.isFinite(customPlanPrice) || customPlanPrice <= 0)) {
+            return json({ success: false, error: "Custom plan price must be greater than 0" }, { status: 400 });
+        }
+
+        if (visitorLimitInput && (customPlanVisitorLimit === null || !Number.isFinite(customPlanVisitorLimit) || customPlanVisitorLimit <= 0)) {
+            return json({ success: false, error: "Visitor limit must be a positive number or empty for unlimited" }, { status: 400 });
+        }
+
+        if (!customPlanNoOverage && !customPlanVisitorLimit) {
+            return json({ success: false, error: "Visitor limit is required when overage billing is enabled" }, { status: 400 });
+        }
+
+        if (!Number.isFinite(customPlanTrialDays) || customPlanTrialDays < 0 || customPlanTrialDays > 90) {
+            return json({ success: false, error: "Trial days must be between 0 and 90" }, { status: 400 });
+        }
 
         try {
             await prisma.settings.upsert({
                 where: { shop },
-                update: { allowUnlimitedPlan },
-                create: { shop, allowUnlimitedPlan },
+                update: {
+                    customPlanEnabled,
+                    customPlanName,
+                    customPlanPrice,
+                    customPlanVisitorLimit,
+                    customPlanNoOverage,
+                    customPlanTrialDays,
+                    allowUnlimitedPlan: false,
+                },
+                create: {
+                    shop,
+                    customPlanEnabled,
+                    customPlanName,
+                    customPlanPrice,
+                    customPlanVisitorLimit,
+                    customPlanNoOverage,
+                    customPlanTrialDays,
+                    allowUnlimitedPlan: false,
+                },
             });
             return json({
                 success: true,
-                message: allowUnlimitedPlan
-                    ? "Unlimited plan access enabled for this shop"
-                    : "Unlimited plan access disabled for this shop",
+                message: customPlanEnabled
+                    ? "Custom plan saved and enabled for this shop"
+                    : "Custom plan disabled for this shop",
             });
         } catch (e: any) {
             return json({ success: false, error: e.message }, { status: 500 });
@@ -141,6 +180,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             excludeBots: settings.excludeBots,
             cookieDuration: settings.cookieDuration,
             allowUnlimitedPlan: settings.allowUnlimitedPlan,
+            customPlanEnabled: settings.customPlanEnabled,
+            customPlanName: settings.customPlanName,
+            customPlanPrice: settings.customPlanPrice.toString(),
+            customPlanVisitorLimit: settings.customPlanVisitorLimit,
+            customPlanNoOverage: settings.customPlanNoOverage,
+            customPlanTrialDays: settings.customPlanTrialDays,
             createdAt: settings.createdAt.toISOString(),
             updatedAt: settings.updatedAt.toISOString(),
         } : null,
@@ -265,6 +310,7 @@ export default function AdminShopDetail() {
                         const plan = (currentPlan || 'FREE').toUpperCase();
                         if (plan === 'ELITE') return 'background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); color: #7c3aed; border: 1px solid #7c3aed33; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);';
                         if (plan === 'UNLIMITED') return 'background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border: 1px solid #2563eb33; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);';
+                        if (plan === 'CUSTOM') return 'background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border: 1px solid #2563eb33; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);';
                         if (plan === 'PLUS') return 'background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #059669; border: 1px solid #05966933;';
                         if (plan === 'PREMIUM') return 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #4f46e5; border: 1px solid #4f46e533;';
                         return 'background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0;';
@@ -530,10 +576,15 @@ export default function AdminShopDetail() {
                                 <ShieldAlert size={24} style={{ marginBottom: '12px', opacity: 0.5 }} />
                                 <div>No settings found for this shop.</div>
                                 <Form method="post" className="inline-action-form" style={{ marginTop: '16px' }}>
-                                    <input type="hidden" name="intent" value="toggle_unlimited_plan" />
-                                    <input type="hidden" name="allowUnlimitedPlan" value="true" />
+                                    <input type="hidden" name="intent" value="save_custom_plan" />
+                                    <input type="hidden" name="customPlanEnabled" value="true" />
+                                    <input type="hidden" name="customPlanName" value="Custom plan" />
+                                    <input type="hidden" name="customPlanPrice" value="79.99" />
+                                    <input type="hidden" name="customPlanVisitorLimit" value="" />
+                                    <input type="hidden" name="customPlanNoOverage" value="true" />
+                                    <input type="hidden" name="customPlanTrialDays" value="7" />
                                     <button type="submit" className="inline-toggle-btn enabled" disabled={isSubmitting}>
-                                        Enable Unlimited Plan Access
+                                        Create Custom Plan Access
                                     </button>
                                 </Form>
                             </div>
@@ -555,28 +606,58 @@ export default function AdminShopDetail() {
                                     <span className="label">Cookie TTL</span>
                                     <span className="value">{settings!.cookieDuration} Days</span>
                                 </div>
-                                <div className="info-item">
-                                    <span className="label">Unlimited Plan Access</span>
-                                    <span className="value" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <span style={{ color: settings!.allowUnlimitedPlan ? '#059669' : '#64748b' }}>
-                                            {settings!.allowUnlimitedPlan ? 'ENABLED' : 'DISABLED'}
+                                <div style={{ padding: '16px 0 4px', borderTop: '1px solid #f1f5f9', marginTop: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                                        <span className="label">Custom Plan</span>
+                                        <span style={{ color: settings!.customPlanEnabled ? '#059669' : '#64748b', fontSize: '12px', fontWeight: 800 }}>
+                                            {settings!.customPlanEnabled ? 'ENABLED' : 'DISABLED'}
                                         </span>
-                                        <Form method="post" className="inline-action-form">
-                                            <input type="hidden" name="intent" value="toggle_unlimited_plan" />
+                                    </div>
+                                    <Form method="post">
+                                        <input type="hidden" name="intent" value="save_custom_plan" />
+                                        <div className="billing-input-group">
+                                            <label>Plan status</label>
+                                            <select name="customPlanEnabled" className="billing-input" defaultValue={settings!.customPlanEnabled ? "true" : "false"}>
+                                                <option value="true">Enabled for this shop</option>
+                                                <option value="false">Disabled</option>
+                                            </select>
+                                        </div>
+                                        <div className="billing-input-group">
+                                            <label>Display name</label>
+                                            <input name="customPlanName" className="billing-input" defaultValue={settings!.customPlanName || "Custom plan"} />
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                            <div className="billing-input-group">
+                                                <label>Monthly price USD</label>
+                                                <input type="number" step="0.01" min="0" name="customPlanPrice" className="billing-input" defaultValue={settings!.customPlanPrice || "79.99"} />
+                                            </div>
+                                            <div className="billing-input-group">
+                                                <label>Trial days</label>
+                                                <input type="number" min="0" max="90" name="customPlanTrialDays" className="billing-input" defaultValue={settings!.customPlanTrialDays ?? 7} />
+                                            </div>
+                                        </div>
+                                        <div className="billing-input-group">
+                                            <label>Visitor limit</label>
                                             <input
-                                                type="hidden"
-                                                name="allowUnlimitedPlan"
-                                                value={settings!.allowUnlimitedPlan ? "false" : "true"}
+                                                type="number"
+                                                min="1"
+                                                name="customPlanVisitorLimit"
+                                                className="billing-input"
+                                                placeholder="Leave empty for unlimited"
+                                                defaultValue={settings!.customPlanVisitorLimit ?? ""}
                                             />
-                                            <button
-                                                type="submit"
-                                                className={`inline-toggle-btn ${settings!.allowUnlimitedPlan ? 'disabled' : 'enabled'}`}
-                                                disabled={isSubmitting}
-                                            >
-                                                {settings!.allowUnlimitedPlan ? 'Disable' : 'Enable'}
-                                            </button>
-                                        </Form>
-                                    </span>
+                                        </div>
+                                        <div className="billing-input-group">
+                                            <label>Overage mode</label>
+                                            <select name="customPlanNoOverage" className="billing-input" defaultValue={settings!.customPlanNoOverage ? "true" : "false"}>
+                                                <option value="true">No overage charges</option>
+                                                <option value="false">Use app overage billing after limit</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" className="primary-btn" disabled={isSubmitting}>
+                                            {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Save Custom Plan <ChevronRight size={16} /></>}
+                                        </button>
+                                    </Form>
                                 </div>
                                 <div className="info-item">
                                     <span className="label">Installed On</span>

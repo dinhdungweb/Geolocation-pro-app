@@ -83,6 +83,12 @@ model Settings {
   isEnabled          Boolean  @default(true)
   blockVpn           Boolean  @default(false)
   allowUnlimitedPlan Boolean  @default(false)
+  customPlanEnabled  Boolean  @default(false)
+  customPlanName     String   @default("Custom plan")
+  customPlanPrice    Decimal  @default(79.99) @db.Decimal(10, 2)
+  customPlanVisitorLimit Int?
+  customPlanNoOverage Boolean @default(true)
+  customPlanTrialDays Int     @default(7)
 }
 
 model AnalyticsCountry {

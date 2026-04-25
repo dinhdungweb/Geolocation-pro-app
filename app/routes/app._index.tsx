@@ -19,7 +19,7 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PLUS_PLAN, UNLIMITED_PLAN } from "../billing.config";
+import { ALL_PAID_PLANS, FREE_PLAN, PLUS_PLAN, CUSTOM_PLAN, getPlanLimit, hasUnlimitedUsage } from "../billing.config";
 // checkAndChargeOverage is called in the parent layout (app.tsx), not here
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
@@ -69,7 +69,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
   const hasProPlan = billingConfig.hasActivePayment;
   const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
-  const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+  const planLimit = getPlanLimit(currentPlan, settings);
+  const isUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
+  const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
 
   // Sync currentPlan to Settings (ensure proxy.config can check plan limits)
   try {
@@ -189,7 +191,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shop,
     hasProPlan,
     currentPlan,
+    planDisplayName,
     planLimit,
+    isUnlimitedUsage,
     currentUsage,
     stats: {
       totalRules: rulesCount,
@@ -208,11 +212,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 export default function Index() {
-  const { shop, currentPlan, planLimit, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
+  const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
   const { smUp } = useBreakpoints();
 
   // Calculate usage percentage
-  const isUnlimitedPlan = currentPlan === UNLIMITED_PLAN;
+  const isUnlimitedPlan = isUnlimitedUsage;
   const usagePercent = isUnlimitedPlan ? 100 : Math.min(100, Math.round((currentUsage / planLimit) * 100));
   const isNearLimit = !isUnlimitedPlan && usagePercent >= 80;
   const isOverLimit = !isUnlimitedPlan && currentUsage > planLimit;
@@ -334,7 +338,7 @@ export default function Index() {
             <InlineStack align="space-between">
               <Text as="h3" variant="headingSm">Monthly Usage</Text>
               <Badge tone={isOverLimit ? "critical" : isNearLimit ? "warning" : "success"}>
-                {currentPlan}
+                {planDisplayName}
               </Badge>
             </InlineStack>
             <BlockStack gap="200">
