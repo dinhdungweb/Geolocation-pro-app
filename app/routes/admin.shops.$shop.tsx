@@ -18,7 +18,8 @@ import {
     ChevronRight,
     Loader2,
     X,
-    Settings2
+    Settings2,
+    Gem
 } from "lucide-react";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -204,20 +205,27 @@ export default function AdminShopDetail() {
     const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
     
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCustomPlanModalOpen, setIsCustomPlanModalOpen] = useState(false);
 
     // Close modal on escape key
     useEffect(() => {
-        const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsModalOpen(false); };
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsModalOpen(false);
+                setIsCustomPlanModalOpen(false);
+            }
+        };
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
     // Close modal after successful submission
     useEffect(() => {
-        if (actionData?.success && isModalOpen) {
+        if (actionData?.success && (isModalOpen || isCustomPlanModalOpen)) {
             setIsModalOpen(false);
+            setIsCustomPlanModalOpen(false);
         }
-    }, [actionData, isModalOpen]);
+    }, [actionData, isModalOpen, isCustomPlanModalOpen]);
 
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString("en-GB", {
@@ -259,6 +267,15 @@ export default function AdminShopDetail() {
 
         if (rule.countryCodes === "*") return "All Countries (*)";
         return formatListPreview(rule.countryCodes, "Invalid: no countries selected");
+    };
+
+    const formatCustomPlanPrice = () => Number(settings?.customPlanPrice || 0).toFixed(2);
+    const formatCustomPlanLimit = () => {
+        if (!settings) return "Not configured";
+        if (settings.customPlanNoOverage || !settings.customPlanVisitorLimit) {
+            return "Unlimited usage, no overage";
+        }
+        return `${settings.customPlanVisitorLimit.toLocaleString()} visitors, overage enabled`;
     };
 
     return (
@@ -361,6 +378,18 @@ export default function AdminShopDetail() {
                 .info-item:last-child { border-bottom: none; }
                 .info-item .label { color: #64748b; font-size: 13px; font-weight: 500; }
                 .info-item .value { font-weight: 700; font-size: 13px; color: #1e293b; }
+                .custom-plan-summary {
+                    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+                    padding: 14px 0; border-bottom: 1px solid #f1f5f9;
+                }
+                .custom-plan-summary-main { min-width: 0; }
+                .custom-plan-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+                .custom-plan-name { color: #1e293b; font-size: 13px; font-weight: 800; }
+                .custom-plan-pill { padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+                .custom-plan-pill.enabled { background: #ecfdf5; color: #059669; }
+                .custom-plan-pill.disabled { background: #f1f5f9; color: #64748b; }
+                .custom-plan-meta { color: #64748b; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .modal-content-wide { max-width: 620px; }
 
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
                 .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid transparent; transition: all 0.2s; }
@@ -525,6 +554,77 @@ export default function AdminShopDetail() {
                 </div>
             )}
 
+            {hasSettings && settings && isCustomPlanModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsCustomPlanModalOpen(false)}>
+                    <div className="modal-content modal-content-wide" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div className="modal-title">
+                                <Gem size={20} color="#1e293b" />
+                                Configure Custom Plan
+                            </div>
+                            <button className="modal-close" onClick={() => setIsCustomPlanModalOpen(false)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
+                                Configure the private plan that will appear on this merchant's pricing page after it is enabled.
+                            </p>
+                            <Form method="post">
+                                <input type="hidden" name="intent" value="save_custom_plan" />
+                                <div className="billing-input-group">
+                                    <label>Plan status</label>
+                                    <select name="customPlanEnabled" className="billing-input" defaultValue={settings.customPlanEnabled ? "true" : "false"}>
+                                        <option value="true">Enabled for this shop</option>
+                                        <option value="false">Disabled</option>
+                                    </select>
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Display name</label>
+                                    <input name="customPlanName" className="billing-input" defaultValue={settings.customPlanName || "Custom plan"} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div className="billing-input-group">
+                                        <label>Monthly price USD</label>
+                                        <input type="number" step="0.01" min="0" name="customPlanPrice" className="billing-input" defaultValue={settings.customPlanPrice || "79.99"} />
+                                    </div>
+                                    <div className="billing-input-group">
+                                        <label>Trial days</label>
+                                        <input type="number" min="0" max="90" name="customPlanTrialDays" className="billing-input" defaultValue={settings.customPlanTrialDays ?? 7} />
+                                    </div>
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Visitor limit</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        name="customPlanVisitorLimit"
+                                        className="billing-input"
+                                        placeholder="Leave empty for unlimited"
+                                        defaultValue={settings.customPlanVisitorLimit ?? ""}
+                                    />
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Overage mode</label>
+                                    <select name="customPlanNoOverage" className="billing-input" defaultValue={settings.customPlanNoOverage ? "true" : "false"}>
+                                        <option value="true">No overage charges</option>
+                                        <option value="false">Use app overage billing after limit</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '28px' }}>
+                                    <button type="button" className="inline-toggle-btn" onClick={() => setIsCustomPlanModalOpen(false)}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="primary-btn" style={{ width: 'auto', minWidth: '160px' }} disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Save Plan <ChevronRight size={16} /></>}
+                                    </button>
+                                </div>
+                            </Form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="stats-grid-v3">
                 <div className="premium-stat-card">
                     <div className="stat-card-icon" style={{ background: '#e0f2fe', color: '#0ea5e9' }}>
@@ -606,58 +706,25 @@ export default function AdminShopDetail() {
                                     <span className="label">Cookie TTL</span>
                                     <span className="value">{settings!.cookieDuration} Days</span>
                                 </div>
-                                <div style={{ padding: '16px 0 4px', borderTop: '1px solid #f1f5f9', marginTop: '8px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                        <span className="label">Custom Plan</span>
-                                        <span style={{ color: settings!.customPlanEnabled ? '#059669' : '#64748b', fontSize: '12px', fontWeight: 800 }}>
-                                            {settings!.customPlanEnabled ? 'ENABLED' : 'DISABLED'}
-                                        </span>
+                                <div className="custom-plan-summary">
+                                    <div className="custom-plan-summary-main">
+                                        <div className="custom-plan-title">
+                                            <span className="custom-plan-name">Custom Plan</span>
+                                            <span className={`custom-plan-pill ${settings!.customPlanEnabled ? 'enabled' : 'disabled'}`}>
+                                                {settings!.customPlanEnabled ? 'ENABLED' : 'DISABLED'}
+                                            </span>
+                                        </div>
+                                        <div className="custom-plan-meta">
+                                            {settings!.customPlanName || "Custom plan"} · ${formatCustomPlanPrice()}/mo · {formatCustomPlanLimit()}
+                                        </div>
                                     </div>
-                                    <Form method="post">
-                                        <input type="hidden" name="intent" value="save_custom_plan" />
-                                        <div className="billing-input-group">
-                                            <label>Plan status</label>
-                                            <select name="customPlanEnabled" className="billing-input" defaultValue={settings!.customPlanEnabled ? "true" : "false"}>
-                                                <option value="true">Enabled for this shop</option>
-                                                <option value="false">Disabled</option>
-                                            </select>
-                                        </div>
-                                        <div className="billing-input-group">
-                                            <label>Display name</label>
-                                            <input name="customPlanName" className="billing-input" defaultValue={settings!.customPlanName || "Custom plan"} />
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                            <div className="billing-input-group">
-                                                <label>Monthly price USD</label>
-                                                <input type="number" step="0.01" min="0" name="customPlanPrice" className="billing-input" defaultValue={settings!.customPlanPrice || "79.99"} />
-                                            </div>
-                                            <div className="billing-input-group">
-                                                <label>Trial days</label>
-                                                <input type="number" min="0" max="90" name="customPlanTrialDays" className="billing-input" defaultValue={settings!.customPlanTrialDays ?? 7} />
-                                            </div>
-                                        </div>
-                                        <div className="billing-input-group">
-                                            <label>Visitor limit</label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                name="customPlanVisitorLimit"
-                                                className="billing-input"
-                                                placeholder="Leave empty for unlimited"
-                                                defaultValue={settings!.customPlanVisitorLimit ?? ""}
-                                            />
-                                        </div>
-                                        <div className="billing-input-group">
-                                            <label>Overage mode</label>
-                                            <select name="customPlanNoOverage" className="billing-input" defaultValue={settings!.customPlanNoOverage ? "true" : "false"}>
-                                                <option value="true">No overage charges</option>
-                                                <option value="false">Use app overage billing after limit</option>
-                                            </select>
-                                        </div>
-                                        <button type="submit" className="primary-btn" disabled={isSubmitting}>
-                                            {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Save Custom Plan <ChevronRight size={16} /></>}
-                                        </button>
-                                    </Form>
+                                    <button
+                                        type="button"
+                                        className="inline-toggle-btn enabled"
+                                        onClick={() => setIsCustomPlanModalOpen(true)}
+                                    >
+                                        Configure
+                                    </button>
                                 </div>
                                 <div className="info-item">
                                     <span className="label">Installed On</span>
