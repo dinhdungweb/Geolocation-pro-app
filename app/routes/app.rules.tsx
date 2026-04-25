@@ -264,7 +264,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (intent === "import") {
-            // Server-side plan check: Pro (Premium), Plus and Elite can import
+            // Server-side plan check: paid plans can import
             if (!hasProPlan) {
                 return json({ success: false, message: "Import is only available on Pro plan and above" }, { status: 403 });
             }

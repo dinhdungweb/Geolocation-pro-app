@@ -19,7 +19,7 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PLUS_PLAN } from "../billing.config";
+import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PLUS_PLAN, UNLIMITED_PLAN } from "../billing.config";
 // checkAndChargeOverage is called in the parent layout (app.tsx), not here
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
@@ -212,9 +212,10 @@ export default function Index() {
   const { smUp } = useBreakpoints();
 
   // Calculate usage percentage
-  const usagePercent = Math.min(100, Math.round((currentUsage / planLimit) * 100));
-  const isNearLimit = usagePercent >= 80;
-  const isOverLimit = currentUsage > planLimit;
+  const isUnlimitedPlan = currentPlan === UNLIMITED_PLAN;
+  const usagePercent = isUnlimitedPlan ? 100 : Math.min(100, Math.round((currentUsage / planLimit) * 100));
+  const isNearLimit = !isUnlimitedPlan && usagePercent >= 80;
+  const isOverLimit = !isUnlimitedPlan && currentUsage > planLimit;
 
   const handleOpenThemeEditor = () => {
     const shopName = shop.replace('.myshopify.com', '');
@@ -339,10 +340,10 @@ export default function Index() {
             <BlockStack gap="200">
               <InlineStack align="space-between">
                 <Text as="p" variant="bodySm">
-                  <strong>{currentUsage.toLocaleString()}</strong> / {planLimit.toLocaleString()} visitors (includes redirects, blocks & popups)
+                  <strong>{currentUsage.toLocaleString()}</strong> / {isUnlimitedPlan ? "Unlimited" : planLimit.toLocaleString()} visitors (includes redirects, blocks & popups)
                 </Text>
                 <Text as="p" variant="bodySm" tone={isOverLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
-                  {usagePercent}%
+                  {isUnlimitedPlan ? "Unlimited" : `${usagePercent}%`}
                 </Text>
               </InlineStack>
               <ProgressBar

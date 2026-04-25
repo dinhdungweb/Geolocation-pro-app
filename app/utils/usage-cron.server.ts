@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
-import { PLAN_LIMITS, FREE_PLAN, OVERAGE_HARD_LIMIT } from '../billing.config';
+import { PLAN_LIMITS, FREE_PLAN, OVERAGE_HARD_LIMIT, UNLIMITED_PLAN } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 
 /**
@@ -56,10 +56,11 @@ export async function checkAllShopsUsage() {
         });
 
         const currentUsage = monthlyUsage?.totalVisitors || 0;
-        const usagePercent = (currentUsage / planLimit) * 100;
+        const isUnlimitedPlan = currentPlan === UNLIMITED_PLAN;
+        const usagePercent = isUnlimitedPlan ? 0 : (currentUsage / planLimit) * 100;
 
         // 0. Check for Hard Limit (Unlimited Reward)
-        if (currentUsage >= OVERAGE_HARD_LIMIT) {
+        if (!isUnlimitedPlan && currentUsage >= OVERAGE_HARD_LIMIT) {
             const sentUnlimited = await hasSentEmail(shop, 'limit_unlimited', yearMonth);
             if (!sentUnlimited) {
                 console.log(`[Cron] Sending Unlimited Reward email to ${shop}`);
@@ -103,7 +104,7 @@ export async function checkAllShopsUsage() {
 
         // 3. Auto-bill any accumulated overage in the background
         // Skip Free plan shops - they have no subscription, so billing API calls would be wasted
-        if (currentPlan !== FREE_PLAN) {
+        if (currentPlan !== FREE_PLAN && !isUnlimitedPlan) {
             await checkAndChargeOverageBackground(shop);
         }
     }

@@ -10,7 +10,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
-import { PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN } from "./billing.config";
+import { PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN } from "./billing.config";
 import { sendAdminEmail, hasSentEmail } from "./utils/email.server";
 import { getWelcomeEmailHtml } from "./utils/email-templates";
 
@@ -73,6 +73,16 @@ const shopify = shopifyApp({
           currencyCode: "USD",
           interval: BillingInterval.Usage,
           terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
+        },
+      ],
+      trialDays: 7,
+    },
+    [UNLIMITED_PLAN]: {
+      lineItems: [
+        {
+          amount: 79.99,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
         },
       ],
       trialDays: 7,

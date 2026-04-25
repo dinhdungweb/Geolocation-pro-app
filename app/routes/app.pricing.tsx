@@ -20,6 +20,7 @@ import {
     PREMIUM_PLAN,
     PLUS_PLAN,
     ELITE_PLAN,
+    UNLIMITED_PLAN,
     ALL_PAID_PLANS,
     PLAN_LIMITS,
     OVERAGE_RATE,
@@ -152,12 +153,14 @@ interface PlanCardProps {
     name: string;
     subtitle: string;
     price: string;
-    visitorLimit: number;
+    visitorLimit?: number;
+    visitorLimitLabel?: string;
     features: string[];
     isCurrentPlan: boolean;
     isFree?: boolean;
     isRecommended?: boolean;
     hasTrial?: boolean;
+    noOverage?: boolean;
     ribbon: string;
     ribbonTone?: "green" | "blue";
     onSelect: () => void;
@@ -172,93 +175,99 @@ function PlanCard({
     subtitle,
     price,
     visitorLimit,
+    visitorLimitLabel,
     features,
     isCurrentPlan,
     isFree,
     isRecommended,
     hasTrial,
+    noOverage,
     ribbon,
     ribbonTone = "green",
     onSelect,
 }: PlanCardProps) {
     return (
-        <Card padding="0">
-            <div className={`pricing-plan-card ${isCurrentPlan ? "pricing-plan-current" : ""}`}>
-                <div className={`pricing-plan-ribbon pricing-plan-ribbon-${ribbonTone}`}>
-                    {ribbon}
-                </div>
+        <div className="pricing-plan-shell">
+            <Card padding="0">
+                <div className={`pricing-plan-card ${isCurrentPlan ? "pricing-plan-current" : ""}`}>
+                    <div className={`pricing-plan-ribbon pricing-plan-ribbon-${ribbonTone}`}>
+                        {ribbon}
+                    </div>
 
-                <div className="pricing-plan-body">
-                    <BlockStack gap="400">
-                        <InlineStack align="space-between" blockAlign="start" gap="200" wrap={false}>
+                    <div className="pricing-plan-body">
+                        <BlockStack gap="400">
+                            <InlineStack align="space-between" blockAlign="start" gap="200" wrap={false}>
+                                <BlockStack gap="100">
+                                    <Text as="h2" variant="headingLg">{formatPlanName(name)}</Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        {subtitle}
+                                    </Text>
+                                </BlockStack>
+                                {isCurrentPlan ? (
+                                    <Badge tone="success">Current</Badge>
+                                ) : isRecommended ? (
+                                    <Badge tone="success">Most popular</Badge>
+                                ) : null}
+                            </InlineStack>
+
                             <BlockStack gap="100">
-                                <Text as="h2" variant="headingLg">{formatPlanName(name)}</Text>
+                                <InlineStack gap="100" blockAlign="end">
+                                    <Text as="p" variant="headingXl">
+                                        {isFree ? "Free" : `$${price}`}
+                                    </Text>
+                                    {!isFree && (
+                                        <Text as="span" variant="bodySm" tone="subdued">
+                                            USD / month
+                                        </Text>
+                                    )}
+                                </InlineStack>
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                    {subtitle}
+                                    {isFree ? "No monthly charge" : hasTrial ? "7-day free trial included" : "Monthly Shopify billing"}
                                 </Text>
                             </BlockStack>
-                            {isCurrentPlan ? (
-                                <Badge tone="success">Current</Badge>
-                            ) : isRecommended ? (
-                                <Badge tone="success">Most popular</Badge>
-                            ) : null}
-                        </InlineStack>
+                        </BlockStack>
 
-                        <BlockStack gap="100">
-                            <InlineStack gap="100" blockAlign="end">
-                                <Text as="p" variant="headingXl">
-                                    {isFree ? "Free" : `$${price}`}
+                        <Divider />
+
+                        <BlockStack gap="300">
+                            <BlockStack gap="100">
+                                <Text as="p" variant="bodySm" fontWeight="semibold">
+                                    Monthly usage
                                 </Text>
-                                {!isFree && (
-                                    <Text as="span" variant="bodySm" tone="subdued">
-                                        USD / month
-                                    </Text>
-                                )}
-                            </InlineStack>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                {isFree ? "No monthly charge" : hasTrial ? "7-day free trial included" : "Monthly Shopify billing"}
-                            </Text>
-                        </BlockStack>
-                    </BlockStack>
+                                <ul className="pricing-feature-list">
+                                    <li>{visitorLimitLabel || `${visitorLimit?.toLocaleString()} visitors included`}</li>
+                                    <li>Redirects, blocks and popups included</li>
+                                    {!isFree && (
+                                        <li>{noOverage ? "No overage charges" : "Overage billing available after limit"}</li>
+                                    )}
+                                </ul>
+                            </BlockStack>
 
-                    <Divider />
-
-                    <BlockStack gap="300">
-                        <BlockStack gap="100">
-                            <Text as="p" variant="bodySm" fontWeight="semibold">
-                                Monthly usage
-                            </Text>
-                            <ul className="pricing-feature-list">
-                                <li>{visitorLimit.toLocaleString()} visitors included</li>
-                                <li>Redirects, blocks and popups included</li>
-                                {!isFree && <li>Overage billing available after limit</li>}
-                            </ul>
+                            <BlockStack gap="100">
+                                <Text as="p" variant="bodySm" fontWeight="semibold">
+                                    Standout features
+                                </Text>
+                                <ul className="pricing-feature-list">
+                                    {features.map((feature) => (
+                                        <li key={feature}>{feature}</li>
+                                    ))}
+                                </ul>
+                            </BlockStack>
                         </BlockStack>
 
-                        <BlockStack gap="100">
-                            <Text as="p" variant="bodySm" fontWeight="semibold">
-                                Standout features
-                            </Text>
-                            <ul className="pricing-feature-list">
-                                {features.map((feature) => (
-                                    <li key={feature}>{feature}</li>
-                                ))}
-                            </ul>
-                        </BlockStack>
-                    </BlockStack>
-
-                    <div className="pricing-plan-action">
-                        {isCurrentPlan ? (
-                            <Button disabled fullWidth>Current plan</Button>
-                        ) : (
-                            <Button variant={isFree ? "secondary" : "primary"} onClick={onSelect} fullWidth>
-                                {isFree ? "Downgrade" : "Subscribe"}
-                            </Button>
-                        )}
+                        <div className="pricing-plan-action">
+                            {isCurrentPlan ? (
+                                <Button disabled fullWidth>Current plan</Button>
+                            ) : (
+                                <Button variant={isFree ? "secondary" : "primary"} onClick={onSelect} fullWidth>
+                                    {isFree ? "Downgrade" : "Subscribe"}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
-        </Card>
+            </Card>
+        </div>
     );
 }
 
@@ -330,10 +339,28 @@ export default function PricingPage() {
             ribbon: "Best for high traffic",
             ribbonTone: "blue" as const,
         },
+        {
+            name: UNLIMITED_PLAN,
+            subtitle: "For stores that want predictable billing",
+            price: "79.99",
+            visitorLimit: PLAN_LIMITS[UNLIMITED_PLAN],
+            visitorLimitLabel: "Unlimited visitors included",
+            features: [
+                "Everything in Elite",
+                "Unlimited monthly visitors",
+                "No overage charges",
+                "Priority VIP support",
+            ],
+            hasTrial: true,
+            noOverage: true,
+            ribbon: "Unlimited usage",
+            ribbonTone: "blue" as const,
+        },
     ];
 
     return (
         <Page
+            fullWidth
             title="Pricing plans"
             subtitle="Choose the monthly visitor limit and controls that match your store traffic."
             backAction={{ url: "/app" }}
@@ -343,12 +370,22 @@ export default function PricingPage() {
                 {`
                     .pricing-cards-grid {
                         display: grid;
-                        grid-template-columns: repeat(4, minmax(0, 1fr));
+                        grid-template-columns: repeat(5, minmax(0, 1fr));
                         gap: 12px;
                         align-items: stretch;
                     }
-                    .pricing-plan-card {
+                    .pricing-plan-shell {
                         min-height: 100%;
+                        display: flex;
+                    }
+                    .pricing-plan-shell > *,
+                    .pricing-plan-shell .Polaris-ShadowBevel,
+                    .pricing-plan-shell .Polaris-Box {
+                        flex: 1;
+                        height: 100%;
+                    }
+                    .pricing-plan-card {
+                        height: 100%;
                         display: flex;
                         flex-direction: column;
                         border: 1px solid transparent;
@@ -381,6 +418,7 @@ export default function PricingPage() {
                         flex-direction: column;
                         gap: 16px;
                         padding: 18px 14px 16px;
+                        min-height: 0;
                     }
                     .pricing-feature-list {
                         margin: 0;
@@ -424,6 +462,11 @@ export default function PricingPage() {
                         border-radius: 8px;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                     }
+                    @media (max-width: 80em) {
+                        .pricing-cards-grid {
+                            grid-template-columns: repeat(3, minmax(0, 1fr));
+                        }
+                    }
                     @media (max-width: 64em) {
                         .pricing-cards-grid {
                             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -448,11 +491,13 @@ export default function PricingPage() {
                             subtitle={plan.subtitle}
                             price={plan.price}
                             visitorLimit={plan.visitorLimit}
+                            visitorLimitLabel={plan.visitorLimitLabel}
                             features={plan.features}
                             isCurrentPlan={currentPlan === plan.name}
                             isFree={plan.isFree}
                             isRecommended={plan.isRecommended}
                             hasTrial={plan.hasTrial}
+                            noOverage={plan.noOverage}
                             ribbon={plan.ribbon}
                             ribbonTone={plan.ribbonTone}
                             onSelect={() => handleSelectPlan(plan.name)}
@@ -479,7 +524,7 @@ export default function PricingPage() {
                             <div className="pricing-note-item">
                                 <BlockStack gap="100">
                                     <Text as="p" fontWeight="semibold">Overage</Text>
-                                    <Text as="p" tone="subdued">Paid plans charge extra visitors through Shopify billing when limits are exceeded.</Text>
+                                    <Text as="p" tone="subdued">Premium, Plus and Elite can charge extra visitors when limits are exceeded. Unlimited has no overage charges.</Text>
                                 </BlockStack>
                             </div>
                         </div>

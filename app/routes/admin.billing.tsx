@@ -329,6 +329,7 @@ export default function AdminBilling() {
                     <option value="premium">Premium</option>
                     <option value="plus">Plus</option>
                     <option value="elite">Elite</option>
+                    <option value="unlimited">Unlimited</option>
                 </select>
                 {(searchQuery || statusFilter !== "all" || planFilter !== "all") && (
                     <button className="b-clear" onClick={() => { setSearchQuery(""); setStatusFilter("all"); setPlanFilter("all"); }}>

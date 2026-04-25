@@ -624,6 +624,7 @@ export default function EmailComposer() {
                             <div className={`plan-chip ${filterPlan === 'premium' ? 'active' : ''}`} onClick={() => setFilterPlan('premium')}>Premium</div>
                             <div className={`plan-chip ${filterPlan === 'plus' ? 'active' : ''}`} onClick={() => setFilterPlan('plus')}>Plus</div>
                             <div className={`plan-chip ${filterPlan === 'elite' ? 'active' : ''}`} onClick={() => setFilterPlan('elite')}>Elite</div>
+                            <div className={`plan-chip ${filterPlan === 'unlimited' ? 'active' : ''}`} onClick={() => setFilterPlan('unlimited')}>Unlimited</div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px 12px' }}>

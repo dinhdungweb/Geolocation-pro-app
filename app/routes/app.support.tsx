@@ -40,7 +40,7 @@ const faqItems = [
     },
     {
         question: "What happens when I exceed my visitor limit?",
-        answer: "Paid plans can charge overage through Shopify billing. Free plan traffic may pause until the next billing cycle.",
+        answer: "Premium, Plus and Elite can charge overage through Shopify billing. Unlimited has no overage charges, and Free plan traffic may pause until the next billing cycle.",
     },
 ];
 
