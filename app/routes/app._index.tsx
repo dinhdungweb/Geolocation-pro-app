@@ -10,7 +10,6 @@ import {
   BlockStack,
   InlineStack,
   Badge,
-  CalloutCard,
   IndexTable,
   Button,
   Banner,
@@ -302,26 +301,6 @@ export default function Index() {
   );
 
   // visitsRowMarkup removed - using plain HTML table
-  const reviewCalloutContent = (
-    <BlockStack gap="300">
-      <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
-      {showReviewPrompt && (
-        <BlockStack gap="200">
-          <Text as="p" variant="bodyMd" tone="subdued">
-            Your honest feedback helps us improve Geo: Redirect &amp; Country Block for merchants like you.
-          </Text>
-          <InlineStack gap="300">
-            <Button variant="plain" onClick={handleSnoozeReviewPrompt}>
-              Maybe later
-            </Button>
-            <Button variant="plain" onClick={handleDismissReviewPrompt}>
-              Don&apos;t ask again
-            </Button>
-          </InlineStack>
-        </BlockStack>
-      )}
-    </BlockStack>
-  );
 
   return (
     <Page>
@@ -391,18 +370,94 @@ export default function Index() {
           .traffic-table .country-cell span {
             font-weight: 600;
           }
+          .dashboard-summary-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 20px 24px;
+            min-height: 124px;
+          }
+          .dashboard-summary-main {
+            flex: 1;
+            min-width: 0;
+          }
+          .dashboard-summary-illustration {
+            width: 88px;
+            height: 88px;
+            object-fit: contain;
+            flex: 0 0 auto;
+          }
+          .dashboard-review-prompt {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 10px 12px;
+            background: var(--p-color-bg-surface-secondary, #f7f7f7);
+            border-radius: 8px;
+          }
+          .dashboard-review-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+          @media (max-width: 47.9975em) {
+            .dashboard-summary-card {
+              align-items: flex-start;
+              padding: 16px;
+            }
+            .dashboard-summary-illustration {
+              display: none;
+            }
+            .dashboard-review-prompt {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+          }
         `}
       </style>
       <BlockStack gap="500">
 
         {/* Banner */}
-        <CalloutCard
-          title={`Visitors: ${stats.totalRedirected} redirected, ${stats.totalBlocked} blocked`}
-          illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
-          primaryAction={{ content: 'Rate Us', onAction: handleOpenReview }}
-        >
-          {reviewCalloutContent}
-        </CalloutCard>
+        <Card padding="0">
+          <div className="dashboard-summary-card">
+            <div className="dashboard-summary-main">
+              <BlockStack gap="300">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingSm">
+                    Visitors: {stats.totalRedirected} redirected, {stats.totalBlocked} blocked
+                  </Text>
+                  <Text as="p" variant="bodyMd">
+                    In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.
+                  </Text>
+                </BlockStack>
+                {showReviewPrompt && (
+                  <div className="dashboard-review-prompt">
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Your honest feedback helps us improve Geo: Redirect &amp; Country Block for merchants like you.
+                    </Text>
+                    <div className="dashboard-review-actions">
+                      <Button onClick={handleOpenReview}>Rate Us</Button>
+                      <Button variant="plain" onClick={handleSnoozeReviewPrompt}>
+                        Maybe later
+                      </Button>
+                      <Button variant="plain" onClick={handleDismissReviewPrompt}>
+                        Don&apos;t ask again
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </BlockStack>
+            </div>
+            <img
+              className="dashboard-summary-illustration"
+              src="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
+              alt=""
+            />
+          </div>
+        </Card>
 
         {/* Usage Progress Bar */}
         <Card>
