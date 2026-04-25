@@ -10,7 +10,7 @@ const resend = process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_
 
 const DEFAULT_SENDER = process.env.SENDER_EMAIL || 'send@geopro.bluepeaks.top';
 
-export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'manual';
+export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'limit_unlimited' | 'manual';
 
 function getEmailLogType(type: EmailType, dedupeKey?: string) {
     return dedupeKey ? `${type}:${dedupeKey}` : type;
