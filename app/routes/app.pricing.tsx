@@ -238,7 +238,11 @@ function PlanCard({
                                     )}
                                 </InlineStack>
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                    {isFree ? "No monthly charge" : hasTrial ? "7-day free trial included" : "Monthly Shopify billing"}
+                                    {isFree
+                                        ? "No monthly charge"
+                                        : hasTrial
+                                            ? "7-day free trial included"
+                                            : "Monthly Shopify billing"}
                                 </Text>
                             </BlockStack>
                         </BlockStack>
@@ -394,6 +398,11 @@ export default function PricingPage() {
                     .pricing-cards-grid-5 {
                         grid-template-columns: repeat(5, minmax(0, 1fr));
                     }
+                    .pricing-custom-plan-card {
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        border-radius: 8px;
+                        background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+                    }
                     .pricing-plan-shell {
                         min-height: 100%;
                         display: flex;
@@ -503,7 +512,28 @@ export default function PricingPage() {
                 `}
             </style>
             <BlockStack gap="500">
-                <div className={`pricing-cards-grid pricing-cards-grid-${visiblePlans.length}`}>
+                {!canUseUnlimitedPlan && (
+                    <Card>
+                        <div className="pricing-custom-plan-card">
+                            <Box padding="400">
+                                <InlineStack align="space-between" blockAlign="center" gap="400">
+                                    <BlockStack gap="150">
+                                        <InlineStack gap="200" blockAlign="center">
+                                            <Text as="h2" variant="headingMd">Need unlimited traffic?</Text>
+                                            <Badge tone="info">Custom plan</Badge>
+                                        </InlineStack>
+                                        <Text as="p" tone="subdued">
+                                            High-volume stores can request a private unlimited plan with predictable monthly billing and no overage charges.
+                                        </Text>
+                                    </BlockStack>
+                                    <Button url="/app/support" variant="primary">Contact support</Button>
+                                </InlineStack>
+                            </Box>
+                        </div>
+                    </Card>
+                )}
+
+                <div className={`pricing-cards-grid ${visiblePlans.length === 5 ? "pricing-cards-grid-5" : ""}`}>
                     {visiblePlans.map((plan) => (
                         <PlanCard
                             key={plan.name}
@@ -556,11 +586,6 @@ export default function PricingPage() {
                         <Text as="p" variant="bodySm" tone="subdued">
                             Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor.
                         </Text>
-                        {!canUseUnlimitedPlan && (
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                Need a custom high-volume plan? Contact support and we can review options for your store.
-                            </Text>
-                        )}
                     </BlockStack>
                 </Card>
 
