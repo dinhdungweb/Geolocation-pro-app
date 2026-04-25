@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { useEffect, useState } from "react";
 import {
   Page,
   Layout,
@@ -24,6 +25,10 @@ import { ALL_PAID_PLANS, PLAN_LIMITS, FREE_PLAN, PLUS_PLAN } from "../billing.co
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
 
+const REVIEW_URL = "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal";
+const REVIEW_PROMPT_STORAGE_KEY = "geo_review_prompt_state";
+const REVIEW_PROMPT_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
     <Text as="p" tone="subdued">{title}</Text>
@@ -44,6 +49,28 @@ interface VisitsDataItem {
   popup: number;
   redirected: string;
   blocked: number;
+}
+
+function parseDashboardMetric(value: string | number) {
+  return Number.parseInt(String(value).replace(/,/g, ''), 10) || 0;
+}
+
+function shouldShowStoredReviewPrompt() {
+  const storedState = window.localStorage.getItem(REVIEW_PROMPT_STORAGE_KEY);
+  if (!storedState) {
+    return true;
+  }
+
+  if (storedState === "dismissed") {
+    return false;
+  }
+
+  try {
+    const parsedState = JSON.parse(storedState) as { snoozedUntil?: number };
+    return !parsedState.snoozedUntil || Date.now() >= parsedState.snoozedUntil;
+  } catch {
+    return true;
+  }
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -210,15 +237,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Index() {
   const { shop, currentPlan, planLimit, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
   const { smUp } = useBreakpoints();
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
 
   // Calculate usage percentage
   const usagePercent = Math.min(100, Math.round((currentUsage / planLimit) * 100));
   const isNearLimit = usagePercent >= 80;
   const isOverLimit = currentUsage > planLimit;
+  const redirectedCount = parseDashboardMetric(stats.totalRedirected);
+  const blockedCount = parseDashboardMetric(stats.totalBlocked);
+  const hasReviewWorthyActivity = stats.activeRules > 0 && redirectedCount + blockedCount > 0;
+
+  useEffect(() => {
+    if (!hasReviewWorthyActivity) {
+      setShowReviewPrompt(false);
+      return;
+    }
+
+    setShowReviewPrompt(shouldShowStoredReviewPrompt());
+  }, [hasReviewWorthyActivity]);
 
   const handleOpenThemeEditor = () => {
     const shopName = shop.replace('.myshopify.com', '');
     window.open(`https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps`, '_blank');
+  };
+
+  const handleOpenReview = () => {
+    window.open(REVIEW_URL, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSnoozeReviewPrompt = () => {
+    window.localStorage.setItem(
+      REVIEW_PROMPT_STORAGE_KEY,
+      JSON.stringify({ snoozedUntil: Date.now() + REVIEW_PROMPT_SNOOZE_MS }),
+    );
+    setShowReviewPrompt(false);
+  };
+
+  const handleDismissReviewPrompt = () => {
+    window.localStorage.setItem(REVIEW_PROMPT_STORAGE_KEY, "dismissed");
+    setShowReviewPrompt(false);
   };
 
   // Removed IndexTable state for visits - using plain HTML table now
@@ -245,6 +302,26 @@ export default function Index() {
   );
 
   // visitsRowMarkup removed - using plain HTML table
+  const reviewCalloutContent = (
+    <BlockStack gap="300">
+      <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
+      {showReviewPrompt && (
+        <BlockStack gap="200">
+          <Text as="p" variant="bodyMd" tone="subdued">
+            Your honest feedback helps us improve Geo: Redirect &amp; Country Block for merchants like you.
+          </Text>
+          <InlineStack gap="300">
+            <Button variant="plain" onClick={handleSnoozeReviewPrompt}>
+              Maybe later
+            </Button>
+            <Button variant="plain" onClick={handleDismissReviewPrompt}>
+              Don&apos;t ask again
+            </Button>
+          </InlineStack>
+        </BlockStack>
+      )}
+    </BlockStack>
+  );
 
   return (
     <Page>
@@ -322,9 +399,9 @@ export default function Index() {
         <CalloutCard
           title={`Visitors: ${stats.totalRedirected} redirected, ${stats.totalBlocked} blocked`}
           illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
-          primaryAction={{ content: 'Rate Us', onAction: () => window.open('https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal', '_blank') }}
+          primaryAction={{ content: 'Rate Us', onAction: handleOpenReview }}
         >
-          <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
+          {reviewCalloutContent}
         </CalloutCard>
 
         {/* Usage Progress Bar */}
