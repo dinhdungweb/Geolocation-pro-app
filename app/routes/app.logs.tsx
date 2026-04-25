@@ -204,7 +204,8 @@ export default function VisitorLogs() {
                     .visitor-log-pagination {
                         display: flex;
                         align-items: center;
-                        justify-content: space-between;
+                        justify-content: center;
+                        flex-wrap: wrap;
                         gap: 16px;
                         padding: 14px 20px;
                         border-top: 1px solid var(--p-color-border-secondary, #dfe3e8);
