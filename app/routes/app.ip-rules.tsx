@@ -55,6 +55,16 @@ function validateUrl(url: string) {
     return !dangerous.test(url.trim());
 }
 
+const IP_REQUIRED_MESSAGE = "Please enter at least one IP address before saving this rule.";
+
+function normalizeIPAddresses(value: unknown) {
+    if (typeof value !== "string") return [];
+    return value
+        .split(/[\n,]+/)
+        .map((ip) => ip.trim())
+        .filter(Boolean);
+}
+
 function isPaidBillingConfig(billingConfig: any) {
     return billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 }
@@ -104,7 +114,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             const name = formData.get("name") as string;
-            const ipAddresses = formData.get("ipAddresses") as string;
+            const ipAddresses = normalizeIPAddresses(formData.get("ipAddresses")).join(",");
+            if (!ipAddresses) {
+                return json({ success: false, message: IP_REQUIRED_MESSAGE }, { status: 400 });
+            }
             const targetUrl = formData.get("targetUrl") as string || "";
             if (!validateUrl(targetUrl)) {
                 return json({ success: false, message: "Invalid URL format" }, { status: 400 });
@@ -141,7 +154,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             const id = formData.get("id") as string;
             const name = formData.get("name") as string;
-            const ipAddresses = formData.get("ipAddresses") as string;
+            const ipAddresses = normalizeIPAddresses(formData.get("ipAddresses")).join(",");
+            if (!ipAddresses) {
+                return json({ success: false, message: IP_REQUIRED_MESSAGE }, { status: 400 });
+            }
             const targetUrl = formData.get("targetUrl") as string || "";
             if (!validateUrl(targetUrl)) {
                 return json({ success: false, message: "Invalid URL format" }, { status: 400 });
@@ -213,15 +229,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             let created = 0;
+            let skipped = 0;
             for (const rule of importedRules) {
-                if (!rule.name || !rule.ipAddresses) continue;
-                if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
+                const ipAddresses = normalizeIPAddresses(rule.ipAddresses).join(",");
+                if (!rule.name || !ipAddresses) {
+                    skipped++;
+                    continue;
+                }
+                if (rule.targetUrl && !validateUrl(rule.targetUrl)) {
+                    skipped++;
+                    continue;
+                }
 
                 await prisma.redirectRule.create({
                     data: {
                         shop,
                         name: rule.name,
-                        ipAddresses: rule.ipAddresses || "",
+                        ipAddresses,
                         countryCodes: "",
                         targetUrl: rule.targetUrl || "",
                         priority: parseInt(rule.priority) || 0,
@@ -236,7 +260,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 created++;
             }
 
-            return json({ success: true, message: `Successfully imported ${created} IP rule(s)` });
+            const skippedMessage = skipped > 0 ? ` Skipped ${skipped} invalid IP rule(s).` : "";
+            return json({ success: true, message: `Imported ${created} IP rule(s).${skippedMessage}` });
         }
 
         return json({ success: false, message: "Unknown intent" });
@@ -268,6 +293,7 @@ export default function IPRulesPage() {
 
     const { smUp } = useBreakpoints();
     const [mounted, setMounted] = useState(false);
+    const hasNormalizedIPs = normalizeIPAddresses(formIPAddresses).length > 0;
 
     useEffect(() => {
         setMounted(true);
@@ -323,8 +349,7 @@ export default function IPRulesPage() {
         formData.append("intent", editingRule ? "update" : "create");
         if (editingRule) formData.append("id", editingRule.id);
         formData.append("name", formName);
-        // Normalize IP addresses: replace newlines with commas, remove extra spaces
-        const normalizedIPs = formIPAddresses.split(/[\n,]+/).map(ip => ip.trim()).filter(Boolean).join(",");
+        const normalizedIPs = normalizeIPAddresses(formIPAddresses).join(",");
         formData.append("ipAddresses", normalizedIPs);
         formData.append("targetUrl", formTargetUrl);
         formData.append("priority", formPriority);
@@ -618,7 +643,7 @@ export default function IPRulesPage() {
                 primaryAction={{
                     content: editingRule ? "Save" : "Create",
                     onAction: handleSubmit,
-                    disabled: !formIPAddresses || !formName || (formRuleType === "redirect" && !formTargetUrl),
+                    disabled: !hasNormalizedIPs || !formName || (formRuleType === "redirect" && !formTargetUrl),
                 }}
                 secondaryActions={[
                     {

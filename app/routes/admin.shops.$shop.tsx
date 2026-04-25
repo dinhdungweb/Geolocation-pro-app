@@ -73,7 +73,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             orderBy: { priority: "desc" },
             select: {
                 id: true, name: true, matchType: true, ruleType: true,
-                isActive: true, priority: true, countryCodes: true,
+                isActive: true, priority: true, countryCodes: true, ipAddresses: true,
                 scheduleEnabled: true, createdAt: true,
             },
         }),
@@ -173,6 +173,26 @@ export default function AdminShopDetail() {
             auto_redirect: "#10b981", popup_show: "#6366f1",
         };
         return m[action] ?? "#64748b";
+    };
+
+    const formatListPreview = (value: string | null | undefined, emptyText: string) => {
+        const items = (value || "")
+            .split(/[\n,]+/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+        if (items.length === 0) return emptyText;
+        if (items.length <= 3) return items.join(", ");
+        return `${items.slice(0, 3).join(", ")} ... +${items.length - 3} more`;
+    };
+
+    const formatRuleMatch = (rule: any) => {
+        if (rule.matchType === "ip") {
+            return formatListPreview(rule.ipAddresses, "Invalid: no IPs selected");
+        }
+
+        if (rule.countryCodes === "*") return "All Countries (*)";
+        return formatListPreview(rule.countryCodes, "Invalid: no countries selected");
     };
 
     return (
@@ -555,13 +575,8 @@ export default function AdminShopDetail() {
                                     <td>
                                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
                                             <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>{r.matchType.toUpperCase()}</div>
-                                            <div style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.countryCodes || 'All'}>
-                                                {(() => {
-                                                    if (!r.countryCodes || r.countryCodes === '*') return 'All Countries';
-                                                    const codes = r.countryCodes.split(',');
-                                                    if (codes.length <= 3) return r.countryCodes;
-                                                    return `${codes.slice(0, 3).join(', ')} ... +${codes.length - 3} more`;
-                                                })()}
+                                            <div style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatRuleMatch(r)}>
+                                                {formatRuleMatch(r)}
                                             </div>
                                         </div>
                                     </td>
