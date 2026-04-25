@@ -8,10 +8,12 @@ import {
     BlockStack,
     Divider,
     InlineStack,
+    Badge,
 } from "@shopify/polaris";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import {
@@ -23,7 +25,6 @@ import {
     PLAN_LIMITS,
     OVERAGE_RATE,
 } from "../billing.config";
-import { Check } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing } = await authenticate.admin(request);
@@ -155,49 +156,81 @@ interface PlanCardProps {
     features: string[];
     isCurrentPlan: boolean;
     isFree?: boolean;
+    isRecommended?: boolean;
     hasTrial?: boolean;
     onSelect: () => void;
 }
 
-function PlanCard({ name, price, visitorLimit, features, isCurrentPlan, isFree, hasTrial, onSelect }: PlanCardProps) {
-    return (
-        <Card background={isCurrentPlan ? "bg-surface-success" : "bg-surface"}>
-            <BlockStack gap="400">
-                <BlockStack gap="200">
-                    <Text as="p" variant="bodySm" tone="subdued">{name}</Text>
-                    <Text as="h2" variant="headingLg">
-                        {isFree ? "Free" : `$${price}`}
-                        {!isFree && <Text as="span" variant="bodySm" tone="subdued"> / month</Text>}
-                    </Text>
-                </BlockStack>
-                <Divider />
-                <BlockStack gap="200">
-                    <Text as="p" fontWeight="bold">Features:</Text>
-                    <BlockStack gap="100">
-                        {features.map((feature, index) => (
-                            <InlineStack key={index} gap="200" align="start" wrap={false}>
-                                <div style={{ marginTop: '2px' }}><Check size={16} color="#008060" strokeWidth={3} /></div>
-                                <Text as="span" variant="bodyMd">{feature}</Text>
-                            </InlineStack>
-                        ))}
-                    </BlockStack>
+function formatPlanName(name: string) {
+    return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
-                    {hasTrial && !isFree && (
-                        <Box paddingBlockStart="200">
+function PlanCard({
+    name,
+    price,
+    visitorLimit,
+    features,
+    isCurrentPlan,
+    isFree,
+    isRecommended,
+    hasTrial,
+    onSelect,
+}: PlanCardProps) {
+    return (
+        <Card padding="0">
+            <div className={`pricing-plan-card ${isCurrentPlan ? "pricing-plan-current" : ""}`}>
+                <BlockStack gap="400">
+                    <InlineStack align="space-between" blockAlign="start" gap="200">
+                        <BlockStack gap="100">
+                            <Text as="h2" variant="headingMd">{formatPlanName(name)}</Text>
                             <Text as="p" variant="bodySm" tone="subdued">
-                                7-day free trial
+                                {visitorLimit.toLocaleString()} visitors / month
                             </Text>
-                        </Box>
-                    )}
+                        </BlockStack>
+                        {isCurrentPlan ? (
+                            <Badge tone="success">Current</Badge>
+                        ) : isRecommended ? (
+                            <Badge tone="info">Popular</Badge>
+                        ) : hasTrial ? (
+                            <Badge>Trial</Badge>
+                        ) : null}
+                    </InlineStack>
+
+                    <BlockStack gap="100">
+                        <InlineStack gap="100" blockAlign="end">
+                            <Text as="p" variant="headingXl">
+                                {isFree ? "Free" : `$${price}`}
+                            </Text>
+                            {!isFree && (
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                    / month
+                                </Text>
+                            )}
+                        </InlineStack>
+                        {hasTrial && !isFree && (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                                7-day free trial included
+                            </Text>
+                        )}
+                    </BlockStack>
                 </BlockStack>
-                {isCurrentPlan ? (
-                    <Button disabled fullWidth>Current Plan</Button>
-                ) : (
-                    <Button variant={isFree ? "secondary" : "primary"} onClick={onSelect} fullWidth>
-                        {isFree ? "Downgrade" : "Subscribe"}
-                    </Button>
-                )}
-            </BlockStack>
+
+                <ul className="pricing-feature-list">
+                    {features.map((feature) => (
+                        <li key={feature}>{feature}</li>
+                    ))}
+                </ul>
+
+                <div className="pricing-plan-action">
+                    {isCurrentPlan ? (
+                        <Button disabled fullWidth>Current plan</Button>
+                    ) : (
+                        <Button variant={isFree ? "secondary" : "primary"} onClick={onSelect} fullWidth>
+                            {isFree ? "Downgrade" : "Subscribe"}
+                        </Button>
+                    )}
+                </div>
+            </div>
         </Card>
     );
 }
@@ -217,10 +250,10 @@ export default function PricingPage() {
             price: "0",
             visitorLimit: PLAN_LIMITS[FREE_PLAN],
             features: [
-                `${PLAN_LIMITS[FREE_PLAN]} Visitors / month`,
-                "Unlimited Redirect Rules",
-                "Schedule Redirects",
-                "Analytics Dashboard",
+                "Country redirects",
+                "Unlimited redirect rules",
+                "Schedule redirects",
+                "Analytics dashboard",
             ],
             isFree: true,
         },
@@ -229,11 +262,10 @@ export default function PricingPage() {
             price: "4.99",
             visitorLimit: PLAN_LIMITS[PREMIUM_PLAN],
             features: [
-                `${PLAN_LIMITS[PREMIUM_PLAN]} Visitors / month`,
-                "Includes all Free features",
-                "Country Blocking",
-                "IP Blocking & Redirects",
-                "Page-specific Targeting",
+                "Everything in Free",
+                "Country blocking",
+                "IP blocking and redirects",
+                "Page-specific targeting",
             ],
             hasTrial: true,
         },
@@ -242,94 +274,163 @@ export default function PricingPage() {
             price: "7.99",
             visitorLimit: PLAN_LIMITS[PLUS_PLAN],
             features: [
-                `${PLAN_LIMITS[PLUS_PLAN]} Visitors / month`,
-                "Includes all Premium features",
-                "Dedicated Support",
-                "High Traffic Priority",
+                "Everything in Premium",
+                "Higher monthly limit",
+                "Dedicated support",
+                "High traffic priority",
             ],
             hasTrial: true,
+            isRecommended: true,
         },
         {
             name: ELITE_PLAN,
             price: "14.99",
             visitorLimit: PLAN_LIMITS[ELITE_PLAN],
             features: [
-                `${PLAN_LIMITS[ELITE_PLAN]} Visitors / month`,
-                "Includes all Plus features",
-                "VIP Support",
-                "Highest Traffic Priority",
+                "Everything in Plus",
+                "Highest monthly limit",
+                "VIP support",
+                "Highest traffic priority",
             ],
             hasTrial: true,
         },
     ];
 
+    const currentLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS[FREE_PLAN];
+
     return (
-        <Page title="Pricing" backAction={{ url: "/app" }}>
+        <Page
+            title="Pricing"
+            subtitle="Choose the monthly visitor limit that matches your store traffic."
+            backAction={{ url: "/app" }}
+        >
+            <TitleBar title="Pricing" />
+            <style>
+                {`
+                    .pricing-plan-card {
+                        min-height: 100%;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 20px;
+                        padding: 20px;
+                        border: 1px solid transparent;
+                        border-radius: 8px;
+                    }
+                    .pricing-plan-current {
+                        border-color: var(--p-color-border-success, #008060);
+                        background: var(--p-color-bg-surface-success, #f1f8f5);
+                    }
+                    .pricing-feature-list {
+                        flex: 1;
+                        margin: 0;
+                        padding: 0;
+                        list-style: none;
+                        color: var(--p-color-text-secondary, #6d7175);
+                        font-size: 13px;
+                        line-height: 1.45;
+                    }
+                    .pricing-feature-list li {
+                        position: relative;
+                        padding-left: 16px;
+                    }
+                    .pricing-feature-list li + li {
+                        margin-top: 8px;
+                    }
+                    .pricing-feature-list li::before {
+                        content: "";
+                        position: absolute;
+                        left: 0;
+                        top: 0.58em;
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 999px;
+                        background: var(--p-color-bg-fill-success, #008060);
+                    }
+                    .pricing-plan-action {
+                        margin-top: auto;
+                    }
+                    .pricing-note-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 16px;
+                    }
+                    .pricing-note-item {
+                        padding: 12px;
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        border-radius: 8px;
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    @media (max-width: 47.9975em) {
+                        .pricing-note-grid {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                `}
+            </style>
             <BlockStack gap="500">
-                <Box paddingBlockStart="200">
-                    <Grid>
-                        {plans.map((plan) => (
-                            <Grid.Cell key={plan.name} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
-                                <PlanCard
-                                    name={plan.name}
-                                    price={plan.price}
-                                    visitorLimit={plan.visitorLimit}
-                                    features={plan.features}
-                                    isCurrentPlan={currentPlan === plan.name}
-                                    isFree={plan.isFree}
-                                    hasTrial={plan.hasTrial}
-                                    onSelect={() => handleSelectPlan(plan.name)}
-                                />
-                            </Grid.Cell>
-                        ))}
-                    </Grid>
-                </Box>
+                <Card>
+                    <InlineStack align="space-between" blockAlign="center" gap="400">
+                        <BlockStack gap="100">
+                            <Text as="h2" variant="headingMd">Current plan: {formatPlanName(currentPlan)}</Text>
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                                Your current monthly limit is {currentLimit.toLocaleString()} visitors.
+                            </Text>
+                        </BlockStack>
+                        <Badge tone={currentPlan === FREE_PLAN ? "attention" : "success"}>
+                            {currentPlan === FREE_PLAN ? "Free plan" : "Paid plan"}
+                        </Badge>
+                    </InlineStack>
+                </Card>
 
-                <Box paddingBlockStart="800" paddingBlockEnd="400">
-                    <BlockStack gap="600">
+                <Grid>
+                    {plans.map((plan) => (
+                        <Grid.Cell key={plan.name} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
+                            <PlanCard
+                                name={plan.name}
+                                price={plan.price}
+                                visitorLimit={plan.visitorLimit}
+                                features={plan.features}
+                                isCurrentPlan={currentPlan === plan.name}
+                                isFree={plan.isFree}
+                                isRecommended={plan.isRecommended}
+                                hasTrial={plan.hasTrial}
+                                onSelect={() => handleSelectPlan(plan.name)}
+                            />
+                        </Grid.Cell>
+                    ))}
+                </Grid>
+
+                <Card>
+                    <BlockStack gap="400">
+                        <Text as="h2" variant="headingMd">Billing notes</Text>
+                        <div className="pricing-note-grid">
+                            <div className="pricing-note-item">
+                                <BlockStack gap="100">
+                                    <Text as="p" fontWeight="semibold">7-day trial</Text>
+                                    <Text as="p" tone="subdued">Paid plans include a free trial before billing starts.</Text>
+                                </BlockStack>
+                            </div>
+                            <div className="pricing-note-item">
+                                <BlockStack gap="100">
+                                    <Text as="p" fontWeight="semibold">Cancel anytime</Text>
+                                    <Text as="p" tone="subdued">Upgrade or downgrade from this page when traffic changes.</Text>
+                                </BlockStack>
+                            </div>
+                            <div className="pricing-note-item">
+                                <BlockStack gap="100">
+                                    <Text as="p" fontWeight="semibold">Overage</Text>
+                                    <Text as="p" tone="subdued">Paid plans charge extra visitors through Shopify billing when limits are exceeded.</Text>
+                                </BlockStack>
+                            </div>
+                        </div>
                         <Divider />
-                        <InlineStack align="center" gap="800">
-                            <InlineStack gap="200" align="center" wrap={false}>
-                                <Check size={14} color="#008060" />
-                                <Text as="span" variant="bodyMd" tone="subdued">7-day free trial</Text>
-                            </InlineStack>
-                            <InlineStack gap="200" align="center" wrap={false}>
-                                <Check size={14} color="#008060" />
-                                <Text as="span" variant="bodyMd" tone="subdued">Cancel anytime</Text>
-                            </InlineStack>
-                            <InlineStack gap="200" align="center" wrap={false}>
-                                <Check size={14} color="#008060" />
-                                <Text as="span" variant="bodyMd" tone="subdued">Secure payments via Shopify</Text>
-                            </InlineStack>
-                        </InlineStack>
-
-                        <Box paddingBlockStart="400">
-                            <BlockStack gap="400">
-                                <Text as="h3" variant="headingMd" alignment="center">Frequently Asked Questions</Text>
-                                <Grid>
-                                    <Grid.Cell columnSpan={{ xs: 6, md: 3 }}>
-                                        <Box padding="400">
-                                            <BlockStack gap="200">
-                                                <Text as="p" fontWeight="bold">How does the 7-day trial work?</Text>
-                                                <Text as="p" tone="subdued">You can try all Pro features for 7 days. You won't be charged until the trial ends.</Text>
-                                            </BlockStack>
-                                        </Box>
-                                    </Grid.Cell>
-                                    <Grid.Cell columnSpan={{ xs: 6, md: 3 }}>
-                                        <Box padding="400">
-                                            <BlockStack gap="200">
-                                                <Text as="p" fontWeight="bold">Can I change plans later?</Text>
-                                                <Text as="p" tone="subdued">Yes, you can upgrade or downgrade your plan at any time from this page.</Text>
-                                            </BlockStack>
-                                        </Box>
-                                    </Grid.Cell>
-                                </Grid>
-                            </BlockStack>
-                        </Box>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                            Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor.
+                        </Text>
                     </BlockStack>
-                </Box>
+                </Card>
 
-
+                <Box paddingBlockEnd="800" />
             </BlockStack>
         </Page>
     );
