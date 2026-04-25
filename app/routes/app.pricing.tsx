@@ -420,8 +420,8 @@ function PlanCard({
                                 <ul className="pricing-feature-list">
                                     <li>{visitorLimitLabel || `${visitorLimit?.toLocaleString()} visitors included`}</li>
                                     <li>Redirects, blocks and popups included</li>
-                                    {!isFree && (
-                                        <li>{noOverage ? "No overage charges" : "Overage billing available after limit"}</li>
+                                    {!isFree && noOverage && (
+                                        <li>No overage charges</li>
                                     )}
                                 </ul>
                             </BlockStack>
@@ -486,7 +486,7 @@ export default function PricingPage() {
     const plans = [
         {
             name: FREE_PLAN,
-            subtitle: "For new stores testing geolocation",
+            subtitle: "Start with basics",
             price: "0",
             visitorLimit: PLAN_LIMITS[FREE_PLAN],
             features: [
@@ -500,7 +500,7 @@ export default function PricingPage() {
         },
         {
             name: PREMIUM_PLAN,
-            subtitle: "For stores that need blocking rules",
+            subtitle: "More controls",
             price: "4.99",
             visitorLimit: PLAN_LIMITS[PREMIUM_PLAN],
             features: [
@@ -514,7 +514,7 @@ export default function PricingPage() {
         },
         {
             name: PLUS_PLAN,
-            subtitle: "For growing stores with more traffic",
+            subtitle: "Growing stores",
             price: "7.99",
             visitorLimit: PLAN_LIMITS[PLUS_PLAN],
             features: [
@@ -529,7 +529,7 @@ export default function PricingPage() {
         },
         {
             name: ELITE_PLAN,
-            subtitle: "For higher-volume storefronts",
+            subtitle: "Higher traffic",
             price: "14.99",
             visitorLimit: PLAN_LIMITS[ELITE_PLAN],
             features: [
@@ -544,7 +544,7 @@ export default function PricingPage() {
         },
         {
             name: UNLIMITED_PLAN,
-            subtitle: "For stores that want predictable billing",
+            subtitle: "Predictable billing",
             price: "79.99",
             visitorLimit: PLAN_LIMITS[UNLIMITED_PLAN],
             visitorLimitLabel: "Unlimited visitors included",
@@ -562,7 +562,7 @@ export default function PricingPage() {
         {
             name: CUSTOM_PLAN,
             displayName: customPlan?.name || "Custom plan",
-            subtitle: "Private plan configured for your store",
+            subtitle: "Private pricing",
             price: (customPlan?.price ?? 79.99).toFixed(2),
             visitorLimit: customLimit,
             visitorLimitLabel: customLimit >= Number.MAX_SAFE_INTEGER
