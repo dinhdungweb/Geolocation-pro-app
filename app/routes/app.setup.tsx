@@ -12,15 +12,14 @@ import {
     Button,
     Divider,
     Box,
-    List,
-    Icon,
 } from "@shopify/polaris";
 import {
-    CheckCircleIcon,
     ChevronRightIcon,
+    EmailIcon,
+    ExternalIcon,
 } from "@shopify/polaris-icons";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { CheckCircle2 } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
@@ -28,19 +27,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return json({ shopName });
 };
 
-type StepStatus = "done" | "active" | "pending";
+type StepTone = "start" | "required" | "optional" | "verify";
 
 interface Step {
     number: number;
     title: string;
     description: string;
-    status: StepStatus;
+    tone: StepTone;
     action?: {
         label: string;
         url: string;
         internal?: boolean;
+        external?: boolean;
     };
-    tips: string[];
+    checklist: string[];
+}
+
+function getStepBadge(tone: StepTone) {
+    if (tone === "start") return <Badge tone="info">Start here</Badge>;
+    if (tone === "optional") return <Badge>Optional</Badge>;
+    if (tone === "verify") return <Badge tone="success">Verify</Badge>;
+    return <Badge tone="attention">Required</Badge>;
 }
 
 export default function SetupGuide() {
@@ -51,198 +58,260 @@ export default function SetupGuide() {
     const steps: Step[] = [
         {
             number: 1,
-            title: "Enable App Embed in Theme Editor",
-            description:
-                "The app works via a Theme App Embed. You must enable it in your Shopify Theme Editor for the geolocation script to run on your store.",
-            status: "active",
+            title: "Enable the app embed",
+            description: "Turn on the storefront script in your current theme so rules can run for visitors.",
+            tone: "start",
             action: {
                 label: "Open Theme Editor",
                 url: themeEditorUrl,
+                external: true,
             },
-            tips: [
-                "Click \"App embeds\" in the left panel of the Theme Editor.",
-                "Find \"Geo: Redirect & Country Block\" and toggle it ON.",
-                "Click Save in the top right corner.",
+            checklist: [
+                "Open App embeds in the left panel.",
+                "Enable Geo: Redirect & Country Block.",
+                "Click Save in the top-right corner.",
             ],
         },
         {
             number: 2,
-            title: "Create Your First Geolocation Rule",
-            description:
-                "Set up rules to redirect or block visitors based on their country. For example, redirect US visitors to your .com store, or block a specific country.",
-            status: "pending",
+            title: "Create a geolocation rule",
+            description: "Redirect, block, or show a popup based on the visitor country.",
+            tone: "required",
             action: {
-                label: "Go to Geolocation Rules",
+                label: "Geolocation Rules",
                 url: "/app/rules",
                 internal: true,
             },
-            tips: [
-                "Click \"Create Rule\" and select a country.",
-                "Choose the action: Redirect, Block, or show a Popup.",
-                "Set the target URL for redirects.",
-                "Toggle the rule ON to activate it.",
+            checklist: [
+                "Select one or more countries.",
+                "Choose Redirect, Block, or Popup.",
+                "Keep the rule active when ready.",
             ],
         },
         {
             number: 3,
-            title: "Configure App Settings",
-            description:
-                "Adjust the app behavior: set the redirect mode (popup or auto-redirect), configure popup appearance, and set cookie duration.",
-            status: "pending",
+            title: "Review app settings",
+            description: "Set popup text, redirect behavior, cookies, and bot/VPN handling.",
+            tone: "required",
             action: {
-                label: "Go to Settings",
+                label: "Settings",
                 url: "/app/settings",
                 internal: true,
             },
-            tips: [
-                "Popup Mode: Asks visitors before redirecting.",
-                "Auto-Redirect: Redirects visitors instantly without a popup.",
-                "Cookie Duration: How long the app remembers a visitor's choice.",
-                "You can customize the popup message and button text.",
+            checklist: [
+                "Choose popup or auto-redirect behavior.",
+                "Customize visitor-facing messages.",
+                "Set how long visitor choices are remembered.",
             ],
         },
         {
             number: 4,
-            title: "(Optional) Add IP-Based Rules",
-            description:
-                "In addition to country rules, you can block or redirect specific IP addresses. Useful for blocking known bots or competitors.",
-            status: "pending",
+            title: "Add IP rules when needed",
+            description: "Block or redirect specific IPs and CIDR ranges before country rules are checked.",
+            tone: "optional",
             action: {
-                label: "Go to IP Rules",
+                label: "IP Rules",
                 url: "/app/ip-rules",
                 internal: true,
             },
-            tips: [
-                "Add individual IPs or CIDR ranges (e.g. 192.168.1.0/24).",
-                "IP rules take priority over country rules.",
+            checklist: [
+                "Use one IP or CIDR range per comma-separated entry.",
+                "Use IP rules for known bots, abuse traffic, or internal testing.",
             ],
         },
         {
             number: 5,
-            title: "Verify the Setup",
-            description:
-                "Test your configuration by visiting your store from a different location, or use a VPN to simulate a visit from your target country.",
-            status: "pending",
-            tips: [
-                "Clear your browser cookies before testing (the app remembers your choice).",
-                "Use Incognito/Private mode for a clean test.",
-                "Check Visitor Logs to confirm the app is tracking correctly.",
-            ],
+            title: "Test and confirm",
+            description: "Use a fresh browser session and visitor logs to confirm rules are firing.",
+            tone: "verify",
             action: {
-                label: "View Visitor Logs",
+                label: "Visitor Logs",
                 url: "/app/logs",
                 internal: true,
             },
+            checklist: [
+                "Clear cookies or use an incognito window.",
+                "Test from a matching country or IP.",
+                "Check logs for visits, redirects, and blocks.",
+            ],
         },
     ];
-
-    const getStatusBadge = (status: StepStatus) => {
-        if (status === "done") return <Badge tone="success">Done</Badge>;
-        if (status === "active") return <Badge tone="info">Start here</Badge>;
-        return <Badge tone="attention">Pending</Badge>;
-    };
 
     return (
         <Page
             title="Setup Guide"
-            subtitle="Follow these steps to get Geo: Redirect & Country Block working on your store."
+            subtitle="A compact checklist for getting Geo: Redirect & Country Block live on your storefront."
         >
+            <TitleBar title="Setup Guide" />
+            <style>
+                {`
+                    .setup-summary-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 12px;
+                    }
+                    .setup-summary-item {
+                        padding: 12px;
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        border-radius: 8px;
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    .setup-step-row {
+                        display: grid;
+                        grid-template-columns: 36px minmax(0, 1fr) auto;
+                        gap: 16px;
+                        padding: 18px 20px;
+                    }
+                    .setup-step-row-start {
+                        background: var(--p-color-bg-surface-info, #eef4ff);
+                    }
+                    .setup-step-number {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 999px;
+                        background: var(--p-color-bg-fill-brand, #005bd3);
+                        color: #fff;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: 700;
+                        font-size: 13px;
+                    }
+                    .setup-step-number-muted {
+                        background: var(--p-color-bg-fill-secondary, #e4e5e7);
+                        color: var(--p-color-text-secondary, #6d7175);
+                    }
+                    .setup-step-checklist {
+                        margin: 0;
+                        padding-left: 18px;
+                        color: var(--p-color-text-secondary, #6d7175);
+                        font-size: 13px;
+                        line-height: 1.45;
+                    }
+                    .setup-step-checklist li + li {
+                        margin-top: 4px;
+                    }
+                    .setup-side-link {
+                        width: 100%;
+                    }
+                    @media (max-width: 47.9975em) {
+                        .setup-summary-grid {
+                            grid-template-columns: 1fr;
+                        }
+                        .setup-step-row {
+                            grid-template-columns: 32px minmax(0, 1fr);
+                        }
+                        .setup-step-action {
+                            grid-column: 2;
+                        }
+                    }
+                `}
+            </style>
             <Layout>
                 <Layout.Section>
                     <BlockStack gap="400">
-                        {steps.map((step) => (
-                            <Card key={step.number}>
-                                <BlockStack gap="400">
-                                    {/* Step header */}
-                                    <InlineStack align="space-between" blockAlign="start">
-                                        <InlineStack gap="300" blockAlign="center">
-                                            <div
-                                                style={{
-                                                    width: "32px",
-                                                    height: "32px",
-                                                    borderRadius: "50%",
-                                                    background:
-                                                        step.status === "done"
-                                                            ? "#008060"
-                                                            : step.status === "active"
-                                                                ? "#005bd3"
-                                                                : "#e4e5e7",
-                                                    color:
-                                                        step.status === "pending"
-                                                            ? "#6d7175"
-                                                            : "#fff",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    fontWeight: "700",
-                                                    fontSize: "14px",
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                {step.status === "done" ? (
-                                                    <Icon source={CheckCircleIcon} tone="base" />
-                                                ) : (
-                                                    step.number
-                                                )}
-                                            </div>
-                                            <Text as="h2" variant="headingMd">
-                                                {step.title}
-                                            </Text>
-                                        </InlineStack>
-                                        {getStatusBadge(step.status)}
-                                    </InlineStack>
-
-                                    {/* Description */}
-                                    <Text as="p" variant="bodyMd" tone="subdued">
-                                        {step.description}
-                                    </Text>
-
-                                    <Divider />
-
-                                    {/* Tips */}
-                                    <BlockStack gap="200">
-                                        <Text as="p" variant="bodySm" fontWeight="semibold">
-                                            How to do it:
+                        <Card>
+                            <BlockStack gap="400">
+                                <InlineStack align="space-between" blockAlign="center" gap="300">
+                                    <BlockStack gap="100">
+                                        <Text as="h2" variant="headingMd">Launch checklist</Text>
+                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                            Complete the embed first, then add rules and verify traffic.
                                         </Text>
-                                        <List type="bullet">
-                                            {step.tips.map((tip, i) => (
-                                                <List.Item key={i}>{tip}</List.Item>
-                                            ))}
-                                        </List>
                                     </BlockStack>
+                                    <Button
+                                        url={themeEditorUrl}
+                                        target="_blank"
+                                        icon={ExternalIcon}
+                                        variant="primary"
+                                    >
+                                        Open Theme Editor
+                                    </Button>
+                                </InlineStack>
 
-                                    {/* Action button */}
-                                    {step.action && (
-                                        <div>
-                                            <Button
-                                                url={step.action.url}
-                                                target={step.action.internal ? undefined : "_blank"}
-                                                icon={ChevronRightIcon}
-                                                variant={
-                                                    step.status === "active" ? "primary" : "secondary"
-                                                }
+                                <div className="setup-summary-grid">
+                                    <div className="setup-summary-item">
+                                        <BlockStack gap="100">
+                                            <Text as="p" variant="bodySm" tone="subdued">Step 1</Text>
+                                            <Text as="p" variant="bodyMd" fontWeight="semibold">Enable embed</Text>
+                                        </BlockStack>
+                                    </div>
+                                    <div className="setup-summary-item">
+                                        <BlockStack gap="100">
+                                            <Text as="p" variant="bodySm" tone="subdued">Step 2-4</Text>
+                                            <Text as="p" variant="bodyMd" fontWeight="semibold">Create rules</Text>
+                                        </BlockStack>
+                                    </div>
+                                    <div className="setup-summary-item">
+                                        <BlockStack gap="100">
+                                            <Text as="p" variant="bodySm" tone="subdued">Step 5</Text>
+                                            <Text as="p" variant="bodyMd" fontWeight="semibold">Verify logs</Text>
+                                        </BlockStack>
+                                    </div>
+                                </div>
+                            </BlockStack>
+                        </Card>
+
+                        <Card padding="0">
+                            <BlockStack gap="0">
+                                {steps.map((step, index) => (
+                                    <div key={step.number}>
+                                        <div className={`setup-step-row ${step.tone === "start" ? "setup-step-row-start" : ""}`}>
+                                            <div
+                                                className={`setup-step-number ${step.tone === "optional" ? "setup-step-number-muted" : ""}`}
+                                                aria-hidden="true"
                                             >
-                                                {step.action.label}
-                                            </Button>
+                                                {step.number}
+                                            </div>
+                                            <BlockStack gap="200">
+                                                <InlineStack gap="200" blockAlign="center">
+                                                    <Text as="h3" variant="headingSm">{step.title}</Text>
+                                                    {getStepBadge(step.tone)}
+                                                </InlineStack>
+                                                <Text as="p" variant="bodyMd" tone="subdued">
+                                                    {step.description}
+                                                </Text>
+                                                <ul className="setup-step-checklist">
+                                                    {step.checklist.map((item) => (
+                                                        <li key={item}>{item}</li>
+                                                    ))}
+                                                </ul>
+                                            </BlockStack>
+                                            {step.action && (
+                                                <div className="setup-step-action">
+                                                    <Button
+                                                        url={step.action.url}
+                                                        target={step.action.external ? "_blank" : undefined}
+                                                        icon={ChevronRightIcon}
+                                                        variant={step.tone === "start" ? "primary" : "secondary"}
+                                                    >
+                                                        {step.action.label}
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </BlockStack>
-                            </Card>
-                        ))}
+                                        {index < steps.length - 1 && <Divider />}
+                                    </div>
+                                ))}
+                            </BlockStack>
+                        </Card>
                     </BlockStack>
                 </Layout.Section>
 
-                {/* Sidebar */}
                 <Layout.Section variant="oneThird">
                     <BlockStack gap="400">
                         <Card>
                             <BlockStack gap="300">
                                 <Text as="h2" variant="headingMd">Need help?</Text>
-                                <Divider />
                                 <Text as="p" variant="bodyMd" tone="subdued">
-                                    If you're having trouble setting up the app, our support team is happy to help.
+                                    Send us your store URL and the rule you are testing. We typically respond within 24 hours.
                                 </Text>
-                                <Button url="mailto:support@bluepeaks.top" target="_blank" variant="primary">
+                                <Button
+                                    url="mailto:support@bluepeaks.top"
+                                    target="_blank"
+                                    icon={EmailIcon}
+                                    variant="primary"
+                                >
                                     Email Support
                                 </Button>
                             </BlockStack>
@@ -250,40 +319,20 @@ export default function SetupGuide() {
 
                         <Card>
                             <BlockStack gap="300">
-                                <Text as="h2" variant="headingMd">Quick Links</Text>
-                                <Divider />
+                                <Text as="h2" variant="headingMd">Quick links</Text>
                                 <BlockStack gap="200">
-                                    <Button url="/app/rules" variant="plain" icon={ChevronRightIcon}>Geolocation Rules</Button>
-                                    <Button url="/app/ip-rules" variant="plain" icon={ChevronRightIcon}>IP Rules</Button>
-                                    <Button url="/app/settings" variant="plain" icon={ChevronRightIcon}>Settings</Button>
-                                    <Button url="/app/logs" variant="plain" icon={ChevronRightIcon}>Visitor Logs</Button>
-                                </BlockStack>
-                            </BlockStack>
-                        </Card>
-
-                        <Card>
-                            <BlockStack gap="300">
-                                <Text as="h2" variant="headingMd">Tips</Text>
-                                <Divider />
-                                <BlockStack gap="200">
-                                    <InlineStack gap="200" wrap={false} blockAlign="center">
-                                        <CheckCircle2 size={16} color="#008060" />
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                            Always clear your browser cookies when testing rules.
-                                        </Text>
-                                    </InlineStack>
-                                    <InlineStack gap="200" wrap={false} blockAlign="center">
-                                        <CheckCircle2 size={16} color="#008060" />
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                            Try Incognito mode for a fresh visitor experience.
-                                        </Text>
-                                    </InlineStack>
-                                    <InlineStack gap="200" wrap={false} blockAlign="center">
-                                        <CheckCircle2 size={16} color="#008060" />
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                            Use Visitor Logs to confirm the app is detecting countries correctly.
-                                        </Text>
-                                    </InlineStack>
+                                    <div className="setup-side-link">
+                                        <Button url="/app/rules" variant="plain" icon={ChevronRightIcon}>Geolocation Rules</Button>
+                                    </div>
+                                    <div className="setup-side-link">
+                                        <Button url="/app/ip-rules" variant="plain" icon={ChevronRightIcon}>IP Rules</Button>
+                                    </div>
+                                    <div className="setup-side-link">
+                                        <Button url="/app/settings" variant="plain" icon={ChevronRightIcon}>Settings</Button>
+                                    </div>
+                                    <div className="setup-side-link">
+                                        <Button url="/app/logs" variant="plain" icon={ChevronRightIcon}>Visitor Logs</Button>
+                                    </div>
                                 </BlockStack>
                             </BlockStack>
                         </Card>
