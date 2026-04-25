@@ -4,7 +4,7 @@ import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-
 import { useState, useEffect } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
-import { FREE_PLAN } from "../billing.config";
+import { CUSTOM_PLAN, FREE_PLAN } from "../billing.config";
 import { issueApplicationCredit } from "../utils/billing.server";
 import { 
     ArrowLeft, 
@@ -110,8 +110,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             return json({
                 success: true,
                 message: customPlanEnabled
-                    ? "Custom plan saved and enabled for this shop"
-                    : "Custom plan disabled for this shop",
+                    ? "Custom plan saved and made available to this shop"
+                    : "Custom plan saved and hidden from this shop",
             });
         } catch (e: any) {
             return json({ success: false, error: e.message }, { status: 500 });
@@ -382,13 +382,18 @@ export default function AdminShopDetail() {
                     display: flex; align-items: center; justify-content: space-between; gap: 16px;
                     padding: 14px 0; border-bottom: 1px solid #f1f5f9;
                 }
-                .custom-plan-summary-main { min-width: 0; }
-                .custom-plan-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+                .custom-plan-summary-main { min-width: 0; flex: 1; }
+                .custom-plan-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
                 .custom-plan-name { color: #1e293b; font-size: 13px; font-weight: 800; }
                 .custom-plan-pill { padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
                 .custom-plan-pill.enabled { background: #ecfdf5; color: #059669; }
                 .custom-plan-pill.disabled { background: #f1f5f9; color: #64748b; }
+                .custom-plan-pill.active { background: #eff6ff; color: #2563eb; }
                 .custom-plan-meta { color: #64748b; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .custom-plan-note {
+                    margin-top: 8px; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 10px;
+                    background: #eff6ff; color: #1e40af; font-size: 12px; line-height: 1.45; font-weight: 600;
+                }
                 .modal-content-wide { max-width: 620px; }
 
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
@@ -568,15 +573,20 @@ export default function AdminShopDetail() {
                         </div>
                         <div className="modal-body">
                             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
-                                Configure the private plan that will appear on this merchant's pricing page after it is enabled.
+                                Configure the private plan shown to this merchant. Hiding it only removes the option from their pricing page; it does not cancel an active Shopify subscription.
                             </p>
+                            {currentPlan === CUSTOM_PLAN && (
+                                <div className="custom-plan-note" style={{ marginBottom: '20px' }}>
+                                    This shop is currently subscribed to the custom plan. Changing availability will not cancel or downgrade the active subscription.
+                                </div>
+                            )}
                             <Form method="post">
                                 <input type="hidden" name="intent" value="save_custom_plan" />
                                 <div className="billing-input-group">
-                                    <label>Plan status</label>
+                                    <label>Merchant availability</label>
                                     <select name="customPlanEnabled" className="billing-input" defaultValue={settings.customPlanEnabled ? "true" : "false"}>
-                                        <option value="true">Enabled for this shop</option>
-                                        <option value="false">Disabled</option>
+                                        <option value="true">Available on pricing page</option>
+                                        <option value="false">Hidden from pricing page</option>
                                     </select>
                                 </div>
                                 <div className="billing-input-group">
@@ -709,14 +719,22 @@ export default function AdminShopDetail() {
                                 <div className="custom-plan-summary">
                                     <div className="custom-plan-summary-main">
                                         <div className="custom-plan-title">
-                                            <span className="custom-plan-name">Custom Plan</span>
+                                            <span className="custom-plan-name">Custom Plan Access</span>
                                             <span className={`custom-plan-pill ${settings!.customPlanEnabled ? 'enabled' : 'disabled'}`}>
-                                                {settings!.customPlanEnabled ? 'ENABLED' : 'DISABLED'}
+                                                {settings!.customPlanEnabled ? 'AVAILABLE' : 'HIDDEN'}
                                             </span>
+                                            {currentPlan === CUSTOM_PLAN && (
+                                                <span className="custom-plan-pill active">ACTIVE SUBSCRIPTION</span>
+                                            )}
                                         </div>
                                         <div className="custom-plan-meta">
-                                            {settings!.customPlanName || "Custom plan"} · ${formatCustomPlanPrice()}/mo · {formatCustomPlanLimit()}
+                                            {settings!.customPlanName || "Custom plan"} | ${formatCustomPlanPrice()}/mo | {formatCustomPlanLimit()}
                                         </div>
+                                        {currentPlan === CUSTOM_PLAN && !settings!.customPlanEnabled && (
+                                            <div className="custom-plan-note">
+                                                Hidden from pricing page, but this shop is still subscribed to the custom plan.
+                                            </div>
+                                        )}
                                     </div>
                                     <button
                                         type="button"
