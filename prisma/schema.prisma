@@ -54,34 +54,35 @@ model RedirectRule {
 }
 
 model Settings {
-  id               String   @id @default(uuid())
-  shop             String   @unique
-  mode             String   @default("popup")
-  template         String   @default("modal")
-  popupTitle       String   @default("Would you like to switch to a local version?")
-  popupMessage     String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
-  confirmBtnText   String   @default("Go now")
-  cancelBtnText    String   @default("Stay here")
-  popupBgColor     String   @default("#ffffff")
-  popupTextColor   String   @default("#333333")
-  popupBtnColor    String   @default("#007bff")
-  blockedTitle     String   @default("Access Denied")
-  blockedMessage   String   @default("We do not offer services in your country/region.")
-  excludeBots      Boolean  @default(true)
-  excludedIPs      String   @default("")
-  cookieDuration   Int      @default(7)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  currentPlan      String   @default("free")
-  emailSenderEmail String?  @default("noreply@geopro.bluepeaks.top")
-  emailSenderName  String?  @default("Geo Admin")
-  smtpHost         String?
-  smtpPass         String?
-  smtpPort         Int?
-  smtpSecure       Boolean  @default(true)
-  smtpUser         String?
-  isEnabled        Boolean  @default(true)
-  blockVpn         Boolean  @default(false)
+  id                 String   @id @default(uuid())
+  shop               String   @unique
+  mode               String   @default("popup")
+  template           String   @default("modal")
+  popupTitle         String   @default("Would you like to switch to a local version?")
+  popupMessage       String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
+  confirmBtnText     String   @default("Go now")
+  cancelBtnText      String   @default("Stay here")
+  popupBgColor       String   @default("#ffffff")
+  popupTextColor     String   @default("#333333")
+  popupBtnColor      String   @default("#007bff")
+  blockedTitle       String   @default("Access Denied")
+  blockedMessage     String   @default("We do not offer services in your country/region.")
+  excludeBots        Boolean  @default(true)
+  excludedIPs        String   @default("")
+  cookieDuration     Int      @default(7)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  currentPlan        String   @default("free")
+  emailSenderEmail   String?  @default("noreply@geopro.bluepeaks.top")
+  emailSenderName    String?  @default("Geo Admin")
+  smtpHost           String?
+  smtpPass           String?
+  smtpPort           Int?
+  smtpSecure         Boolean  @default(true)
+  smtpUser           String?
+  isEnabled          Boolean  @default(true)
+  blockVpn           Boolean  @default(false)
+  allowUnlimitedPlan Boolean  @default(false)
 }
 
 model AnalyticsCountry {

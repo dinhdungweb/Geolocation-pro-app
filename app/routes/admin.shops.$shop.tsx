@@ -58,6 +58,26 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
     }
 
+    if (intent === "toggle_unlimited_plan") {
+        const allowUnlimitedPlan = formData.get("allowUnlimitedPlan") === "true";
+
+        try {
+            await prisma.settings.upsert({
+                where: { shop },
+                update: { allowUnlimitedPlan },
+                create: { shop, allowUnlimitedPlan },
+            });
+            return json({
+                success: true,
+                message: allowUnlimitedPlan
+                    ? "Unlimited plan access enabled for this shop"
+                    : "Unlimited plan access disabled for this shop",
+            });
+        } catch (e: any) {
+            return json({ success: false, error: e.message }, { status: 500 });
+        }
+    }
+
     return json({ success: false, error: "Unknown intent" }, { status: 400 });
 };
 
@@ -120,6 +140,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             template: settings.template,
             excludeBots: settings.excludeBots,
             cookieDuration: settings.cookieDuration,
+            allowUnlimitedPlan: settings.allowUnlimitedPlan,
             createdAt: settings.createdAt.toISOString(),
             updatedAt: settings.updatedAt.toISOString(),
         } : null,
@@ -243,6 +264,7 @@ export default function AdminShopDetail() {
                     ${(() => {
                         const plan = (currentPlan || 'FREE').toUpperCase();
                         if (plan === 'ELITE') return 'background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); color: #7c3aed; border: 1px solid #7c3aed33; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);';
+                        if (plan === 'UNLIMITED') return 'background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border: 1px solid #2563eb33; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);';
                         if (plan === 'PLUS') return 'background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #059669; border: 1px solid #05966933;';
                         if (plan === 'PREMIUM') return 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #4f46e5; border: 1px solid #4f46e533;';
                         return 'background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0;';
@@ -333,6 +355,15 @@ export default function AdminShopDetail() {
                 }
                 .primary-btn:hover { background: #4f46e5; }
                 .primary-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+                .inline-action-form { margin: 0; }
+                .inline-toggle-btn {
+                    padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px;
+                    background: white; color: #334155; font-size: 12px; font-weight: 700;
+                    cursor: pointer; transition: all 0.2s;
+                }
+                .inline-toggle-btn:hover { border-color: #6366f1; color: #4f46e5; }
+                .inline-toggle-btn.enabled { border-color: #10b98133; background: #ecfdf5; color: #059669; }
+                .inline-toggle-btn.disabled { border-color: #ef444433; background: #fef2f2; color: #ef4444; }
 
                 .alert { padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
                 .alert-success { background: #ecfdf5; color: #059669; border: 1px solid #10b98133; }
@@ -498,6 +529,13 @@ export default function AdminShopDetail() {
                             <div style={{ padding: '24px', textAlign: 'center', color: '#f59e0b', fontSize: '13px', fontWeight: 600 }}>
                                 <ShieldAlert size={24} style={{ marginBottom: '12px', opacity: 0.5 }} />
                                 <div>No settings found for this shop.</div>
+                                <Form method="post" className="inline-action-form" style={{ marginTop: '16px' }}>
+                                    <input type="hidden" name="intent" value="toggle_unlimited_plan" />
+                                    <input type="hidden" name="allowUnlimitedPlan" value="true" />
+                                    <button type="submit" className="inline-toggle-btn enabled" disabled={isSubmitting}>
+                                        Enable Unlimited Plan Access
+                                    </button>
+                                </Form>
                             </div>
                         ) : (
                             <>
@@ -516,6 +554,29 @@ export default function AdminShopDetail() {
                                 <div className="info-item">
                                     <span className="label">Cookie TTL</span>
                                     <span className="value">{settings!.cookieDuration} Days</span>
+                                </div>
+                                <div className="info-item">
+                                    <span className="label">Unlimited Plan Access</span>
+                                    <span className="value" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ color: settings!.allowUnlimitedPlan ? '#059669' : '#64748b' }}>
+                                            {settings!.allowUnlimitedPlan ? 'ENABLED' : 'DISABLED'}
+                                        </span>
+                                        <Form method="post" className="inline-action-form">
+                                            <input type="hidden" name="intent" value="toggle_unlimited_plan" />
+                                            <input
+                                                type="hidden"
+                                                name="allowUnlimitedPlan"
+                                                value={settings!.allowUnlimitedPlan ? "false" : "true"}
+                                            />
+                                            <button
+                                                type="submit"
+                                                className={`inline-toggle-btn ${settings!.allowUnlimitedPlan ? 'disabled' : 'enabled'}`}
+                                                disabled={isSubmitting}
+                                            >
+                                                {settings!.allowUnlimitedPlan ? 'Disable' : 'Enable'}
+                                            </button>
+                                        </Form>
+                                    </span>
                                 </div>
                                 <div className="info-item">
                                     <span className="label">Installed On</span>

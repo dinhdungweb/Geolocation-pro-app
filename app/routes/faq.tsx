@@ -27,7 +27,7 @@ export default function FAQ() {
 
                 <div style={{ marginBottom: "20px" }}>
                     <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>What happens if I exceed my visitor limit?</h3>
-                    <p style={{ color: "#444" }}>Premium, Plus and Elite can charge overage when limits are exceeded. Unlimited has no overage charges. For the Free plan, geolocation features will pause until the next billing cycle.</p>
+                    <p style={{ color: "#444" }}>If you are on a paid plan, overage charges may apply. For the Free plan, geolocation features will pause until the next billing cycle.</p>
                 </div>
             </section>
 

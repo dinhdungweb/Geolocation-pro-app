@@ -27,7 +27,7 @@ import {
 } from "../billing.config";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { billing } = await authenticate.admin(request);
+    const { billing, session } = await authenticate.admin(request);
     const isTest = false;
 
     // Restore billing check
@@ -37,8 +37,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     const currentPlan = billingCheck.appSubscriptions[0]?.name || FREE_PLAN;
+    const settings = await prisma.settings.findUnique({
+        where: { shop: session.shop },
+        select: { allowUnlimitedPlan: true },
+    });
 
     return json({
+        canUseUnlimitedPlan: Boolean(settings?.allowUnlimitedPlan) || currentPlan === UNLIMITED_PLAN,
         hasActivePayment: billingCheck.hasActivePayment,
         currentPlan,
     });
@@ -53,6 +58,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const currentPlan = formData.get("currentPlan") as string;
 
     if (selectedPlan) {
+        if (selectedPlan === UNLIMITED_PLAN) {
+            const settings = await prisma.settings.findUnique({
+                where: { shop },
+                select: { allowUnlimitedPlan: true },
+            });
+
+            if (!settings?.allowUnlimitedPlan) {
+                throw new Response("Unlimited plan is not available for this shop", { status: 403 });
+            }
+        }
+
         // Handling Downgrade to Free Plan
         if (selectedPlan === FREE_PLAN) {
             // Get active subscription to cancel it
@@ -272,7 +288,7 @@ function PlanCard({
 }
 
 export default function PricingPage() {
-    const { currentPlan } = useLoaderData<typeof loader>();
+    const { canUseUnlimitedPlan, currentPlan } = useLoaderData<typeof loader>();
     const submit = useSubmit();
 
     const handleSelectPlan = (plan: string) => {
@@ -357,6 +373,7 @@ export default function PricingPage() {
             ribbonTone: "blue" as const,
         },
     ];
+    const visiblePlans = plans.filter((plan) => plan.name !== UNLIMITED_PLAN || canUseUnlimitedPlan);
 
     return (
         <Page
@@ -370,9 +387,12 @@ export default function PricingPage() {
                 {`
                     .pricing-cards-grid {
                         display: grid;
-                        grid-template-columns: repeat(5, minmax(0, 1fr));
+                        grid-template-columns: repeat(4, minmax(0, 1fr));
                         gap: 12px;
                         align-items: stretch;
+                    }
+                    .pricing-cards-grid-5 {
+                        grid-template-columns: repeat(5, minmax(0, 1fr));
                     }
                     .pricing-plan-shell {
                         min-height: 100%;
@@ -483,8 +503,8 @@ export default function PricingPage() {
                 `}
             </style>
             <BlockStack gap="500">
-                <div className="pricing-cards-grid">
-                    {plans.map((plan) => (
+                <div className={`pricing-cards-grid pricing-cards-grid-${visiblePlans.length}`}>
+                    {visiblePlans.map((plan) => (
                         <PlanCard
                             key={plan.name}
                             name={plan.name}
@@ -524,7 +544,11 @@ export default function PricingPage() {
                             <div className="pricing-note-item">
                                 <BlockStack gap="100">
                                     <Text as="p" fontWeight="semibold">Overage</Text>
-                                    <Text as="p" tone="subdued">Premium, Plus and Elite can charge extra visitors when limits are exceeded. Unlimited has no overage charges.</Text>
+                                    <Text as="p" tone="subdued">
+                                        {canUseUnlimitedPlan
+                                            ? "Premium, Plus and Elite can charge extra visitors when limits are exceeded. Unlimited has no overage charges."
+                                            : "Paid plans can charge extra visitors through Shopify billing when limits are exceeded."}
+                                    </Text>
                                 </BlockStack>
                             </div>
                         </div>
@@ -532,6 +556,11 @@ export default function PricingPage() {
                         <Text as="p" variant="bodySm" tone="subdued">
                             Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor.
                         </Text>
+                        {!canUseUnlimitedPlan && (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                                Need a custom high-volume plan? Contact support and we can review options for your store.
+                            </Text>
+                        )}
                     </BlockStack>
                 </Card>
 
