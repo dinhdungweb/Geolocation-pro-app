@@ -10,7 +10,10 @@ import {
     Text,
     Pagination,
     EmptyState,
+    BlockStack,
+    InlineStack,
 } from "@shopify/polaris";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
@@ -51,8 +54,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function VisitorLogs() {
-    const { logs, page, totalPages } = useLoaderData<typeof loader>();
+    const { logs, page, totalPages, totalLogs } = useLoaderData<typeof loader>();
     const [, setSearchParams] = useSearchParams();
+    const pageSize = 20;
+    const firstLogNumber = logs.length > 0 ? (page - 1) * pageSize + 1 : 0;
+    const lastLogNumber = logs.length > 0 ? Math.min((page - 1) * pageSize + logs.length, totalLogs) : 0;
+    const recentLogsLabel = `${totalLogs.toLocaleString()} recent log${totalLogs === 1 ? "" : "s"}`;
 
     const handleNextPage = () => {
         if (page < totalPages) {
@@ -113,11 +120,11 @@ export default function VisitorLogs() {
                 <IndexTable.Cell>{log.ipAddress}</IndexTable.Cell>
                 <IndexTable.Cell>
                     {log.countryCode ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div className="visitor-log-country">
                             <img
                                 src={`https://flagcdn.com/20x15/${log.countryCode.toLowerCase()}.png`}
                                 alt={log.countryCode}
-                                style={{ borderRadius: "2px" }}
+                                className="visitor-log-flag"
                             />
                             {log.countryCode}
                         </div>
@@ -128,7 +135,7 @@ export default function VisitorLogs() {
                 <IndexTable.Cell>{getActionBadge(log.action)}</IndexTable.Cell>
                 <IndexTable.Cell>
                     {log.path ? (
-                        <div style={{ fontSize: "12px", color: "#666", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.path}>
+                        <div className="visitor-log-path" title={log.path}>
                             {log.path}
                         </div>
                     ) : (
@@ -140,13 +147,13 @@ export default function VisitorLogs() {
                         {log.ruleName || "-"}
                     </Text>
                     {log.targetUrl && (
-                        <div style={{ fontSize: "12px", color: "#666", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div className="visitor-log-target" title={log.targetUrl}>
                             {log.targetUrl}
                         </div>
                     )}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
-                    <div style={{ fontSize: "11px", color: "#888", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.userAgent}>
+                    <div className="visitor-log-user-agent" title={log.userAgent || ""}>
                         {log.userAgent || "-"}
                     </div>
                 </IndexTable.Cell>
@@ -156,9 +163,92 @@ export default function VisitorLogs() {
 
     return (
         <Page title="Visitor Logs" subtitle="Detailed logs of all visitor interactions" fullWidth>
+            <TitleBar title="Visitor Logs" />
+            <style>
+                {`
+                    .visitor-log-card-header {
+                        padding: 16px 20px;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                    }
+                    .visitor-log-country {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-weight: 500;
+                    }
+                    .visitor-log-flag {
+                        border-radius: 2px;
+                        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+                    }
+                    .visitor-log-path,
+                    .visitor-log-target,
+                    .visitor-log-user-agent {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        color: var(--p-color-text-secondary, #6d7175);
+                    }
+                    .visitor-log-path {
+                        max-width: 220px;
+                        font-size: 12px;
+                    }
+                    .visitor-log-target {
+                        max-width: 260px;
+                        margin-top: 2px;
+                        font-size: 12px;
+                    }
+                    .visitor-log-user-agent {
+                        max-width: 180px;
+                        font-size: 11px;
+                    }
+                    .visitor-log-pagination {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 16px;
+                        padding: 14px 20px;
+                        border-top: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                    }
+                    @media (max-width: 47.9975em) {
+                        .visitor-log-card-header,
+                        .visitor-log-pagination {
+                            align-items: flex-start;
+                            flex-direction: column;
+                        }
+                    }
+                `}
+            </style>
             <Layout>
                 <Layout.Section>
-                    <Card padding="0">
+                    <BlockStack gap="400">
+                        <Card>
+                            <InlineStack align="space-between" blockAlign="center" gap="400">
+                                <BlockStack gap="100">
+                                    <Text as="h2" variant="headingMd">Recent visitor activity</Text>
+                                    <Text as="p" variant="bodyMd" tone="subdued">
+                                        Review recent visits, redirects, blocks, and popup events for troubleshooting.
+                                    </Text>
+                                </BlockStack>
+                                <Badge tone="info">{recentLogsLabel}</Badge>
+                            </InlineStack>
+                        </Card>
+
+                        <Card padding="0">
+                            <div className="visitor-log-card-header">
+                                <InlineStack align="space-between" blockAlign="center" gap="300">
+                                    <BlockStack gap="100">
+                                        <Text as="h2" variant="headingSm">Activity log</Text>
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Showing {firstLogNumber.toLocaleString()}-{lastLogNumber.toLocaleString()} of {totalLogs.toLocaleString()} logs.
+                                        </Text>
+                                    </BlockStack>
+                                    {totalPages > 1 && (
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Page {page} of {totalPages}
+                                        </Text>
+                                    )}
+                                </InlineStack>
+                            </div>
                         {logs.length > 0 ? (
                             <>
                                 <IndexTable
@@ -177,7 +267,10 @@ export default function VisitorLogs() {
                                 >
                                     {rowMarkup}
                                 </IndexTable>
-                                <div style={{ padding: "16px", display: "flex", justifyContent: "center" }}>
+                                <div className="visitor-log-pagination">
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        Latest logs are shown first.
+                                    </Text>
                                     <Pagination
                                         hasPrevious={page > 1}
                                         onPrevious={handlePreviousPage}
@@ -195,8 +288,8 @@ export default function VisitorLogs() {
                             </EmptyState>
                         )}
 
-                    </Card>
-                    <div style={{ height: "60px" }} />
+                        </Card>
+                    </BlockStack>
                 </Layout.Section>
             </Layout>
         </Page>
