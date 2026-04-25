@@ -11,7 +11,7 @@ import {
 } from "@shopify/polaris";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useSubmit } from "@remix-run/react";
+import { useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -340,6 +340,8 @@ interface PlanCardProps {
     noOverage?: boolean;
     ribbon: string;
     ribbonTone?: "green" | "blue";
+    isLoading?: boolean;
+    isDisabled?: boolean;
     onSelect: () => void;
 }
 
@@ -363,6 +365,8 @@ function PlanCard({
     noOverage,
     ribbon,
     ribbonTone = "green",
+    isLoading,
+    isDisabled,
     onSelect,
 }: PlanCardProps) {
     return (
@@ -442,7 +446,13 @@ function PlanCard({
                             {isCurrentPlan ? (
                                 <Button disabled fullWidth>Current plan</Button>
                             ) : (
-                                <Button variant={isFree ? "secondary" : "primary"} onClick={onSelect} fullWidth>
+                                <Button
+                                    variant={isFree ? "secondary" : "primary"}
+                                    onClick={onSelect}
+                                    loading={isLoading}
+                                    disabled={isDisabled}
+                                    fullWidth
+                                >
                                     {isFree ? "Downgrade" : "Subscribe"}
                                 </Button>
                             )}
@@ -457,6 +467,8 @@ function PlanCard({
 export default function PricingPage() {
     const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan } = useLoaderData<typeof loader>();
     const submit = useSubmit();
+    const navigation = useNavigation();
+    const submittingPlan = navigation.state !== "idle" ? navigation.formData?.get("plan")?.toString() : null;
 
     const handleSelectPlan = (plan: string) => {
         // Pass both selected plan and current plan if needed
@@ -667,7 +679,7 @@ export default function PricingPage() {
                         font-size: 12px;
                         line-height: 16px;
                         font-weight: 500;
-                        transform: translateY(-2px);
+                        transform: translateY(3px);
                     }
                     .pricing-feature-list {
                         margin: 0;
@@ -775,6 +787,8 @@ export default function PricingPage() {
                             noOverage={plan.noOverage}
                             ribbon={plan.ribbon}
                             ribbonTone={plan.ribbonTone}
+                            isLoading={submittingPlan === plan.name}
+                            isDisabled={Boolean(submittingPlan) && submittingPlan !== plan.name}
                             onSelect={() => handleSelectPlan(plan.name)}
                         />
                     ))}
