@@ -334,7 +334,7 @@ export default function AdminLayout() {
                     .btn-menu-toggle { display: flex; padding: 8px; border-radius: 8px; }
                     .global-search { display: none; }
                     .page-content {
-                        padding: 14px 10px 24px;
+                        padding: 15px;
                         max-width: none;
                         margin: 0;
                     }
@@ -361,9 +361,6 @@ export default function AdminLayout() {
                     .page-content th {
                         font-size: 10px !important;
                         letter-spacing: 0.03em !important;
-                    }
-                    .page-content table {
-                        min-width: 760px !important;
                     }
                     .page-content th,
                     .page-content td {
@@ -396,8 +393,7 @@ export default function AdminLayout() {
                     .topbar-actions .topbar-date { display: none; }
                     .topbar-left { gap: 8px; }
                     .topbar { padding: 0 8px; }
-                    .page-content { padding: 10px 6px 20px; }
-                    .page-content table { min-width: 700px !important; }
+                    .page-content { padding: 15px; }
                     .page-content th,
                     .page-content td {
                         padding: 8px 10px !important;
