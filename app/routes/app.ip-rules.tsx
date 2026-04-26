@@ -573,9 +573,6 @@ export default function IPRulesPage() {
                     </Text>
                 </BlockStack>
                 <InlineStack gap="200" align="end">
-                    <Button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
-                        Add IP Rule
-                    </Button>
                     <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
                         <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
                             <Button
@@ -603,6 +600,9 @@ export default function IPRulesPage() {
                             </Button>
                         </div>
                     </Tooltip>
+                    <Button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
+                        Add IP Rule
+                    </Button>
                 </InlineStack>
             </div>
             <BlockStack gap="500">

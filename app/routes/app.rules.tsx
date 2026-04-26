@@ -683,9 +683,6 @@ export default function RulesPage() {
                     </Text>
                 </BlockStack>
                 <InlineStack gap="200" align="end">
-                    <Button variant="primary" onClick={() => handleOpenModal()}>
-                        Add Rule
-                    </Button>
                     <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
                         <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
                             <Button
@@ -713,6 +710,9 @@ export default function RulesPage() {
                             </Button>
                         </div>
                     </Tooltip>
+                    <Button variant="primary" onClick={() => handleOpenModal()}>
+                        Add Rule
+                    </Button>
                 </InlineStack>
             </div>
             <BlockStack gap="500">
