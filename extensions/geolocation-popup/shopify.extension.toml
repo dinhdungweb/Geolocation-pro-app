@@ -5,7 +5,7 @@ api_version = "2026-04"
 uid = "862b6fed-5fb7-4ce9-aa37-442f34bc3a93334efce1"
 
 type = "theme"
-name = "Geolocation Popup"
+name = "Geolocation"
 handle = "geolocation-popup"
 
 [[extensions.targeting]]

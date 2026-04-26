@@ -1,5 +1,5 @@
 {% comment %}
-  Geolocation Popup - Theme App Extension.
+  Geolocation - Theme App Extension.
   Storefront decisions are resolved by the app proxy. The browser only renders
   the returned action and reports signed analytics events.
 {% endcomment %}
@@ -10,15 +10,13 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-04-24-theme-debug';
-  const THEME_BLOCK_ENABLED = {{ block.settings.enabled | json }};
+  const SCRIPT_VERSION = '2026-04-26-single-app-embed-toggle';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
     proxyUrl: '/apps/geolocation/config',
     analyticsUrl: '/apps/geolocation/analytics?shop={{ shop.permanent_domain }}',
-    visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}',
-    themeBlockEnabled: THEME_BLOCK_ENABLED
+    visitorCountry: '{{ request.country.iso_code | default: localization.country.iso_code | default: "" }}'
   };
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -271,11 +269,6 @@
   const init = async () => {
     if (window.Shopify && window.Shopify.designMode) return;
     if (window.location.search.includes('preview_theme_id') || window.location.pathname.includes('/editor')) return;
-    if (!THEME_BLOCK_ENABLED) {
-      log('Theme block is disabled');
-      return;
-    }
-
     let config;
     try {
       config = await fetchConfig();
@@ -323,7 +316,6 @@
 
   window.GeolocationDebug = {
     version: SCRIPT_VERSION,
-    themeBlockEnabled: THEME_BLOCK_ENABLED,
     clearPreference: () => {
       CookieManager.remove('geo_choice');
       console.log('Cleared geolocation preference. Refresh the page to test again.');
@@ -346,18 +338,12 @@
 
 {% schema %}
 {
-  "name": "Geolocation Popup",
+  "name": "Geolocation",
   "target": "body",
   "settings": [
     {
       "type": "paragraph",
-      "content": "Configure redirect rules and popup settings in the Geolocation app admin."
-    },
-    {
-      "type": "checkbox",
-      "id": "enabled",
-      "label": "Enable Geolocation Popup",
-      "default": true
+      "content": "Use the app embed toggle above to enable redirects, country blocking, IP rules, and popups. Configure rules in the app admin."
     }
   ]
 }
