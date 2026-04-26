@@ -56,9 +56,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function VisitorLogs() {
     const { logs, page, totalPages, totalLogs } = useLoaderData<typeof loader>();
     const [, setSearchParams] = useSearchParams();
-    const pageSize = 20;
-    const firstLogNumber = logs.length > 0 ? (page - 1) * pageSize + 1 : 0;
-    const lastLogNumber = logs.length > 0 ? Math.min((page - 1) * pageSize + logs.length, totalLogs) : 0;
     const recentLogsLabel = `${totalLogs.toLocaleString()} recent log${totalLogs === 1 ? "" : "s"}`;
 
     const handleNextPage = () => {
@@ -161,10 +158,6 @@ export default function VisitorLogs() {
             <TitleBar title="Visitor Logs" />
             <style>
                 {`
-                    .visitor-log-card-header {
-                        padding: 16px 20px;
-                        border-bottom: 1px solid var(--p-color-border-secondary, #dfe3e8);
-                    }
                     .visitor-log-country {
                         display: flex;
                         align-items: center;
@@ -200,7 +193,6 @@ export default function VisitorLogs() {
                         border-top: 1px solid var(--p-color-border-secondary, #dfe3e8);
                     }
                     @media (max-width: 47.9975em) {
-                        .visitor-log-card-header,
                         .visitor-log-pagination {
                             align-items: flex-start;
                             flex-direction: column;
@@ -224,21 +216,6 @@ export default function VisitorLogs() {
                         </Card>
 
                         <Card padding="0">
-                            <div className="visitor-log-card-header">
-                                <InlineStack align="space-between" blockAlign="center" gap="300">
-                                    <BlockStack gap="100">
-                                        <Text as="h2" variant="headingSm">Activity log</Text>
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                            Showing {firstLogNumber.toLocaleString()}-{lastLogNumber.toLocaleString()} of {totalLogs.toLocaleString()} logs.
-                                        </Text>
-                                    </BlockStack>
-                                    {totalPages > 1 && (
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                            Page {page} of {totalPages}
-                                        </Text>
-                                    )}
-                                </InlineStack>
-                            </div>
                         {logs.length > 0 ? (
                             <>
                                 <IndexTable
