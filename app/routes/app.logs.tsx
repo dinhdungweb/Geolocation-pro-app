@@ -158,6 +158,9 @@ export default function VisitorLogs() {
             <TitleBar title="Visitor Logs" />
             <style>
                 {`
+                    .visitor-log-page-content {
+                        padding-bottom: 72px;
+                    }
                     .visitor-log-country {
                         display: flex;
                         align-items: center;
@@ -193,6 +196,9 @@ export default function VisitorLogs() {
                         border-top: 1px solid var(--p-color-border-secondary, #dfe3e8);
                     }
                     @media (max-width: 47.9975em) {
+                        .visitor-log-page-content {
+                            padding-bottom: 88px;
+                        }
                         .visitor-log-pagination {
                             align-items: flex-start;
                             flex-direction: column;
@@ -202,61 +208,62 @@ export default function VisitorLogs() {
             </style>
             <Layout>
                 <Layout.Section>
-                    <BlockStack gap="400">
-                        <Card>
-                            <InlineStack align="space-between" blockAlign="center" gap="400">
-                                <BlockStack gap="100">
-                                    <Text as="h2" variant="headingMd">Recent visitor activity</Text>
-                                    <Text as="p" variant="bodyMd" tone="subdued">
-                                        Review recent visits, redirects, blocks, and popup events for troubleshooting.
-                                    </Text>
-                                </BlockStack>
-                                <Badge tone="info">{recentLogsLabel}</Badge>
-                            </InlineStack>
-                        </Card>
+                    <div className="visitor-log-page-content">
+                        <BlockStack gap="400">
+                            <Card>
+                                <InlineStack align="space-between" blockAlign="center" gap="400">
+                                    <BlockStack gap="100">
+                                        <Text as="h2" variant="headingMd">Recent visitor activity</Text>
+                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                            Review recent visits, redirects, blocks, and popup events for troubleshooting.
+                                        </Text>
+                                    </BlockStack>
+                                    <Badge tone="info">{recentLogsLabel}</Badge>
+                                </InlineStack>
+                            </Card>
 
-                        <Card padding="0">
-                        {logs.length > 0 ? (
-                            <>
-                                <IndexTable
-                                    resourceName={resourceName}
-                                    itemCount={logs.length}
-                                    headings={[
-                                        { title: "Timestamp" },
-                                        { title: "IP Address" },
-                                        { title: "Country" },
-                                        { title: "Action" },
-                                        { title: "Page Path" },
-                                        { title: "Details / Rule" },
-                                        { title: "User Agent" },
-                                    ]}
-                                    selectable={false}
-                                >
-                                    {rowMarkup}
-                                </IndexTable>
-                                <div className="visitor-log-pagination">
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                        Latest logs are shown first.
-                                    </Text>
-                                    <Pagination
-                                        hasPrevious={page > 1}
-                                        onPrevious={handlePreviousPage}
-                                        hasNext={page < totalPages}
-                                        onNext={handleNextPage}
-                                    />
-                                </div>
-                            </>
-                        ) : (
-                            <EmptyState
-                                heading="No logs found"
-                                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                            >
-                                <p>Visitor activity will appear here.</p>
-                            </EmptyState>
-                        )}
-
-                        </Card>
-                    </BlockStack>
+                            <Card padding="0">
+                                {logs.length > 0 ? (
+                                    <>
+                                        <IndexTable
+                                            resourceName={resourceName}
+                                            itemCount={logs.length}
+                                            headings={[
+                                                { title: "Timestamp" },
+                                                { title: "IP Address" },
+                                                { title: "Country" },
+                                                { title: "Action" },
+                                                { title: "Page Path" },
+                                                { title: "Details / Rule" },
+                                                { title: "User Agent" },
+                                            ]}
+                                            selectable={false}
+                                        >
+                                            {rowMarkup}
+                                        </IndexTable>
+                                        <div className="visitor-log-pagination">
+                                            <Text as="p" variant="bodySm" tone="subdued">
+                                                Latest logs are shown first.
+                                            </Text>
+                                            <Pagination
+                                                hasPrevious={page > 1}
+                                                onPrevious={handlePreviousPage}
+                                                hasNext={page < totalPages}
+                                                onNext={handleNextPage}
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <EmptyState
+                                        heading="No logs found"
+                                        image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                                    >
+                                        <p>Visitor activity will appear here.</p>
+                                    </EmptyState>
+                                )}
+                            </Card>
+                        </BlockStack>
+                    </div>
                 </Layout.Section>
             </Layout>
         </Page>
