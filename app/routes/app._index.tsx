@@ -19,7 +19,16 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS, FREE_PLAN, PLUS_PLAN, CUSTOM_PLAN, getPlanLimit, hasUnlimitedUsage } from "../billing.config";
+import {
+  ALL_PAID_PLANS,
+  FREE_PLAN,
+  PREMIUM_PLAN,
+  PLUS_PLAN,
+  ELITE_PLAN,
+  CUSTOM_PLAN,
+  getPlanLimit,
+  hasUnlimitedUsage,
+} from "../billing.config";
 // checkAndChargeOverage is called in the parent layout (app.tsx), not here
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
@@ -44,6 +53,19 @@ interface VisitsDataItem {
   popup: number;
   redirected: string;
   blocked: number;
+}
+
+const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: string }> = {
+  [FREE_PLAN]: { label: "Premium", actionContent: "Upgrade to Premium" },
+  [PREMIUM_PLAN]: { label: "Plus", actionContent: "Upgrade to Plus" },
+  [PLUS_PLAN]: { label: "Elite", actionContent: "Upgrade to Elite" },
+};
+
+const CUSTOM_PLAN_REQUEST_ACTION = { content: "Request custom plan", url: "/app/pricing" };
+
+function formatPlanLabel(planName: string) {
+  if (!planName) return "current";
+  return planName.charAt(0).toUpperCase() + planName.slice(1);
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -220,6 +242,31 @@ export default function Index() {
   const usagePercent = isUnlimitedPlan ? 100 : Math.min(100, Math.round((currentUsage / planLimit) * 100));
   const isNearLimit = !isUnlimitedPlan && usagePercent >= 80;
   const isOverLimit = !isUnlimitedPlan && currentUsage > planLimit;
+  const upgradeTarget = STANDARD_PLAN_UPGRADES[currentPlan];
+  const canRequestCustomPlan = currentPlan !== FREE_PLAN && currentPlan !== CUSTOM_PLAN && !isUnlimitedPlan;
+  const currentPlanLabel = formatPlanLabel(planDisplayName || currentPlan);
+  const usageBannerAction = upgradeTarget
+    ? { content: upgradeTarget.actionContent, url: "/app/pricing" }
+    : canRequestCustomPlan
+      ? CUSTOM_PLAN_REQUEST_ACTION
+    : { content: "View pricing", url: "/app/pricing" };
+  const usageBannerSecondaryAction = upgradeTarget && canRequestCustomPlan
+    ? CUSTOM_PLAN_REQUEST_ACTION
+    : undefined;
+  const overLimitMessage = upgradeTarget && canRequestCustomPlan
+    ? `You have exceeded your ${currentPlanLabel} plan limit. Upgrade to ${upgradeTarget.label} for more visitors, or request a custom plan for heavier traffic.`
+    : upgradeTarget
+      ? `You have exceeded your ${currentPlanLabel} plan limit. Upgrade to ${upgradeTarget.label} for a higher monthly visitor limit.`
+      : canRequestCustomPlan
+        ? `You have exceeded your ${currentPlanLabel} plan limit. Request a custom plan for higher monthly traffic.`
+        : `You have exceeded your ${currentPlanLabel} plan limit. Review available plans to manage overage charges.`;
+  const nearLimitMessage = upgradeTarget && canRequestCustomPlan
+    ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Upgrade to ${upgradeTarget.label}, or request a custom plan for heavier traffic.`
+    : upgradeTarget
+      ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Upgrade to ${upgradeTarget.label} for more monthly visitors.`
+      : canRequestCustomPlan
+        ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Request a custom plan for higher monthly traffic.`
+        : `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Review available plans before overage applies.`;
 
   const handleOpenThemeEditor = () => {
     const shopName = shop.replace('.myshopify.com', '');
@@ -357,19 +404,13 @@ export default function Index() {
               />
             </BlockStack>
             {isOverLimit && (
-              <Banner tone="critical">
-                {currentPlan === PLUS_PLAN 
-                  ? "You have exceeded your Plus plan limit. Overage charges will apply for additional visitors."
-                  : "You have exceeded your plan limit. Consider upgrading to avoid overage charges."
-                }
+              <Banner tone="critical" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
+                {overLimitMessage}
               </Banner>
             )}
             {isNearLimit && !isOverLimit && (
-              <Banner tone="warning">
-                {currentPlan === PLUS_PLAN
-                  ? `You're approaching your Plus plan limit (${usagePercent}% used).`
-                  : `You're approaching your plan limit (${usagePercent}% used). Consider upgrading.`
-                }
+              <Banner tone="warning" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
+                {nearLimitMessage}
               </Banner>
             )}
           </BlockStack>
