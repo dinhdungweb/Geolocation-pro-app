@@ -555,7 +555,10 @@ export default function IPRulesPage() {
     );
 
     return (
-        <Page>
+        <Page
+            title="IP Rules"
+            subtitle="Block or redirect specific IP addresses and CIDR ranges before they reach your store."
+        >
             <TitleBar title="IP Rules">
                 <button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
                     Add IP Rule

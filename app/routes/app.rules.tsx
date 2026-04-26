@@ -665,7 +665,10 @@ export default function RulesPage() {
     );
 
     return (
-        <Page>
+        <Page
+            title="Geolocation Rules"
+            subtitle="Create country-based rules to redirect, block, or target visitors by location."
+        >
             <TitleBar title="Geolocation Rules">
                 <button variant="primary" onClick={() => handleOpenModal()}>
                     Add Rule
