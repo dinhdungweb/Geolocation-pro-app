@@ -555,18 +555,27 @@ export default function IPRulesPage() {
     );
 
     return (
-        <Page
-            title="IP Rules"
-            subtitle="Block or redirect specific IP addresses and CIDR ranges before they reach your store."
-        >
+        <Page>
             <TitleBar title="IP Rules">
-                <button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
-                    Add IP Rule
-                </button>
             </TitleBar>
-            {/* Import/Export Action Bar */}
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: '16px',
+                flexWrap: 'wrap',
+                marginBottom: '16px',
+            }}>
+                <BlockStack gap="100">
+                    <Text as="h1" variant="headingLg">IP Rules</Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                        Block or redirect specific IP addresses and CIDR ranges before they reach your store.
+                    </Text>
+                </BlockStack>
                 <InlineStack gap="200" align="end">
+                    <Button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
+                        Add IP Rule
+                    </Button>
                     <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
                         <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
                             <Button

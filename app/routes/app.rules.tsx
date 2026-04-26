@@ -665,18 +665,27 @@ export default function RulesPage() {
     );
 
     return (
-        <Page
-            title="Geolocation Rules"
-            subtitle="Create country-based rules to redirect, block, or target visitors by location."
-        >
+        <Page>
             <TitleBar title="Geolocation Rules">
-                <button variant="primary" onClick={() => handleOpenModal()}>
-                    Add Rule
-                </button>
             </TitleBar>
-            {/* Import/Export Action Bar */}
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: '16px',
+                flexWrap: 'wrap',
+                marginBottom: '16px',
+            }}>
+                <BlockStack gap="100">
+                    <Text as="h1" variant="headingLg">Geolocation Rules</Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                        Create country-based rules to redirect, block, or target visitors by location.
+                    </Text>
+                </BlockStack>
                 <InlineStack gap="200" align="end">
+                    <Button variant="primary" onClick={() => handleOpenModal()}>
+                        Add Rule
+                    </Button>
                     <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
                         <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
                             <Button
