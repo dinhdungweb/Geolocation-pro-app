@@ -118,6 +118,7 @@ function ColorPickerField({
                 onClose={() => setActive(false)}
             >
                 <Popover.Section>
+                    <div className="settings-color-picker-panel">
                     <BlockStack gap="300">
                         <ColorPicker
                             color={hexToPickerColor(normalizedValue, fallback)}
@@ -128,6 +129,7 @@ function ColorPickerField({
                             {normalizedValue.toUpperCase()}
                         </Text>
                     </BlockStack>
+                    </div>
                 </Popover.Section>
             </Popover>
         </BlockStack>
@@ -413,6 +415,20 @@ export default function SettingsPage() {
                     .settings-page-content {
                         padding-bottom: 72px;
                     }
+                    .settings-content-grid {
+                        display: grid;
+                        grid-template-columns: minmax(0, 1fr) minmax(380px, 440px);
+                        gap: 20px;
+                        align-items: start;
+                    }
+                    .settings-form-column {
+                        min-width: 0;
+                    }
+                    .settings-preview-sidebar {
+                        position: sticky;
+                        top: 20px;
+                        min-width: 0;
+                    }
                     .settings-summary-grid {
                         display: grid;
                         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -433,6 +449,10 @@ export default function SettingsPage() {
                         display: grid;
                         grid-template-columns: repeat(3, minmax(0, 1fr));
                         gap: 16px;
+                    }
+                    .settings-color-picker-panel {
+                        width: 280px;
+                        max-width: calc(100vw - 48px);
                     }
                     .settings-color-trigger {
                         width: 100%;
@@ -497,7 +517,7 @@ export default function SettingsPage() {
                     }
                     .settings-preview-canvas {
                         position: relative;
-                        min-height: 440px;
+                        min-height: 300px;
                         aspect-ratio: 16 / 9;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                         overflow: hidden;
@@ -506,7 +526,7 @@ export default function SettingsPage() {
                     }
                     .settings-preview-canvas-modal {
                         align-items: center;
-                        padding: 32px;
+                        padding: 20px;
                     }
                     .settings-preview-canvas-top_bar {
                         align-items: flex-start;
@@ -538,8 +558,8 @@ export default function SettingsPage() {
                         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
                     }
                     .settings-popup-preview-modal {
-                        width: min(440px, 88%);
-                        padding: 24px;
+                        width: min(340px, 88%);
+                        padding: 20px;
                         border-radius: 10px;
                         border: 1px solid rgba(0, 0, 0, 0.08);
                         text-align: center;
@@ -579,6 +599,12 @@ export default function SettingsPage() {
                     @media (max-width: 47.9975em) {
                         .settings-page-content {
                             padding-bottom: 88px;
+                        }
+                        .settings-content-grid {
+                            grid-template-columns: 1fr;
+                        }
+                        .settings-preview-sidebar {
+                            position: static;
                         }
                         .settings-summary-grid,
                         .settings-two-field-grid,
@@ -620,6 +646,8 @@ export default function SettingsPage() {
                     )}
                     <Layout>
                         <Layout.Section>
+                            <div className="settings-content-grid">
+                            <div className="settings-form-column">
                             <BlockStack gap="400">
                                 <Card>
                                     <BlockStack gap="400">
@@ -673,8 +701,6 @@ export default function SettingsPage() {
                                         </div>
                                     </BlockStack>
                                 </Card>
-
-                                {isEnabled && previewMarkup}
 
                                 {isEnabled && (
                                     <Card>
@@ -854,6 +880,13 @@ export default function SettingsPage() {
                                     </Button>
                                 </div>
                             </BlockStack>
+                            </div>
+                            {isEnabled && (
+                                <div className="settings-preview-sidebar">
+                                    {previewMarkup}
+                                </div>
+                            )}
+                            </div>
                         </Layout.Section>
 
                         <Layout.Section>
