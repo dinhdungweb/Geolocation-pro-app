@@ -8,6 +8,7 @@ export const CUSTOM_PLAN = "custom";
 
 export const ALL_PAID_PLANS = [PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN, CUSTOM_PLAN];
 export const ALL_PLANS = [FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN, CUSTOM_PLAN];
+export const DEFAULT_TRIAL_DAYS = 3;
 
 // Visitor limits per plan
 export const PLAN_LIMITS = {

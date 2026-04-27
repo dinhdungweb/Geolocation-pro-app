@@ -88,7 +88,7 @@ model Settings {
   customPlanPrice    Decimal  @default(79.99) @db.Decimal(10, 2)
   customPlanVisitorLimit Int?
   customPlanNoOverage Boolean @default(true)
-  customPlanTrialDays Int     @default(7)
+  customPlanTrialDays Int     @default(3)
 }
 
 model AnalyticsCountry {

@@ -25,6 +25,7 @@ import {
     ALL_PAID_PLANS,
     PLAN_LIMITS,
     OVERAGE_RATE,
+    DEFAULT_TRIAL_DAYS,
     getPlanLimit,
 } from "../billing.config";
 
@@ -408,7 +409,7 @@ function PlanCard({
                                     {isFree
                                         ? "No monthly charge"
                                         : hasTrial
-                                            ? `${trialDays ?? 7}-day free trial included`
+                                            ? `${trialDays ?? DEFAULT_TRIAL_DAYS}-day free trial included`
                                             : "Monthly Shopify billing"}
                                 </Text>
                             </BlockStack>
@@ -522,7 +523,7 @@ export default function PricingPage() {
                 "Page-specific targeting",
             ],
             hasTrial: true,
-            ribbon: "7-day free trial",
+            ribbon: `${DEFAULT_TRIAL_DAYS}-day free trial`,
         },
         {
             name: PLUS_PLAN,
@@ -537,7 +538,7 @@ export default function PricingPage() {
             ],
             hasTrial: true,
             isRecommended: true,
-            ribbon: "7-day free trial",
+            ribbon: `${DEFAULT_TRIAL_DAYS}-day free trial`,
         },
         {
             name: ELITE_PLAN,
@@ -586,8 +587,8 @@ export default function PricingPage() {
                 customNoOverage ? "No overage charges" : "Overage billing after limit",
                 "Priority support",
             ],
-            hasTrial: (customPlan?.trialDays ?? 7) > 0,
-            trialDays: customPlan?.trialDays ?? 7,
+            hasTrial: (customPlan?.trialDays ?? DEFAULT_TRIAL_DAYS) > 0,
+            trialDays: customPlan?.trialDays ?? DEFAULT_TRIAL_DAYS,
             noOverage: customNoOverage,
             ribbon: "Private plan",
             ribbonTone: "blue" as const,
@@ -800,7 +801,7 @@ export default function PricingPage() {
                         <div className="pricing-note-grid">
                             <div className="pricing-note-item">
                                 <BlockStack gap="100">
-                                    <Text as="p" fontWeight="semibold">7-day trial</Text>
+                                    <Text as="p" fontWeight="semibold">{DEFAULT_TRIAL_DAYS}-day trial</Text>
                                     <Text as="p" tone="subdued">Paid plans include a free trial before billing starts.</Text>
                                 </BlockStack>
                             </div>

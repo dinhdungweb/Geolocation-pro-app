@@ -4,7 +4,7 @@ import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-
 import { useState, useEffect } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
-import { CUSTOM_PLAN, FREE_PLAN } from "../billing.config";
+import { CUSTOM_PLAN, DEFAULT_TRIAL_DAYS, FREE_PLAN } from "../billing.config";
 import { issueApplicationCredit } from "../utils/billing.server";
 import { 
     ArrowLeft, 
@@ -66,7 +66,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const visitorLimitInput = ((formData.get("customPlanVisitorLimit") as string) || "").trim();
         const customPlanVisitorLimit = visitorLimitInput ? Number.parseInt(visitorLimitInput, 10) : null;
         const customPlanNoOverage = formData.get("customPlanNoOverage") === "true";
-        const customPlanTrialDays = Number.parseInt((formData.get("customPlanTrialDays") as string) || "7", 10);
+        const customPlanTrialDays = Number.parseInt((formData.get("customPlanTrialDays") as string) || String(DEFAULT_TRIAL_DAYS), 10);
 
         if (customPlanEnabled && (!Number.isFinite(customPlanPrice) || customPlanPrice <= 0)) {
             return json({ success: false, error: "Custom plan price must be greater than 0" }, { status: 400 });
@@ -600,7 +600,7 @@ export default function AdminShopDetail() {
                                     </div>
                                     <div className="billing-input-group">
                                         <label>Trial days</label>
-                                        <input type="number" min="0" max="90" name="customPlanTrialDays" className="billing-input" defaultValue={settings.customPlanTrialDays ?? 7} />
+                                        <input type="number" min="0" max="90" name="customPlanTrialDays" className="billing-input" defaultValue={settings.customPlanTrialDays ?? DEFAULT_TRIAL_DAYS} />
                                     </div>
                                 </div>
                                 <div className="billing-input-group">
@@ -692,7 +692,7 @@ export default function AdminShopDetail() {
                                     <input type="hidden" name="customPlanPrice" value="79.99" />
                                     <input type="hidden" name="customPlanVisitorLimit" value="" />
                                     <input type="hidden" name="customPlanNoOverage" value="true" />
-                                    <input type="hidden" name="customPlanTrialDays" value="7" />
+                                    <input type="hidden" name="customPlanTrialDays" value={DEFAULT_TRIAL_DAYS} />
                                     <button type="submit" className="inline-toggle-btn enabled" disabled={isSubmitting}>
                                         Create Custom Plan Access
                                     </button>
