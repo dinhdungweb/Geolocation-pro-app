@@ -14,7 +14,9 @@ import {
     Banner,
     Divider,
     InlineStack,
-    CalloutCard,
+    Button,
+    Badge,
+    Box,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -238,59 +240,240 @@ export default function SettingsPage() {
         { label: "Top Bar", value: "top_bar" },
         { label: "Bottom Bar", value: "bottom_bar" },
     ];
+    const previewMessage = popupMessage
+        .replace("{country}", "US")
+        .replace("{target}", "US Store");
+    const previewCanvasClass = `settings-preview-canvas settings-preview-canvas-${template}`;
+    const previewPanelClass = `settings-popup-preview settings-popup-preview-${template}`;
+    const isBarTemplate = template !== "modal";
+    const saveButtonText = isLoading ? "Saving..." : "Save settings";
 
     return (
-        <Page>
+        <Page
+            title="Settings"
+            subtitle="Control storefront behavior, popup appearance, and visitor protection."
+            fullWidth
+        >
             <TitleBar title="Settings">
                 <button variant="primary" onClick={handleSave} disabled={isLoading}>
-                    {isLoading ? "Saving..." : "Save"}
+                    {saveButtonText}
                 </button>
             </TitleBar>
-            <BlockStack gap="500">
+            <style>
+                {`
+                    .settings-page-content {
+                        padding-bottom: 72px;
+                    }
+                    .settings-summary-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 12px;
+                    }
+                    .settings-summary-item {
+                        padding: 12px;
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        border-radius: 8px;
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    .settings-two-field-grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 16px;
+                    }
+                    .settings-color-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 16px;
+                    }
+                    .settings-preview-sticky {
+                        position: sticky;
+                        top: 20px;
+                    }
+                    .settings-preview-canvas {
+                        position: relative;
+                        min-height: 320px;
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        border-radius: 8px;
+                        overflow: hidden;
+                        display: flex;
+                        justify-content: center;
+                    }
+                    .settings-preview-canvas-modal {
+                        align-items: center;
+                        padding: 24px;
+                    }
+                    .settings-preview-canvas-top_bar {
+                        align-items: flex-start;
+                    }
+                    .settings-preview-canvas-bottom_bar {
+                        align-items: flex-end;
+                    }
+                    .settings-preview-skeleton {
+                        position: absolute;
+                        inset: 24px;
+                        opacity: 0.35;
+                    }
+                    .settings-skeleton-line,
+                    .settings-skeleton-block {
+                        border-radius: 6px;
+                        background: var(--p-color-bg-fill-secondary, #d8dadd);
+                    }
+                    .settings-skeleton-line {
+                        height: 14px;
+                        margin-bottom: 12px;
+                    }
+                    .settings-skeleton-block {
+                        height: 120px;
+                        margin-bottom: 16px;
+                    }
+                    .settings-popup-preview {
+                        position: relative;
+                        z-index: 1;
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+                    }
+                    .settings-popup-preview-modal {
+                        width: min(320px, 100%);
+                        padding: 20px;
+                        border-radius: 10px;
+                        border: 1px solid rgba(0, 0, 0, 0.08);
+                        text-align: center;
+                    }
+                    .settings-popup-preview-top_bar,
+                    .settings-popup-preview-bottom_bar {
+                        width: 100%;
+                        padding: 12px 16px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 12px;
+                    }
+                    .settings-popup-actions {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 8px;
+                        flex-wrap: wrap;
+                    }
+                    .settings-preview-button {
+                        border: 0;
+                        border-radius: 6px;
+                        padding: 8px 12px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        white-space: nowrap;
+                    }
+                    .settings-preview-button-secondary {
+                        background: transparent;
+                        border: 1px solid currentColor;
+                    }
+                    .settings-save-row {
+                        display: flex;
+                        justify-content: flex-end;
+                    }
+                    @media (max-width: 47.9975em) {
+                        .settings-page-content {
+                            padding-bottom: 88px;
+                        }
+                        .settings-summary-grid,
+                        .settings-two-field-grid,
+                        .settings-color-grid {
+                            grid-template-columns: 1fr;
+                        }
+                        .settings-preview-sticky {
+                            position: static;
+                        }
+                        .settings-popup-preview-top_bar,
+                        .settings-popup-preview-bottom_bar {
+                            align-items: flex-start;
+                            flex-direction: column;
+                        }
+                    }
+                `}
+            </style>
+            <div className="settings-page-content">
+            <BlockStack gap="400">
                 {isFreePlan && (
-                    <CalloutCard
-                        title="Upgrade to Premium"
-                        illustration="https://cdn.shopify.com/s/assets/admin/checkout/settings-customizecart-705f57c725ac05be5a34ec20c05b94298cb8afd10aac7bd9c7ad02030f48cfa0.svg"
-                        primaryAction={{
-                            content: 'View plans',
-                            url: '/app/pricing',
+                    <Banner
+                        tone="info"
+                        action={{
+                            content: "View plans",
+                            url: "/app/pricing",
                         }}
                     >
-                        <p>Increase your visitor limit and unlock advanced features like Country Blocking by upgrading to a paid plan.</p>
-                    </CalloutCard>
+                        <p>Upgrade to a paid plan to increase your visitor limit and unlock advanced protection features.</p>
+                    </Banner>
+                )}
+                {fetcher.data && !fetcher.data.success && (
+                    <Banner tone="critical">
+                        <p>{fetcher.data.message || "Failed to save settings"}</p>
+                    </Banner>
                 )}
                 <Layout>
                     <Layout.Section>
-                        <Card>
-                            <BlockStack gap="400">
-                                <Text as="h2" variant="headingMd">
-                                    Application Status
-                                </Text>
-                                <Checkbox
-                                    label="Enable Geolocation App"
-                                    checked={isEnabled}
-                                    onChange={setIsEnabled}
-                                    helpText="When disabled, all redirects and blocking rules will be inactive."
-                                />
-                                {!isEnabled && (
-                                    <Banner tone="info">
-                                        <p>The app is currently disabled on your storefront.</p>
-                                    </Banner>
-                                )}
-                            </BlockStack>
-                        </Card>
-                    </Layout.Section>
-                </Layout>
+                        <BlockStack gap="400">
+                            <Card>
+                                <BlockStack gap="400">
+                                    <InlineStack align="space-between" blockAlign="center" gap="300">
+                                        <BlockStack gap="100">
+                                            <Text as="h2" variant="headingMd">Storefront status</Text>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                This controls whether redirects, blocks, and popup rules run on your storefront.
+                                            </Text>
+                                        </BlockStack>
+                                        <Badge tone={isEnabled ? "success" : "critical"}>
+                                            {isEnabled ? "Enabled" : "Disabled"}
+                                        </Badge>
+                                    </InlineStack>
+                                    <Checkbox
+                                        label="Enable Geolocation"
+                                        checked={isEnabled}
+                                        onChange={setIsEnabled}
+                                        helpText="The Shopify theme app embed must also be enabled in your current theme."
+                                    />
+                                    {!isEnabled && (
+                                        <Banner tone="warning">
+                                            <p>Geolocation is disabled. Visitor rules will not run until you enable it again.</p>
+                                        </Banner>
+                                    )}
+                                    <div className="settings-summary-grid">
+                                        <div className="settings-summary-item">
+                                            <BlockStack gap="100">
+                                                <Text as="p" variant="bodySm" tone="subdued">Popup template</Text>
+                                                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                    {templateOptions.find((option) => option.value === template)?.label || "Modal"}
+                                                </Text>
+                                            </BlockStack>
+                                        </div>
+                                        <div className="settings-summary-item">
+                                            <BlockStack gap="100">
+                                                <Text as="p" variant="bodySm" tone="subdued">Bot handling</Text>
+                                                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                    {excludeBots ? "Search bots excluded" : "Search bots included"}
+                                                </Text>
+                                            </BlockStack>
+                                        </div>
+                                        <div className="settings-summary-item">
+                                            <BlockStack gap="100">
+                                                <Text as="p" variant="bodySm" tone="subdued">Visitor preference</Text>
+                                                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                    {cookieDuration || "7"} day cookie
+                                                </Text>
+                                            </BlockStack>
+                                        </div>
+                                    </div>
+                                </BlockStack>
+                            </Card>
 
-                {isEnabled && (
-                    <>
-                        <Layout>
-                            <Layout.Section>
+                            {isEnabled && (
                                 <Card>
                                     <BlockStack gap="400">
-                                        <Text as="h2" variant="headingMd">
-                                            Popup Appearance
-                                        </Text>
+                                        <BlockStack gap="100">
+                                            <Text as="h2" variant="headingMd">Popup appearance</Text>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                Customize the prompt shown when a rule uses popup mode.
+                                            </Text>
+                                        </BlockStack>
                                         <Select
                                             label="Template Design"
                                             options={templateOptions}
@@ -299,9 +482,6 @@ export default function SettingsPage() {
                                             helpText="Choose how the popup appears on the visitor's screen."
                                         />
                                         <Divider />
-                                        <Text as="h2" variant="headingMd">
-                                            Popup Customization
-                                        </Text>
                                         <TextField
                                             label="Popup Title"
                                             value={popupTitle}
@@ -316,7 +496,7 @@ export default function SettingsPage() {
                                             multiline={2}
                                             autoComplete="off"
                                         />
-                                        <InlineStack gap="400">
+                                        <div className="settings-two-field-grid">
                                             <TextField
                                                 label="Confirm Button Text"
                                                 value={confirmBtnText}
@@ -329,12 +509,12 @@ export default function SettingsPage() {
                                                 onChange={setCancelBtnText}
                                                 autoComplete="off"
                                             />
-                                        </InlineStack>
+                                        </div>
                                         <Divider />
                                         <Text as="h3" variant="headingSm">
                                             Colors
                                         </Text>
-                                        <InlineStack gap="400">
+                                        <div className="settings-color-grid">
                                             <TextField
                                                 label="Background Color"
                                                 value={popupBgColor}
@@ -356,118 +536,21 @@ export default function SettingsPage() {
                                                 placeholder="#007bff"
                                                 autoComplete="off"
                                             />
-                                        </InlineStack>
+                                        </div>
                                     </BlockStack>
                                 </Card>
-                            </Layout.Section>
 
-                            <Layout.Section variant="oneThird">
-                                <div style={{ position: 'sticky', top: '20px' }}>
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <Text as="h2" variant="headingMd">
-                                                Popup Preview
-                                            </Text>
-                                            <div
-                                                style={{
-                                                    position: "relative",
-                                                    height: "300px",
-                                                    backgroundColor: "#f4f6f8",
-                                                    border: "1px solid #ddd",
-                                                    borderRadius: "8px",
-                                                    overflow: "hidden",
-                                                    display: "flex",
-                                                    alignItems: template === "modal" ? "center" : (template === "top_bar" ? "flex-start" : "flex-end"),
-                                                    justifyContent: "center",
-                                                }}
-                                            >
-                                                <div style={{ position: "absolute", top: 20, left: 20, right: 20, bottom: 20, opacity: 0.3 }}>
-                                                    <div style={{ height: "20px", width: "100px", background: "#ccc", marginBottom: "20px" }}></div>
-                                                    <div style={{ height: "150px", width: "100%", background: "#ccc", marginBottom: "20px" }}></div>
-                                                    <div style={{ height: "20px", width: "80%", background: "#ccc" }}></div>
-                                                </div>
+                            )}
 
-                                                <div
-                                                    style={{
-                                                        padding: template === "modal" ? "20px" : "12px 20px",
-                                                        borderRadius: template === "modal" ? "8px" : "0",
-                                                        backgroundColor: popupBgColor,
-                                                        color: popupTextColor,
-                                                        width: template === "modal" ? "90%" : "100%",
-                                                        maxWidth: template === "modal" ? "300px" : "100%",
-                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                                                        display: "flex",
-                                                        flexDirection: template === "modal" ? "column" : "row",
-                                                        alignItems: "center",
-                                                        gap: "10px",
-                                                        justifyContent: template === "modal" ? "center" : "space-between",
-                                                        textAlign: template === "modal" ? "center" : "left",
-                                                        border: template === "modal" ? "1px solid #ddd" : "none",
-                                                        zIndex: 10,
-                                                    }}
-                                                >
-                                                    <div style={{ flex: 1 }}>
-                                                        {template === "modal" && (
-                                                            <Text as="h3" variant="headingMd" fontWeight="bold">
-                                                                {popupTitle}
-                                                            </Text>
-                                                        )}
-                                                        <p style={{ margin: template === "modal" ? "10px 0" : "0", fontSize: template === "modal" ? "14px" : "13px" }}>
-                                                            {template !== "modal" && <strong style={{ marginRight: 5 }}>{popupTitle}</strong>}
-                                                            {popupMessage
-                                                                .replace("{country}", "US")
-                                                                .replace("{target}", "US Store")}
-                                                        </p>
-                                                    </div>
-
-                                                    <InlineStack gap="200">
-                                                        <button
-                                                            style={{
-                                                                backgroundColor: popupBtnColor,
-                                                                color: "#fff",
-                                                                border: "none",
-                                                                padding: template === "modal" ? "8px 16px" : "6px 12px",
-                                                                borderRadius: "4px",
-                                                                cursor: "pointer",
-                                                                fontSize: "13px",
-                                                                whiteSpace: "nowrap",
-                                                            }}
-                                                        >
-                                                            {confirmBtnText}
-                                                        </button>
-                                                        <button
-                                                            style={{
-                                                                backgroundColor: "transparent",
-                                                                border: `1px solid ${popupTextColor}`,
-                                                                color: popupTextColor,
-                                                                padding: template === "modal" ? "8px 16px" : "6px 12px",
-                                                                borderRadius: "4px",
-                                                                cursor: "pointer",
-                                                                fontSize: "13px",
-                                                                whiteSpace: "nowrap",
-                                                            }}
-                                                        >
-                                                            {cancelBtnText}
-                                                        </button>
-                                                    </InlineStack>
-                                                </div>
-                                            </div>
-                                            <Text as="p" tone="subdued">
-                                                Preview shows how the popup will appear relative to the screen.
-                                            </Text>
-                                        </BlockStack>
-                                    </Card>
-                                </div>
-                            </Layout.Section>
-                        </Layout>
-
-                        <Layout>
-                            <Layout.Section>
+                            {isEnabled && (
                                 <Card>
                                     <BlockStack gap="400">
-                                        <Text as="h2" variant="headingMd">
-                                            Blocked Page Appearance
-                                        </Text>
+                                        <BlockStack gap="100">
+                                            <Text as="h2" variant="headingMd">Blocked page</Text>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                Set the message visitors see when a block rule applies.
+                                            </Text>
+                                        </BlockStack>
                                         <TextField
                                             label="Blocked Title"
                                             value={blockedTitle}
@@ -485,14 +568,17 @@ export default function SettingsPage() {
                                         />
                                     </BlockStack>
                                 </Card>
-                            </Layout.Section>
+                            )}
 
-                            <Layout.Section>
+                            {isEnabled && (
                                 <Card>
                                     <BlockStack gap="400">
-                                        <Text as="h2" variant="headingMd">
-                                            Advanced Settings
-                                        </Text>
+                                        <BlockStack gap="100">
+                                            <Text as="h2" variant="headingMd">Advanced settings</Text>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                Fine-tune bot handling, test exclusions, and visitor memory.
+                                            </Text>
+                                        </BlockStack>
                                         <Checkbox
                                             label="Exclude Search Engine Bots"
                                             checked={excludeBots}
@@ -507,7 +593,7 @@ export default function SettingsPage() {
                                             helpText="Comma-separated list of IP addresses to exclude from redirection"
                                             autoComplete="off"
                                         />
-                                         <TextField
+                                        <TextField
                                             label="Cookie Duration (days)"
                                             type="number"
                                             value={cookieDuration}
@@ -517,17 +603,17 @@ export default function SettingsPage() {
                                         />
                                     </BlockStack>
                                 </Card>
-                            </Layout.Section>
-                            
-                            <Layout.Section>
+                            )}
+
+                            {isEnabled && (
                                 <Card>
                                     <BlockStack gap="400">
                                         <InlineStack align="space-between">
                                             <Text as="h2" variant="headingMd">
-                                                Anti-Fraud Protection
+                                                Anti-fraud protection
                                             </Text>
                                             {!isFreePlan ? (
-                                                <span style={{ background: '#e1e3e5', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>PRO</span>
+                                                <Badge>Paid plan</Badge>
                                             ) : null}
                                         </InlineStack>
                                         <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
@@ -547,11 +633,103 @@ export default function SettingsPage() {
                                         />
                                     </BlockStack>
                                 </Card>
-                            </Layout.Section>
-                        </Layout>
-                    </>
-                )}
+                            )}
+
+                            <div className="settings-save-row">
+                                <Button
+                                    variant="primary"
+                                    onClick={handleSave}
+                                    loading={isLoading}
+                                    disabled={isLoading}
+                                >
+                                    {saveButtonText}
+                                </Button>
+                            </div>
+                        </BlockStack>
+                    </Layout.Section>
+
+                    <Layout.Section variant="oneThird">
+                        <div className="settings-preview-sticky">
+                            <Card>
+                                <BlockStack gap="400">
+                                    <BlockStack gap="100">
+                                        <Text as="h2" variant="headingMd">Popup preview</Text>
+                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                            Preview uses US and US Store as sample values.
+                                        </Text>
+                                    </BlockStack>
+                                    <div className={previewCanvasClass}>
+                                        <div className="settings-preview-skeleton" aria-hidden="true">
+                                            <div className="settings-skeleton-line" style={{ width: "40%" }} />
+                                            <div className="settings-skeleton-block" />
+                                            <div className="settings-skeleton-line" style={{ width: "82%" }} />
+                                            <div className="settings-skeleton-line" style={{ width: "62%" }} />
+                                        </div>
+
+                                        <div
+                                            className={previewPanelClass}
+                                            style={{
+                                                backgroundColor: popupBgColor,
+                                                color: popupTextColor,
+                                            }}
+                                        >
+                                            <div style={{ flex: 1 }}>
+                                                {template === "modal" ? (
+                                                    <BlockStack gap="200">
+                                                        <Text as="h3" variant="headingMd" fontWeight="bold">
+                                                            {popupTitle}
+                                                        </Text>
+                                                        <Text as="p" variant="bodyMd">
+                                                            {previewMessage}
+                                                        </Text>
+                                                    </BlockStack>
+                                                ) : (
+                                                    <Text as="p" variant="bodySm">
+                                                        <strong>{popupTitle}</strong>{" "}
+                                                        {previewMessage}
+                                                    </Text>
+                                                )}
+                                            </div>
+
+                                            <div className="settings-popup-actions">
+                                                <button
+                                                    className="settings-preview-button"
+                                                    style={{
+                                                        backgroundColor: popupBtnColor,
+                                                        color: "#fff",
+                                                    }}
+                                                    type="button"
+                                                >
+                                                    {confirmBtnText}
+                                                </button>
+                                                <button
+                                                    className="settings-preview-button settings-preview-button-secondary"
+                                                    style={{
+                                                        color: popupTextColor,
+                                                    }}
+                                                    type="button"
+                                                >
+                                                    {cancelBtnText}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {isBarTemplate && (
+                                        <Banner tone="info">
+                                            <p>Bar templates appear at the top or bottom of the storefront and use less vertical space than the modal.</p>
+                                        </Banner>
+                                    )}
+                                </BlockStack>
+                            </Card>
+                        </div>
+                    </Layout.Section>
+
+                    <Layout.Section>
+                        <Box paddingBlockEnd="800" />
+                    </Layout.Section>
+                </Layout>
             </BlockStack>
+            </div>
         </Page>
     );
 }
