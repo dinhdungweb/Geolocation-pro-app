@@ -279,9 +279,61 @@ export default function SettingsPage() {
         .replace("{country}", "US")
         .replace("{target}", "US Store");
     const previewCanvasClass = `settings-preview-canvas settings-preview-canvas-${template}`;
-    const previewPanelClass = `settings-popup-preview settings-popup-preview-${template}`;
     const isBarTemplate = template !== "modal";
     const saveButtonText = isLoading ? "Saving..." : "Save settings";
+    const previewBgColor = normalizeHexColor(popupBgColor, "#ffffff");
+    const previewTextColor = normalizeHexColor(popupTextColor, "#333333");
+    const previewButtonColor = normalizeHexColor(popupBtnColor, "#007bff");
+    const previewButtons = (
+        <div className="settings-storefront-buttons">
+            <button
+                className="settings-storefront-button settings-storefront-confirm"
+                style={{ backgroundColor: previewButtonColor }}
+                type="button"
+            >
+                {confirmBtnText}
+            </button>
+            <button
+                className="settings-storefront-button settings-storefront-cancel"
+                style={{
+                    color: previewTextColor,
+                    borderColor: previewTextColor,
+                }}
+                type="button"
+            >
+                {cancelBtnText}
+            </button>
+        </div>
+    );
+    const previewPopupMarkup = template === "modal" ? (
+        <div className="settings-storefront-overlay settings-storefront-overlay-modal">
+            <div
+                className="settings-storefront-modal"
+                style={{
+                    backgroundColor: previewBgColor,
+                    color: previewTextColor,
+                }}
+            >
+                <h3>{popupTitle}</h3>
+                <p>{previewMessage}</p>
+                {previewButtons}
+            </div>
+        </div>
+    ) : (
+        <div
+            className={`settings-storefront-overlay settings-storefront-overlay-${template}`}
+            style={{
+                backgroundColor: previewBgColor,
+                color: previewTextColor,
+            }}
+        >
+            <div className="settings-storefront-bar-content">
+                <span className="settings-storefront-bar-title">{popupTitle}</span>
+                <span className="settings-storefront-bar-message">{previewMessage}</span>
+                {previewButtons}
+            </div>
+        </div>
+    );
     const previewMarkup = (
         <Card>
             <BlockStack gap="400">
@@ -305,54 +357,7 @@ export default function SettingsPage() {
                             <div className="settings-skeleton-line" style={{ width: "82%" }} />
                             <div className="settings-skeleton-line" style={{ width: "64%" }} />
                         </div>
-
-                        <div
-                            className={previewPanelClass}
-                            style={{
-                                backgroundColor: normalizeHexColor(popupBgColor, "#ffffff"),
-                                color: normalizeHexColor(popupTextColor, "#333333"),
-                            }}
-                        >
-                            <div className="settings-preview-copy">
-                                {template === "modal" ? (
-                                    <BlockStack gap="200">
-                                        <Text as="h3" variant="headingMd" fontWeight="bold">
-                                            {popupTitle}
-                                        </Text>
-                                        <Text as="p" variant="bodyMd">
-                                            {previewMessage}
-                                        </Text>
-                                    </BlockStack>
-                                ) : (
-                                    <Text as="p" variant="bodySm">
-                                        <strong>{popupTitle}</strong>{" "}
-                                        {previewMessage}
-                                    </Text>
-                                )}
-                            </div>
-
-                            <div className="settings-popup-actions">
-                                <button
-                                    className="settings-preview-button"
-                                    style={{
-                                        backgroundColor: normalizeHexColor(popupBtnColor, "#007bff"),
-                                        color: "#fff",
-                                    }}
-                                    type="button"
-                                >
-                                    {confirmBtnText}
-                                </button>
-                                <button
-                                    className="settings-preview-button settings-preview-button-secondary"
-                                    style={{
-                                        color: normalizeHexColor(popupTextColor, "#333333"),
-                                    }}
-                                    type="button"
-                                >
-                                    {cancelBtnText}
-                                </button>
-                            </div>
-                        </div>
+                        {previewPopupMarkup}
                     </div>
                 </div>
                 {isBarTemplate && (
@@ -382,7 +387,7 @@ export default function SettingsPage() {
                     }
                     .settings-content-grid {
                         display: grid;
-                        grid-template-columns: minmax(0, 1fr) minmax(500px, 600px);
+                        grid-template-columns: minmax(0, 1fr) minmax(560px, 680px);
                         gap: 20px;
                         align-items: start;
                     }
@@ -491,22 +496,9 @@ export default function SettingsPage() {
                     }
                     .settings-preview-canvas {
                         position: relative;
-                        min-height: 340px;
-                        aspect-ratio: 16 / 9;
+                        height: 390px;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                         overflow: hidden;
-                        display: flex;
-                        justify-content: center;
-                    }
-                    .settings-preview-canvas-modal {
-                        align-items: center;
-                        padding: 20px;
-                    }
-                    .settings-preview-canvas-top_bar {
-                        align-items: flex-start;
-                    }
-                    .settings-preview-canvas-bottom_bar {
-                        align-items: flex-end;
                     }
                     .settings-preview-skeleton {
                         position: absolute;
@@ -526,56 +518,101 @@ export default function SettingsPage() {
                         height: 120px;
                         margin-bottom: 16px;
                     }
-                    .settings-popup-preview {
-                        position: relative;
-                        z-index: 1;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+                    .settings-storefront-overlay,
+                    .settings-storefront-overlay *,
+                    .settings-storefront-modal,
+                    .settings-storefront-modal * {
                         box-sizing: border-box;
                     }
-                    .settings-popup-preview * {
-                        box-sizing: border-box;
+                    .settings-storefront-overlay {
+                        position: absolute;
+                        z-index: 2;
                     }
-                    .settings-popup-preview-modal {
-                        width: min(340px, 88%);
-                        padding: 20px;
-                        border-radius: 10px;
-                        border: 1px solid rgba(0, 0, 0, 0.08);
+                    .settings-storefront-overlay-modal {
+                        inset: 0;
+                        background: rgba(0, 0, 0, 0.5);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .settings-storefront-modal {
+                        padding: 24px;
+                        border-radius: 12px;
+                        max-width: 400px;
+                        width: 90%;
+                        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
                         text-align: center;
+                        position: relative;
                     }
-                    .settings-popup-preview-top_bar,
-                    .settings-popup-preview-bottom_bar {
-                        width: calc(100% - 24px);
-                        margin: 12px;
+                    .settings-storefront-modal h3 {
+                        margin: 0 0 12px;
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+                    .settings-storefront-modal p {
+                        margin: 0 0 20px;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        opacity: 0.9;
+                    }
+                    .settings-storefront-overlay-top_bar,
+                    .settings-storefront-overlay-bottom_bar {
+                        left: 0;
+                        right: 0;
                         padding: 12px 16px;
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        gap: 12px;
                         flex-wrap: wrap;
-                        border-radius: 8px;
+                        gap: 15px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
                     }
-                    .settings-preview-copy {
-                        flex: 1;
-                        min-width: 220px;
+                    .settings-storefront-overlay-top_bar {
+                        top: 0;
                     }
-                    .settings-popup-actions {
+                    .settings-storefront-overlay-bottom_bar {
+                        bottom: 0;
+                    }
+                    .settings-storefront-bar-content {
                         display: flex;
                         align-items: center;
-                        justify-content: flex-end;
-                        gap: 8px;
+                        gap: 15px;
+                        flex: 1;
+                        flex-wrap: wrap;
+                        min-width: 0;
+                    }
+                    .settings-storefront-bar-title {
+                        font-weight: 600;
+                        font-size: 14px;
+                    }
+                    .settings-storefront-bar-message {
+                        font-size: 14px;
+                        opacity: 0.9;
+                        margin-right: auto;
+                        min-width: min(260px, 100%);
+                        flex: 1 1 260px;
+                    }
+                    .settings-storefront-buttons {
+                        display: flex;
+                        gap: 12px;
+                        justify-content: center;
                         flex-wrap: wrap;
                         flex: 0 0 auto;
                     }
-                    .settings-preview-button {
+                    .settings-storefront-button {
                         border: 0;
                         border-radius: 6px;
-                        padding: 8px 12px;
-                        font-size: 13px;
-                        font-weight: 600;
+                        padding: 12px 24px;
+                        font-size: 14px;
+                        font-weight: 500;
                         white-space: nowrap;
                         max-width: 100%;
+                        cursor: default;
                     }
-                    .settings-preview-button-secondary {
+                    .settings-storefront-confirm {
+                        color: #fff;
+                    }
+                    .settings-storefront-cancel {
                         background: transparent;
                         border: 1px solid currentColor;
                     }
@@ -599,16 +636,14 @@ export default function SettingsPage() {
                             grid-template-columns: 1fr;
                         }
                         .settings-preview-canvas {
-                            min-height: 320px;
-                            aspect-ratio: auto;
+                            height: 320px;
                         }
                         .settings-browser-url {
                             font-size: 11px;
                         }
-                        .settings-popup-preview-top_bar,
-                        .settings-popup-preview-bottom_bar {
+                        .settings-storefront-overlay-top_bar,
+                        .settings-storefront-overlay-bottom_bar {
                             align-items: flex-start;
-                            flex-direction: column;
                         }
                     }
                 `}
