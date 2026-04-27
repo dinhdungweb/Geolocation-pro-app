@@ -544,21 +544,24 @@ export default function SettingsPage() {
                     }
                     .settings-popup-preview-top_bar,
                     .settings-popup-preview-bottom_bar {
-                        width: 100%;
+                        width: calc(100% - 24px);
+                        margin: 12px;
                         padding: 12px 16px;
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
                         gap: 12px;
+                        flex-wrap: wrap;
+                        border-radius: 8px;
                     }
                     .settings-preview-copy {
                         flex: 1;
-                        min-width: 0;
+                        min-width: 220px;
                     }
                     .settings-popup-actions {
                         display: flex;
                         align-items: center;
-                        justify-content: center;
+                        justify-content: flex-end;
                         gap: 8px;
                         flex-wrap: wrap;
                         flex: 0 0 auto;
@@ -570,6 +573,7 @@ export default function SettingsPage() {
                         font-size: 13px;
                         font-weight: 600;
                         white-space: nowrap;
+                        max-width: 100%;
                     }
                     .settings-preview-button-secondary {
                         background: transparent;
