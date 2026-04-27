@@ -17,11 +17,6 @@ import {
     Button,
     Badge,
     Box,
-    ColorPicker,
-    Popover,
-    hexToRgb,
-    rgbToHsb,
-    hsbToHex,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -76,10 +71,6 @@ function normalizeHexColor(value: string, fallback: string) {
     return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed : fallback;
 }
 
-function hexToPickerColor(value: string, fallback: string) {
-    return rgbToHsb(hexToRgb(normalizeHexColor(value, fallback)));
-}
-
 function ColorPickerField({
     label,
     value,
@@ -91,47 +82,21 @@ function ColorPickerField({
     fallback: string;
     onChange: (value: string) => void;
 }) {
-    const [active, setActive] = useState(false);
     const normalizedValue = normalizeHexColor(value, fallback);
 
     return (
         <BlockStack gap="150">
             <Text as="p" variant="bodyMd" fontWeight="semibold">{label}</Text>
-            <Popover
-                active={active}
-                activator={
-                    <button
-                        type="button"
-                        className="settings-color-trigger"
-                        onClick={() => setActive((open) => !open)}
-                    >
-                        <span
-                            className="settings-color-swatch"
-                            style={{ backgroundColor: normalizedValue }}
-                            aria-hidden="true"
-                        />
-                        <span>{normalizedValue.toUpperCase()}</span>
-                    </button>
-                }
-                autofocusTarget="none"
-                preferredAlignment="left"
-                onClose={() => setActive(false)}
-            >
-                <Popover.Section>
-                    <div className="settings-color-picker-panel">
-                    <BlockStack gap="300">
-                        <ColorPicker
-                            color={hexToPickerColor(normalizedValue, fallback)}
-                            onChange={(color) => onChange(hsbToHex(color))}
-                            fullWidth
-                        />
-                        <Text as="p" variant="bodySm" tone="subdued">
-                            {normalizedValue.toUpperCase()}
-                        </Text>
-                    </BlockStack>
-                    </div>
-                </Popover.Section>
-            </Popover>
+            <label className="settings-color-trigger">
+                <input
+                    type="color"
+                    className="settings-native-color-input"
+                    value={normalizedValue}
+                    onChange={(event) => onChange(event.currentTarget.value.toUpperCase())}
+                    aria-label={label}
+                />
+                <span>{normalizedValue.toUpperCase()}</span>
+            </label>
         </BlockStack>
     );
 }
@@ -348,7 +313,7 @@ export default function SettingsPage() {
                                 color: normalizeHexColor(popupTextColor, "#333333"),
                             }}
                         >
-                            <div style={{ flex: 1 }}>
+                            <div className="settings-preview-copy">
                                 {template === "modal" ? (
                                     <BlockStack gap="200">
                                         <Text as="h3" variant="headingMd" fontWeight="bold">
@@ -417,7 +382,7 @@ export default function SettingsPage() {
                     }
                     .settings-content-grid {
                         display: grid;
-                        grid-template-columns: minmax(0, 1fr) minmax(380px, 440px);
+                        grid-template-columns: minmax(0, 1fr) minmax(500px, 600px);
                         gap: 20px;
                         align-items: start;
                     }
@@ -450,10 +415,6 @@ export default function SettingsPage() {
                         grid-template-columns: repeat(3, minmax(0, 1fr));
                         gap: 16px;
                     }
-                    .settings-color-picker-panel {
-                        width: 280px;
-                        max-width: calc(100vw - 48px);
-                    }
                     .settings-color-trigger {
                         width: 100%;
                         min-height: 42px;
@@ -473,12 +434,25 @@ export default function SettingsPage() {
                     .settings-color-trigger:hover {
                         border-color: var(--p-color-border-hover, #8c9196);
                     }
-                    .settings-color-swatch {
-                        width: 24px;
-                        height: 24px;
-                        border-radius: 6px;
-                        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+                    .settings-native-color-input {
+                        width: 28px;
+                        height: 28px;
+                        border: 0;
+                        padding: 0;
+                        background: transparent;
+                        cursor: pointer;
                         flex: 0 0 auto;
+                    }
+                    .settings-native-color-input::-webkit-color-swatch-wrapper {
+                        padding: 0;
+                    }
+                    .settings-native-color-input::-webkit-color-swatch {
+                        border: 1px solid rgba(0, 0, 0, 0.16);
+                        border-radius: 6px;
+                    }
+                    .settings-native-color-input::-moz-color-swatch {
+                        border: 1px solid rgba(0, 0, 0, 0.16);
+                        border-radius: 6px;
                     }
                     .settings-browser-shell {
                         border: 1px solid var(--p-color-border-secondary, #dfe3e8);
@@ -517,7 +491,7 @@ export default function SettingsPage() {
                     }
                     .settings-preview-canvas {
                         position: relative;
-                        min-height: 300px;
+                        min-height: 340px;
                         aspect-ratio: 16 / 9;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                         overflow: hidden;
@@ -556,6 +530,10 @@ export default function SettingsPage() {
                         position: relative;
                         z-index: 1;
                         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+                        box-sizing: border-box;
+                    }
+                    .settings-popup-preview * {
+                        box-sizing: border-box;
                     }
                     .settings-popup-preview-modal {
                         width: min(340px, 88%);
@@ -573,12 +551,17 @@ export default function SettingsPage() {
                         justify-content: space-between;
                         gap: 12px;
                     }
+                    .settings-preview-copy {
+                        flex: 1;
+                        min-width: 0;
+                    }
                     .settings-popup-actions {
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         gap: 8px;
                         flex-wrap: wrap;
+                        flex: 0 0 auto;
                     }
                     .settings-preview-button {
                         border: 0;
