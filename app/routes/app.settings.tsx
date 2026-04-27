@@ -464,6 +464,7 @@ export default function SettingsPage() {
                         border-radius: 10px;
                         overflow: hidden;
                         background: var(--p-color-bg-surface, #ffffff);
+                        container-type: inline-size;
                     }
                     .settings-browser-toolbar {
                         min-height: 38px;
@@ -615,6 +616,39 @@ export default function SettingsPage() {
                     .settings-storefront-cancel {
                         background: transparent;
                         border: 1px solid currentColor;
+                    }
+                    @container (max-width: 560px) {
+                        .settings-storefront-overlay-top_bar,
+                        .settings-storefront-overlay-bottom_bar {
+                            padding: 10px 14px;
+                            gap: 10px;
+                        }
+                        .settings-storefront-bar-content {
+                            gap: 10px;
+                        }
+                        .settings-storefront-bar-title,
+                        .settings-storefront-bar-message {
+                            font-size: 12px;
+                        }
+                        .settings-storefront-bar-message {
+                            flex-basis: 220px;
+                        }
+                        .settings-storefront-buttons {
+                            gap: 8px;
+                        }
+                        .settings-storefront-button {
+                            padding: 8px 14px;
+                            font-size: 12px;
+                        }
+                    }
+                    @container (max-width: 460px) {
+                        .settings-storefront-bar-message {
+                            flex-basis: 180px;
+                        }
+                        .settings-storefront-button {
+                            padding: 7px 12px;
+                            font-size: 11px;
+                        }
                     }
                     .settings-save-row {
                         display: flex;
