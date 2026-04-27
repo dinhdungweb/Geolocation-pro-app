@@ -500,8 +500,11 @@ export default function IPRulesPage() {
             </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
             <IndexTable.Cell>
-                <div onClick={(e) => e.stopPropagation()}>
-                    <InlineStack gap="200">
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ display: "flex", justifyContent: "flex-end" }}
+                >
+                    <InlineStack gap="200" wrap={false}>
                         <Button size="slim" onClick={() => handleOpenModal(rule)}>
                             Edit
                         </Button>
@@ -635,7 +638,7 @@ export default function IPRulesPage() {
                                         { title: "Action" },
                                         { title: "Status" },
                                         { title: "Priority" },
-                                        { title: "Actions" },
+                                        { title: "Actions", alignment: "end" },
                                     ]}
                                     promotedBulkActions={promotedBulkActions}
                                 >

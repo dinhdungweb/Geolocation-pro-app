@@ -630,7 +630,7 @@ export default function SettingsPage() {
                     }
                     @container (max-width: 560px) {
                         .settings-preview-canvas {
-                            --settings-preview-scale: 0.72;
+                            --settings-preview-scale: 0.5;
                         }
                         .settings-storefront-overlay-top_bar,
                         .settings-storefront-overlay-bottom_bar {
@@ -711,245 +711,245 @@ export default function SettingsPage() {
                     <Layout>
                         <Layout.Section>
                             <div className="settings-content-grid">
-                            <div className="settings-form-column">
-                            <BlockStack gap="400">
-                                <Card>
+                                <div className="settings-form-column">
                                     <BlockStack gap="400">
-                                        <InlineStack align="space-between" blockAlign="center" gap="300">
-                                            <BlockStack gap="100">
-                                                <Text as="h2" variant="headingMd">Storefront status</Text>
-                                                <Text as="p" variant="bodyMd" tone="subdued">
-                                                    This controls whether redirects, blocks, and popup rules run on your storefront.
-                                                </Text>
+                                        <Card>
+                                            <BlockStack gap="400">
+                                                <InlineStack align="space-between" blockAlign="center" gap="300">
+                                                    <BlockStack gap="100">
+                                                        <Text as="h2" variant="headingMd">Storefront status</Text>
+                                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                                            This controls whether redirects, blocks, and popup rules run on your storefront.
+                                                        </Text>
+                                                    </BlockStack>
+                                                    <Badge tone={isEnabled ? "success" : "critical"}>
+                                                        {isEnabled ? "Enabled" : "Disabled"}
+                                                    </Badge>
+                                                </InlineStack>
+                                                <Checkbox
+                                                    label="Enable Geolocation"
+                                                    checked={isEnabled}
+                                                    onChange={setIsEnabled}
+                                                    helpText="The Shopify theme app embed must also be enabled in your current theme."
+                                                />
+                                                {!isEnabled && (
+                                                    <Banner tone="warning">
+                                                        <p>Geolocation is disabled. Visitor rules will not run until you enable it again.</p>
+                                                    </Banner>
+                                                )}
+                                                <div className="settings-summary-grid">
+                                                    <div className="settings-summary-item">
+                                                        <BlockStack gap="100">
+                                                            <Text as="p" variant="bodySm" tone="subdued">Popup template</Text>
+                                                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                                {templateOptions.find((option) => option.value === template)?.label || "Modal"}
+                                                            </Text>
+                                                        </BlockStack>
+                                                    </div>
+                                                    <div className="settings-summary-item">
+                                                        <BlockStack gap="100">
+                                                            <Text as="p" variant="bodySm" tone="subdued">Bot handling</Text>
+                                                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                                {excludeBots ? "Search bots excluded" : "Search bots included"}
+                                                            </Text>
+                                                        </BlockStack>
+                                                    </div>
+                                                    <div className="settings-summary-item">
+                                                        <BlockStack gap="100">
+                                                            <Text as="p" variant="bodySm" tone="subdued">Visitor preference</Text>
+                                                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                                {cookieDuration || "7"} day cookie
+                                                            </Text>
+                                                        </BlockStack>
+                                                    </div>
+                                                </div>
                                             </BlockStack>
-                                            <Badge tone={isEnabled ? "success" : "critical"}>
-                                                {isEnabled ? "Enabled" : "Disabled"}
-                                            </Badge>
-                                        </InlineStack>
-                                        <Checkbox
-                                            label="Enable Geolocation"
-                                            checked={isEnabled}
-                                            onChange={setIsEnabled}
-                                            helpText="The Shopify theme app embed must also be enabled in your current theme."
-                                        />
-                                        {!isEnabled && (
-                                            <Banner tone="warning">
-                                                <p>Geolocation is disabled. Visitor rules will not run until you enable it again.</p>
-                                            </Banner>
+                                        </Card>
+
+                                        {isEnabled && (
+                                            <Card>
+                                                <BlockStack gap="400">
+                                                    <BlockStack gap="100">
+                                                        <Text as="h2" variant="headingMd">Popup appearance</Text>
+                                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                                            Customize the prompt shown when a rule uses popup mode.
+                                                        </Text>
+                                                    </BlockStack>
+                                                    <Select
+                                                        label="Template Design"
+                                                        options={templateOptions}
+                                                        value={template}
+                                                        onChange={setTemplate}
+                                                        helpText="Choose how the popup appears on the visitor's screen."
+                                                    />
+                                                    <Divider />
+                                                    <TextField
+                                                        label="Popup Title"
+                                                        value={popupTitle}
+                                                        onChange={setPopupTitle}
+                                                        autoComplete="off"
+                                                    />
+                                                    <TextField
+                                                        label="Popup Message"
+                                                        value={popupMessage}
+                                                        onChange={setPopupMessage}
+                                                        helpText="Use {country} for visitor's country and {target} for target store name"
+                                                        multiline={2}
+                                                        autoComplete="off"
+                                                    />
+                                                    <div className="settings-two-field-grid">
+                                                        <TextField
+                                                            label="Confirm Button Text"
+                                                            value={confirmBtnText}
+                                                            onChange={setConfirmBtnText}
+                                                            autoComplete="off"
+                                                        />
+                                                        <TextField
+                                                            label="Cancel Button Text"
+                                                            value={cancelBtnText}
+                                                            onChange={setCancelBtnText}
+                                                            autoComplete="off"
+                                                        />
+                                                    </div>
+                                                    <Divider />
+                                                    <Text as="h3" variant="headingSm">
+                                                        Colors
+                                                    </Text>
+                                                    <div className="settings-color-grid">
+                                                        <ColorPickerField
+                                                            label="Background"
+                                                            value={popupBgColor}
+                                                            onChange={setPopupBgColor}
+                                                            fallback="#ffffff"
+                                                        />
+                                                        <ColorPickerField
+                                                            label="Text"
+                                                            value={popupTextColor}
+                                                            onChange={setPopupTextColor}
+                                                            fallback="#333333"
+                                                        />
+                                                        <ColorPickerField
+                                                            label="Button"
+                                                            value={popupBtnColor}
+                                                            onChange={setPopupBtnColor}
+                                                            fallback="#007bff"
+                                                        />
+                                                    </div>
+                                                </BlockStack>
+                                            </Card>
+
                                         )}
-                                        <div className="settings-summary-grid">
-                                            <div className="settings-summary-item">
-                                                <BlockStack gap="100">
-                                                    <Text as="p" variant="bodySm" tone="subdued">Popup template</Text>
-                                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                        {templateOptions.find((option) => option.value === template)?.label || "Modal"}
-                                                    </Text>
+
+                                        {isEnabled && (
+                                            <Card>
+                                                <BlockStack gap="400">
+                                                    <BlockStack gap="100">
+                                                        <Text as="h2" variant="headingMd">Blocked page</Text>
+                                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                                            Set the message visitors see when a block rule applies.
+                                                        </Text>
+                                                    </BlockStack>
+                                                    <TextField
+                                                        label="Blocked Title"
+                                                        value={blockedTitle}
+                                                        onChange={setBlockedTitle}
+                                                        placeholder="Access Denied"
+                                                        autoComplete="off"
+                                                    />
+                                                    <TextField
+                                                        label="Blocked Message"
+                                                        value={blockedMessage}
+                                                        onChange={setBlockedMessage}
+                                                        placeholder="We do not offer services in your country/region."
+                                                        multiline={2}
+                                                        autoComplete="off"
+                                                    />
                                                 </BlockStack>
-                                            </div>
-                                            <div className="settings-summary-item">
-                                                <BlockStack gap="100">
-                                                    <Text as="p" variant="bodySm" tone="subdued">Bot handling</Text>
-                                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                        {excludeBots ? "Search bots excluded" : "Search bots included"}
-                                                    </Text>
+                                            </Card>
+                                        )}
+
+                                        {isEnabled && (
+                                            <Card>
+                                                <BlockStack gap="400">
+                                                    <BlockStack gap="100">
+                                                        <Text as="h2" variant="headingMd">Advanced settings</Text>
+                                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                                            Fine-tune bot handling, test exclusions, and visitor memory.
+                                                        </Text>
+                                                    </BlockStack>
+                                                    <Checkbox
+                                                        label="Exclude Search Engine Bots"
+                                                        checked={excludeBots}
+                                                        onChange={setExcludeBots}
+                                                        helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
+                                                    />
+                                                    <TextField
+                                                        label="Excluded IP Addresses"
+                                                        value={excludedIPs}
+                                                        onChange={setExcludedIPs}
+                                                        placeholder="192.168.1.1, 10.0.0.1"
+                                                        helpText="Comma-separated list of IP addresses to exclude from redirection"
+                                                        autoComplete="off"
+                                                    />
+                                                    <TextField
+                                                        label="Cookie Duration (days)"
+                                                        type="number"
+                                                        value={cookieDuration}
+                                                        onChange={setCookieDuration}
+                                                        helpText="How long to remember visitor's preference (only for rules using Popup mode)"
+                                                        autoComplete="off"
+                                                    />
                                                 </BlockStack>
-                                            </div>
-                                            <div className="settings-summary-item">
-                                                <BlockStack gap="100">
-                                                    <Text as="p" variant="bodySm" tone="subdued">Visitor preference</Text>
-                                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                        {cookieDuration || "7"} day cookie
-                                                    </Text>
+                                            </Card>
+                                        )}
+
+                                        {isEnabled && (
+                                            <Card>
+                                                <BlockStack gap="400">
+                                                    <InlineStack align="space-between">
+                                                        <Text as="h2" variant="headingMd">
+                                                            Anti-fraud protection
+                                                        </Text>
+                                                        {!isFreePlan ? (
+                                                            <Badge>Paid plan</Badge>
+                                                        ) : null}
+                                                    </InlineStack>
+                                                    <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
+
+                                                    {isFreePlan ? (
+                                                        <Banner tone="warning">
+                                                            <p>Upgrade to a paid plan to enable advanced security checks.</p>
+                                                        </Banner>
+                                                    ) : null}
+
+                                                    <Checkbox
+                                                        label="Block VPNs, Proxies & Tor Exit Nodes"
+                                                        checked={blockVpn}
+                                                        onChange={setBlockVpn}
+                                                        disabled={isFreePlan}
+                                                        helpText="Overrides all rules to unconditionally block connections that mask their real location."
+                                                    />
                                                 </BlockStack>
-                                            </div>
+                                            </Card>
+                                        )}
+
+                                        <div className="settings-save-row">
+                                            <Button
+                                                variant="primary"
+                                                onClick={handleSave}
+                                                loading={isLoading}
+                                                disabled={isLoading}
+                                            >
+                                                {saveButtonText}
+                                            </Button>
                                         </div>
                                     </BlockStack>
-                                </Card>
-
-                                {isEnabled && (
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <BlockStack gap="100">
-                                                <Text as="h2" variant="headingMd">Popup appearance</Text>
-                                                <Text as="p" variant="bodyMd" tone="subdued">
-                                                    Customize the prompt shown when a rule uses popup mode.
-                                                </Text>
-                                            </BlockStack>
-                                            <Select
-                                                label="Template Design"
-                                                options={templateOptions}
-                                                value={template}
-                                                onChange={setTemplate}
-                                                helpText="Choose how the popup appears on the visitor's screen."
-                                            />
-                                            <Divider />
-                                            <TextField
-                                                label="Popup Title"
-                                                value={popupTitle}
-                                                onChange={setPopupTitle}
-                                                autoComplete="off"
-                                            />
-                                            <TextField
-                                                label="Popup Message"
-                                                value={popupMessage}
-                                                onChange={setPopupMessage}
-                                                helpText="Use {country} for visitor's country and {target} for target store name"
-                                                multiline={2}
-                                                autoComplete="off"
-                                            />
-                                            <div className="settings-two-field-grid">
-                                                <TextField
-                                                    label="Confirm Button Text"
-                                                    value={confirmBtnText}
-                                                    onChange={setConfirmBtnText}
-                                                    autoComplete="off"
-                                                />
-                                                <TextField
-                                                    label="Cancel Button Text"
-                                                    value={cancelBtnText}
-                                                    onChange={setCancelBtnText}
-                                                    autoComplete="off"
-                                                />
-                                            </div>
-                                            <Divider />
-                                            <Text as="h3" variant="headingSm">
-                                                Colors
-                                            </Text>
-                                            <div className="settings-color-grid">
-                                                <ColorPickerField
-                                                    label="Background"
-                                                    value={popupBgColor}
-                                                    onChange={setPopupBgColor}
-                                                    fallback="#ffffff"
-                                                />
-                                                <ColorPickerField
-                                                    label="Text"
-                                                    value={popupTextColor}
-                                                    onChange={setPopupTextColor}
-                                                    fallback="#333333"
-                                                />
-                                                <ColorPickerField
-                                                    label="Button"
-                                                    value={popupBtnColor}
-                                                    onChange={setPopupBtnColor}
-                                                    fallback="#007bff"
-                                                />
-                                            </div>
-                                        </BlockStack>
-                                    </Card>
-
-                                )}
-
-                                {isEnabled && (
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <BlockStack gap="100">
-                                                <Text as="h2" variant="headingMd">Blocked page</Text>
-                                                <Text as="p" variant="bodyMd" tone="subdued">
-                                                    Set the message visitors see when a block rule applies.
-                                                </Text>
-                                            </BlockStack>
-                                            <TextField
-                                                label="Blocked Title"
-                                                value={blockedTitle}
-                                                onChange={setBlockedTitle}
-                                                placeholder="Access Denied"
-                                                autoComplete="off"
-                                            />
-                                            <TextField
-                                                label="Blocked Message"
-                                                value={blockedMessage}
-                                                onChange={setBlockedMessage}
-                                                placeholder="We do not offer services in your country/region."
-                                                multiline={2}
-                                                autoComplete="off"
-                                            />
-                                        </BlockStack>
-                                    </Card>
-                                )}
-
-                                {isEnabled && (
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <BlockStack gap="100">
-                                                <Text as="h2" variant="headingMd">Advanced settings</Text>
-                                                <Text as="p" variant="bodyMd" tone="subdued">
-                                                    Fine-tune bot handling, test exclusions, and visitor memory.
-                                                </Text>
-                                            </BlockStack>
-                                            <Checkbox
-                                                label="Exclude Search Engine Bots"
-                                                checked={excludeBots}
-                                                onChange={setExcludeBots}
-                                                helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
-                                            />
-                                            <TextField
-                                                label="Excluded IP Addresses"
-                                                value={excludedIPs}
-                                                onChange={setExcludedIPs}
-                                                placeholder="192.168.1.1, 10.0.0.1"
-                                                helpText="Comma-separated list of IP addresses to exclude from redirection"
-                                                autoComplete="off"
-                                            />
-                                            <TextField
-                                                label="Cookie Duration (days)"
-                                                type="number"
-                                                value={cookieDuration}
-                                                onChange={setCookieDuration}
-                                                helpText="How long to remember visitor's preference (only for rules using Popup mode)"
-                                                autoComplete="off"
-                                            />
-                                        </BlockStack>
-                                    </Card>
-                                )}
-
-                                {isEnabled && (
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <InlineStack align="space-between">
-                                                <Text as="h2" variant="headingMd">
-                                                    Anti-fraud protection
-                                                </Text>
-                                                {!isFreePlan ? (
-                                                    <Badge>Paid plan</Badge>
-                                                ) : null}
-                                            </InlineStack>
-                                            <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
-
-                                            {isFreePlan ? (
-                                                <Banner tone="warning">
-                                                    <p>Upgrade to a paid plan to enable advanced security checks.</p>
-                                                </Banner>
-                                            ) : null}
-
-                                            <Checkbox
-                                                label="Block VPNs, Proxies & Tor Exit Nodes"
-                                                checked={blockVpn}
-                                                onChange={setBlockVpn}
-                                                disabled={isFreePlan}
-                                                helpText="Overrides all rules to unconditionally block connections that mask their real location."
-                                            />
-                                        </BlockStack>
-                                    </Card>
-                                )}
-
-                                <div className="settings-save-row">
-                                    <Button
-                                        variant="primary"
-                                        onClick={handleSave}
-                                        loading={isLoading}
-                                        disabled={isLoading}
-                                    >
-                                        {saveButtonText}
-                                    </Button>
                                 </div>
-                            </BlockStack>
-                            </div>
-                            {isEnabled && (
-                                <div className="settings-preview-sidebar">
-                                    {previewMarkup}
-                                </div>
-                            )}
+                                {isEnabled && (
+                                    <div className="settings-preview-sidebar">
+                                        {previewMarkup}
+                                    </div>
+                                )}
                             </div>
                         </Layout.Section>
 
