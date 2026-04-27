@@ -625,7 +625,7 @@ export default function SettingsPage() {
                     }
                     @container (max-width: 720px) {
                         .settings-preview-canvas {
-                            --settings-preview-scale: 0.82;
+                            --settings-preview-scale: 0.6;
                         }
                     }
                     @container (max-width: 560px) {
