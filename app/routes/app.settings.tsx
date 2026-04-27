@@ -500,6 +500,7 @@ export default function SettingsPage() {
                         height: 390px;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                         overflow: hidden;
+                        --settings-preview-scale: 1;
                     }
                     .settings-preview-skeleton {
                         position: absolute;
@@ -544,6 +545,8 @@ export default function SettingsPage() {
                         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
                         text-align: center;
                         position: relative;
+                        transform: scale(var(--settings-preview-scale));
+                        transform-origin: center;
                     }
                     .settings-storefront-modal h3 {
                         margin: 0 0 12px;
@@ -559,7 +562,7 @@ export default function SettingsPage() {
                     .settings-storefront-overlay-top_bar,
                     .settings-storefront-overlay-bottom_bar {
                         left: 0;
-                        right: 0;
+                        width: calc(100% / var(--settings-preview-scale));
                         padding: 12px 16px;
                         display: flex;
                         align-items: center;
@@ -567,12 +570,15 @@ export default function SettingsPage() {
                         flex-wrap: wrap;
                         gap: 15px;
                         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                        transform: scale(var(--settings-preview-scale));
                     }
                     .settings-storefront-overlay-top_bar {
                         top: 0;
+                        transform-origin: top left;
                     }
                     .settings-storefront-overlay-bottom_bar {
                         bottom: 0;
+                        transform-origin: bottom left;
                     }
                     .settings-storefront-bar-content {
                         display: flex;
@@ -617,10 +623,17 @@ export default function SettingsPage() {
                         background: transparent;
                         border: 1px solid currentColor;
                     }
+                    @container (max-width: 720px) {
+                        .settings-preview-canvas {
+                            --settings-preview-scale: 0.82;
+                        }
+                    }
                     @container (max-width: 560px) {
+                        .settings-preview-canvas {
+                            --settings-preview-scale: 0.72;
+                        }
                         .settings-storefront-overlay-top_bar,
                         .settings-storefront-overlay-bottom_bar {
-                            padding: 10px 14px;
                             gap: 10px;
                         }
                         .settings-storefront-bar-content {
@@ -636,18 +649,13 @@ export default function SettingsPage() {
                         .settings-storefront-buttons {
                             gap: 8px;
                         }
-                        .settings-storefront-button {
-                            padding: 8px 14px;
-                            font-size: 12px;
-                        }
                     }
                     @container (max-width: 460px) {
+                        .settings-preview-canvas {
+                            --settings-preview-scale: 0.65;
+                        }
                         .settings-storefront-bar-message {
                             flex-basis: 180px;
-                        }
-                        .settings-storefront-button {
-                            padding: 7px 12px;
-                            font-size: 11px;
                         }
                     }
                     .settings-save-row {
