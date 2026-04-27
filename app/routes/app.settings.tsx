@@ -17,6 +17,11 @@ import {
     Button,
     Badge,
     Box,
+    ColorPicker,
+    Popover,
+    hexToRgb,
+    rgbToHsb,
+    hsbToHex,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -64,6 +69,69 @@ const defaultSettings: Omit<Settings, "id"> = {
 
 function normalizeOption(value: string | null, allowed: string[], fallback: string) {
     return value && allowed.includes(value) ? value : fallback;
+}
+
+function normalizeHexColor(value: string, fallback: string) {
+    const trimmed = value.trim();
+    return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed : fallback;
+}
+
+function hexToPickerColor(value: string, fallback: string) {
+    return rgbToHsb(hexToRgb(normalizeHexColor(value, fallback)));
+}
+
+function ColorPickerField({
+    label,
+    value,
+    fallback,
+    onChange,
+}: {
+    label: string;
+    value: string;
+    fallback: string;
+    onChange: (value: string) => void;
+}) {
+    const [active, setActive] = useState(false);
+    const normalizedValue = normalizeHexColor(value, fallback);
+
+    return (
+        <BlockStack gap="150">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">{label}</Text>
+            <Popover
+                active={active}
+                activator={
+                    <button
+                        type="button"
+                        className="settings-color-trigger"
+                        onClick={() => setActive((open) => !open)}
+                    >
+                        <span
+                            className="settings-color-swatch"
+                            style={{ backgroundColor: normalizedValue }}
+                            aria-hidden="true"
+                        />
+                        <span>{normalizedValue.toUpperCase()}</span>
+                    </button>
+                }
+                autofocusTarget="none"
+                preferredAlignment="left"
+                onClose={() => setActive(false)}
+            >
+                <Popover.Section>
+                    <BlockStack gap="300">
+                        <ColorPicker
+                            color={hexToPickerColor(normalizedValue, fallback)}
+                            onChange={(color) => onChange(hsbToHex(color))}
+                            fullWidth
+                        />
+                        <Text as="p" variant="bodySm" tone="subdued">
+                            {normalizedValue.toUpperCase()}
+                        </Text>
+                    </BlockStack>
+                </Popover.Section>
+            </Popover>
+        </BlockStack>
+    );
 }
 
 // Loader: Fetch settings for the current shop
@@ -247,6 +315,87 @@ export default function SettingsPage() {
     const previewPanelClass = `settings-popup-preview settings-popup-preview-${template}`;
     const isBarTemplate = template !== "modal";
     const saveButtonText = isLoading ? "Saving..." : "Save settings";
+    const previewMarkup = (
+        <Card>
+            <BlockStack gap="400">
+                <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Popup preview</Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                        A desktop-sized preview using US and US Store as sample values.
+                    </Text>
+                </BlockStack>
+                <div className="settings-browser-shell">
+                    <div className="settings-browser-toolbar" aria-hidden="true">
+                        <span className="settings-browser-dot" />
+                        <span className="settings-browser-dot" />
+                        <span className="settings-browser-dot" />
+                        <div className="settings-browser-url">https://your-store.com</div>
+                    </div>
+                    <div className={previewCanvasClass}>
+                        <div className="settings-preview-skeleton" aria-hidden="true">
+                            <div className="settings-skeleton-line" style={{ width: "28%" }} />
+                            <div className="settings-skeleton-block" />
+                            <div className="settings-skeleton-line" style={{ width: "82%" }} />
+                            <div className="settings-skeleton-line" style={{ width: "64%" }} />
+                        </div>
+
+                        <div
+                            className={previewPanelClass}
+                            style={{
+                                backgroundColor: normalizeHexColor(popupBgColor, "#ffffff"),
+                                color: normalizeHexColor(popupTextColor, "#333333"),
+                            }}
+                        >
+                            <div style={{ flex: 1 }}>
+                                {template === "modal" ? (
+                                    <BlockStack gap="200">
+                                        <Text as="h3" variant="headingMd" fontWeight="bold">
+                                            {popupTitle}
+                                        </Text>
+                                        <Text as="p" variant="bodyMd">
+                                            {previewMessage}
+                                        </Text>
+                                    </BlockStack>
+                                ) : (
+                                    <Text as="p" variant="bodySm">
+                                        <strong>{popupTitle}</strong>{" "}
+                                        {previewMessage}
+                                    </Text>
+                                )}
+                            </div>
+
+                            <div className="settings-popup-actions">
+                                <button
+                                    className="settings-preview-button"
+                                    style={{
+                                        backgroundColor: normalizeHexColor(popupBtnColor, "#007bff"),
+                                        color: "#fff",
+                                    }}
+                                    type="button"
+                                >
+                                    {confirmBtnText}
+                                </button>
+                                <button
+                                    className="settings-preview-button settings-preview-button-secondary"
+                                    style={{
+                                        color: normalizeHexColor(popupTextColor, "#333333"),
+                                    }}
+                                    type="button"
+                                >
+                                    {cancelBtnText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {isBarTemplate && (
+                    <Banner tone="info">
+                        <p>Bar templates appear at the top or bottom of the storefront and use less vertical space than the modal.</p>
+                    </Banner>
+                )}
+            </BlockStack>
+        </Card>
+    );
 
     return (
         <Page
@@ -285,23 +434,79 @@ export default function SettingsPage() {
                         grid-template-columns: repeat(3, minmax(0, 1fr));
                         gap: 16px;
                     }
-                    .settings-preview-sticky {
-                        position: sticky;
-                        top: 20px;
+                    .settings-color-trigger {
+                        width: 100%;
+                        min-height: 42px;
+                        padding: 8px 10px;
+                        border: 1px solid var(--p-color-border, #c9cccf);
+                        border-radius: 8px;
+                        background: var(--p-color-bg-surface, #ffffff);
+                        color: var(--p-color-text, #202223);
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        font: inherit;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+                    .settings-color-trigger:hover {
+                        border-color: var(--p-color-border-hover, #8c9196);
+                    }
+                    .settings-color-swatch {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 6px;
+                        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+                        flex: 0 0 auto;
+                    }
+                    .settings-browser-shell {
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        border-radius: 10px;
+                        overflow: hidden;
+                        background: var(--p-color-bg-surface, #ffffff);
+                    }
+                    .settings-browser-toolbar {
+                        min-height: 38px;
+                        padding: 8px 12px;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .settings-browser-dot {
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 999px;
+                        background: var(--p-color-bg-fill-secondary, #d8dadd);
+                    }
+                    .settings-browser-url {
+                        margin-left: 8px;
+                        min-width: 0;
+                        flex: 1;
+                        height: 22px;
+                        border-radius: 999px;
+                        background: var(--p-color-bg-surface, #ffffff);
+                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
+                        display: flex;
+                        align-items: center;
+                        padding: 0 12px;
+                        color: var(--p-color-text-secondary, #6d7175);
+                        font-size: 12px;
                     }
                     .settings-preview-canvas {
                         position: relative;
-                        min-height: 320px;
+                        min-height: 440px;
+                        aspect-ratio: 16 / 9;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
-                        border: 1px solid var(--p-color-border-secondary, #dfe3e8);
-                        border-radius: 8px;
                         overflow: hidden;
                         display: flex;
                         justify-content: center;
                     }
                     .settings-preview-canvas-modal {
                         align-items: center;
-                        padding: 24px;
+                        padding: 32px;
                     }
                     .settings-preview-canvas-top_bar {
                         align-items: flex-start;
@@ -333,8 +538,8 @@ export default function SettingsPage() {
                         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
                     }
                     .settings-popup-preview-modal {
-                        width: min(320px, 100%);
-                        padding: 20px;
+                        width: min(440px, 88%);
+                        padding: 24px;
                         border-radius: 10px;
                         border: 1px solid rgba(0, 0, 0, 0.08);
                         text-align: center;
@@ -380,8 +585,12 @@ export default function SettingsPage() {
                         .settings-color-grid {
                             grid-template-columns: 1fr;
                         }
-                        .settings-preview-sticky {
-                            position: static;
+                        .settings-preview-canvas {
+                            min-height: 320px;
+                            aspect-ratio: auto;
+                        }
+                        .settings-browser-url {
+                            font-size: 11px;
                         }
                         .settings-popup-preview-top_bar,
                         .settings-popup-preview-bottom_bar {
@@ -392,343 +601,266 @@ export default function SettingsPage() {
                 `}
             </style>
             <div className="settings-page-content">
-            <BlockStack gap="400">
-                {isFreePlan && (
-                    <Banner
-                        tone="info"
-                        action={{
-                            content: "View plans",
-                            url: "/app/pricing",
-                        }}
-                    >
-                        <p>Upgrade to a paid plan to increase your visitor limit and unlock advanced protection features.</p>
-                    </Banner>
-                )}
-                {fetcher.data && !fetcher.data.success && (
-                    <Banner tone="critical">
-                        <p>{fetcher.data.message || "Failed to save settings"}</p>
-                    </Banner>
-                )}
-                <Layout>
-                    <Layout.Section>
-                        <BlockStack gap="400">
-                            <Card>
-                                <BlockStack gap="400">
-                                    <InlineStack align="space-between" blockAlign="center" gap="300">
-                                        <BlockStack gap="100">
-                                            <Text as="h2" variant="headingMd">Storefront status</Text>
-                                            <Text as="p" variant="bodyMd" tone="subdued">
-                                                This controls whether redirects, blocks, and popup rules run on your storefront.
-                                            </Text>
-                                        </BlockStack>
-                                        <Badge tone={isEnabled ? "success" : "critical"}>
-                                            {isEnabled ? "Enabled" : "Disabled"}
-                                        </Badge>
-                                    </InlineStack>
-                                    <Checkbox
-                                        label="Enable Geolocation"
-                                        checked={isEnabled}
-                                        onChange={setIsEnabled}
-                                        helpText="The Shopify theme app embed must also be enabled in your current theme."
-                                    />
-                                    {!isEnabled && (
-                                        <Banner tone="warning">
-                                            <p>Geolocation is disabled. Visitor rules will not run until you enable it again.</p>
-                                        </Banner>
-                                    )}
-                                    <div className="settings-summary-grid">
-                                        <div className="settings-summary-item">
+                <BlockStack gap="400">
+                    {isFreePlan && (
+                        <Banner
+                            tone="info"
+                            action={{
+                                content: "View plans",
+                                url: "/app/pricing",
+                            }}
+                        >
+                            <p>Upgrade to a paid plan to increase your visitor limit and unlock advanced protection features.</p>
+                        </Banner>
+                    )}
+                    {fetcher.data && !fetcher.data.success && (
+                        <Banner tone="critical">
+                            <p>{fetcher.data.message || "Failed to save settings"}</p>
+                        </Banner>
+                    )}
+                    <Layout>
+                        <Layout.Section>
+                            <BlockStack gap="400">
+                                <Card>
+                                    <BlockStack gap="400">
+                                        <InlineStack align="space-between" blockAlign="center" gap="300">
                                             <BlockStack gap="100">
-                                                <Text as="p" variant="bodySm" tone="subdued">Popup template</Text>
-                                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                    {templateOptions.find((option) => option.value === template)?.label || "Modal"}
+                                                <Text as="h2" variant="headingMd">Storefront status</Text>
+                                                <Text as="p" variant="bodyMd" tone="subdued">
+                                                    This controls whether redirects, blocks, and popup rules run on your storefront.
                                                 </Text>
                                             </BlockStack>
-                                        </div>
-                                        <div className="settings-summary-item">
-                                            <BlockStack gap="100">
-                                                <Text as="p" variant="bodySm" tone="subdued">Bot handling</Text>
-                                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                    {excludeBots ? "Search bots excluded" : "Search bots included"}
-                                                </Text>
-                                            </BlockStack>
-                                        </div>
-                                        <div className="settings-summary-item">
-                                            <BlockStack gap="100">
-                                                <Text as="p" variant="bodySm" tone="subdued">Visitor preference</Text>
-                                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                    {cookieDuration || "7"} day cookie
-                                                </Text>
-                                            </BlockStack>
-                                        </div>
-                                    </div>
-                                </BlockStack>
-                            </Card>
-
-                            {isEnabled && (
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <BlockStack gap="100">
-                                            <Text as="h2" variant="headingMd">Popup appearance</Text>
-                                            <Text as="p" variant="bodyMd" tone="subdued">
-                                                Customize the prompt shown when a rule uses popup mode.
-                                            </Text>
-                                        </BlockStack>
-                                        <Select
-                                            label="Template Design"
-                                            options={templateOptions}
-                                            value={template}
-                                            onChange={setTemplate}
-                                            helpText="Choose how the popup appears on the visitor's screen."
-                                        />
-                                        <Divider />
-                                        <TextField
-                                            label="Popup Title"
-                                            value={popupTitle}
-                                            onChange={setPopupTitle}
-                                            autoComplete="off"
-                                        />
-                                        <TextField
-                                            label="Popup Message"
-                                            value={popupMessage}
-                                            onChange={setPopupMessage}
-                                            helpText="Use {country} for visitor's country and {target} for target store name"
-                                            multiline={2}
-                                            autoComplete="off"
-                                        />
-                                        <div className="settings-two-field-grid">
-                                            <TextField
-                                                label="Confirm Button Text"
-                                                value={confirmBtnText}
-                                                onChange={setConfirmBtnText}
-                                                autoComplete="off"
-                                            />
-                                            <TextField
-                                                label="Cancel Button Text"
-                                                value={cancelBtnText}
-                                                onChange={setCancelBtnText}
-                                                autoComplete="off"
-                                            />
-                                        </div>
-                                        <Divider />
-                                        <Text as="h3" variant="headingSm">
-                                            Colors
-                                        </Text>
-                                        <div className="settings-color-grid">
-                                            <TextField
-                                                label="Background Color"
-                                                value={popupBgColor}
-                                                onChange={setPopupBgColor}
-                                                placeholder="#ffffff"
-                                                autoComplete="off"
-                                            />
-                                            <TextField
-                                                label="Text Color"
-                                                value={popupTextColor}
-                                                onChange={setPopupTextColor}
-                                                placeholder="#333333"
-                                                autoComplete="off"
-                                            />
-                                            <TextField
-                                                label="Button Color"
-                                                value={popupBtnColor}
-                                                onChange={setPopupBtnColor}
-                                                placeholder="#007bff"
-                                                autoComplete="off"
-                                            />
-                                        </div>
-                                    </BlockStack>
-                                </Card>
-
-                            )}
-
-                            {isEnabled && (
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <BlockStack gap="100">
-                                            <Text as="h2" variant="headingMd">Blocked page</Text>
-                                            <Text as="p" variant="bodyMd" tone="subdued">
-                                                Set the message visitors see when a block rule applies.
-                                            </Text>
-                                        </BlockStack>
-                                        <TextField
-                                            label="Blocked Title"
-                                            value={blockedTitle}
-                                            onChange={setBlockedTitle}
-                                            placeholder="Access Denied"
-                                            autoComplete="off"
-                                        />
-                                        <TextField
-                                            label="Blocked Message"
-                                            value={blockedMessage}
-                                            onChange={setBlockedMessage}
-                                            placeholder="We do not offer services in your country/region."
-                                            multiline={2}
-                                            autoComplete="off"
-                                        />
-                                    </BlockStack>
-                                </Card>
-                            )}
-
-                            {isEnabled && (
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <BlockStack gap="100">
-                                            <Text as="h2" variant="headingMd">Advanced settings</Text>
-                                            <Text as="p" variant="bodyMd" tone="subdued">
-                                                Fine-tune bot handling, test exclusions, and visitor memory.
-                                            </Text>
-                                        </BlockStack>
-                                        <Checkbox
-                                            label="Exclude Search Engine Bots"
-                                            checked={excludeBots}
-                                            onChange={setExcludeBots}
-                                            helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
-                                        />
-                                        <TextField
-                                            label="Excluded IP Addresses"
-                                            value={excludedIPs}
-                                            onChange={setExcludedIPs}
-                                            placeholder="192.168.1.1, 10.0.0.1"
-                                            helpText="Comma-separated list of IP addresses to exclude from redirection"
-                                            autoComplete="off"
-                                        />
-                                        <TextField
-                                            label="Cookie Duration (days)"
-                                            type="number"
-                                            value={cookieDuration}
-                                            onChange={setCookieDuration}
-                                            helpText="How long to remember visitor's preference (only for rules using Popup mode)"
-                                            autoComplete="off"
-                                        />
-                                    </BlockStack>
-                                </Card>
-                            )}
-
-                            {isEnabled && (
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <InlineStack align="space-between">
-                                            <Text as="h2" variant="headingMd">
-                                                Anti-fraud protection
-                                            </Text>
-                                            {!isFreePlan ? (
-                                                <Badge>Paid plan</Badge>
-                                            ) : null}
+                                            <Badge tone={isEnabled ? "success" : "critical"}>
+                                                {isEnabled ? "Enabled" : "Disabled"}
+                                            </Badge>
                                         </InlineStack>
-                                        <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
-                                        
-                                        {isFreePlan ? (
-                                            <Banner tone="warning">
-                                                <p>Upgrade to a paid plan to enable advanced security checks.</p>
-                                            </Banner>
-                                        ) : null}
-
                                         <Checkbox
-                                            label="Block VPNs, Proxies & Tor Exit Nodes"
-                                            checked={blockVpn}
-                                            onChange={setBlockVpn}
-                                            disabled={isFreePlan}
-                                            helpText="Overrides all rules to unconditionally block connections that mask their real location."
+                                            label="Enable Geolocation"
+                                            checked={isEnabled}
+                                            onChange={setIsEnabled}
+                                            helpText="The Shopify theme app embed must also be enabled in your current theme."
                                         />
+                                        {!isEnabled && (
+                                            <Banner tone="warning">
+                                                <p>Geolocation is disabled. Visitor rules will not run until you enable it again.</p>
+                                            </Banner>
+                                        )}
+                                        <div className="settings-summary-grid">
+                                            <div className="settings-summary-item">
+                                                <BlockStack gap="100">
+                                                    <Text as="p" variant="bodySm" tone="subdued">Popup template</Text>
+                                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                        {templateOptions.find((option) => option.value === template)?.label || "Modal"}
+                                                    </Text>
+                                                </BlockStack>
+                                            </div>
+                                            <div className="settings-summary-item">
+                                                <BlockStack gap="100">
+                                                    <Text as="p" variant="bodySm" tone="subdued">Bot handling</Text>
+                                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                        {excludeBots ? "Search bots excluded" : "Search bots included"}
+                                                    </Text>
+                                                </BlockStack>
+                                            </div>
+                                            <div className="settings-summary-item">
+                                                <BlockStack gap="100">
+                                                    <Text as="p" variant="bodySm" tone="subdued">Visitor preference</Text>
+                                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                                        {cookieDuration || "7"} day cookie
+                                                    </Text>
+                                                </BlockStack>
+                                            </div>
+                                        </div>
                                     </BlockStack>
                                 </Card>
-                            )}
 
-                            <div className="settings-save-row">
-                                <Button
-                                    variant="primary"
-                                    onClick={handleSave}
-                                    loading={isLoading}
-                                    disabled={isLoading}
-                                >
-                                    {saveButtonText}
-                                </Button>
-                            </div>
-                        </BlockStack>
-                    </Layout.Section>
+                                {isEnabled && previewMarkup}
 
-                    <Layout.Section variant="oneThird">
-                        <div className="settings-preview-sticky">
-                            <Card>
-                                <BlockStack gap="400">
-                                    <BlockStack gap="100">
-                                        <Text as="h2" variant="headingMd">Popup preview</Text>
-                                        <Text as="p" variant="bodyMd" tone="subdued">
-                                            Preview uses US and US Store as sample values.
-                                        </Text>
-                                    </BlockStack>
-                                    <div className={previewCanvasClass}>
-                                        <div className="settings-preview-skeleton" aria-hidden="true">
-                                            <div className="settings-skeleton-line" style={{ width: "40%" }} />
-                                            <div className="settings-skeleton-block" />
-                                            <div className="settings-skeleton-line" style={{ width: "82%" }} />
-                                            <div className="settings-skeleton-line" style={{ width: "62%" }} />
-                                        </div>
-
-                                        <div
-                                            className={previewPanelClass}
-                                            style={{
-                                                backgroundColor: popupBgColor,
-                                                color: popupTextColor,
-                                            }}
-                                        >
-                                            <div style={{ flex: 1 }}>
-                                                {template === "modal" ? (
-                                                    <BlockStack gap="200">
-                                                        <Text as="h3" variant="headingMd" fontWeight="bold">
-                                                            {popupTitle}
-                                                        </Text>
-                                                        <Text as="p" variant="bodyMd">
-                                                            {previewMessage}
-                                                        </Text>
-                                                    </BlockStack>
-                                                ) : (
-                                                    <Text as="p" variant="bodySm">
-                                                        <strong>{popupTitle}</strong>{" "}
-                                                        {previewMessage}
-                                                    </Text>
-                                                )}
+                                {isEnabled && (
+                                    <Card>
+                                        <BlockStack gap="400">
+                                            <BlockStack gap="100">
+                                                <Text as="h2" variant="headingMd">Popup appearance</Text>
+                                                <Text as="p" variant="bodyMd" tone="subdued">
+                                                    Customize the prompt shown when a rule uses popup mode.
+                                                </Text>
+                                            </BlockStack>
+                                            <Select
+                                                label="Template Design"
+                                                options={templateOptions}
+                                                value={template}
+                                                onChange={setTemplate}
+                                                helpText="Choose how the popup appears on the visitor's screen."
+                                            />
+                                            <Divider />
+                                            <TextField
+                                                label="Popup Title"
+                                                value={popupTitle}
+                                                onChange={setPopupTitle}
+                                                autoComplete="off"
+                                            />
+                                            <TextField
+                                                label="Popup Message"
+                                                value={popupMessage}
+                                                onChange={setPopupMessage}
+                                                helpText="Use {country} for visitor's country and {target} for target store name"
+                                                multiline={2}
+                                                autoComplete="off"
+                                            />
+                                            <div className="settings-two-field-grid">
+                                                <TextField
+                                                    label="Confirm Button Text"
+                                                    value={confirmBtnText}
+                                                    onChange={setConfirmBtnText}
+                                                    autoComplete="off"
+                                                />
+                                                <TextField
+                                                    label="Cancel Button Text"
+                                                    value={cancelBtnText}
+                                                    onChange={setCancelBtnText}
+                                                    autoComplete="off"
+                                                />
                                             </div>
-
-                                            <div className="settings-popup-actions">
-                                                <button
-                                                    className="settings-preview-button"
-                                                    style={{
-                                                        backgroundColor: popupBtnColor,
-                                                        color: "#fff",
-                                                    }}
-                                                    type="button"
-                                                >
-                                                    {confirmBtnText}
-                                                </button>
-                                                <button
-                                                    className="settings-preview-button settings-preview-button-secondary"
-                                                    style={{
-                                                        color: popupTextColor,
-                                                    }}
-                                                    type="button"
-                                                >
-                                                    {cancelBtnText}
-                                                </button>
+                                            <Divider />
+                                            <Text as="h3" variant="headingSm">
+                                                Colors
+                                            </Text>
+                                            <div className="settings-color-grid">
+                                                <ColorPickerField
+                                                    label="Background"
+                                                    value={popupBgColor}
+                                                    onChange={setPopupBgColor}
+                                                    fallback="#ffffff"
+                                                />
+                                                <ColorPickerField
+                                                    label="Text"
+                                                    value={popupTextColor}
+                                                    onChange={setPopupTextColor}
+                                                    fallback="#333333"
+                                                />
+                                                <ColorPickerField
+                                                    label="Button"
+                                                    value={popupBtnColor}
+                                                    onChange={setPopupBtnColor}
+                                                    fallback="#007bff"
+                                                />
                                             </div>
-                                        </div>
-                                    </div>
-                                    {isBarTemplate && (
-                                        <Banner tone="info">
-                                            <p>Bar templates appear at the top or bottom of the storefront and use less vertical space than the modal.</p>
-                                        </Banner>
-                                    )}
-                                </BlockStack>
-                            </Card>
-                        </div>
-                    </Layout.Section>
+                                        </BlockStack>
+                                    </Card>
 
-                    <Layout.Section>
-                        <Box paddingBlockEnd="800" />
-                    </Layout.Section>
-                </Layout>
-            </BlockStack>
+                                )}
+
+                                {isEnabled && (
+                                    <Card>
+                                        <BlockStack gap="400">
+                                            <BlockStack gap="100">
+                                                <Text as="h2" variant="headingMd">Blocked page</Text>
+                                                <Text as="p" variant="bodyMd" tone="subdued">
+                                                    Set the message visitors see when a block rule applies.
+                                                </Text>
+                                            </BlockStack>
+                                            <TextField
+                                                label="Blocked Title"
+                                                value={blockedTitle}
+                                                onChange={setBlockedTitle}
+                                                placeholder="Access Denied"
+                                                autoComplete="off"
+                                            />
+                                            <TextField
+                                                label="Blocked Message"
+                                                value={blockedMessage}
+                                                onChange={setBlockedMessage}
+                                                placeholder="We do not offer services in your country/region."
+                                                multiline={2}
+                                                autoComplete="off"
+                                            />
+                                        </BlockStack>
+                                    </Card>
+                                )}
+
+                                {isEnabled && (
+                                    <Card>
+                                        <BlockStack gap="400">
+                                            <BlockStack gap="100">
+                                                <Text as="h2" variant="headingMd">Advanced settings</Text>
+                                                <Text as="p" variant="bodyMd" tone="subdued">
+                                                    Fine-tune bot handling, test exclusions, and visitor memory.
+                                                </Text>
+                                            </BlockStack>
+                                            <Checkbox
+                                                label="Exclude Search Engine Bots"
+                                                checked={excludeBots}
+                                                onChange={setExcludeBots}
+                                                helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
+                                            />
+                                            <TextField
+                                                label="Excluded IP Addresses"
+                                                value={excludedIPs}
+                                                onChange={setExcludedIPs}
+                                                placeholder="192.168.1.1, 10.0.0.1"
+                                                helpText="Comma-separated list of IP addresses to exclude from redirection"
+                                                autoComplete="off"
+                                            />
+                                            <TextField
+                                                label="Cookie Duration (days)"
+                                                type="number"
+                                                value={cookieDuration}
+                                                onChange={setCookieDuration}
+                                                helpText="How long to remember visitor's preference (only for rules using Popup mode)"
+                                                autoComplete="off"
+                                            />
+                                        </BlockStack>
+                                    </Card>
+                                )}
+
+                                {isEnabled && (
+                                    <Card>
+                                        <BlockStack gap="400">
+                                            <InlineStack align="space-between">
+                                                <Text as="h2" variant="headingMd">
+                                                    Anti-fraud protection
+                                                </Text>
+                                                {!isFreePlan ? (
+                                                    <Badge>Paid plan</Badge>
+                                                ) : null}
+                                            </InlineStack>
+                                            <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
+
+                                            {isFreePlan ? (
+                                                <Banner tone="warning">
+                                                    <p>Upgrade to a paid plan to enable advanced security checks.</p>
+                                                </Banner>
+                                            ) : null}
+
+                                            <Checkbox
+                                                label="Block VPNs, Proxies & Tor Exit Nodes"
+                                                checked={blockVpn}
+                                                onChange={setBlockVpn}
+                                                disabled={isFreePlan}
+                                                helpText="Overrides all rules to unconditionally block connections that mask their real location."
+                                            />
+                                        </BlockStack>
+                                    </Card>
+                                )}
+
+                                <div className="settings-save-row">
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleSave}
+                                        loading={isLoading}
+                                        disabled={isLoading}
+                                    >
+                                        {saveButtonText}
+                                    </Button>
+                                </div>
+                            </BlockStack>
+                        </Layout.Section>
+
+                        <Layout.Section>
+                            <Box paddingBlockEnd="800" />
+                        </Layout.Section>
+                    </Layout>
+                </BlockStack>
             </div>
         </Page>
     );
