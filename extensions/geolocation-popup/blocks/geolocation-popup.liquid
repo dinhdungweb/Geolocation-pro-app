@@ -10,7 +10,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-04-26-single-app-embed-toggle';
+  const SCRIPT_VERSION = '2026-04-28-internal-once-redirect';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -47,6 +47,24 @@
     },
     remove(name) {
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }
+  };
+
+  const SessionManager = {
+    get(name) {
+      try {
+        return sessionStorage.getItem(name);
+      } catch {
+        return null;
+      }
+    },
+    set(name, value) {
+      try {
+        sessionStorage.setItem(name, value);
+      } catch {}
+    },
+    has(name) {
+      return this.get(name) !== null;
     }
   };
 
@@ -117,6 +135,25 @@
     } catch {
       return window.location.href.includes(targetUrl);
     }
+  };
+
+  const getTargetUrl = (targetUrl) => {
+    if (!targetUrl) return null;
+    try {
+      return new URL(targetUrl, window.location.origin);
+    } catch {
+      return null;
+    }
+  };
+
+  const isInternalTarget = (targetUrl) => {
+    const target = getTargetUrl(targetUrl);
+    return Boolean(target && target.origin === window.location.origin);
+  };
+
+  const getInternalRedirectKey = (rule) => {
+    const keySource = rule.ruleId || rule.name || rule.targetUrl || 'unknown';
+    return `geo_internal_redirected:${GEOLOCATION_CONFIG.shop}:${keySource}`;
   };
 
   const showPopup = (config) => {
@@ -286,6 +323,9 @@
 
     const rule = config.rule || {};
     if ((config.action === 'popup' || config.action === 'auto_redirect') && alreadyOnTarget(rule.targetUrl)) {
+      if (config.action === 'auto_redirect' && isInternalTarget(rule.targetUrl)) {
+        SessionManager.set(getInternalRedirectKey(rule), 'true');
+      }
       log('Already on target URL');
       return;
     }
@@ -298,6 +338,15 @@
     }
 
     if (config.action === 'auto_redirect') {
+      if (isInternalTarget(rule.targetUrl)) {
+        const internalRedirectKey = getInternalRedirectKey(rule);
+        if (SessionManager.has(internalRedirectKey)) {
+          log('Internal redirect already handled for this session');
+          return;
+        }
+        SessionManager.set(internalRedirectKey, 'true');
+      }
+
       CookieManager.remove('geo_choice');
       trackEvent(config.analyticsEvent || 'auto_redirected', config);
       window.location.href = rule.targetUrl;

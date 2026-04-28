@@ -24,7 +24,6 @@ import {
   FREE_PLAN,
   PREMIUM_PLAN,
   PLUS_PLAN,
-  ELITE_PLAN,
   CUSTOM_PLAN,
   getPlanLimit,
   hasUnlimitedUsage,
