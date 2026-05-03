@@ -99,8 +99,6 @@ export function analyticsEventAllowedForToken(
   eventType: string,
   payload: AnalyticsTokenPayload
 ) {
-  if (eventType === "action_skipped") return payload.action !== "none";
-
   if (payload.action === "popup") {
     return ["popup_shown", "redirected", "clicked_no", "dismissed"].includes(eventType);
   }

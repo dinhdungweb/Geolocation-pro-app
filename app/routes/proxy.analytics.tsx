@@ -25,7 +25,6 @@ const VALID_TYPES = [
   "clicked_no",
   "dismissed",
   "vpn_blocked",
-  "action_skipped",
 ];
 
 const corsHeaders = {
@@ -78,7 +77,6 @@ function actionFromType(type: string) {
   if (type === "ip_blocked") return "ip_block";
   if (type === "vpn_blocked") return "vpn_block";
   if (type === "clicked_no") return "declined";
-  if (type === "action_skipped") return "skipped";
   return type;
 }
 
@@ -190,9 +188,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         : asSafeString(data.ruleName, 200) || null;
     const path = tokenPayload?.path || asSafeString(data.path, 500) || null;
     const targetUrl = asSafeString(data.targetUrl, 1000) || null;
-    const resolvedAction =
-      tokenPayload?.action || asSafeString(data.resolvedAction, 40) || null;
-    const skipReason = asSafeString(data.skipReason, 100) || null;
 
     try {
       await prisma.visitorLog.create({
@@ -202,10 +197,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           countryCode,
           city: null,
           action: actionFromType(type),
-          ruleId,
           ruleName,
-          resolvedAction,
-          skipReason,
           targetUrl,
           userAgent: request.headers.get("user-agent") || "Unknown",
           path,

@@ -10,7 +10,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-05-03-action-skip-logs';
+  const SCRIPT_VERSION = '2026-04-28-internal-once-redirect';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -121,18 +121,6 @@
     } catch (error) {
       log('Analytics failed:', error);
     }
-  };
-
-  const trackSkipped = (config, skipReason) => {
-    if (!config || !config.eventToken || !config.rule?.ruleId) {
-      log('Skipped action without analytics token:', skipReason, config);
-      return;
-    }
-
-    trackEvent('action_skipped', config, {
-      resolvedAction: config.action || 'none',
-      skipReason
-    });
   };
 
   const alreadyOnTarget = (targetUrl) => {
@@ -326,22 +314,9 @@
       return;
     }
 
-    trackEvent('visit', config, {
-      resolvedAction: config?.action || 'none',
-      skipReason: config?.limitExceeded
-        ? 'limit_exceeded'
-        : config?.action === 'none'
-          ? 'no_action'
-          : undefined
-    });
+    trackEvent('visit', config);
 
-    if (!config) {
-      log('No storefront action required', config);
-      return;
-    }
-
-    if (config.action === 'none' || config.limitExceeded) {
-      trackSkipped(config, config.limitExceeded ? 'limit_exceeded' : 'no_action');
+    if (!config || config.action === 'none' || config.limitExceeded) {
       log('No storefront action required', config);
       return;
     }
@@ -351,7 +326,6 @@
       if (config.action === 'auto_redirect' && isInternalTarget(rule.targetUrl)) {
         SessionManager.set(getInternalRedirectKey(rule), 'true');
       }
-      trackSkipped(config, 'already_on_target');
       log('Already on target URL');
       return;
     }
@@ -367,7 +341,6 @@
       if (isInternalTarget(rule.targetUrl)) {
         const internalRedirectKey = getInternalRedirectKey(rule);
         if (SessionManager.has(internalRedirectKey)) {
-          trackSkipped(config, 'internal_redirect_already_handled');
           log('Internal redirect already handled for this session');
           return;
         }
@@ -382,7 +355,6 @@
 
     if (config.action === 'popup') {
       if (CookieManager.has('geo_choice')) {
-        trackSkipped(config, 'user_preference_cookie');
         log('User preference found, skipping popup');
         return;
       }
