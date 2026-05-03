@@ -140,9 +140,13 @@ export default function VisitorLogs() {
                     )}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
-                    <Text as="span" variant="bodyMd" truncate>
-                        {log.ruleName || "-"}
-                    </Text>
+                    {log.ruleName ? (
+                        <div className="visitor-log-rule-name" title={log.ruleName}>
+                            {log.ruleName}
+                        </div>
+                    ) : (
+                        <Text as="span" variant="bodyMd" tone="subdued">-</Text>
+                    )}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
                     <div className="visitor-log-user-agent" title={log.userAgent || ""}>
@@ -185,6 +189,16 @@ export default function VisitorLogs() {
                     .visitor-log-user-agent {
                         max-width: 180px;
                         font-size: 11px;
+                    }
+                    .visitor-log-rule-name {
+                        max-width: 220px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        color: var(--p-color-text-secondary, #6d7175);
+                        font-size: 12px;
+                        line-height: 1.4;
+                        font-weight: 400;
                     }
                     .visitor-log-pagination {
                         display: flex;
