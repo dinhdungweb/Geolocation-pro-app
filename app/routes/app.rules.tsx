@@ -28,7 +28,7 @@ import {
     Tooltip,
 } from "@shopify/polaris";
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
@@ -322,15 +322,47 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 };
 
+const REVIEW_PROMPTED_KEY = "geo_review_prompted";
+
 export default function RulesPage() {
     const { rules, hasProPlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
+    const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
+    const [reviewRequested, setReviewRequested] = useState(false);
+
+    // Review prompt: show once after first rule creation
+    useEffect(() => {
+        if (
+            fetcher.state === "idle" &&
+            fetcher.data &&
+            (fetcher.data as any).success &&
+            (fetcher.data as any).message === "Rule created successfully" &&
+            rules.length === 1 &&
+            !reviewRequested
+        ) {
+            try {
+                if (localStorage.getItem(REVIEW_PROMPTED_KEY) === "true") return;
+            } catch { return; }
+
+            setReviewRequested(true);
+            const timer = setTimeout(() => {
+                try {
+                    (shopify as any).reviews.request().finally(() => {
+                        try { localStorage.setItem(REVIEW_PROMPTED_KEY, "true"); } catch {}
+                    });
+                } catch {
+                    // reviews API not available
+                }
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [fetcher.state, fetcher.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Form state
     const [formName, setFormName] = useState("");

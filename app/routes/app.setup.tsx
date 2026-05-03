@@ -90,22 +90,6 @@ export default function SetupGuide() {
         },
         {
             number: 3,
-            title: "Review app settings",
-            description: "Set popup text, redirect behavior, cookies, and bot/VPN handling.",
-            tone: "required",
-            action: {
-                label: "Settings",
-                url: "/app/settings",
-                internal: true,
-            },
-            checklist: [
-                "Choose popup or auto-redirect behavior.",
-                "Customize visitor-facing messages.",
-                "Set how long visitor choices are remembered.",
-            ],
-        },
-        {
-            number: 4,
             title: "Add IP rules when needed",
             description: "Block or redirect specific IPs and CIDR ranges before country rules are checked.",
             tone: "optional",
@@ -120,7 +104,7 @@ export default function SetupGuide() {
             ],
         },
         {
-            number: 5,
+            number: 4,
             title: "Test and confirm",
             description: "Use a fresh browser session and visitor logs to confirm rules are firing.",
             tone: "verify",
@@ -238,13 +222,13 @@ export default function SetupGuide() {
                                     </div>
                                     <div className="setup-summary-item">
                                         <BlockStack gap="100">
-                                            <Text as="p" variant="bodySm" tone="subdued">Step 2-4</Text>
+                                            <Text as="p" variant="bodySm" tone="subdued">Step 2-3</Text>
                                             <Text as="p" variant="bodyMd" fontWeight="semibold">Create rules</Text>
                                         </BlockStack>
                                     </div>
                                     <div className="setup-summary-item">
                                         <BlockStack gap="100">
-                                            <Text as="p" variant="bodySm" tone="subdued">Step 5</Text>
+                                            <Text as="p" variant="bodySm" tone="subdued">Step 4</Text>
                                             <Text as="p" variant="bodyMd" fontWeight="semibold">Verify logs</Text>
                                         </BlockStack>
                                     </div>
