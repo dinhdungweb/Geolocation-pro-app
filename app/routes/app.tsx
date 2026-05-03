@@ -7,79 +7,70 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
-import { checkAndChargeOverage } from "../utils/billing.server";
 import { cleanupOldLogs } from "../utils/cleanup.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
+const CRISP_LOAD_DELAY_MS = 7000;
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, billing, admin } = await authenticate.admin(request);
-  const isTest = false;
+  const { session } = await authenticate.admin(request);
 
-  // Check and charge overage on every admin page load
-  await checkAndChargeOverage(session.shop, billing, isTest);
+  // Fire-and-forget cleanup so it cannot delay the initial admin iframe render.
+  cleanupOldLogs().catch(() => {});
 
-  // Lazy cleanup: delete old visitor logs (fire-and-forget, max 1x/day)
-  cleanupOldLogs().catch(() => { });
-
-  // Lấy thông tin shop để hiển thị trong Crisp
-  const response = await admin.graphql(`
-    #graphql
-    query getShopInfo {
-      shop {
-        name
-        email
-        myshopifyDomain
-      }
-    }
-  `);
-  const { data: { shop: shopData } } = await response.json();
-
-  return { 
+  return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
-    shopInfo: shopData
+    shop: session.shop,
   };
 };
 
 export default function App() {
-  const { apiKey, shopInfo } = useLoaderData<typeof loader>();
-
+  const { apiKey, shop } = useLoaderData<typeof loader>();
   const crispInitialized = useRef(false);
 
   useEffect(() => {
-    // Chỉ chạy ở phía Client và chỉ khởi tạo 1 lần duy nhất
-    if (typeof window === "undefined" || crispInitialized.current) return;
-    crispInitialized.current = true;
+    if (typeof window === "undefined") return;
 
-    // 1. Khởi tạo Crisp (chỉ khi chưa có script trong DOM)
-    if (!(window as any).CRISP_WEBSITE_ID) {
-      (window as any).$crisp = [];
-      (window as any).CRISP_WEBSITE_ID = "b882709c-9f60-4bf7-b823-0f6bc6196f4a";
+    let idleCallbackId: number | undefined;
 
+    const loadCrisp = () => {
+      if (crispInitialized.current) return;
+      crispInitialized.current = true;
+
+      const crisp = ((window as any).$crisp ||= []);
+      if (!(window as any).CRISP_WEBSITE_ID) {
+        (window as any).CRISP_WEBSITE_ID = "b882709c-9f60-4bf7-b823-0f6bc6196f4a";
+      }
+
+      crisp.push(["set", "session:data", [[["shop", shop]]]]);
+      crisp.push(["do", "chat:show"]);
+
+      // Defer chat loading so third-party JS cannot compete with LCP.
       const existingScript = document.querySelector('script[src*="crisp.chat"]');
       if (!existingScript) {
-        const s = document.createElement("script");
-        s.src = "https://client.crisp.chat/l.js";
-        s.async = true;
-        document.head.appendChild(s);
-      }
-    }
-
-    // 2. Nhận diện Shop khi script đã tải xong
-    const handleIdentify = () => {
-      if ((window as any).$crisp && shopInfo) {
-        const crisp = (window as any).$crisp;
-        crisp.push(["set", "user:email", [shopInfo.email]]);
-        crisp.push(["set", "user:nickname", [shopInfo.name]]);
-        crisp.push(["set", "session:data", [[["shop", shopInfo.myshopifyDomain]]]]);
-        crisp.push(["do", "chat:show"]);
+        const script = document.createElement("script");
+        script.src = "https://client.crisp.chat/l.js";
+        script.async = true;
+        document.head.appendChild(script);
       }
     };
 
-    // Đợi một chút để Crisp init hoàn toàn
-    const timer = setTimeout(handleIdentify, 1500);
-    return () => clearTimeout(timer);
-  }, [shopInfo]);
+    const delayTimer = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleCallbackId = window.requestIdleCallback(loadCrisp, { timeout: 3000 });
+      } else {
+        loadCrisp();
+      }
+    }, CRISP_LOAD_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(delayTimer);
+      if (idleCallbackId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+    };
+  }, [shop]);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>

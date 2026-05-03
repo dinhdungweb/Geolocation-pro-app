@@ -9,7 +9,6 @@ import {
   BlockStack,
   InlineStack,
   Badge,
-  CalloutCard,
   IndexTable,
   Button,
   Banner,
@@ -28,7 +27,7 @@ import {
   getPlanLimit,
   hasUnlimitedUsage,
 } from "../billing.config";
-// checkAndChargeOverage is called in the parent layout (app.tsx), not here
+// Overage charging is handled by the background usage cron.
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -71,8 +70,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Basic stats that are always available
-  const [rulesCount, activeRulesCount, settings] = await Promise.all([
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const [
+    rulesCount,
+    activeRulesCount,
+    settings,
+    billingConfig,
+    monthlyUsage,
+    countryStats,
+    ruleStats,
+  ] = await Promise.all([
     prisma.redirectRule.count({ where: { shop } }),
     prisma.redirectRule.count({ where: { shop, isActive: true } }),
     prisma.settings.upsert({
@@ -80,62 +91,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       update: {},
       create: { shop },
     }),
-  ]);
-
-  // Check for active subscription
-  const isTest = false;
-  const billingConfig = await billing.check({
-    plans: ALL_PAID_PLANS as any,
-    isTest,
-  });
-  const hasProPlan = billingConfig.hasActivePayment;
-  const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
-  const planLimit = getPlanLimit(currentPlan, settings);
-  const isUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
-  const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
-
-  // Sync currentPlan to Settings (ensure proxy.config can check plan limits)
-  try {
-    await prisma.settings.upsert({
-      where: { shop },
-      update: { currentPlan },
-      create: { shop, currentPlan },
-    });
-  } catch (error) {
-    console.error("[Settings] Failed to sync currentPlan:", error);
-  }
-
-  // Get current month usage
-  const now = new Date();
-  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthlyUsage = await prisma.monthlyUsage.findUnique({
-    where: {
-      shop_yearMonth: {
-        shop,
-        yearMonth,
+    billing.check({
+      plans: ALL_PAID_PLANS as any,
+      isTest: false,
+    }),
+    prisma.monthlyUsage.findUnique({
+      where: {
+        shop_yearMonth: {
+          shop,
+          yearMonth,
+        },
       },
-    },
-  });
-  const currentUsage = monthlyUsage?.totalVisitors || 0;
-
-  // Overage charging is handled by the parent layout (app.tsx) on every page load.
-  // Do NOT call checkAndChargeOverage() here to avoid double-charging race conditions.
-
-  // --------------------------------
-
-
-
-
-  // Date range: Last 30 days
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  // Get statistics
-  // Using prisma to bypass potential stale type definitions for new models
-  const [
-    countryStats,
-    ruleStats
-  ] = await Promise.all([
+    }),
     prisma.analyticsCountry.groupBy({
       by: ['countryCode'],
       where: {
@@ -164,6 +131,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     })
   ]);
+
+  const hasProPlan = billingConfig.hasActivePayment;
+  const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
+  const planLimit = getPlanLimit(currentPlan, settings);
+  const isUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
+  const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
+  const currentUsage = monthlyUsage?.totalVisitors || 0;
+
+  // Keep proxy limit checks up to date without delaying the dashboard response.
+  prisma.settings.upsert({
+    where: { shop },
+    update: { currentPlan },
+    create: { shop, currentPlan },
+  }).catch((error) => {
+    console.error("[Settings] Failed to sync currentPlan:", error);
+  });
 
   // Aggregate total redirected and blocked for banner
   const totalRedirected = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.redirected || 0), 0) : 0;
@@ -369,14 +352,24 @@ export default function Index() {
       </style>
       <BlockStack gap="500">
 
-        {/* Banner */}
-        <CalloutCard
-          title={`Visitors: ${stats.totalRedirected} redirected, ${stats.totalBlocked} blocked`}
-          illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/tag.png?v=1705642267"
-          primaryAction={{ content: 'Rate Us', onAction: () => window.open('https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal', '_blank') }}
-        >
-          <p>In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.</p>
-        </CalloutCard>
+        {/* Text-only summary avoids loading an above-the-fold illustration during LCP. */}
+        <Card>
+          <InlineStack align="space-between" blockAlign="center" gap="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">
+                Visitors: {stats.totalRedirected} redirected, {stats.totalBlocked} blocked
+              </Text>
+              <Text as="p" tone="subdued">
+                In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.
+              </Text>
+            </BlockStack>
+            <Button
+              onClick={() => window.open('https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal', '_blank')}
+            >
+              Rate Us
+            </Button>
+          </InlineStack>
+        </Card>
 
         {/* Usage Progress Bar */}
         <Card>
