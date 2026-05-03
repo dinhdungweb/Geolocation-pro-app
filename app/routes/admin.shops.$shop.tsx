@@ -144,6 +144,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             select: {
                 id: true, ipAddress: true, countryCode: true, action: true,
                 ruleName: true, targetUrl: true, timestamp: true,
+                userAgent: true, path: true,
             },
         }),
         prisma.monthlyUsage.findMany({
@@ -828,6 +829,8 @@ export default function AdminShopDetail() {
                             <tr>
                                 <th>Time</th>
                                 <th>Visitor IP</th>
+                                <th>Page Path</th>
+                                <th>User Agent</th>
                                 <th>Action</th>
                                 <th>Rule</th>
                             </tr>
@@ -840,6 +843,16 @@ export default function AdminShopDetail() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             {l.countryCode && <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />}
                                             <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ fontSize: '11px', color: '#64748b', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.path || '/'}>
+                                            {l.path || '/'}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ fontSize: '11px', color: '#64748b', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.userAgent || 'Unknown'}>
+                                            {l.userAgent || '—'}
                                         </div>
                                     </td>
                                     <td><span className="badge-v3" style={{ background: `${actionColor(l.action)}15`, color: actionColor(l.action) }}>{l.action.toUpperCase()}</span></td>
