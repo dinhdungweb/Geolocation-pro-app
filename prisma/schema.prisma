@@ -165,7 +165,10 @@ model VisitorLog {
   countryCode String?
   city        String?
   action      String
-  ruleName    String?
+  ruleId         String?
+  ruleName       String?
+  resolvedAction String?
+  skipReason     String?
   targetUrl   String?
   userAgent   String?
   timestamp   DateTime @default(now())

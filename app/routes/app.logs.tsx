@@ -74,6 +74,9 @@ export default function VisitorLogs() {
         switch (action) {
             case "visit":
                 return <Badge tone="info">Visit</Badge>;
+            case "skipped":
+            case "action_skipped":
+                return <Badge tone="warning">Skipped</Badge>;
             case "redirected":
             case "clicked_redirect":
                 return <Badge tone="success">Redirected</Badge>;
@@ -96,6 +99,72 @@ export default function VisitorLogs() {
             default:
                 return <Badge>{action}</Badge>;
         }
+    };
+
+    const getResolvedActionLabel = (action?: string | null) => {
+        switch (action) {
+            case "popup":
+                return "Popup";
+            case "auto_redirect":
+                return "Auto Redirect";
+            case "block":
+                return "Block";
+            case "none":
+                return "None";
+            default:
+                return action || "";
+        }
+    };
+
+    const getSkipReasonLabel = (reason?: string | null) => {
+        switch (reason) {
+            case "already_on_target":
+                return "Already on target URL";
+            case "user_preference_cookie":
+                return "User preference cookie found";
+            case "internal_redirect_already_handled":
+                return "Internal redirect already handled this session";
+            case "no_action":
+                return "No storefront action required";
+            case "limit_exceeded":
+                return "Visitor limit exceeded";
+            default:
+                return reason || "";
+        }
+    };
+
+    const renderRuleDetails = (log: any) => {
+        const resolvedActionLabel = getResolvedActionLabel(log.resolvedAction);
+        const skipReasonLabel = getSkipReasonLabel(log.skipReason);
+
+        if (!log.ruleName && !log.ruleId && !resolvedActionLabel && !skipReasonLabel) {
+            return <Text as="span" variant="bodyMd" tone="subdued">-</Text>;
+        }
+
+        return (
+            <div className="visitor-log-details">
+                {log.ruleName || log.ruleId ? (
+                    <Text as="span" variant="bodyMd" fontWeight="semibold" truncate>
+                        {log.ruleName || log.ruleId}
+                    </Text>
+                ) : null}
+                {log.action === "visit" && (log.ruleName || log.ruleId) ? (
+                    <Text as="span" variant="bodySm" tone="subdued">
+                        Matched rule on visit
+                    </Text>
+                ) : null}
+                {resolvedActionLabel ? (
+                    <Text as="span" variant="bodySm" tone="subdued">
+                        Resolved action: {resolvedActionLabel}
+                    </Text>
+                ) : null}
+                {skipReasonLabel ? (
+                    <Text as="span" variant="bodySm" tone="subdued">
+                        Reason: {skipReasonLabel}
+                    </Text>
+                ) : null}
+            </div>
+        );
     };
 
     const resourceName = {
@@ -140,9 +209,7 @@ export default function VisitorLogs() {
                     )}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
-                    <Text as="span" variant="bodyMd" truncate>
-                        {log.ruleName || "-"}
-                    </Text>
+                    {renderRuleDetails(log)}
                 </IndexTable.Cell>
                 <IndexTable.Cell>
                     <div className="visitor-log-user-agent" title={log.userAgent || ""}>
@@ -185,6 +252,12 @@ export default function VisitorLogs() {
                     .visitor-log-user-agent {
                         max-width: 180px;
                         font-size: 11px;
+                    }
+                    .visitor-log-details {
+                        max-width: 240px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
                     }
                     .visitor-log-pagination {
                         display: flex;
