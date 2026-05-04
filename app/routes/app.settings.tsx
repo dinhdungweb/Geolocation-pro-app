@@ -22,6 +22,7 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
+import { isBillingTestMode } from "../utils/billing-mode.server";
 
 interface Settings {
     id: string;
@@ -39,6 +40,12 @@ interface Settings {
     cookieDuration: number;
     blockedTitle: string;
     blockedMessage: string;
+    blockedLogoUrl: string;
+    blockedBgColor: string;
+    blockedTextColor: string;
+    blockedAccentColor: string;
+    blockedSupportText: string;
+    blockedSupportUrl: string;
     template: string;
     blockVpn: boolean;
 }
@@ -59,6 +66,12 @@ const defaultSettings: Omit<Settings, "id"> = {
     cookieDuration: 7,
     blockedTitle: "Access Denied",
     blockedMessage: "We do not offer services in your country/region.",
+    blockedLogoUrl: "",
+    blockedBgColor: "#111827",
+    blockedTextColor: "#ffffff",
+    blockedAccentColor: "#2563eb",
+    blockedSupportText: "Contact support",
+    blockedSupportUrl: "",
     blockVpn: false,
 };
 
@@ -69,6 +82,10 @@ function normalizeOption(value: string | null, allowed: string[], fallback: stri
 function normalizeHexColor(value: string, fallback: string) {
     const trimmed = value.trim();
     return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed : fallback;
+}
+
+function isDangerousUrl(value: string) {
+    return /^(javascript|data|vbscript):/i.test(value.trim());
 }
 
 function ColorPickerField({
@@ -108,7 +125,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const billingCheck = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: false,
+        isTest: isBillingTestMode(),
     });
 
     // Explicitly check for active subscription, default to FREE_PLAN if none
@@ -142,7 +159,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
         const billingCheck = await billing.check({
             plans: ALL_PAID_PLANS as any,
-            isTest: false,
+            isTest: isBillingTestMode(),
         });
         const activeSubscription = billingCheck.appSubscriptions[0];
         const currentPlan = activeSubscription ? activeSubscription.name : FREE_PLAN;
@@ -162,8 +179,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const cookieDuration = parseInt(formData.get("cookieDuration") as string) || 7;
         const blockedTitle = formData.get("blockedTitle") as string;
         const blockedMessage = formData.get("blockedMessage") as string;
+        const blockedLogoUrl = formData.get("blockedLogoUrl") as string;
+        const blockedBgColor = formData.get("blockedBgColor") as string;
+        const blockedTextColor = formData.get("blockedTextColor") as string;
+        const blockedAccentColor = formData.get("blockedAccentColor") as string;
+        const blockedSupportText = formData.get("blockedSupportText") as string;
+        const blockedSupportUrl = formData.get("blockedSupportUrl") as string;
         const template = normalizeOption(formData.get("template") as string | null, ["modal", "top_bar", "bottom_bar"], "modal");
         const blockVpn = !isFreePlan && formData.get("blockVpn") === "true";
+
+        if ((blockedLogoUrl && isDangerousUrl(blockedLogoUrl)) || (blockedSupportUrl && isDangerousUrl(blockedSupportUrl))) {
+            return json({ success: false, message: "Blocked page URLs cannot use unsafe protocols" }, { status: 400 });
+        }
 
         await prisma.settings.upsert({
             where: { shop },
@@ -183,6 +210,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 cookieDuration,
                 blockedTitle,
                 blockedMessage,
+                blockedLogoUrl,
+                blockedBgColor: normalizeHexColor(blockedBgColor, "#111827"),
+                blockedTextColor: normalizeHexColor(blockedTextColor, "#ffffff"),
+                blockedAccentColor: normalizeHexColor(blockedAccentColor, "#2563eb"),
+                blockedSupportText,
+                blockedSupportUrl,
                 blockVpn,
             },
             create: {
@@ -202,6 +235,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 cookieDuration,
                 blockedTitle,
                 blockedMessage,
+                blockedLogoUrl,
+                blockedBgColor: normalizeHexColor(blockedBgColor, "#111827"),
+                blockedTextColor: normalizeHexColor(blockedTextColor, "#ffffff"),
+                blockedAccentColor: normalizeHexColor(blockedAccentColor, "#2563eb"),
+                blockedSupportText,
+                blockedSupportUrl,
                 blockVpn,
             },
         });
@@ -234,6 +273,12 @@ export default function SettingsPage() {
     const [cookieDuration, setCookieDuration] = useState(settings.cookieDuration.toString());
     const [blockedTitle, setBlockedTitle] = useState(settings.blockedTitle || "Access Denied");
     const [blockedMessage, setBlockedMessage] = useState(settings.blockedMessage || "We do not offer services in your country/region.");
+    const [blockedLogoUrl, setBlockedLogoUrl] = useState(settings.blockedLogoUrl || "");
+    const [blockedBgColor, setBlockedBgColor] = useState(settings.blockedBgColor || "#111827");
+    const [blockedTextColor, setBlockedTextColor] = useState(settings.blockedTextColor || "#ffffff");
+    const [blockedAccentColor, setBlockedAccentColor] = useState(settings.blockedAccentColor || "#2563eb");
+    const [blockedSupportText, setBlockedSupportText] = useState(settings.blockedSupportText || "Contact support");
+    const [blockedSupportUrl, setBlockedSupportUrl] = useState(settings.blockedSupportUrl || "");
     const [blockVpn, setBlockVpn] = useState(settings.blockVpn);
 
     const isLoading = fetcher.state !== "idle";
@@ -261,13 +306,21 @@ export default function SettingsPage() {
         formData.append("cookieDuration", cookieDuration);
         formData.append("blockedTitle", blockedTitle);
         formData.append("blockedMessage", blockedMessage);
+        formData.append("blockedLogoUrl", blockedLogoUrl);
+        formData.append("blockedBgColor", blockedBgColor);
+        formData.append("blockedTextColor", blockedTextColor);
+        formData.append("blockedAccentColor", blockedAccentColor);
+        formData.append("blockedSupportText", blockedSupportText);
+        formData.append("blockedSupportUrl", blockedSupportUrl);
         formData.append("blockVpn", blockVpn.toString());
 
         fetcher.submit(formData, { method: "POST" });
     }, [
         mode, template, popupTitle, popupMessage, confirmBtnText, cancelBtnText,
         popupBgColor, popupTextColor, popupBtnColor, excludeBots, excludedIPs,
-        cookieDuration, fetcher, isEnabled, blockVpn, blockedTitle, blockedMessage
+        cookieDuration, fetcher, isEnabled, blockVpn, blockedTitle, blockedMessage,
+        blockedLogoUrl, blockedBgColor, blockedTextColor, blockedAccentColor,
+        blockedSupportText, blockedSupportUrl
     ]);
 
     const templateOptions = [
@@ -284,6 +337,9 @@ export default function SettingsPage() {
     const previewBgColor = normalizeHexColor(popupBgColor, "#ffffff");
     const previewTextColor = normalizeHexColor(popupTextColor, "#333333");
     const previewButtonColor = normalizeHexColor(popupBtnColor, "#007bff");
+    const blockedPreviewBgColor = normalizeHexColor(blockedBgColor, "#111827");
+    const blockedPreviewTextColor = normalizeHexColor(blockedTextColor, "#ffffff");
+    const blockedPreviewAccentColor = normalizeHexColor(blockedAccentColor, "#2563eb");
     const previewButtons = (
         <div className="settings-storefront-buttons">
             <button
@@ -365,6 +421,57 @@ export default function SettingsPage() {
                         <p>Bar templates appear at the top or bottom of the storefront and use less vertical space than the modal.</p>
                     </Banner>
                 )}
+            </BlockStack>
+        </Card>
+    );
+    const blockedPreviewMarkup = (
+        <Card>
+            <BlockStack gap="400">
+                <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Blocked page preview</Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                        Preview for visitors matched by a block rule.
+                    </Text>
+                </BlockStack>
+                <div className="settings-browser-shell">
+                    <div className="settings-browser-toolbar" aria-hidden="true">
+                        <span className="settings-browser-dot" />
+                        <span className="settings-browser-dot" />
+                        <span className="settings-browser-dot" />
+                        <div className="settings-browser-url">https://your-store.com</div>
+                    </div>
+                    <div
+                        className="settings-blocked-preview-canvas"
+                        style={{
+                            background: blockedPreviewBgColor,
+                            color: blockedPreviewTextColor,
+                        }}
+                    >
+                        <div className="settings-blocked-preview-card">
+                            {blockedLogoUrl ? (
+                                <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" />
+                            ) : (
+                                <div
+                                    className="settings-blocked-preview-shield"
+                                    style={{ borderColor: blockedPreviewAccentColor, color: blockedPreviewAccentColor }}
+                                >
+                                    !
+                                </div>
+                            )}
+                            <h3>{blockedTitle}</h3>
+                            <p>{blockedMessage}</p>
+                            {blockedSupportUrl && blockedSupportText ? (
+                                <button
+                                    type="button"
+                                    className="settings-blocked-preview-button"
+                                    style={{ background: blockedPreviewAccentColor }}
+                                >
+                                    {blockedSupportText}
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
             </BlockStack>
         </Card>
     );
@@ -623,6 +730,59 @@ export default function SettingsPage() {
                         background: transparent;
                         border: 1px solid currentColor;
                     }
+                    .settings-blocked-preview-canvas {
+                        min-height: 340px;
+                        padding: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .settings-blocked-preview-card {
+                        width: min(420px, 100%);
+                        padding: 28px;
+                        border-radius: 16px;
+                        border: 1px solid rgba(255, 255, 255, 0.16);
+                        background: rgba(255, 255, 255, 0.08);
+                        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+                        text-align: center;
+                    }
+                    .settings-blocked-preview-logo {
+                        max-width: 120px;
+                        max-height: 56px;
+                        object-fit: contain;
+                        margin-bottom: 18px;
+                    }
+                    .settings-blocked-preview-shield {
+                        width: 56px;
+                        height: 56px;
+                        margin: 0 auto 18px;
+                        border: 2px solid currentColor;
+                        border-radius: 999px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 28px;
+                        font-weight: 800;
+                    }
+                    .settings-blocked-preview-card h3 {
+                        margin: 0 0 12px;
+                        font-size: 22px;
+                        line-height: 1.2;
+                    }
+                    .settings-blocked-preview-card p {
+                        margin: 0;
+                        font-size: 14px;
+                        line-height: 1.55;
+                        opacity: 0.86;
+                    }
+                    .settings-blocked-preview-button {
+                        margin-top: 20px;
+                        border: 0;
+                        border-radius: 8px;
+                        padding: 11px 18px;
+                        color: #ffffff;
+                        font-weight: 700;
+                    }
                     @container (max-width: 720px) {
                         .settings-preview-canvas {
                             --settings-preview-scale: 0.6;
@@ -864,6 +1024,51 @@ export default function SettingsPage() {
                                                         multiline={2}
                                                         autoComplete="off"
                                                     />
+                                                    <TextField
+                                                        label="Logo URL"
+                                                        value={blockedLogoUrl}
+                                                        onChange={setBlockedLogoUrl}
+                                                        placeholder="https://your-store.com/logo.png"
+                                                        helpText="Optional. Leave empty to show the default alert icon."
+                                                        autoComplete="off"
+                                                    />
+                                                    <div className="settings-color-grid">
+                                                        <ColorPickerField
+                                                            label="Background"
+                                                            value={blockedBgColor}
+                                                            onChange={setBlockedBgColor}
+                                                            fallback="#111827"
+                                                        />
+                                                        <ColorPickerField
+                                                            label="Text"
+                                                            value={blockedTextColor}
+                                                            onChange={setBlockedTextColor}
+                                                            fallback="#ffffff"
+                                                        />
+                                                        <ColorPickerField
+                                                            label="Button / Icon"
+                                                            value={blockedAccentColor}
+                                                            onChange={setBlockedAccentColor}
+                                                            fallback="#2563eb"
+                                                        />
+                                                    </div>
+                                                    <div className="settings-two-field-grid">
+                                                        <TextField
+                                                            label="Support Button Text"
+                                                            value={blockedSupportText}
+                                                            onChange={setBlockedSupportText}
+                                                            placeholder="Contact support"
+                                                            autoComplete="off"
+                                                        />
+                                                        <TextField
+                                                            label="Support Button URL"
+                                                            value={blockedSupportUrl}
+                                                            onChange={setBlockedSupportUrl}
+                                                            placeholder="mailto:support@example.com or /pages/contact"
+                                                            helpText="Optional. Hide the button by leaving this blank."
+                                                            autoComplete="off"
+                                                        />
+                                                    </div>
                                                 </BlockStack>
                                             </Card>
                                         )}
@@ -947,7 +1152,10 @@ export default function SettingsPage() {
                                 </div>
                                 {isEnabled && (
                                     <div className="settings-preview-sidebar">
-                                        {previewMarkup}
+                                        <BlockStack gap="400">
+                                            {previewMarkup}
+                                            {blockedPreviewMarkup}
+                                        </BlockStack>
                                     </div>
                                 )}
                             </div>

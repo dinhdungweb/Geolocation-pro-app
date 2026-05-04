@@ -1,0 +1,2 @@
+ALTER TABLE "RedirectRule"
+ADD COLUMN IF NOT EXISTS "marketHandles" TEXT NOT NULL DEFAULT '';

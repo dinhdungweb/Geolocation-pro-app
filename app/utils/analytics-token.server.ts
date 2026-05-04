@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 export type StorefrontAction = "none" | "popup" | "auto_redirect" | "block";
-export type RuleSource = "country" | "ip" | "vpn";
+export type RuleSource = "country" | "ip" | "market" | "vpn";
 
 export interface AnalyticsTokenPayload {
   shop: string;

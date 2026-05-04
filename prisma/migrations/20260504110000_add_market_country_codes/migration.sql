@@ -1,0 +1,2 @@
+ALTER TABLE "RedirectRule"
+ADD COLUMN IF NOT EXISTS "marketCountryCodes" TEXT NOT NULL DEFAULT '';

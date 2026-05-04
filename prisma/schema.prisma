@@ -44,6 +44,8 @@ model RedirectRule {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   ipAddresses       String   @default("")
+  marketHandles     String   @default("")
+  marketCountryCodes String  @default("")
   matchType         String   @default("country")
   redirectMode      String   @default("popup")
   pagePaths         String?
@@ -67,6 +69,12 @@ model Settings {
   popupBtnColor      String   @default("#007bff")
   blockedTitle       String   @default("Access Denied")
   blockedMessage     String   @default("We do not offer services in your country/region.")
+  blockedLogoUrl     String   @default("")
+  blockedBgColor     String   @default("#111827")
+  blockedTextColor   String   @default("#ffffff")
+  blockedAccentColor String   @default("#2563eb")
+  blockedSupportText String   @default("Contact support")
+  blockedSupportUrl  String   @default("")
   excludeBots        Boolean  @default(true)
   excludedIPs        String   @default("")
   cookieDuration     Int      @default(7)

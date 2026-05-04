@@ -32,13 +32,11 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
+import { detectRuleConflicts } from "../utils/rule-conflicts";
+import { getShopifyMarkets } from "../utils/shopify-markets.server";
+import { isBillingTestMode } from "../utils/billing-mode.server";
 
 import { COUNTRY_MAP } from "../utils/countries";
-
-// Complete ISO 3166-1 alpha-2 country list
-// Complete ISO 3166-1 alpha-2 country list
-const ALL_COUNTRIES = Object.entries(COUNTRY_MAP).map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
 
 const REGIONS: Record<string, string[]> = {
     "North America": ["CA", "US", "MX", "BM", "GL", "PM"],
@@ -71,11 +69,15 @@ const REGIONS: Record<string, string[]> = {
     ],
     "Other": ["AQ", "BV", "CC", "CX", "HM", "IO", "TF", "UM"]
 };
+const ALL_REGION_COUNTRY_CODES = Array.from(new Set(Object.values(REGIONS).flat()));
 
 interface RedirectRule {
     id: string;
     name: string;
     countryCodes: string;
+    marketHandles: string;
+    marketCountryCodes: string;
+    matchType: string;
     targetUrl: string;
     isActive: boolean;
     priority: number;
@@ -104,19 +106,32 @@ function isPaidBillingConfig(billingConfig: any) {
     return billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 }
 
-function isFreePlanFeatureRequest(ruleType: string, pageTargetingType: string) {
-    return ruleType === "block" || pageTargetingType !== "all";
+function isFreePlanFeatureRequest(ruleType: string, pageTargetingType: string, matchType = "country") {
+    return ruleType === "block" || pageTargetingType !== "all" || matchType === "market";
+}
+
+function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConflicts>[]) {
+    return summaries.reduce(
+        (merged, summary) => {
+            merged.total += summary.total;
+            Object.entries(summary.byRuleId).forEach(([ruleId, conflicts]) => {
+                merged.byRuleId[ruleId] = [...(merged.byRuleId[ruleId] || []), ...conflicts];
+            });
+            return merged;
+        },
+        { total: 0, byRuleId: {} as Record<string, any[]> },
+    );
 }
 
 // Loader: Fetch all rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session, billing } = await authenticate.admin(request);
+    const { session, billing, admin } = await authenticate.admin(request);
     const shop = session.shop;
 
-    const rules = await prisma.redirectRule.findMany({
+    let rules = await prisma.redirectRule.findMany({
         where: {
             shop,
-            matchType: "country",
+            matchType: { in: ["country", "market"] },
         },
         orderBy: { priority: "desc" },
     });
@@ -124,11 +139,55 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Check for active subscription
     const billingConfig = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: false,
+        isTest: isBillingTestMode(),
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+    const marketsResult = await getShopifyMarkets(admin);
+    const marketCountriesByHandle = new Map(
+        marketsResult.markets.map((market) => [market.handle, market.countryCodes] as const),
+    );
+    const marketRuleBackfills = rules
+        .filter((rule) => rule.matchType === "market" && !rule.marketCountryCodes)
+        .map((rule) => {
+            const countryCodes = Array.from(new Set(
+                (rule.marketHandles || "")
+                    .split(",")
+                    .map((handle) => handle.trim())
+                    .filter(Boolean)
+                    .flatMap((handle) => marketCountriesByHandle.get(handle) || []),
+            ));
+            return { rule, countryCodes };
+        })
+        .filter((item) => item.countryCodes.length > 0);
 
-    return json({ rules, shop, hasProPlan });
+    if (marketRuleBackfills.length > 0) {
+        await Promise.all(
+            marketRuleBackfills.map(({ rule, countryCodes }) =>
+                prisma.redirectRule.update({
+                    where: { id: rule.id },
+                    data: { marketCountryCodes: countryCodes.join(",") },
+                }),
+            ),
+        );
+        rules = rules.map((rule) => {
+            const backfill = marketRuleBackfills.find((item) => item.rule.id === rule.id);
+            return backfill ? { ...rule, marketCountryCodes: backfill.countryCodes.join(",") } : rule;
+        });
+    }
+
+    const conflictSummary = mergeConflictSummaries(
+        detectRuleConflicts(rules, "country"),
+        detectRuleConflicts(rules, "market"),
+    );
+
+    return json({
+        rules,
+        shop,
+        hasProPlan,
+        conflictSummary,
+        markets: marketsResult.markets,
+        marketsError: marketsResult.error,
+    });
 };
 
 // Action: Handle CRUD operations
@@ -141,13 +200,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
         const billingConfig = await billing.check({
             plans: ALL_PAID_PLANS as any,
-            isTest: false,
+            isTest: isBillingTestMode(),
         });
         const hasProPlan = isPaidBillingConfig(billingConfig);
 
         if (intent === "create") {
             const name = formData.get("name") as string;
+            const matchType = normalizeOption(formData.get("matchType") as string | null, ["country", "market"], "country");
             const countryCodes = formData.get("countryCodes") as string;
+            const marketHandles = formData.get("marketHandles") as string;
+            const marketCountryCodes = formData.get("marketCountryCodes") as string;
             const targetUrl = formData.get("targetUrl") as string;
             if (!validateUrl(targetUrl)) {
                 return json({ success: false, message: "Invalid URL format" }, { status: 400 });
@@ -163,21 +225,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = formData.get("pagePaths") as string || "";
 
-            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType)) {
+            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType, matchType)) {
                 return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
+            }
+            if (matchType === "country" && !countryCodes) {
+                return json({ success: false, message: "Select at least one country" }, { status: 400 });
+            }
+            if (matchType === "market" && !marketHandles) {
+                return json({ success: false, message: "Select at least one Shopify Market" }, { status: 400 });
             }
  
             await prisma.redirectRule.create({
                 data: {
                     shop,
                     name,
-                    countryCodes,
+                    countryCodes: matchType === "country" ? countryCodes : "",
+                    marketHandles: matchType === "market" ? marketHandles : "",
+                    marketCountryCodes: matchType === "market" ? marketCountryCodes : "",
                     targetUrl,
                     priority,
                     isActive: true,
                     ruleType,
                     redirectMode,
-                    matchType: "country", // Mark as country rule
+                    matchType,
                     scheduleEnabled,
                     startTime,
                     endTime,
@@ -193,7 +263,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "update") {
             const id = formData.get("id") as string;
             const name = formData.get("name") as string;
+            const matchType = normalizeOption(formData.get("matchType") as string | null, ["country", "market"], "country");
             const countryCodes = formData.get("countryCodes") as string;
+            const marketHandles = formData.get("marketHandles") as string;
+            const marketCountryCodes = formData.get("marketCountryCodes") as string;
             const targetUrl = formData.get("targetUrl") as string;
             if (!validateUrl(targetUrl)) {
                 return json({ success: false, message: "Invalid URL format" }, { status: 400 });
@@ -209,15 +282,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = formData.get("pagePaths") as string || "";
 
-            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType)) {
+            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType, matchType)) {
                 return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
+            }
+            if (matchType === "country" && !countryCodes) {
+                return json({ success: false, message: "Select at least one country" }, { status: 400 });
+            }
+            if (matchType === "market" && !marketHandles) {
+                return json({ success: false, message: "Select at least one Shopify Market" }, { status: 400 });
             }
 
             await prisma.redirectRule.update({
                 where: { id, shop },
                 data: {
                     name,
-                    countryCodes,
+                    countryCodes: matchType === "country" ? countryCodes : "",
+                    marketHandles: matchType === "market" ? marketHandles : "",
+                    marketCountryCodes: matchType === "market" ? marketCountryCodes : "",
+                    matchType,
                     targetUrl,
                     priority,
                     ruleType,
@@ -240,10 +322,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             if (!hasProPlan && !isActive) {
                 const rule = await prisma.redirectRule.findFirst({
-                    where: { id, shop, matchType: "country" },
-                    select: { ruleType: true, pageTargetingType: true },
+                    where: { id, shop, matchType: { in: ["country", "market"] } },
+                    select: { ruleType: true, pageTargetingType: true, matchType: true },
                 });
-                if (rule && isFreePlanFeatureRequest(rule.ruleType, rule.pageTargetingType || "all")) {
+                if (rule && isFreePlanFeatureRequest(rule.ruleType, rule.pageTargetingType || "all", rule.matchType)) {
                     return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
                 }
             }
@@ -286,20 +368,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             let created = 0;
             for (const rule of importedRules) {
-                if (!rule.name || !rule.countryCodes) continue;
+                const matchType = normalizeOption(rule.matchType, ["country", "market"], "country");
+                const countryCodes = rule.countryCodes || "";
+                const marketHandles = rule.marketHandles || "";
+                const marketCountryCodes = rule.marketCountryCodes || "";
+                if (!rule.name) continue;
+                if (matchType === "country" && !countryCodes) continue;
+                if (matchType === "market" && !marketHandles) continue;
                 if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
 
                 await prisma.redirectRule.create({
                     data: {
                         shop,
                         name: rule.name,
-                        countryCodes: rule.countryCodes || "",
+                        countryCodes: matchType === "country" ? countryCodes : "",
+                        marketHandles: matchType === "market" ? marketHandles : "",
+                        marketCountryCodes: matchType === "market" ? marketCountryCodes : "",
                         targetUrl: rule.targetUrl || "",
                         priority: parseInt(rule.priority) || 0,
                         isActive: rule.isActive !== false,
                         ruleType: normalizeOption(rule.ruleType, ["redirect", "block"], "redirect"),
                         redirectMode: normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
-                        matchType: "country",
+                        matchType,
                         scheduleEnabled: rule.scheduleEnabled || false,
                         startTime: rule.startTime || null,
                         endTime: rule.endTime || null,
@@ -325,7 +415,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 const REVIEW_PROMPTED_KEY = "geo_review_prompted";
 
 export default function RulesPage() {
-    const { rules, hasProPlan } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan, conflictSummary, markets, marketsError } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
@@ -366,7 +456,9 @@ export default function RulesPage() {
 
     // Form state
     const [formName, setFormName] = useState("");
+    const [formMatchType, setFormMatchType] = useState("country");
     const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+    const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
@@ -392,17 +484,55 @@ export default function RulesPage() {
 
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(rules);
+    const conflictsByRuleId = conflictSummary?.byRuleId || {};
+    const conflictTotal = conflictSummary?.total || 0;
 
     // Get country label from code
     const getCountryLabel = (code: string) => {
         return COUNTRY_MAP[code] || code;
+    };
+    const marketLabelByHandle = markets.reduce((labels: Record<string, string>, market: any) => {
+        labels[market.handle] = market.name || market.handle;
+        return labels;
+    }, {});
+    const marketCountryCodesByHandle = markets.reduce((items: Record<string, string[]>, market: any) => {
+        items[market.handle] = Array.isArray(market.countryCodes) ? market.countryCodes : [];
+        return items;
+    }, {});
+    const getMarketCountryCount = (handle: string, rule?: any) => {
+        const liveCount = marketCountryCodesByHandle[handle]?.length || 0;
+        if (liveCount > 0) return liveCount;
+
+        const ruleMarketHandles = (rule?.marketHandles || "")
+            .split(",")
+            .map((value: string) => value.trim())
+            .filter(Boolean);
+        if (ruleMarketHandles.length === 1 && ruleMarketHandles[0] === handle) {
+            return (rule?.marketCountryCodes || "")
+                .split(",")
+                .map((value: string) => value.trim())
+                .filter(Boolean).length;
+        }
+
+        return 0;
+    };
+    const formatMarketLabel = (handle: string, rule?: any) => {
+        const label = marketLabelByHandle[handle] || handle;
+        const countryCount = getMarketCountryCount(handle, rule);
+        return countryCount > 1 ? `${label} (${countryCount} countries)` : label;
+    };
+    const formatMarketOptionLabel = (market: any) => {
+        const countryCount = Array.isArray(market.countryCodes) ? market.countryCodes.length : 0;
+        return countryCount > 1 ? `${market.label} (${countryCount} countries)` : market.label;
     };
 
     // Reset form when modal opens/closes
     useEffect(() => {
         if (editingRule) {
             setFormName(editingRule.name);
+            setFormMatchType(editingRule.matchType || "country");
             setSelectedCountries(editingRule.countryCodes.split(",").map(c => c.trim()).filter(Boolean));
+            setSelectedMarkets((editingRule.marketHandles || "").split(",").map(c => c.trim()).filter(Boolean));
             setFormTargetUrl(editingRule.targetUrl);
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "redirect");
@@ -417,7 +547,9 @@ export default function RulesPage() {
             setExpandedRegions([]); // Reset expansion
         } else {
             setFormName("");
+            setFormMatchType("country");
             setSelectedCountries([]);
+            setSelectedMarkets([]);
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("redirect");
@@ -449,7 +581,18 @@ export default function RulesPage() {
         formData.append("intent", editingRule ? "update" : "create");
         if (editingRule) formData.append("id", editingRule.id);
         formData.append("name", formName);
+        formData.append("matchType", formMatchType);
         formData.append("countryCodes", selectedCountries.join(","));
+        formData.append("marketHandles", selectedMarkets.join(","));
+        const selectedMarketCountryCodes = Array.from(new Set(
+            selectedMarkets.flatMap((handle) => marketCountryCodesByHandle[handle] || []),
+        ));
+        formData.append(
+            "marketCountryCodes",
+            selectedMarketCountryCodes.length > 0
+                ? selectedMarketCountryCodes.join(",")
+                : editingRule?.marketCountryCodes || "",
+        );
         formData.append("targetUrl", formTargetUrl);
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
@@ -465,7 +608,7 @@ export default function RulesPage() {
         fetcher.submit(formData, { method: "POST" });
         handleCloseModal();
     }, [
-        editingRule, formName, selectedCountries, formTargetUrl, formPriority,
+        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, marketCountryCodesByHandle, formTargetUrl, formPriority,
         formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
         pageTargetingType, pagePaths,
         fetcher, handleCloseModal
@@ -497,7 +640,7 @@ export default function RulesPage() {
             return;
         }
         if (region === "ALL") {
-            setSelectedCountries(ALL_COUNTRIES.map(c => c.value));
+            setSelectedCountries(ALL_REGION_COUNTRY_CODES);
             return;
         }
         // Add countries from region that aren't already selected
@@ -533,6 +676,14 @@ export default function RulesPage() {
         }
     };
 
+    const toggleMarketSelection = (marketHandle: string) => {
+        if (selectedMarkets.includes(marketHandle)) {
+            setSelectedMarkets(selectedMarkets.filter(handle => handle !== marketHandle));
+        } else {
+            setSelectedMarkets([...selectedMarkets, marketHandle]);
+        }
+    };
+
     // --- Export Rules ---
     const handleExportRules = useCallback((exportAll: boolean) => {
         const rulesToExport = exportAll
@@ -541,7 +692,10 @@ export default function RulesPage() {
 
         const exportData = rulesToExport.map((rule: any) => ({
             name: rule.name,
+            matchType: rule.matchType,
             countryCodes: rule.countryCodes,
+            marketHandles: rule.marketHandles,
+            marketCountryCodes: rule.marketCountryCodes,
             targetUrl: rule.targetUrl,
             isActive: rule.isActive,
             priority: rule.priority,
@@ -601,8 +755,23 @@ export default function RulesPage() {
             onAction: () => handleExportRules(false),
         }] : []),
     ];
+    const selectedTargetCount = formMatchType === "market" ? selectedMarkets.length : selectedCountries.length;
+    const isPaidOnlyRule = (rule: any) =>
+        rule.ruleType === "block" || rule.matchType === "market" || (rule.pageTargetingType || "all") !== "all";
 
-    const rowMarkup = rules.map((rule: any, index: number) => (
+    const rowMarkup = rules.map((rule: any, index: number) => {
+        const ruleConflicts = conflictsByRuleId[rule.id] || [];
+        const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
+        const conflictTooltip = ruleConflicts
+            .slice(0, 3)
+            .map((item: any) => `${item.message} (${item.scope})`)
+            .join("\n");
+        const targetValues = (rule.matchType === "market" ? rule.marketHandles : rule.countryCodes)
+            .split(",")
+            .map((value: string) => value.trim())
+            .filter(Boolean);
+
+        return (
         <IndexTable.Row
             id={rule.id}
             key={rule.id}
@@ -611,52 +780,80 @@ export default function RulesPage() {
             onClick={() => handleOpenModal(rule)}
         >
             <IndexTable.Cell>
-                <Text variant="bodyMd" fontWeight="bold" as="span">
-                    {rule.name}
-                </Text>
+                <div style={{ minWidth: "120px" }}>
+                    <InlineStack gap="100" blockAlign="center" wrap={false}>
+                        <Text variant="bodyMd" fontWeight="bold" as="span">
+                            {rule.name}
+                        </Text>
+                        {ruleConflicts.length > 0 && (
+                            <Tooltip content={conflictTooltip}>
+                                <Badge tone={conflictTone}>
+                                    {`${ruleConflicts.length} conflict${ruleConflicts.length === 1 ? "" : "s"}`}
+                                </Badge>
+                            </Tooltip>
+                        )}
+                    </InlineStack>
+                </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <InlineStack gap="100" wrap={false}>
-                    {rule.countryCodes.split(",").slice(0, 3).map((code: string) => (
-                        <Badge key={code} tone="info">{code.trim()}</Badge>
-                    ))}
-                    {rule.countryCodes.split(",").length > 3 && (
-                        <Badge>{`+${rule.countryCodes.split(",").length - 3}`}</Badge>
-                    )}
-                </InlineStack>
+                <div style={{ minWidth: "64px" }}>
+                    <Badge tone={rule.matchType === "market" ? "attention" : "info"}>
+                        {rule.matchType === "market" ? "Market" : "Country"}
+                    </Badge>
+                </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <Text as="span" variant="bodyMd" truncate>
-                    {rule.ruleType === "block" ? (
-                        <Badge tone="critical">Access Blocked</Badge>
+                <div style={{ minWidth: "300px" }}>
+                    <InlineStack gap="100" wrap={false}>
+                        {targetValues.slice(0, 3).map((value: string) => (
+                            <Badge key={value} tone={rule.matchType === "market" ? "attention" : "info"}>
+                                {rule.matchType === "market" ? formatMarketLabel(value, rule) : value}
+                            </Badge>
+                        ))}
+                        {targetValues.length > 3 && (
+                            <Badge>{`+${targetValues.length - 3}`}</Badge>
+                        )}
+                    </InlineStack>
+                </div>
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+                <div style={{ minWidth: "180px" }}>
+                    <Text as="span" variant="bodyMd" truncate>
+                        {rule.ruleType === "block" ? (
+                            <Badge tone="critical">Access Blocked</Badge>
+                        ) : (
+                            rule.targetUrl
+                        )}
+                    </Text>
+                </div>
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+                <div style={{ minWidth: "64px" }}>
+                    {rule.isActive && isPaidOnlyRule(rule) && !hasProPlan ? (
+                        <Badge tone="warning">Disabled (Free Plan)</Badge>
                     ) : (
-                        rule.targetUrl
+                        <Badge tone={rule.isActive ? "success" : "critical"}>
+                            {rule.isActive ? "Active" : "Inactive"}
+                        </Badge>
                     )}
-                </Text>
+                </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                {rule.isActive && rule.ruleType === "block" && !hasProPlan ? (
-                    <Badge tone="warning">Disabled (Free Plan)</Badge>
-                ) : (
-                    <Badge tone={rule.isActive ? "success" : "critical"}>
-                        {rule.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                )}
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                {rule.ruleType === 'redirect' ? (
-                    <Badge tone={rule.redirectMode === 'auto_redirect' ? 'warning' : 'info'}>
-                        {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
-                    </Badge>
-                ) : (
-                    <Badge tone="critical">Block</Badge>
-                )}
+                <div style={{ minWidth: "110px" }}>
+                    {rule.ruleType === 'redirect' ? (
+                        <Badge tone={rule.redirectMode === 'auto_redirect' ? 'warning' : 'info'}>
+                            {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
+                        </Badge>
+                    ) : (
+                        <Badge tone="critical">Block</Badge>
+                    )}
+                </div>
             </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
             <IndexTable.Cell>
                 <div
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: "flex", justifyContent: "flex-end" }}
+                    style={{ display: "flex", justifyContent: "flex-end", minWidth: "124px" }}
                 >
                     <InlineStack gap="200" wrap={false}>
                         <Button size="slim" onClick={() => handleOpenModal(rule)}>
@@ -670,7 +867,7 @@ export default function RulesPage() {
                             <Button
                                 size="slim"
                                 onClick={() => {
-                                    if (rule.ruleType === "block" && !hasProPlan) {
+                                    if (isPaidOnlyRule(rule) && !hasProPlan) {
                                         // Show upgrade modal instead of enabling
                                         setShowUpgradeModal(true);
                                     } else {
@@ -685,7 +882,8 @@ export default function RulesPage() {
                 </div>
             </IndexTable.Cell>
         </IndexTable.Row>
-    ));
+        );
+    });
 
     const emptyStateMarkup = (
         <EmptyState
@@ -694,15 +892,38 @@ export default function RulesPage() {
             image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
         >
             <BlockStack gap="400">
-                <p>Set up rules to redirect customers based on their location.</p>
+                <p>Set up rules to redirect or block customers by country or Shopify Market.</p>
             </BlockStack>
         </EmptyState>
     );
 
     return (
-        <Page>
+        <Page fullWidth>
             <TitleBar title="Geolocation Rules">
             </TitleBar>
+            <style>
+                {`
+                    .country-selector-scroll {
+                        scrollbar-color: #8a8f93 transparent;
+                        scrollbar-width: thin;
+                    }
+                    .country-selector-scroll::-webkit-scrollbar {
+                        width: 8px;
+                    }
+                    .country-selector-scroll::-webkit-scrollbar-track {
+                        background: transparent;
+                        border-radius: 999px;
+                    }
+                    .country-selector-scroll::-webkit-scrollbar-thumb {
+                        background: #8a8f93;
+                        border: 2px solid #ffffff;
+                        border-radius: 999px;
+                    }
+                    .country-selector-scroll::-webkit-scrollbar-thumb:hover {
+                        background: #6d7175;
+                    }
+                `}
+            </style>
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -751,6 +972,11 @@ export default function RulesPage() {
                 </InlineStack>
             </div>
             <BlockStack gap="500">
+                {conflictTotal > 0 && (
+                    <Banner tone="warning" title={`${conflictTotal} potential rule conflict${conflictTotal === 1 ? "" : "s"} found`}>
+                        <p>Active rules with overlapping countries or markets, pages, schedules, and the same priority can conflict. Open the marked rules and adjust priority or targeting.</p>
+                    </Banner>
+                )}
                 <Layout>
                     <Layout.Section>
                         <Card padding="0">
@@ -767,7 +993,8 @@ export default function RulesPage() {
                                     onSelectionChange={handleSelectionChange}
                                     headings={[
                                         { title: "Name" },
-                                        { title: "Countries" },
+                                        { title: "Type" },
+                                        { title: "Target" },
                                         { title: "Target URL" },
                                         { title: "Status" },
                                         { title: "Method" },
@@ -792,7 +1019,7 @@ export default function RulesPage() {
                 primaryAction={{
                     content: editingRule ? "Save" : "Create",
                     onAction: handleSubmit,
-                    disabled: selectedCountries.length === 0 || !formName || (formRuleType === "redirect" && !formTargetUrl),
+                    disabled: selectedTargetCount === 0 || !formName || (formRuleType === "redirect" && !formTargetUrl),
                 }}
                 secondaryActions={[
                     {
@@ -811,79 +1038,187 @@ export default function RulesPage() {
                             autoComplete="off"
                         />
 
-                        {/* Hierarchical Country Selector */}
-                        <BlockStack gap="200">
-                            <Text as="p" variant="bodySm">Countries</Text>
-
-                            {/* Search and Bulk Actions */}
-                            <TextField
-                                label="Search countries/regions"
-                                labelHidden
-                                placeholder="Search countries..."
-                                value={inputValue}
-                                onChange={setInputValue}
-                                prefix={<Icon source={SearchIcon} />}
-                                autoComplete="off"
+                        <BlockStack gap="300">
+                            <ChoiceList
+                                title="Target visitors by"
+                                choices={[
+                                    { label: "Country", value: "country" },
+                                    {
+                                        label: (
+                                            <InlineStack gap="200">
+                                                <span>Shopify Market</span>
+                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
+                                            </InlineStack>
+                                        ),
+                                        value: "market",
+                                        disabled: !hasProPlan,
+                                    },
+                                ]}
+                                selected={[formMatchType]}
+                                onChange={(value) => {
+                                    if (value[0] === "market" && !hasProPlan) {
+                                        setShowUpgradeModal(true);
+                                        return;
+                                    }
+                                    setFormMatchType(value[0]);
+                                }}
                             />
 
-                            <InlineStack gap="200">
-                                <Button size="slim" onClick={() => handleBulkSelect("ALL")}>Select All</Button>
-                                <Button size="slim" onClick={() => handleBulkSelect("CLEAR")}>Clear All</Button>
-                            </InlineStack>
+                            {formMatchType === "country" ? (
+                                <BlockStack gap="300">
+                                    <InlineStack align="space-between" blockAlign="center">
+                                        <Text as="p" variant="bodySm" fontWeight="semibold">Countries</Text>
+                                        <Badge tone={selectedCountries.length > 0 ? "success" : "attention"}>
+                                            {`${selectedCountries.length} selected`}
+                                        </Badge>
+                                    </InlineStack>
 
-                            {/* Tree View */}
-                            <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dfe3e8', borderRadius: '4px', padding: '8px' }}>
-                                {Object.entries(REGIONS).map(([regionName, codes]) => {
-                                    // Filter logic
-                                    const matchingCountryCodes = codes.filter(code => {
-                                        if (!inputValue) return true;
-                                        const label = getCountryLabel(code).toLowerCase();
-                                        const region = regionName.toLowerCase();
-                                        const search = inputValue.toLowerCase();
-                                        return label.includes(search) || code.toLowerCase().includes(search) || region.includes(search);
-                                    });
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: smUp ? "minmax(0, 1fr) auto" : "1fr",
+                                            gap: "8px",
+                                            alignItems: "stretch",
+                                        }}
+                                    >
+                                        <TextField
+                                            label="Search countries/regions"
+                                            labelHidden
+                                            placeholder="Search countries..."
+                                            value={inputValue}
+                                            onChange={setInputValue}
+                                            prefix={<Icon source={SearchIcon} />}
+                                            autoComplete="off"
+                                        />
 
-                                    if (matchingCountryCodes.length === 0) return null;
-
-                                    const isAllSelected = matchingCountryCodes.every(c => selectedCountries.includes(c));
-                                    const isSomeSelected = matchingCountryCodes.some(c => selectedCountries.includes(c));
-                                    const isIndeterminate = isSomeSelected && !isAllSelected;
-                                    const isExpanded = expandedRegions.includes(regionName) || !!inputValue; // Auto expand on search
-
-                                    return (
-                                        <div key={regionName} style={{ marginBottom: '4px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0' }}>
-                                                <div onClick={() => toggleRegionExpansion(regionName)} style={{ cursor: 'pointer', marginRight: '4px' }}>
-                                                    <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
-                                                </div>
-                                                <Checkbox
-                                                    label={regionName}
-                                                    checked={isIndeterminate ? "indeterminate" : isAllSelected}
-                                                    onChange={() => toggleRegionSelection(regionName as any)}
-                                                />
-                                            </div>
-
-                                            {isExpanded && (
-                                                <div style={{ paddingLeft: '28px' }}>
-                                                    {matchingCountryCodes.map(code => (
-                                                        <div key={code} style={{ padding: '2px 0' }}>
-                                                            <Checkbox
-                                                                label={`${getCountryLabel(code)} (${code})`}
-                                                                checked={selectedCountries.includes(code)}
-                                                                onChange={() => toggleCountrySelection(code)}
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                        <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                                            <Button onClick={() => handleBulkSelect("ALL")}>Select All</Button>
+                                            <Button onClick={() => handleBulkSelect("CLEAR")}>Clear All</Button>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
 
-                            <Text as="p" variant="bodySm" tone="subdued">
-                                Selected: {selectedCountries.length} countries
-                            </Text>
+                                    <div className="country-selector-scroll" style={{ maxHeight: '340px', overflowY: 'auto', border: '1px solid #dfe3e8', borderRadius: '8px', padding: '6px', background: '#ffffff' }}>
+                                        {Object.entries(REGIONS).map(([regionName, codes]) => {
+                                            const matchingCountryCodes = codes.filter(code => {
+                                                if (!inputValue) return true;
+                                                const label = getCountryLabel(code).toLowerCase();
+                                                const region = regionName.toLowerCase();
+                                                const search = inputValue.toLowerCase();
+                                                return label.includes(search) || code.toLowerCase().includes(search) || region.includes(search);
+                                            });
+
+                                            if (matchingCountryCodes.length === 0) return null;
+
+                                            const isAllSelected = matchingCountryCodes.every(c => selectedCountries.includes(c));
+                                            const isSomeSelected = matchingCountryCodes.some(c => selectedCountries.includes(c));
+                                            const isIndeterminate = isSomeSelected && !isAllSelected;
+                                            const isExpanded = expandedRegions.includes(regionName) || !!inputValue;
+                                            const selectedInRegion = matchingCountryCodes.filter(c => selectedCountries.includes(c)).length;
+
+                                            return (
+                                                <div key={regionName} style={{ marginBottom: '4px' }}>
+                                                    <div
+                                                        style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: '24px minmax(0, 1fr) auto',
+                                                            alignItems: 'center',
+                                                            gap: '8px',
+                                                            padding: '6px 8px',
+                                                            borderRadius: '6px',
+                                                            background: isExpanded ? '#f6f6f7' : 'transparent',
+                                                        }}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${regionName}`}
+                                                            onClick={() => toggleRegionExpansion(regionName)}
+                                                            style={{
+                                                                alignItems: 'center',
+                                                                background: 'transparent',
+                                                                border: 0,
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                height: '24px',
+                                                                justifyContent: 'center',
+                                                                padding: 0,
+                                                                width: '24px',
+                                                            }}
+                                                        >
+                                                            <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
+                                                        </button>
+                                                        <Checkbox
+                                                            label={regionName}
+                                                            checked={isIndeterminate ? "indeterminate" : isAllSelected}
+                                                            onChange={() => toggleRegionSelection(regionName as any)}
+                                                        />
+                                                        <Text as="span" variant="bodySm" tone="subdued">
+                                                            {`${selectedInRegion}/${matchingCountryCodes.length}`}
+                                                        </Text>
+                                                    </div>
+
+                                                    {isExpanded && (
+                                                        <div
+                                                            style={{
+                                                                display: 'grid',
+                                                                gap: '2px 12px',
+                                                                gridTemplateColumns: smUp ? 'repeat(2, minmax(0, 1fr))' : '1fr',
+                                                                padding: '6px 8px 8px 40px',
+                                                            }}
+                                                        >
+                                                            {matchingCountryCodes.map(code => (
+                                                                <div key={code} style={{ padding: '2px 0' }}>
+                                                                    <Checkbox
+                                                                        label={`${getCountryLabel(code)} (${code})`}
+                                                                        checked={selectedCountries.includes(code)}
+                                                                        onChange={() => toggleCountrySelection(code)}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </BlockStack>
+                            ) : (
+                                <BlockStack gap="300">
+                                    <InlineStack align="space-between" blockAlign="center">
+                                        <Text as="p" variant="bodySm" fontWeight="semibold">Shopify Markets</Text>
+                                        <Badge tone={selectedMarkets.length > 0 ? "success" : "attention"}>
+                                            {`${selectedMarkets.length} selected`}
+                                        </Badge>
+                                    </InlineStack>
+                                    {markets.length > 0 ? (
+                                        <>
+                                            <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                                                <Button onClick={() => setSelectedMarkets(markets.map((market: any) => market.handle))}>Select All</Button>
+                                                <Button onClick={() => setSelectedMarkets([])}>Clear All</Button>
+                                            </div>
+                                            <div style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid #dfe3e8', borderRadius: '8px', padding: '6px', background: '#ffffff' }}>
+                                                {markets.map((market: any) => (
+                                                    <div key={market.id} style={{ padding: '6px 8px', borderRadius: '6px' }}>
+                                                        <Checkbox
+                                                            label={formatMarketOptionLabel(market)}
+                                                            checked={selectedMarkets.includes(market.handle)}
+                                                            onChange={() => toggleMarketSelection(market.handle)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <Banner tone="info">
+                                            <p>Shopify Markets could not be loaded. The app may need the read_markets scope, or this shop may not have markets configured.</p>
+                                        </Banner>
+                                    )}
+                                    {marketsError && (
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            {marketsError}
+                                        </Text>
+                                    )}
+                                </BlockStack>
+                            )}
                         </BlockStack>
 
                         <BlockStack gap="200">
@@ -953,7 +1288,6 @@ export default function RulesPage() {
                             autoComplete="off"
                         />
 
-                        {/* Scheduling Section */}
                         <Text as="h3" variant="headingSm">Scheduling (Optional)</Text>
                         <Checkbox
                             label="Enable Scheduling"
@@ -1158,8 +1492,8 @@ export default function RulesPage() {
             >
                 <Modal.Section>
                     <Text as="p">
-                        The Country Blocking feature is only available on the Pro plan.
-                        Upgrade now to protect your store from unwanted traffic.
+                        Blocking, Shopify Markets targeting, and page-specific targeting are available on paid plans.
+                        Upgrade to use these advanced rule controls.
                     </Text>
                 </Modal.Section>
             </Modal>

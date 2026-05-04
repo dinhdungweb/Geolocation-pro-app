@@ -31,6 +31,8 @@ import { ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
+import { detectRuleConflicts } from "../utils/rule-conflicts";
+import { isBillingTestMode } from "../utils/billing-mode.server";
 
 interface IPRule {
     id: string;
@@ -85,13 +87,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Check for active subscription (IP Rules is a Pro feature)
     const billingConfig = await billing.check({
         plans: ALL_PAID_PLANS as any,
-        isTest: false,
+        isTest: isBillingTestMode(),
     });
     const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 
     const canCreateRule = hasProPlan;
+    const conflictSummary = detectRuleConflicts(rules, "ip");
 
-    return json({ rules, shop, hasProPlan, canCreateRule });
+    return json({ rules, shop, hasProPlan, canCreateRule, conflictSummary });
 };
 
 // Action: Handle CRUD operations
@@ -104,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
         const billingConfig = await billing.check({
             plans: ALL_PAID_PLANS as any,
-            isTest: false,
+            isTest: isBillingTestMode(),
         });
         const hasProPlan = isPaidBillingConfig(billingConfig);
 
@@ -272,7 +275,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function IPRulesPage() {
-    const { rules, hasProPlan } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan, conflictSummary } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -306,6 +309,8 @@ export default function IPRulesPage() {
 
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(rules);
+    const conflictsByRuleId = conflictSummary?.byRuleId || {};
+    const conflictTotal = conflictSummary?.total || 0;
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -449,7 +454,15 @@ export default function IPRulesPage() {
         }] : []),
     ];
 
-    const rowMarkup = rules.map((rule: any, index: number) => (
+    const rowMarkup = rules.map((rule: any, index: number) => {
+        const ruleConflicts = conflictsByRuleId[rule.id] || [];
+        const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
+        const conflictTooltip = ruleConflicts
+            .slice(0, 3)
+            .map((item: any) => `${item.message} (${item.scope})`)
+            .join("\n");
+
+        return (
         <IndexTable.Row
             id={rule.id}
             key={rule.id}
@@ -458,51 +471,68 @@ export default function IPRulesPage() {
             onClick={() => handleOpenModal(rule)}
         >
             <IndexTable.Cell>
-                <Text variant="bodyMd" fontWeight="bold" as="span">
-                    {rule.name}
-                </Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                <InlineStack gap="100" wrap={false}>
-                    {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).slice(0, 3).map((ip: string) => (
-                        <Badge key={ip} tone="info">{ip.trim()}</Badge>
-                    ))}
-                    {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length > 3 && (
-                        <Badge>{`+${rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length - 3}`}</Badge>
-                    )}
-                </InlineStack>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                <Text as="span" variant="bodyMd" truncate>
-                    {rule.ruleType === "block" ? (
-                        <Badge tone="critical">Block</Badge>
-                    ) : (
-                        <>
-                            <Badge tone="warning">Redirect</Badge>
-                            <span style={{ marginLeft: 4 }}>
-                                <Badge tone="info" size="small">
-                                    {rule.redirectMode === "popup" ? "Popup" : "Auto"}
+                <div style={{ minWidth: "140px" }}>
+                    <InlineStack gap="100" blockAlign="center" wrap={false}>
+                        <Text variant="bodyMd" fontWeight="bold" as="span">
+                            {rule.name}
+                        </Text>
+                        {ruleConflicts.length > 0 && (
+                            <Tooltip content={conflictTooltip}>
+                                <Badge tone={conflictTone}>
+                                    {`${ruleConflicts.length} conflict${ruleConflicts.length === 1 ? "" : "s"}`}
                                 </Badge>
-                            </span>
-                            <span style={{ marginLeft: 8 }}>{rule.targetUrl}</span>
-                        </>
-                    )}
-                </Text>
+                            </Tooltip>
+                        )}
+                    </InlineStack>
+                </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                {rule.isActive && !hasProPlan ? (
-                    <Badge tone="warning">Disabled (Free Plan)</Badge>
-                ) : (
-                    <Badge tone={rule.isActive ? "success" : "critical"}>
-                        {rule.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                )}
+                <div style={{ minWidth: "300px" }}>
+                    <InlineStack gap="100" wrap={false}>
+                        {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).slice(0, 3).map((ip: string) => (
+                            <Badge key={ip} tone="info">{ip.trim()}</Badge>
+                        ))}
+                        {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length > 3 && (
+                            <Badge>{`+${rule.ipAddresses.split(/[\n,]+/).filter(Boolean).length - 3}`}</Badge>
+                        )}
+                    </InlineStack>
+                </div>
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+                <div style={{ minWidth: "260px" }}>
+                    <Text as="span" variant="bodyMd" truncate>
+                        {rule.ruleType === "block" ? (
+                            <Badge tone="critical">Block</Badge>
+                        ) : (
+                            <>
+                                <Badge tone="warning">Redirect</Badge>
+                                <span style={{ marginLeft: 4 }}>
+                                    <Badge tone="info" size="small">
+                                        {rule.redirectMode === "popup" ? "Popup" : "Auto"}
+                                    </Badge>
+                                </span>
+                                <span style={{ marginLeft: 8 }}>{rule.targetUrl}</span>
+                            </>
+                        )}
+                    </Text>
+                </div>
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+                <div style={{ minWidth: "80px" }}>
+                    {rule.isActive && !hasProPlan ? (
+                        <Badge tone="warning">Disabled (Free Plan)</Badge>
+                    ) : (
+                        <Badge tone={rule.isActive ? "success" : "critical"}>
+                            {rule.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                    )}
+                </div>
             </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
             <IndexTable.Cell>
                 <div
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: "flex", justifyContent: "flex-end" }}
+                    style={{ display: "flex", justifyContent: "flex-end", minWidth: "124px" }}
                 >
                     <InlineStack gap="200" wrap={false}>
                         <Button size="slim" onClick={() => handleOpenModal(rule)}>
@@ -530,7 +560,8 @@ export default function IPRulesPage() {
                 </div>
             </IndexTable.Cell>
         </IndexTable.Row>
-    ));
+        );
+    });
 
     const emptyStateMarkup = (
         <EmptyState
@@ -558,7 +589,7 @@ export default function IPRulesPage() {
     );
 
     return (
-        <Page>
+        <Page fullWidth>
             <TitleBar title="IP Rules">
             </TitleBar>
             <div style={{
@@ -616,6 +647,11 @@ export default function IPRulesPage() {
                         action={{ content: "Upgrade", url: "/app/pricing" }}
                     >
                         <p>IP Rules is a Pro feature. Upgrade to create new rules.</p>
+                    </Banner>
+                )}
+                {conflictTotal > 0 && (
+                    <Banner tone="warning" title={`${conflictTotal} potential IP rule conflict${conflictTotal === 1 ? "" : "s"} found`}>
+                        <p>Active IP rules with overlapping addresses and page targeting can shadow each other. Review rules marked with conflict badges and adjust priority or targeting.</p>
                     </Banner>
                 )}
                 <Layout>

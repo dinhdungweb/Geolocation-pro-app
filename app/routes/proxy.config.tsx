@@ -19,6 +19,8 @@ type ProxyRule = {
   name: string;
   countryCodes?: string;
   ipAddresses?: string;
+  marketHandles?: string;
+  marketCountryCodes?: string;
   targetUrl: string;
   priority: number;
   ruleType: string;
@@ -75,6 +77,10 @@ function isLocalOrUnknownIP(ip: string) {
 function normalizeCountryCode(country: string | null) {
   const normalized = country?.trim().toUpperCase() || "";
   return /^[A-Z]{2}$/.test(normalized) ? normalized : "";
+}
+
+function normalizeMarketValue(value: string | null) {
+  return value?.trim().toLowerCase() || "";
 }
 
 function isIPMatch(visitorIP: string, ipPattern: string) {
@@ -196,6 +202,27 @@ function isRuleOnPage(rule: ProxyRule, path: string) {
   return type === "include" ? isMatch : !isMatch;
 }
 
+function isMarketMatch(rule: ProxyRule, marketHandle: string, marketId: string, countryCode: string) {
+  const handle = normalizeMarketValue(marketHandle);
+  const id = normalizeMarketValue(marketId);
+  const country = normalizeCountryCode(countryCode);
+  if (!handle && !id && !country) return false;
+
+  const matchesCurrentMarket = (rule.marketHandles || "")
+    .split(/[\n,]+/)
+    .map((market) => normalizeMarketValue(market))
+    .filter(Boolean)
+    .some((market) => market === "*" || market === handle || market === id);
+
+  if (matchesCurrentMarket) return true;
+
+  return (rule.marketCountryCodes || "")
+    .split(/[\n,]+/)
+    .map((code) => normalizeCountryCode(code))
+    .filter(Boolean)
+    .some((code) => code === country);
+}
+
 function getActionForRule(rule: ProxyRule): StorefrontAction {
   if (rule.ruleType === "block") return "block";
   return rule.redirectMode === "auto_redirect" ? "auto_redirect" : "popup";
@@ -230,6 +257,12 @@ function buildBlocked(settings: any) {
   return {
     title: settings.blockedTitle,
     message: settings.blockedMessage,
+    logoUrl: settings.blockedLogoUrl,
+    bgColor: settings.blockedBgColor,
+    textColor: settings.blockedTextColor,
+    accentColor: settings.blockedAccentColor,
+    supportText: settings.blockedSupportText,
+    supportUrl: settings.blockedSupportUrl,
   };
 }
 
@@ -368,6 +401,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = url.searchParams.get("shop");
   const currentPath = url.searchParams.get("path") || "/";
   const shopifyCountryCode = normalizeCountryCode(url.searchParams.get("country"));
+  const shopifyMarketHandle = normalizeMarketValue(url.searchParams.get("market_handle"));
+  const shopifyMarketId = normalizeMarketValue(url.searchParams.get("market_id"));
   const debugRequested = url.searchParams.get("debug") === "true" || url.searchParams.get("geo_debug") === "true";
 
   if (!shop) {
@@ -399,6 +434,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         countryCode,
         forwardedFor: request.headers.get("x-forwarded-for"),
         maxmindCountryCode,
+        shopifyMarketHandle,
+        shopifyMarketId,
         realIp: request.headers.get("x-real-ip"),
         shopifyClientIp: request.headers.get("x-shopify-client-ip"),
         shopifyCountryCode,
@@ -411,6 +448,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       countryCode,
       forwardedFor: request.headers.get("x-forwarded-for"),
       maxmindCountryCode,
+      shopifyMarketHandle,
+      shopifyMarketId,
       shopifyClientIp: request.headers.get("x-shopify-client-ip"),
       shopifyCountryCode,
       visitorIP,
@@ -567,6 +606,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       if (selectedRule) {
         source = "ip";
+        action = getActionForRule(selectedRule);
+      }
+    }
+
+    if (!selectedRule && currentPlan !== FREE_PLAN && (shopifyMarketHandle || shopifyMarketId)) {
+      const marketRules = await prisma.redirectRule.findMany({
+        where: { shop, isActive: true, matchType: "market" },
+        orderBy: { priority: "desc" },
+        select: {
+          id: true,
+          name: true,
+          marketHandles: true,
+          marketCountryCodes: true,
+          targetUrl: true,
+          priority: true,
+          scheduleEnabled: true,
+          startTime: true,
+          endTime: true,
+          daysOfWeek: true,
+          timezone: true,
+          ruleType: true,
+          redirectMode: true,
+          pageTargetingType: true,
+          pagePaths: true,
+        },
+      });
+
+      selectedRule =
+        marketRules
+          .filter((rule) => isRuleInSchedule(rule))
+          .filter((rule) => isRuleOnPage(rule, currentPath))
+          .find((rule) => isMarketMatch(rule, shopifyMarketHandle, shopifyMarketId, countryCode)) || null;
+
+      if (selectedRule) {
+        source = "market";
         action = getActionForRule(selectedRule);
       }
     }

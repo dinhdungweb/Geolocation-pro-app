@@ -30,6 +30,7 @@ import {
 // Overage charging is handled by the background usage cron.
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
+import { isBillingTestMode } from "../utils/billing-mode.server";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -93,7 +94,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }),
     billing.check({
       plans: ALL_PAID_PLANS as any,
-      isTest: false,
+      isTest: isBillingTestMode(),
     }),
     prisma.monthlyUsage.findUnique({
       where: {
@@ -320,7 +321,7 @@ export default function Index() {
             border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
             position: sticky;
             top: 0;
-            background: var(--p-color-bg-surface, #fff);
+            background: var(--p-color-bg-surface-secondary, #f6f6f7);
             z-index: 1;
           }
           .traffic-table th.text-right {
@@ -339,7 +340,7 @@ export default function Index() {
           .traffic-table .country-cell {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
           }
           .traffic-table .country-cell img {
             border-radius: 2px;
@@ -350,6 +351,7 @@ export default function Index() {
           }
         `}
       </style>
+      <div style={{ paddingBottom: '32px' }}>
       <BlockStack gap="500">
 
         {/* Text-only summary avoids loading an above-the-fold illustration during LCP. */}
@@ -439,8 +441,8 @@ export default function Index() {
                               <img
                                 src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
                                 srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
-                                width="30"
-                                height="20"
+                                width="24"
+                                height="16"
                                 alt={item.country}
                                 loading="lazy"
                                 decoding="async"
@@ -581,7 +583,9 @@ export default function Index() {
             </Card>
           </Layout.Section>
         </Layout>
+        <div aria-hidden="true" style={{ height: '8px' }} />
       </BlockStack>
+      </div>
     </Page>
   );
 }

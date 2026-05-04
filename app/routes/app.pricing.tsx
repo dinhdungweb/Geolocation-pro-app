@@ -28,6 +28,7 @@ import {
     DEFAULT_TRIAL_DAYS,
     getPlanLimit,
 } from "../billing.config";
+import { isBillingTestMode } from "../utils/billing-mode.server";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
     const requestUrl = new URL(request.url);
@@ -56,7 +57,7 @@ function redirectToBillingConfirmation(request: Request, shop: string, confirmat
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing, session } = await authenticate.admin(request);
-    const isTest = false;
+    const isTest = isBillingTestMode();
 
     // Restore billing check
     const billingCheck = await billing.check({
@@ -99,7 +100,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { billing, session, admin } = await authenticate.admin(request);
     const shop = session.shop;
-    const isTest = false;
+    const isTest = isBillingTestMode();
     const formData = await request.formData();
     const selectedPlan = formData.get("plan") as string;
     const currentPlan = formData.get("currentPlan") as string;
@@ -520,6 +521,7 @@ export default function PricingPage() {
                 "Everything in Free",
                 "Country blocking",
                 "IP blocking and redirects",
+                "Shopify Markets targeting",
                 "Page-specific targeting",
             ],
             hasTrial: true,
