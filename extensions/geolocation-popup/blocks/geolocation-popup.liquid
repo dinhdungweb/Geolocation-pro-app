@@ -291,10 +291,15 @@
     const supportUrl = safeUrl(blockedSettings.supportUrl);
     const supportText = escapeHtml(blockedSettings.supportText || 'Contact support');
     const logoMarkup = logoUrl
-      ? `<img src="${logoUrl}" alt="" style="max-width: 140px !important; max-height: 64px !important; object-fit: contain !important; display: block !important; margin: 0 auto 24px !important;">`
-      : `<div style="width:64px !important; height:64px !important; border:2px solid ${accentColor} !important; border-radius:999px !important; display:flex !important; align-items:center !important; justify-content:center !important; margin:0 auto 24px !important; color:${accentColor} !important; font-size:34px !important; font-weight:800 !important;">!</div>`;
+      ? `<img src="${logoUrl}" alt="" style="max-width: 140px !important; max-height: 64px !important; object-fit: contain !important; display: block !important; margin: 0 auto 32px !important;">`
+      : `<div style="width: 72px !important; height: 72px !important; border-radius: 50% !important; background: rgba(255,255,255,0.06) !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 auto 32px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: inset 0 2px 4px rgba(255,255,255,0.05) !important;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+         </div>`;
     const supportMarkup = supportUrl && supportText
-      ? `<a href="${supportUrl}" style="display:inline-block !important; margin-top:24px !important; background:${accentColor} !important; color:#ffffff !important; text-decoration:none !important; padding:12px 20px !important; border-radius:8px !important; font-size:14px !important; font-weight:700 !important;">${supportText}</a>`
+      ? `<a href="${supportUrl}" class="geo-btn-support" style="display:inline-block !important; margin-top:36px !important; background:${accentColor} !important; color:#ffffff !important; text-decoration:none !important; padding:14px 28px !important; border-radius:8px !important; font-size:15px !important; font-weight:600 !important; transition: all 0.2s ease !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; font-family: inherit !important;">${supportText}</a>`
       : '';
 
     const overlay = document.createElement('div');
@@ -309,10 +314,10 @@
     `;
 
     overlay.innerHTML = `
-      <div style="background: rgba(255,255,255,0.08) !important; padding: 40px !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.14) !important; text-align: center !important; max-width: 520px !important; width: 100% !important; box-shadow: 0 20px 40px rgba(0,0,0,0.32) !important; color: ${textColor} !important;">
+      <div style="background: rgba(128, 128, 128, 0.1) !important; padding: 40px 32px !important; border-radius: 12px !important; border: 1px solid rgba(128, 128, 128, 0.2) !important; text-align: center !important; max-width: 480px !important; width: 100% !important; box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; color: ${textColor} !important;">
         ${logoMarkup}
         <h1 style="font-size: 24px !important; font-weight: 700 !important; margin: 0 0 16px !important; color: ${textColor} !important;">${title}</h1>
-        <p style="font-size: 16px !important; line-height: 1.6 !important; color: ${textColor} !important; opacity: 0.84 !important; margin: 0 !important;">${message}</p>
+        <p style="font-size: 16px !important; line-height: 1.6 !important; color: ${textColor} !important; opacity: 0.8 !important; margin: 0 !important;">${message}</p>
         ${supportMarkup}
       </div>
       <style id="geo-block-overrides">
@@ -320,6 +325,11 @@
         html.geo-blocked body { position: fixed !important; width: 100% !important; }
         html.geo-blocked body > *:not(#geolocation-app-container):not(#geo-block-screen) {
           display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;
+        }
+        .geo-btn-support:hover {
+          transform: translateY(-2px) !important;
+          box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
+          opacity: 0.9 !important;
         }
       </style>
     `;
