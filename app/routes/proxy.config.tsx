@@ -462,6 +462,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       (await prisma.settings.create({ data: { shop } }));
 
     const currentPlan = settings.currentPlan || FREE_PLAN;
+    const hasPaidPlan = currentPlan !== FREE_PLAN;
     const planLimit = getPlanLimit(currentPlan, settings);
     const yearMonth = getYearMonth();
     const monthlyUsage = await prisma.monthlyUsage.findUnique({
@@ -562,7 +563,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     let source: RuleSource | null = null;
     let action: StorefrontAction = "none";
 
-    if (settings.blockVpn && (await checkVpnBlocked(visitorIP, ipHash))) {
+    if (hasPaidPlan && settings.blockVpn && (await checkVpnBlocked(visitorIP, ipHash))) {
       source = "vpn";
       action = "block";
       selectedRule = {
@@ -576,7 +577,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       };
     }
 
-    if (!selectedRule && currentPlan !== FREE_PLAN) {
+    if (!selectedRule && hasPaidPlan) {
       const ipRules = await prisma.redirectRule.findMany({
         where: { shop, isActive: true, matchType: "ip" },
         orderBy: { priority: "desc" },
@@ -610,7 +611,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
-    if (!selectedRule && currentPlan !== FREE_PLAN && (shopifyMarketHandle || shopifyMarketId)) {
+    if (!selectedRule && hasPaidPlan && (shopifyMarketHandle || shopifyMarketId)) {
       const marketRules = await prisma.redirectRule.findMany({
         where: { shop, isActive: true, matchType: "market" },
         orderBy: { priority: "desc" },
@@ -670,7 +671,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const eligibleCountryRules = countryRules
         .filter((rule) => isRuleInSchedule(rule))
         .filter((rule) => isRuleOnPage(rule, currentPath))
-        .filter((rule) => currentPlan !== FREE_PLAN || rule.ruleType !== "block");
+        .filter((rule) => hasPaidPlan || rule.ruleType !== "block");
 
       selectedRule =
         eligibleCountryRules.find((rule) =>

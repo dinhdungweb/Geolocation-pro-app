@@ -287,7 +287,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             try {
                 await prisma.settings.upsert({
                     where: { shop },
-                    update: { currentPlan: FREE_PLAN },
+                    update: { currentPlan: FREE_PLAN, blockVpn: false },
                     create: { shop, currentPlan: FREE_PLAN },
                 });
             } catch (err) {
@@ -425,7 +425,7 @@ function PlanCard({
                                 </Text>
                                 <ul className="pricing-feature-list">
                                     <li>{visitorLimitLabel || `${visitorLimit?.toLocaleString()} visitors included`}</li>
-                                    <li>Redirects, blocks and popups included</li>
+                                    <li>{isFree ? "Redirects and popups included" : "Redirects, blocks and popups included"}</li>
                                     {!isFree && noOverage && (
                                         <li>No overage charges</li>
                                     )}
