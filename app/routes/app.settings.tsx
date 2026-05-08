@@ -446,7 +446,7 @@ export default function SettingsPage() {
                             background: blockedPreviewBgColor,
                         }}
                     >
-                        <div className="settings-blocked-preview-card" style={{ background: blockedPreviewBgColor, color: blockedPreviewTextColor }}>
+                        <div style={{ textAlign: 'center', maxWidth: '420px', width: '100%' }}>
                             {blockedLogoUrl ? (
                                 <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" />
                             ) : (
@@ -460,13 +460,13 @@ export default function SettingsPage() {
                                     </svg>
                                 </div>
                             )}
-                            <h3 style={{ color: blockedPreviewTextColor }}>{blockedTitle}</h3>
-                            <p style={{ color: blockedPreviewTextColor, opacity: 0.8 }}>{blockedMessage}</p>
+                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '28px', fontWeight: '800', marginBottom: '16px' }}>{blockedTitle}</h3>
+                            <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '15px', lineHeight: '1.6' }}>{blockedMessage}</p>
                             {blockedSupportUrl && blockedSupportText ? (
                                 <button
                                     type="button"
                                     className="settings-blocked-preview-button"
-                                    style={{ background: blockedPreviewAccentColor }}
+                                    style={{ background: blockedPreviewAccentColor, marginTop: '24px' }}
                                 >
                                     {blockedSupportText}
                                 </button>
@@ -740,12 +740,7 @@ export default function SettingsPage() {
                         justify-content: center;
                     }
                     .settings-blocked-preview-card {
-                        width: min(420px, 100%);
-                        padding: 40px 32px;
-                        border-radius: 20px;
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
-                        text-align: center;
+                        display: none;
                     }
                     .settings-blocked-preview-logo {
                         max-width: 120px;
