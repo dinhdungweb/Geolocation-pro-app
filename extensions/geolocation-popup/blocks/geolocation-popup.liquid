@@ -314,10 +314,10 @@
     `;
 
     overlay.innerHTML = `
-      <div style="background: #ffffff !important; padding: 56px 40px !important; border-radius: 20px !important; border: 1px solid #e2e8f0 !important; text-align: center !important; max-width: 500px !important; width: 100% !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important; color: ${textColor} !important;">
+      <div style="background: ${bgColor} !important; padding: 56px 40px !important; border-radius: 20px !important; border: 1px solid rgba(255,255,255,0.1) !important; text-align: center !important; max-width: 500px !important; width: 100% !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important; color: ${textColor} !important;">
         ${logoMarkup}
         <h1 style="font-size: 28px !important; font-weight: 800 !important; margin: 0 0 16px !important; color: ${textColor} !important; letter-spacing: -0.025em !important;">${title}</h1>
-        <p style="font-size: 17px !important; line-height: 1.6 !important; color: ${textColor} !important; opacity: 0.7 !important; margin: 0 !important; font-weight: 400 !important;">${message}</p>
+        <p style="font-size: 17px !important; line-height: 1.6 !important; color: ${textColor} !important; opacity: 0.8 !important; margin: 0 !important; font-weight: 400 !important;">${message}</p>
         ${supportMarkup}
       </div>
       <style id="geo-block-overrides">
