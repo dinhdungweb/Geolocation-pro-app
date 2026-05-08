@@ -67,8 +67,8 @@ const defaultSettings: Omit<Settings, "id"> = {
     blockedTitle: "Access Denied",
     blockedMessage: "We do not offer services in your country/region.",
     blockedLogoUrl: "",
-    blockedBgColor: "#111827",
-    blockedTextColor: "#ffffff",
+    blockedBgColor: "#f8fafc",
+    blockedTextColor: "#0f172a",
     blockedAccentColor: "#2563eb",
     blockedSupportText: "Contact support",
     blockedSupportUrl: "",
@@ -211,8 +211,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedTitle,
                 blockedMessage,
                 blockedLogoUrl,
-                blockedBgColor: normalizeHexColor(blockedBgColor, "#111827"),
-                blockedTextColor: normalizeHexColor(blockedTextColor, "#ffffff"),
+                blockedBgColor: normalizeHexColor(blockedBgColor, "#f8fafc"),
+                blockedTextColor: normalizeHexColor(blockedTextColor, "#0f172a"),
                 blockedAccentColor: normalizeHexColor(blockedAccentColor, "#2563eb"),
                 blockedSupportText,
                 blockedSupportUrl,
@@ -236,8 +236,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedTitle,
                 blockedMessage,
                 blockedLogoUrl,
-                blockedBgColor: normalizeHexColor(blockedBgColor, "#111827"),
-                blockedTextColor: normalizeHexColor(blockedTextColor, "#ffffff"),
+                blockedBgColor: normalizeHexColor(blockedBgColor, "#f8fafc"),
+                blockedTextColor: normalizeHexColor(blockedTextColor, "#0f172a"),
                 blockedAccentColor: normalizeHexColor(blockedAccentColor, "#2563eb"),
                 blockedSupportText,
                 blockedSupportUrl,
@@ -274,8 +274,8 @@ export default function SettingsPage() {
     const [blockedTitle, setBlockedTitle] = useState(settings.blockedTitle || "Access Denied");
     const [blockedMessage, setBlockedMessage] = useState(settings.blockedMessage || "We do not offer services in your country/region.");
     const [blockedLogoUrl, setBlockedLogoUrl] = useState(settings.blockedLogoUrl || "");
-    const [blockedBgColor, setBlockedBgColor] = useState(settings.blockedBgColor || "#111827");
-    const [blockedTextColor, setBlockedTextColor] = useState(settings.blockedTextColor || "#ffffff");
+    const [blockedBgColor, setBlockedBgColor] = useState(settings.blockedBgColor || "#f8fafc");
+    const [blockedTextColor, setBlockedTextColor] = useState(settings.blockedTextColor || "#0f172a");
     const [blockedAccentColor, setBlockedAccentColor] = useState(settings.blockedAccentColor || "#2563eb");
     const [blockedSupportText, setBlockedSupportText] = useState(settings.blockedSupportText || "Contact support");
     const [blockedSupportUrl, setBlockedSupportUrl] = useState(settings.blockedSupportUrl || "");
@@ -447,19 +447,22 @@ export default function SettingsPage() {
                             color: blockedPreviewTextColor,
                         }}
                     >
-                        <div className="settings-blocked-preview-card">
+                        <div className="settings-blocked-preview-card" style={{ background: '#ffffff', color: blockedPreviewTextColor }}>
                             {blockedLogoUrl ? (
                                 <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" />
                             ) : (
                                 <div
                                     className="settings-blocked-preview-shield"
-                                    style={{ borderColor: blockedPreviewAccentColor, color: blockedPreviewAccentColor }}
+                                    style={{ background: `${blockedPreviewAccentColor}15`, borderColor: `${blockedPreviewAccentColor}30`, color: blockedPreviewAccentColor }}
                                 >
-                                    !
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
                                 </div>
                             )}
-                            <h3>{blockedTitle}</h3>
-                            <p>{blockedMessage}</p>
+                            <h3 style={{ color: blockedPreviewTextColor }}>{blockedTitle}</h3>
+                            <p style={{ color: blockedPreviewTextColor, opacity: 0.7 }}>{blockedMessage}</p>
                             {blockedSupportUrl && blockedSupportText ? (
                                 <button
                                     type="button"
@@ -739,11 +742,11 @@ export default function SettingsPage() {
                     }
                     .settings-blocked-preview-card {
                         width: min(420px, 100%);
-                        padding: 28px;
-                        border-radius: 16px;
-                        border: 1px solid rgba(255, 255, 255, 0.16);
-                        background: rgba(255, 255, 255, 0.08);
-                        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+                        padding: 40px 32px;
+                        border-radius: 20px;
+                        border: 1px solid #e2e8f0;
+                        background: #ffffff;
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
                         text-align: center;
                     }
                     .settings-blocked-preview-logo {
@@ -753,16 +756,14 @@ export default function SettingsPage() {
                         margin-bottom: 18px;
                     }
                     .settings-blocked-preview-shield {
-                        width: 56px;
-                        height: 56px;
-                        margin: 0 auto 18px;
-                        border: 2px solid currentColor;
+                        width: 64px;
+                        height: 64px;
+                        margin: 0 auto 24px;
+                        border: 1px solid currentColor;
                         border-radius: 999px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 28px;
-                        font-weight: 800;
                     }
                     .settings-blocked-preview-card h3 {
                         margin: 0 0 12px;
@@ -1037,13 +1038,13 @@ export default function SettingsPage() {
                                                             label="Background"
                                                             value={blockedBgColor}
                                                             onChange={setBlockedBgColor}
-                                                            fallback="#111827"
+                                                            fallback="#f8fafc"
                                                         />
                                                         <ColorPickerField
                                                             label="Text"
                                                             value={blockedTextColor}
                                                             onChange={setBlockedTextColor}
-                                                            fallback="#ffffff"
+                                                            fallback="#0f172a"
                                                         />
                                                         <ColorPickerField
                                                             label="Button / Icon"
