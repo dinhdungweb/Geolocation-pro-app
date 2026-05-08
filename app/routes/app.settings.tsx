@@ -448,11 +448,11 @@ export default function SettingsPage() {
                     >
                         <div style={{ textAlign: 'center', maxWidth: '420px', width: '100%' }}>
                             {blockedLogoUrl ? (
-                                <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" style={{ marginBottom: '20px' }} />
+                                <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" style={{ marginBottom: '16px' }} />
                             ) : (
                                 <div
                                     className="settings-blocked-preview-shield"
-                                    style={{ background: `${blockedPreviewAccentColor}15`, borderColor: `${blockedPreviewAccentColor}30`, color: blockedPreviewAccentColor, marginBottom: '20px' }}
+                                    style={{ background: `${blockedPreviewAccentColor}15`, borderColor: `${blockedPreviewAccentColor}30`, color: blockedPreviewAccentColor, marginBottom: '16px' }}
                                 >
                                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -460,14 +460,13 @@ export default function SettingsPage() {
                                     </svg>
                                 </div>
                             )}
-                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '32px', fontWeight: '900', marginBottom: '8px', letterSpacing: '-0.03em' }}>{blockedTitle}</h3>
-                            <div style={{ width: '32px', height: '3px', background: blockedPreviewAccentColor, margin: '0 auto 16px', borderRadius: '2px' }}></div>
-                            <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '16px', lineHeight: '1.5' }}>{blockedMessage}</p>
+                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '32px', fontWeight: '900', marginBottom: '4px', letterSpacing: '-0.03em' }}>{blockedTitle}</h3>
+                            <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '16px', lineHeight: '1.4' }}>{blockedMessage}</p>
                             {blockedSupportUrl && blockedSupportText ? (
                                 <button
                                     type="button"
                                     className="settings-blocked-preview-button"
-                                    style={{ background: blockedPreviewAccentColor, marginTop: '24px' }}
+                                    style={{ background: blockedPreviewAccentColor, marginTop: '20px' }}
                                 >
                                     {blockedSupportText}
                                 </button>
