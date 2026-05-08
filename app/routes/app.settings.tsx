@@ -460,7 +460,7 @@ export default function SettingsPage() {
                                     </svg>
                                 </div>
                             )}
-                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '32px', fontWeight: '900', marginBottom: '4px', letterSpacing: '-0.03em' }}>{blockedTitle}</h3>
+                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '32px', fontWeight: '600', marginBottom: '4px', letterSpacing: '-0.03em' }}>{blockedTitle}</h3>
                             <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '16px', lineHeight: '1.4' }}>{blockedMessage}</p>
                             {blockedSupportUrl && blockedSupportText ? (
                                 <button
