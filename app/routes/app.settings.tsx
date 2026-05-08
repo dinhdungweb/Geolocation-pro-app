@@ -733,11 +733,27 @@ export default function SettingsPage() {
                         border: 1px solid currentColor;
                     }
                     .settings-blocked-preview-canvas {
-                        min-height: 340px;
-                        padding: 28px;
+                        --settings-preview-scale: 0.72;
+                        width: 100%;
+                        height: 420px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
+                        position: relative;
+                        overflow: hidden;
+                        border-radius: 8px;
+                        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+                    }
+                    .settings-blocked-preview-canvas > div {
+                        transform: scale(var(--settings-preview-scale));
+                        transform-origin: center;
+                        width: 1000px; /* Virtual width */
+                        height: 600px; /* Virtual height */
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0;
                     }
                     .settings-blocked-preview-card {
                         display: none;
@@ -778,12 +794,14 @@ export default function SettingsPage() {
                         font-weight: 700;
                     }
                     @container (max-width: 720px) {
-                        .settings-preview-canvas {
+                        .settings-preview-canvas,
+                        .settings-blocked-preview-canvas {
                             --settings-preview-scale: 0.6;
                         }
                     }
                     @container (max-width: 560px) {
-                        .settings-preview-canvas {
+                        .settings-preview-canvas,
+                        .settings-blocked-preview-canvas {
                             --settings-preview-scale: 0.5;
                         }
                         .settings-storefront-overlay-top_bar,
@@ -805,7 +823,8 @@ export default function SettingsPage() {
                         }
                     }
                     @container (max-width: 460px) {
-                        .settings-preview-canvas {
+                        .settings-preview-canvas,
+                        .settings-blocked-preview-canvas {
                             --settings-preview-scale: 0.65;
                         }
                         .settings-storefront-bar-message {
