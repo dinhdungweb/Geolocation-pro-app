@@ -1,6 +1,6 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -8,10 +8,12 @@ import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
 import { cleanupOldLogs } from "../utils/cleanup.server";
+import { loadCrisp, prepareCrisp } from "../utils/crisp";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
-const CRISP_LOAD_DELAY_MS = 7000;
+const CRISP_BOOT_DELAY_MS = 1500;
+const CRISP_IDLE_TIMEOUT_MS = 1500;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -27,48 +29,75 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { apiKey, shop } = useLoaderData<typeof loader>();
-  const crispInitialized = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    prepareCrisp(shop);
+
+    let delayTimer: number | undefined;
     let idleCallbackId: number | undefined;
+    let hasRequestedLoad = false;
 
-    const loadCrisp = () => {
-      if (crispInitialized.current) return;
-      crispInitialized.current = true;
+    const intentEvents = ["pointerdown", "keydown", "touchstart"] as const;
+    const listenerOptions: AddEventListenerOptions = {
+      capture: true,
+      passive: true,
+      once: true,
+    };
 
-      const crisp = ((window as any).$crisp ||= []);
-      if (!(window as any).CRISP_WEBSITE_ID) {
-        (window as any).CRISP_WEBSITE_ID = "b882709c-9f60-4bf7-b823-0f6bc6196f4a";
-      }
-
-      crisp.push(["set", "session:data", [[["shop", shop]]]]);
-      crisp.push(["do", "chat:show"]);
-
-      // Defer chat loading so third-party JS cannot compete with LCP.
-      const existingScript = document.querySelector('script[src*="crisp.chat"]');
-      if (!existingScript) {
-        const script = document.createElement("script");
-        script.src = "https://client.crisp.chat/l.js";
-        script.async = true;
-        document.head.appendChild(script);
+    const removeIntentListeners = () => {
+      for (const eventName of intentEvents) {
+        window.removeEventListener(eventName, handleUserIntent, listenerOptions);
       }
     };
 
-    const delayTimer = window.setTimeout(() => {
-      if ("requestIdleCallback" in window) {
-        idleCallbackId = window.requestIdleCallback(loadCrisp, { timeout: 3000 });
-      } else {
-        loadCrisp();
-      }
-    }, CRISP_LOAD_DELAY_MS);
+    const requestCrispLoad = () => {
+      if (hasRequestedLoad) return;
+      hasRequestedLoad = true;
 
-    return () => {
-      window.clearTimeout(delayTimer);
+      if (delayTimer !== undefined) {
+        window.clearTimeout(delayTimer);
+      }
+
       if (idleCallbackId !== undefined && "cancelIdleCallback" in window) {
         window.cancelIdleCallback(idleCallbackId);
       }
+
+      removeIntentListeners();
+      loadCrisp({ shop });
+    };
+
+    function handleUserIntent() {
+      requestCrispLoad();
+    }
+
+    const queueIdleLoad = () => {
+      if ("requestIdleCallback" in window) {
+        idleCallbackId = window.requestIdleCallback(requestCrispLoad, {
+          timeout: CRISP_IDLE_TIMEOUT_MS,
+        });
+      } else {
+        requestCrispLoad();
+      }
+    };
+
+    for (const eventName of intentEvents) {
+      window.addEventListener(eventName, handleUserIntent, listenerOptions);
+    }
+
+    delayTimer = window.setTimeout(queueIdleLoad, CRISP_BOOT_DELAY_MS);
+
+    return () => {
+      if (delayTimer !== undefined) {
+        window.clearTimeout(delayTimer);
+      }
+
+      if (idleCallbackId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+
+      removeIntentListeners();
     };
   }, [shop]);
 

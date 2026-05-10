@@ -29,6 +29,7 @@ import {
     getPlanLimit,
 } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
+import { loadCrisp } from "../utils/crisp";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
     const requestUrl = new URL(request.url);
@@ -94,6 +95,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         } : null,
         hasActivePayment: billingCheck.hasActivePayment,
         currentPlan,
+        shop: session.shop,
     });
 };
 
@@ -467,7 +469,7 @@ function PlanCard({
 }
 
 export default function PricingPage() {
-    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan } = useLoaderData<typeof loader>();
+    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan, shop } = useLoaderData<typeof loader>();
     const submit = useSubmit();
     const navigation = useNavigation();
     const submittingPlan = navigation.state !== "idle" ? navigation.formData?.get("plan")?.toString() : null;
@@ -478,12 +480,7 @@ export default function PricingPage() {
     };
 
     const openLiveChat = () => {
-        if (typeof window === "undefined") return;
-
-        const crisp = (window as any).$crisp;
-        if (crisp?.push) {
-            crisp.push(["do", "chat:show"]);
-            crisp.push(["do", "chat:open"]);
+        if (loadCrisp({ shop, open: true })) {
             return;
         }
 
