@@ -1,5 +1,14 @@
 import prisma from "../db.server";
-import { ALL_PAID_PLANS, FREE_PLAN, OVERAGE_RATE, OVERAGE_HARD_LIMIT, getPlanLimit, hasUnlimitedUsage } from "../billing.config";
+import {
+    ALL_PAID_PLANS,
+    FREE_PLAN,
+    OVERAGE_RATE,
+    getPlanLimit,
+    getUnchargedBillableOverageVisitors,
+    hasMonthlyUnlimitedReward,
+    hasUnlimitedUsage,
+    isFinalMonthlyOverageCapCharge,
+} from "../billing.config";
 import { unauthenticated } from "../shopify.server";
 
 /**
@@ -44,16 +53,23 @@ export async function checkAndChargeOverage(
         const currentUsage = monthlyUsage?.totalVisitors || 0;
         const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
+        if (hasMonthlyUnlimitedReward(currentPlan, chargedVisitors)) return;
         if (currentUsage <= planLimit) return; // Within limits
 
-        const overageVisitors = currentUsage - planLimit - chargedVisitors;
+        const overageVisitors = getUnchargedBillableOverageVisitors(
+            currentPlan,
+            currentUsage,
+            planLimit,
+            chargedVisitors,
+        );
         if (overageVisitors <= 0) return; // Already charged
 
         const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+        const isFinalCapCharge = isFinalMonthlyOverageCapCharge(currentPlan, chargedVisitors, overageVisitors);
         
         // Enforce a minimum charge of $1.00 to avoid spamming Shopify API with micro-charges (e.g., $0.01 or $0.002)
         // This effectively batches overage charges in increments of 500 visitors.
-        if (chargeAmount < 1.00) return;
+        if (chargeAmount < 1.00 && !isFinalCapCharge) return;
 
         // Reserve the charge by updating the database FIRST using optimistic locking
         const updateResult = await prisma.monthlyUsage.updateMany({
@@ -311,25 +327,26 @@ export async function checkAndChargeOverageBackground(shop: string) {
         const currentUsage = monthlyUsage?.totalVisitors || 0;
         const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
-        // Calculate usage capped at the hard limit (e.g., 70,000)
-        // This ensures we charge for all visitors UP TO the limit, but not beyond.
-        const effectiveUsage = Math.min(currentUsage, OVERAGE_HARD_LIMIT);
-
-        if (effectiveUsage <= planLimit) return; // Within limits (or no overage yet)
-
-        const overageVisitors = effectiveUsage - planLimit - chargedVisitors;
-        
-        if (overageVisitors <= 0) {
-            if (currentUsage >= OVERAGE_HARD_LIMIT) {
-                console.log(`[Billing] Shop ${shop} reached hard limit of ${OVERAGE_HARD_LIMIT}. Overage charging completed.`);
-            }
-            return; 
+        if (hasMonthlyUnlimitedReward(currentPlan, chargedVisitors)) {
+            console.log(`[Billing] Shop ${shop} reached monthly overage cap. Overage charging completed.`);
+            return;
         }
 
+        if (currentUsage <= planLimit) return; // Within limits (or no overage yet)
+
+        const overageVisitors = getUnchargedBillableOverageVisitors(
+            currentPlan,
+            currentUsage,
+            planLimit,
+            chargedVisitors,
+        );
+        if (overageVisitors <= 0) return; // Already charged or capped
+
         const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+        const isFinalCapCharge = isFinalMonthlyOverageCapCharge(currentPlan, chargedVisitors, overageVisitors);
         
         // Enforce minimum charge batching ($1.00 minimum)
-        if (chargeAmount < 1.00) return;
+        if (chargeAmount < 1.00 && !isFinalCapCharge) return;
 
         // Reserve the charge by updating the database FIRST using optimistic locking
         const updateResult = await prisma.monthlyUsage.updateMany({

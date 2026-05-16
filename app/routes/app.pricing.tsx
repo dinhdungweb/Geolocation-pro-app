@@ -25,8 +25,12 @@ import {
     ALL_PAID_PLANS,
     PLAN_LIMITS,
     OVERAGE_RATE,
+    OVERAGE_MONTHLY_CAP_AMOUNT,
     DEFAULT_TRIAL_DAYS,
+    getUnchargedBillableOverageVisitors,
     getPlanLimit,
+    hasMonthlyUnlimitedReward,
+    isFinalMonthlyOverageCapCharge,
 } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { loadCrisp } from "../utils/crisp";
@@ -252,27 +256,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 });
 
                 if (monthlyUsage) {
-                    const overageVisitors = monthlyUsage.totalVisitors - planLimit - monthlyUsage.chargedVisitors;
-                    if (overageVisitors > 0) {
-                        const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
-                        // Skip if charge amount is too small (< $0.50) to avoid Shopify API issues
-                        if (chargeAmount >= 0.50) {
-                            try {
-                                await billing.createUsageRecord({
-                                    description: `Final overage before downgrade: ${overageVisitors} visitors beyond ${planLimit} limit`,
-                                    price: { amount: chargeAmount, currencyCode: "USD" },
-                                    isTest,
-                                });
-                                await prisma.monthlyUsage.update({
-                                    where: { shop_yearMonth: { shop, yearMonth } },
-                                    data: { chargedVisitors: { increment: overageVisitors } },
-                                });
-                                console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
-                            } catch (error) {
-                                console.error("[Billing] Failed to charge final overage:", error);
+                    if (hasMonthlyUnlimitedReward(activePlan, monthlyUsage.chargedVisitors)) {
+                        console.log(`[Billing] Skipping final overage for ${shop}: monthly overage cap already reached`);
+                    } else {
+                        const overageVisitors = getUnchargedBillableOverageVisitors(
+                            activePlan,
+                            monthlyUsage.totalVisitors,
+                            planLimit,
+                            monthlyUsage.chargedVisitors,
+                        );
+                        if (overageVisitors > 0) {
+                            const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+                            const isFinalCapCharge = isFinalMonthlyOverageCapCharge(
+                                activePlan,
+                                monthlyUsage.chargedVisitors,
+                                overageVisitors,
+                            );
+                            // Skip if charge amount is too small (< $0.50) to avoid Shopify API issues
+                            if (chargeAmount > 0 && (chargeAmount >= 0.50 || isFinalCapCharge)) {
+                                try {
+                                    await billing.createUsageRecord({
+                                        description: `Final overage before downgrade: ${overageVisitors} visitors beyond ${planLimit} limit`,
+                                        price: { amount: chargeAmount, currencyCode: "USD" },
+                                        isTest,
+                                    });
+                                    await prisma.monthlyUsage.update({
+                                        where: { shop_yearMonth: { shop, yearMonth } },
+                                        data: { chargedVisitors: { increment: overageVisitors } },
+                                    });
+                                    console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
+                                } catch (error) {
+                                    console.error("[Billing] Failed to charge final overage:", error);
+                                }
+                            } else {
+                                console.log(`[Billing] Skipping final overage for ${shop}: $${chargeAmount.toFixed(2)} below minimum threshold`);
                             }
-                        } else {
-                            console.log(`[Billing] Skipping final overage for ${shop}: $${chargeAmount.toFixed(2)} below minimum threshold`);
                         }
                     }
                 }
@@ -823,7 +841,7 @@ export default function PricingPage() {
                         </div>
                         <Divider />
                         <Text as="p" variant="bodySm" tone="subdued">
-                            Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor.
+                            Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor and capped at ${OVERAGE_MONTHLY_CAP_AMOUNT.toFixed(2)} per month for standard paid plans.
                         </Text>
                     </BlockStack>
                 </Card>

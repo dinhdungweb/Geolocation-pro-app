@@ -8,6 +8,7 @@ export const CUSTOM_PLAN = "custom";
 
 export const ALL_PAID_PLANS = [PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN, CUSTOM_PLAN];
 export const ALL_PLANS = [FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN, CUSTOM_PLAN];
+export const STANDARD_PAID_PLANS = [PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN];
 export const DEFAULT_TRIAL_DAYS = 3;
 
 // Visitor limits per plan
@@ -22,9 +23,8 @@ export const PLAN_LIMITS = {
 
 // Overage pricing: $100 per 50,000 visitors = $0.002 per visitor
 export const OVERAGE_RATE = 100 / 50000; // $0.002 per visitor
-
-// Maximum visitors allowed per month before halting overage billing (Hard Cap)
-export const OVERAGE_HARD_LIMIT = 70000;
+export const OVERAGE_MONTHLY_CAP_AMOUNT = 99.99;
+export const OVERAGE_MONTHLY_CAP_VISITORS = 49995;
 
 export type PlanName = typeof ALL_PLANS[number];
 
@@ -47,4 +47,40 @@ export function getPlanLimit(plan: string, settings?: CustomPlanLimitSettings | 
 
 export function hasUnlimitedUsage(plan: string, settings?: CustomPlanLimitSettings | null) {
     return getPlanLimit(plan, settings) >= Number.MAX_SAFE_INTEGER;
+}
+
+export function isStandardPaidPlan(plan: string) {
+    return STANDARD_PAID_PLANS.includes(plan);
+}
+
+export function getBillableOverageVisitors(plan: string, totalVisitors: number, planLimit: number) {
+    const overageVisitors = Math.max(0, totalVisitors - planLimit);
+
+    if (!isStandardPaidPlan(plan)) {
+        return overageVisitors;
+    }
+
+    return Math.min(overageVisitors, OVERAGE_MONTHLY_CAP_VISITORS);
+}
+
+export function getUnchargedBillableOverageVisitors(
+    plan: string,
+    totalVisitors: number,
+    planLimit: number,
+    chargedVisitors: number,
+) {
+    const billableOverageVisitors = getBillableOverageVisitors(plan, totalVisitors, planLimit);
+    return Math.max(0, billableOverageVisitors - Math.max(0, chargedVisitors));
+}
+
+export function hasMonthlyUnlimitedReward(plan: string, chargedVisitors?: number | null) {
+    return isStandardPaidPlan(plan) && (chargedVisitors || 0) >= OVERAGE_MONTHLY_CAP_VISITORS;
+}
+
+export function isFinalMonthlyOverageCapCharge(plan: string, chargedVisitors: number, overageVisitors: number) {
+    return (
+        isStandardPaidPlan(plan) &&
+        chargedVisitors < OVERAGE_MONTHLY_CAP_VISITORS &&
+        chargedVisitors + overageVisitors >= OVERAGE_MONTHLY_CAP_VISITORS
+    );
 }

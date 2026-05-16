@@ -25,6 +25,7 @@ import {
   PLUS_PLAN,
   CUSTOM_PLAN,
   getPlanLimit,
+  hasMonthlyUnlimitedReward,
   hasUnlimitedUsage,
 } from "../billing.config";
 // Overage charging is handled by the background usage cron.
@@ -136,9 +137,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const hasProPlan = billingConfig.hasActivePayment;
   const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
   const planLimit = getPlanLimit(currentPlan, settings);
-  const isUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
   const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
   const currentUsage = monthlyUsage?.totalVisitors || 0;
+  const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
+  const isUnlimitedUsage =
+    hasUnlimitedUsage(currentPlan, settings) ||
+    hasMonthlyUnlimitedReward(currentPlan, chargedVisitors);
 
   // Keep proxy limit checks up to date without delaying the dashboard response.
   prisma.settings.upsert({

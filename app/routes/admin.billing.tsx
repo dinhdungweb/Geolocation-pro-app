@@ -3,7 +3,15 @@ import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
-import { FREE_PLAN, OVERAGE_RATE, getPlanLimit, hasUnlimitedUsage } from "../billing.config";
+import {
+    FREE_PLAN,
+    OVERAGE_RATE,
+    getBillableOverageVisitors,
+    getPlanLimit,
+    getUnchargedBillableOverageVisitors,
+    hasMonthlyUnlimitedReward,
+    hasUnlimitedUsage,
+} from "../billing.config";
 import { useState, useMemo } from "react";
 import { Search, X, DollarSign, AlertTriangle, Users, Clock } from "lucide-react";
 
@@ -29,20 +37,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const shops = allSettings.map((s: any) => {
         const plan = s.currentPlan || FREE_PLAN;
         const limit = getPlanLimit(plan, s);
-        const unlimitedUsage = hasUnlimitedUsage(plan, s);
         const usage = usageMap.get(s.shop);
         const prev = prevUsageMap.get(s.shop);
 
         const totalVisitors = usage?.totalVisitors || 0;
         const chargedVisitors = usage?.chargedVisitors || 0;
-        const overage = unlimitedUsage ? 0 : Math.max(0, totalVisitors - limit);
-        const uncharged = unlimitedUsage ? 0 : Math.max(0, totalVisitors - limit - chargedVisitors);
+        const planUnlimitedUsage = hasUnlimitedUsage(plan, s);
+        const monthlyUnlimitedReward = hasMonthlyUnlimitedReward(plan, chargedVisitors);
+        const unlimitedUsage = planUnlimitedUsage || monthlyUnlimitedReward;
+        const billableOverage = planUnlimitedUsage ? 0 : getBillableOverageVisitors(plan, totalVisitors, limit);
+        const overage = planUnlimitedUsage ? 0 : billableOverage;
+        const uncharged = unlimitedUsage ? 0 : getUnchargedBillableOverageVisitors(plan, totalVisitors, limit, chargedVisitors);
         const chargedAmount = Number((chargedVisitors * OVERAGE_RATE).toFixed(2));
         const unchargedAmount = Number((uncharged * OVERAGE_RATE).toFixed(2));
         const prevTotal = prev?.totalVisitors || 0;
 
         // Detect overcharge: chargedVisitors > actual overage
-        const actualOverage = unlimitedUsage ? 0 : Math.max(0, totalVisitors - limit);
+        const actualOverage = planUnlimitedUsage ? 0 : billableOverage;
         const overcharged = chargedVisitors > actualOverage ? chargedVisitors - actualOverage : 0;
         const overchargedAmount = Number((overcharged * OVERAGE_RATE).toFixed(2));
 
@@ -56,6 +67,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             shop: s.shop,
             plan,
             limit,
+            unlimitedUsage,
+            monthlyUnlimitedReward,
             totalVisitors,
             chargedVisitors,
             overage,
@@ -373,9 +386,9 @@ export default function AdminBilling() {
                             ) : (
                                 (filtered as any[]).map((s) => {
                                     const sc = statusConfig[s.status] || statusConfig.ok;
-                                    const isUnlimited = s.limit >= Number.MAX_SAFE_INTEGER;
+                                    const isUnlimited = s.unlimitedUsage || s.limit >= Number.MAX_SAFE_INTEGER;
                                     const usagePercent = isUnlimited ? 100 : Math.min(100, Math.round((s.totalVisitors / s.limit) * 100));
-                                    const barColor = usagePercent >= 100 ? '#ef4444' : usagePercent >= 80 ? '#f59e0b' : '#10b981';
+                                    const barColor = isUnlimited ? '#10b981' : usagePercent >= 100 ? '#ef4444' : usagePercent >= 80 ? '#f59e0b' : '#10b981';
 
                                     return (
                                         <tr key={s.shop}>
