@@ -191,6 +191,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             customPlanVisitorLimit: settings.customPlanVisitorLimit,
             customPlanNoOverage: settings.customPlanNoOverage,
             customPlanTrialDays: settings.customPlanTrialDays,
+            billingPeriodKey: settings.billingPeriodKey,
+            billingPeriodEnd: settings.billingPeriodEnd?.toISOString() || null,
             createdAt: settings.createdAt.toISOString(),
             updatedAt: settings.updatedAt.toISOString(),
         } : null,
@@ -238,6 +240,31 @@ export default function AdminShopDetail() {
         });
     const formatDateShort = (iso: string) =>
         new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+    const formatUsagePeriodEnd = (value: string | Date | null | undefined) => {
+        if (!value) return null;
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    };
+
+    const getUsagePeriodTitle = (usage: any) => {
+        const periodEnd = formatUsagePeriodEnd(usage.billingPeriodEnd);
+        if (periodEnd) return `Ends ${periodEnd}`;
+        if (usage.billingPeriodKey?.startsWith("calendar:")) return `${usage.yearMonth} calendar`;
+        if (usage.billingPeriodKey?.startsWith("unresolved:")) return `${usage.yearMonth} unresolved`;
+        return usage.yearMonth;
+    };
+
+    const getUsagePeriodMeta = (usage: any) => {
+        if (usage.billingPeriodEnd) return "Shopify billing period";
+        if (usage.billingPeriodKey?.startsWith("calendar:")) return "Legacy calendar month";
+        if (usage.billingPeriodKey?.startsWith("unresolved:")) return "Billing period not synced";
+        return usage.billingPeriodKey || usage.yearMonth;
+    };
+
+    const getUsagePeriodOptionLabel = (usage: any) =>
+        `${getUsagePeriodTitle(usage)} - ${usage.totalVisitors.toLocaleString()} views - charged ${usage.chargedVisitors.toLocaleString()}`;
 
     const modeColor = (mode: string) => {
         if (mode === "popup") return "#6366f1";
@@ -545,7 +572,7 @@ export default function AdminShopDetail() {
                                         <option value="">-- Select Billing Period --</option>
                                         {monthlyUsage.map((u: any) => (
                                             <option key={u.id} value={u.billingPeriodKey}>
-                                                {u.yearMonth} (Logged: {u.totalVisitors})
+                                                {getUsagePeriodOptionLabel(u)}
                                             </option>
                                         ))}
                                     </select>
@@ -769,16 +796,29 @@ export default function AdminShopDetail() {
                             {monthlyUsage.length === 0 ? (
                                 <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No usage data recorded.</div>
                             ) : (
-                                monthlyUsage.map((u: any) => (
-                                    <div className="month-row" key={u.billingPeriodKey || u.yearMonth}>
-                                        <div className="month-name">{u.yearMonth}</div>
-                                        <div className="month-stats">
-                                            <span><b>{u.totalVisitors.toLocaleString()}</b> views</span>
-                                            <span><b>{u.redirected}</b> redirs</span>
-                                            <span>(Charged: <b>{u.chargedVisitors.toLocaleString()}</b>)</span>
+                                monthlyUsage.map((u: any) => {
+                                    const isCurrentPeriod = settings?.billingPeriodKey && u.billingPeriodKey === settings.billingPeriodKey;
+                                    return (
+                                        <div className="month-row" key={u.billingPeriodKey || u.yearMonth}>
+                                            <div>
+                                                <div className="month-name">
+                                                    {getUsagePeriodTitle(u)}
+                                                    {isCurrentPeriod ? (
+                                                        <span style={{ marginLeft: '8px', fontSize: '10px', color: '#10b981', fontWeight: 800 }}>CURRENT</span>
+                                                    ) : null}
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                                                    {getUsagePeriodMeta(u)}
+                                                </div>
+                                            </div>
+                                            <div className="month-stats">
+                                                <span><b>{u.totalVisitors.toLocaleString()}</b> views</span>
+                                                <span><b>{u.redirected}</b> redirs</span>
+                                                <span>(Charged: <b>{u.chargedVisitors.toLocaleString()}</b>)</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </div>

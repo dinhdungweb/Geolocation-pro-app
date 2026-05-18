@@ -28,6 +28,29 @@ function formatBillingPeriodEnd(value: string | Date | null | undefined) {
     }).format(date);
 }
 
+function getYearMonth(date: Date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getBillingWindowMonths(periodEnd: Date | string | null | undefined) {
+    if (!periodEnd) return [];
+
+    const end = periodEnd instanceof Date ? periodEnd : new Date(periodEnd);
+    if (Number.isNaN(end.getTime())) return [];
+
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const months: string[] = [];
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+    while (cursor <= endMonth) {
+        months.push(getYearMonth(cursor));
+        cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return months;
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
@@ -40,17 +63,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const allSettings = await prisma.settings.findMany({ where: { NOT: { shop: 'GLOBAL' } } });
     const currentPeriodKeys = allSettings.map((s: any) => s.billingPeriodKey || `calendar:${calendarYearMonth}`);
+    const shopsWithSettings = allSettings.map((s: any) => s.shop);
+    const legacyMonthsToCheck = Array.from(new Set([
+        calendarYearMonth,
+        prevYearMonth,
+        ...allSettings.flatMap((s: any) => getBillingWindowMonths(s.billingPeriodEnd)),
+    ]));
 
-    const [currentUsage, prevUsage] = await Promise.all([
+    const [currentUsage, prevUsage, legacyCalendarUsage] = await Promise.all([
         prisma.monthlyUsage.findMany({
             where: {
                 billingPeriodKey: { in: currentPeriodKeys },
             },
         }),
         prisma.monthlyUsage.findMany({ where: { yearMonth: prevYearMonth } }),
+        prisma.monthlyUsage.findMany({
+            where: {
+                shop: { in: shopsWithSettings },
+                yearMonth: { in: legacyMonthsToCheck },
+                billingPeriodKey: { startsWith: "calendar:" },
+            },
+            select: {
+                shop: true,
+                yearMonth: true,
+            },
+        }),
     ]);
 
     const usageMap = new Map((currentUsage as any[]).map((u) => [`${u.shop}:${u.billingPeriodKey}`, u]));
+    const legacyCalendarMap = new Set((legacyCalendarUsage as any[]).map((u) => `${u.shop}:${u.yearMonth}`));
     const prevUsageMap = new Map<string, number>();
     (prevUsage as any[]).forEach((u) => {
         prevUsageMap.set(u.shop, (prevUsageMap.get(u.shop) || 0) + (u.totalVisitors || 0));
@@ -64,6 +105,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const totalVisitors = usage?.totalVisitors || 0;
         const chargedVisitors = usage?.chargedVisitors || 0;
+        const hasLegacyCalendarOverlap = Boolean(
+            s.billingPeriodEnd &&
+            getBillingWindowMonths(s.billingPeriodEnd).some((month) => legacyCalendarMap.has(`${s.shop}:${month}`))
+        );
         const planUnlimitedUsage = hasUnlimitedUsage(plan, s);
         const monthlyUnlimitedReward = hasMonthlyUnlimitedReward(plan, chargedVisitors);
         const unlimitedUsage = planUnlimitedUsage || monthlyUnlimitedReward;
@@ -77,10 +122,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         // Detect overcharge: chargedVisitors > actual overage
         const actualOverage = planUnlimitedUsage ? 0 : billableOverage;
         const overcharged = chargedVisitors > actualOverage ? chargedVisitors - actualOverage : 0;
-        const overchargedAmount = Number((overcharged * OVERAGE_RATE).toFixed(2));
+        const needsLegacyReview = overcharged > 0 && hasLegacyCalendarOverlap;
+        const overchargedAmount = needsLegacyReview ? 0 : Number((overcharged * OVERAGE_RATE).toFixed(2));
+        const chargeReviewAmount = needsLegacyReview ? Number((overcharged * OVERAGE_RATE).toFixed(2)) : 0;
 
-        let status: 'ok' | 'pending' | 'waiting' | 'overcharged' | 'free_exceeded' = 'ok';
-        if (overcharged > 0) status = 'overcharged';
+        let status: 'ok' | 'pending' | 'waiting' | 'overcharged' | 'charge_review' | 'free_exceeded' = 'ok';
+        if (needsLegacyReview) status = 'charge_review';
+        else if (overcharged > 0) status = 'overcharged';
         else if (plan === FREE_PLAN && totalVisitors > limit) status = 'free_exceeded';
         else if (uncharged > 0 && unchargedAmount >= 1.00) status = 'pending';
         else if (uncharged > 0 && unchargedAmount < 1.00) status = 'waiting';
@@ -101,6 +149,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             unchargedAmount,
             overcharged,
             overchargedAmount,
+            chargeReviewAmount,
+            hasLegacyCalendarOverlap,
             prevTotal,
             status,
         };
@@ -108,8 +158,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // Sort: issues first, then by totalVisitors desc
     shops.sort((a: any, b: any) => {
-        const priority: Record<string, number> = { overcharged: 0, pending: 1, free_exceeded: 2, waiting: 3, ok: 4 };
-        const diff = (priority[a.status] || 4) - (priority[b.status] || 4);
+        const priority: Record<string, number> = { overcharged: 0, charge_review: 1, pending: 2, free_exceeded: 3, waiting: 4, ok: 5 };
+        const diff = (priority[a.status] ?? 5) - (priority[b.status] ?? 5);
         if (diff !== 0) return diff;
         return b.totalVisitors - a.totalVisitors;
     });
@@ -119,7 +169,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const totalPending = shops.reduce((s: number, x: any) => s + (x.status === 'pending' ? x.unchargedAmount : 0), 0);
     const totalOvercharged = shops.reduce((s: number, x: any) => s + x.overchargedAmount, 0);
     const paidShops = shops.filter((x: any) => x.plan !== FREE_PLAN).length;
-    const issueCount = shops.filter((x: any) => x.status === 'overcharged' || x.status === 'pending').length;
+    const issueCount = shops.filter((x: any) => x.status === 'overcharged' || x.status === 'pending' || x.status === 'charge_review').length;
 
     return json({
         shops,
@@ -156,6 +206,7 @@ export default function AdminBilling() {
         waiting: { label: 'Waiting (< $1)', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
         pending: { label: 'Pending Charge', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
         overcharged: { label: 'Overcharged', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
+        charge_review: { label: 'Review Legacy', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
         free_exceeded: { label: 'Free Exceeded', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
     };
 
@@ -361,6 +412,7 @@ export default function AdminBilling() {
                     <option value="waiting">Waiting (&lt; $1)</option>
                     <option value="pending">Pending Charge</option>
                     <option value="overcharged">Overcharged</option>
+                    <option value="charge_review">Review Legacy</option>
                     <option value="free_exceeded">Free Exceeded</option>
                 </select>
                 <select className="b-filter" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
@@ -468,6 +520,11 @@ export default function AdminBilling() {
                                                 {s.overchargedAmount > 0 && (
                                                     <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
                                                         +${s.overchargedAmount.toFixed(2)} excess
+                                                    </div>
+                                                )}
+                                                {s.chargeReviewAmount > 0 && (
+                                                    <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600 }}>
+                                                        legacy review
                                                     </div>
                                                 )}
                                             </td>
