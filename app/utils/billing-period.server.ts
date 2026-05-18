@@ -98,19 +98,6 @@ function getBillingPeriodStart(periodEnd: Date) {
   return new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000);
 }
 
-function getYearMonthsInRange(start: Date, end: Date) {
-  const months: string[] = [];
-  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-
-  while (cursor <= endMonth) {
-    months.push(getYearMonth(cursor));
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-
-  return months;
-}
-
 async function getBillableUsageCounts(shop: string, periodStart: Date, periodEnd: Date) {
   const events = await prisma.billableUsageEvent.findMany({
     where: {
@@ -133,21 +120,6 @@ async function getBillableUsageCounts(shop: string, periodStart: Date, periodEnd
     ).length,
     popupShown: events.filter((event) => event.action === "popup_shown").length,
   };
-}
-
-async function hasLegacyCalendarUsage(shop: string, periodStart: Date, periodEnd: Date) {
-  const months = getYearMonthsInRange(periodStart, periodEnd);
-  if (months.length === 0) return false;
-
-  const legacyRows = await prisma.monthlyUsage.count({
-    where: {
-      shop,
-      yearMonth: { in: months },
-      billingPeriodKey: { startsWith: "calendar:" },
-    },
-  });
-
-  return legacyRows > 0;
 }
 
 function getUsageRecordChargedVisitors(usageLineItem: any, periodEnd: Date) {
@@ -191,7 +163,6 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
 
   const periodStart = getBillingPeriodStart(period.billingPeriodEnd);
   const usageCounts = await getBillableUsageCounts(shop, periodStart, period.billingPeriodEnd);
-  const hasLegacyUsage = await hasLegacyCalendarUsage(shop, periodStart, period.billingPeriodEnd);
   const existing = await prisma.monthlyUsage.findUnique({
     where: {
       shop_billingPeriodKey: {
@@ -202,9 +173,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
   });
 
   if (existing) {
-    const nextChargedVisitors = hasLegacyUsage
-      ? existing.chargedVisitors
-      : Math.max(existing.chargedVisitors, period.chargedVisitors);
+    const nextChargedVisitors = Math.max(existing.chargedVisitors, period.chargedVisitors);
     await prisma.monthlyUsage.update({
       where: {
         shop_billingPeriodKey: {
@@ -226,7 +195,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
     return;
   }
 
-  const chargedVisitors = hasLegacyUsage ? 0 : period.chargedVisitors;
+  const chargedVisitors = period.chargedVisitors;
   if (usageCounts.totalVisitors === 0 && chargedVisitors === 0) return;
 
   try {

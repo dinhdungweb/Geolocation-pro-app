@@ -60,6 +60,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Previous month for comparison
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevYearMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(prevDate.getFullYear(), prevDate.getMonth(), 1);
 
     const allSettings = await prisma.settings.findMany({ where: { NOT: { shop: 'GLOBAL' } } });
     const currentPeriodKeys = allSettings.map((s: any) => s.billingPeriodKey || `calendar:${calendarYearMonth}`);
@@ -76,7 +78,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 billingPeriodKey: { in: currentPeriodKeys },
             },
         }),
-        prisma.monthlyUsage.findMany({ where: { yearMonth: prevYearMonth } }),
+        prisma.analyticsCountry.groupBy({
+            by: ['shop'],
+            where: {
+                shop: { in: shopsWithSettings },
+                date: {
+                    gte: prevMonthStart,
+                    lt: currentMonthStart,
+                },
+            },
+            _sum: { visitors: true },
+        }),
         prisma.monthlyUsage.findMany({
             where: {
                 shop: { in: shopsWithSettings },
@@ -94,7 +106,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const legacyCalendarMap = new Set((legacyCalendarUsage as any[]).map((u) => `${u.shop}:${u.yearMonth}`));
     const prevUsageMap = new Map<string, number>();
     (prevUsage as any[]).forEach((u) => {
-        prevUsageMap.set(u.shop, (prevUsageMap.get(u.shop) || 0) + (u.totalVisitors || 0));
+        prevUsageMap.set(u.shop, u._sum?.visitors || 0);
     });
 
     const shops = allSettings.map((s: any) => {

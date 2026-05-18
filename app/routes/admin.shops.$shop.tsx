@@ -22,6 +22,35 @@ import {
     Gem
 } from "lucide-react";
 
+function getYearMonth(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getUsageSortTime(usage: any) {
+    const periodEnd = usage.billingPeriodEnd ? new Date(usage.billingPeriodEnd).getTime() : NaN;
+    if (!Number.isNaN(periodEnd)) return periodEnd;
+
+    const monthStart = new Date(`${usage.yearMonth}-01T00:00:00.000Z`).getTime();
+    return Number.isNaN(monthStart) ? 0 : monthStart;
+}
+
+function sortUsageRows(rows: any[], currentBillingPeriodKey: string | null | undefined) {
+    return [...rows].sort((a, b) => {
+        const aCurrent = currentBillingPeriodKey && a.billingPeriodKey === currentBillingPeriodKey;
+        const bCurrent = currentBillingPeriodKey && b.billingPeriodKey === currentBillingPeriodKey;
+        if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+
+        const timeDiff = getUsageSortTime(b) - getUsageSortTime(a);
+        if (timeDiff !== 0) return timeDiff;
+
+        const aHasPeriodEnd = Boolean(a.billingPeriodEnd);
+        const bHasPeriodEnd = Boolean(b.billingPeriodEnd);
+        if (aHasPeriodEnd !== bHasPeriodEnd) return aHasPeriodEnd ? -1 : 1;
+
+        return String(b.billingPeriodKey || b.yearMonth).localeCompare(String(a.billingPeriodKey || a.yearMonth));
+    });
+}
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     await requireAdminAuth(request);
     const shop = decodeURIComponent(params.shop ?? "");
@@ -126,8 +155,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const shop = decodeURIComponent(params.shop ?? "");
     if (!shop) throw redirect("/admin");
 
-    const [settings, rules, logs, monthlyUsage] = await Promise.all([
-        prisma.settings.findUnique({ where: { shop } }),
+    const settings = await prisma.settings.findUnique({ where: { shop } });
+    const currentCalendarKey = `calendar:${getYearMonth()}`;
+    const currentBillingPeriodKey = settings?.billingPeriodKey || currentCalendarKey;
+
+    const [rules, logs, recentUsage, currentPeriodUsage] = await Promise.all([
         prisma.redirectRule.findMany({
             where: { shop },
             orderBy: { priority: "desc" },
@@ -150,20 +182,39 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         prisma.monthlyUsage.findMany({
             where: { shop },
             orderBy: [
-                { billingPeriodEnd: "desc" },
                 { yearMonth: "desc" },
+                { createdAt: "desc" },
             ],
-            take: 6,
+            take: 12,
+        }),
+        prisma.monthlyUsage.findUnique({
+            where: {
+                shop_billingPeriodKey: {
+                    shop,
+                    billingPeriodKey: currentBillingPeriodKey,
+                },
+            },
         }),
     ]);
+    const usageByKey = new Map<string, any>();
+    (recentUsage as any[]).forEach((usage) => usageByKey.set(usage.billingPeriodKey, usage));
+    if (currentPeriodUsage) usageByKey.set((currentPeriodUsage as any).billingPeriodKey, currentPeriodUsage);
+    const monthlyUsage = sortUsageRows(Array.from(usageByKey.values()), currentBillingPeriodKey).slice(0, 6);
 
     const currentPlan = settings?.currentPlan || FREE_PLAN;
     const hasProPlan = currentPlan !== FREE_PLAN;
+    const currentUsage =
+        (settings?.billingPeriodKey
+            ? monthlyUsage.find((u: any) => u.billingPeriodKey === settings.billingPeriodKey)
+            : null) ||
+        monthlyUsage.find((u: any) => u.billingPeriodKey === currentCalendarKey) ||
+        monthlyUsage[0] ||
+        null;
 
-    const totalVisitors = monthlyUsage.reduce((s: number, u: any) => s + u.totalVisitors, 0);
-    const totalRedirected = monthlyUsage.reduce((s: number, u: any) => s + u.redirected, 0);
-    const totalBlocked = monthlyUsage.reduce((s: number, u: any) => s + u.blocked, 0);
-    const totalPopups = monthlyUsage.reduce((s: number, u: any) => s + (u.popupShown || 0), 0);
+    const totalVisitors = currentUsage?.totalVisitors || 0;
+    const totalRedirected = currentUsage?.redirected || 0;
+    const totalBlocked = currentUsage?.blocked || 0;
+    const totalPopups = currentUsage?.popupShown || 0;
 
     const effectiveActiveRules = rules.filter((r: any) => {
         if (!r.isActive) return false;
@@ -199,7 +250,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         rules: rules.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
         logs: logs.map((l: any) => ({ ...l, timestamp: l.timestamp.toISOString() })),
         monthlyUsage,
-        stats: { totalVisitors, totalRedirected, totalBlocked, totalPopups, activeRules: effectiveActiveRules, totalRules: rules.length },
+        stats: {
+            totalVisitors,
+            totalRedirected,
+            totalBlocked,
+            totalPopups,
+            activeRules: effectiveActiveRules,
+            totalRules: rules.length,
+        },
     });
 };
 
@@ -674,7 +732,7 @@ export default function AdminShopDetail() {
                         <Eye size={22} />
                     </div>
                     <div className="stat-info">
-                        <div className="label">Total Views</div>
+                        <div className="label">Period Views</div>
                         <div className="value">{stats.totalVisitors.toLocaleString()}</div>
                     </div>
                 </div>
@@ -683,7 +741,7 @@ export default function AdminShopDetail() {
                         <Zap size={22} />
                     </div>
                     <div className="stat-info">
-                        <div className="label">Redirects</div>
+                        <div className="label">Period Redirects</div>
                         <div className="value">{stats.totalRedirected.toLocaleString()}</div>
                     </div>
                 </div>
@@ -692,7 +750,7 @@ export default function AdminShopDetail() {
                         <ShieldAlert size={22} />
                     </div>
                     <div className="stat-info">
-                        <div className="label">Blocked</div>
+                        <div className="label">Period Blocked</div>
                         <div className="value">{stats.totalBlocked.toLocaleString()}</div>
                     </div>
                 </div>

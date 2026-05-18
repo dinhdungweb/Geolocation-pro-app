@@ -6,41 +6,44 @@ import { requireAdminAuth } from "../utils/admin.session.server";
 import { useState, useMemo } from "react";
 import { Search, ExternalLink, X } from "lucide-react";
 
+function getYearMonth(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    
-    const [shops, ruleCounts, usage] = await Promise.all([
+
+    const [shops, ruleCounts] = await Promise.all([
         prisma.settings.findMany({
+            where: { NOT: { shop: 'GLOBAL' } },
             orderBy: { createdAt: "desc" },
         }),
         prisma.redirectRule.groupBy({
             by: ['shop'],
             _count: { id: true }
-        }),
-        prisma.monthlyUsage.findMany({
-            orderBy: [
-                { billingPeriodEnd: "desc" },
-                { yearMonth: "desc" },
-            ]
         })
     ]);
 
+    const currentCalendarKey = `calendar:${getYearMonth()}`;
+    const usagePeriodKeys = Array.from(new Set(shops.map((s: any) => s.billingPeriodKey || currentCalendarKey)));
+    const usage = usagePeriodKeys.length > 0
+        ? await prisma.monthlyUsage.findMany({
+            where: {
+                shop: { in: shops.map((s: any) => s.shop) },
+                billingPeriodKey: { in: usagePeriodKeys },
+            },
+        })
+        : [];
+
     const rulesMap = new Map(ruleCounts.map((r: any) => [r.shop, r._count.id]));
-    
-    // Create usage map from the latest known billing period per shop.
-    const usageMap = new Map();
-    usage.forEach((u: any) => {
-        if (!usageMap.has(u.shop)) {
-            usageMap.set(u.shop, u);
-        }
-    });
+    const usageMap = new Map((usage as any[]).map((u: any) => [`${u.shop}:${u.billingPeriodKey}`, u]));
 
     return json({ 
         shops: shops.map((s: any) => ({
             ...s,
             createdAt: s.createdAt.toISOString(),
             ruleCount: rulesMap.get(s.shop) || 0,
-            latestUsage: usageMap.get(s.shop)
+            latestUsage: usageMap.get(`${s.shop}:${s.billingPeriodKey || currentCalendarKey}`)
         }))
     });
 };
@@ -286,7 +289,7 @@ export default function AdminShops() {
                                 <th>Plan</th>
                                 <th>Active Mode</th>
                                 <th>Rules</th>
-                                <th>Traffic (Last Month)</th>
+                                <th>Traffic (Current Period)</th>
                                 <th>Installed</th>
                                 <th>Actions</th>
                             </tr>

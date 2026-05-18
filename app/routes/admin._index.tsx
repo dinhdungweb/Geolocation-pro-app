@@ -12,6 +12,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     try {
         const now = new Date();
         const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const yearStart = new Date(now.getFullYear(), 0, 1);
 
         const [
             totalShops,
@@ -19,9 +20,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             totalVisitors,
             countryStats,
             settings,
-            monthlyTrends
+            trendRows
         ] = await Promise.all([
-            prisma.settings.count(),
+            prisma.settings.count({ where: { NOT: { shop: 'GLOBAL' } } }),
             prisma.redirectRule.count({ where: { isActive: true } }),
             prisma.analyticsCountry.aggregate({ _sum: { visitors: true } }),
             prisma.analyticsCountry.groupBy({
@@ -30,14 +31,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 orderBy: { _sum: { visitors: 'desc' } },
                 take: 5
             }),
-            prisma.settings.findMany({ select: { shop: true, currentPlan: true, mode: true, customPlanPrice: true, billingPeriodKey: true } }),
-            prisma.monthlyUsage.groupBy({
-                by: ['yearMonth'],
-                _sum: { totalVisitors: true, redirected: true },
-                orderBy: { yearMonth: 'desc' },
-                take: 12
+            prisma.settings.findMany({
+                where: { NOT: { shop: 'GLOBAL' } },
+                select: { shop: true, currentPlan: true, mode: true, customPlanPrice: true, billingPeriodKey: true },
+            }),
+            prisma.analyticsCountry.findMany({
+                where: { date: { gte: yearStart } },
+                select: { date: true, visitors: true, redirected: true },
             })
         ]);
+
+        const trendMap = new Map<string, { totalVisitors: number; redirected: number }>();
+        (trendRows as any[]).forEach((row) => {
+            const rowMonth = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`;
+            const current = trendMap.get(rowMonth) || { totalVisitors: 0, redirected: 0 };
+            current.totalVisitors += row.visitors || 0;
+            current.redirected += row.redirected || 0;
+            trendMap.set(rowMonth, current);
+        });
+        const monthlyTrends = Array.from(trendMap.entries())
+            .map(([trendMonth, sums]) => ({
+                yearMonth: trendMonth,
+                _sum: {
+                    totalVisitors: sums.totalVisitors,
+                    redirected: sums.redirected,
+                },
+            }))
+            .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
 
         const currentPeriodKeys = settings.map((s: any) => s.billingPeriodKey || `calendar:${yearMonth}`);
         const currentPeriodUsage = await prisma.monthlyUsage.findMany({
@@ -101,7 +121,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 redirects: c._sum.redirected || 0
             })),
             distributions: { plans, modes },
-            trends: monthlyTrends.reverse()
+            trends: monthlyTrends
         });
     } catch (error) {
         console.error("Dashboard Loader Error:", error);
