@@ -7,7 +7,6 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
-import { cleanupOldLogs } from "../utils/cleanup.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
@@ -17,9 +16,6 @@ const CRISP_IDLE_TIMEOUT_MS = 1500;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
-
-  // Fire-and-forget cleanup so it cannot delay the initial admin iframe render.
-  cleanupOldLogs().catch(() => {});
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",

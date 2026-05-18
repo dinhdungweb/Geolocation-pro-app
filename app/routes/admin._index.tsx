@@ -5,6 +5,35 @@ import { Gem, Store, TrendingUp } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 
+type CountryDistribution = {
+  code: string;
+  visitors: number;
+  redirects: number;
+};
+
+type AdminDashboardLoaderData = {
+  stats: {
+    totalShops: number;
+    activeRules: number;
+    totalVisitors: number;
+    subscriptionRevenue: number;
+    overageRevenue: number;
+    totalRevenue: number;
+  };
+  countries: CountryDistribution[];
+  distributions: {
+    plans: Record<string, number>;
+    modes: Record<string, number>;
+  };
+  trends: {
+    yearMonth: string;
+    _sum: {
+      totalVisitors: number;
+      redirected: number;
+    };
+  }[];
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireAdminAuth(request);
 
@@ -108,7 +137,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return acc;
     }, {});
 
-    return json({
+    const countries = countryStats.reduce<CountryDistribution[]>((items, country) => {
+      if (!country.countryCode) return items;
+
+      items.push({
+        code: country.countryCode,
+        visitors: country._sum.visitors || 0,
+        redirects: country._sum.redirected || 0,
+      });
+      return items;
+    }, []);
+
+    return json<AdminDashboardLoaderData>({
       stats: {
         totalShops,
         activeRules,
@@ -117,17 +157,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         overageRevenue,
         totalRevenue: subscriptionRevenue + overageRevenue,
       },
-      countries: countryStats.map((country) => ({
-        code: country.countryCode,
-        visitors: country._sum.visitors || 0,
-        redirects: country._sum.redirected || 0,
-      })),
+      countries,
       distributions: { plans, modes },
       trends: monthlyTrends,
     });
   } catch (error) {
     console.error("Dashboard Loader Error:", error);
-    return json({
+    return json<AdminDashboardLoaderData>({
       stats: {
         totalShops: 0,
         activeRules: 0,
@@ -163,7 +199,7 @@ function getFullYearTrends(monthlyTrends: any[]) {
 }
 
 export default function AdminDashboard() {
-  const { stats, countries, distributions, trends } = useLoaderData<typeof loader>();
+  const { stats, countries, distributions, trends } = useLoaderData<AdminDashboardLoaderData>();
   const fullYearTrends = getFullYearTrends(trends);
   const maxTrendVisitors =
     Math.max(...fullYearTrends.map((trend) => trend._sum?.totalVisitors || 0)) || 1;

@@ -5,13 +5,12 @@ const LOG_RETENTION_DAYS = 30;
 const BILLABLE_EVENT_RETENTION_DAYS = 62; // Must exceed max billing period (~30d) + buffer
 
 // In-memory tracker to avoid running cleanup too frequently
-// Only runs once per server process per day
+// Only runs once per server process per day, even if startup and schedule overlap.
 let lastCleanupDate = "";
 
 /**
- * Lazy cleanup: delete old VisitorLogs and BillableUsageEvents.
+ * Deletes old VisitorLogs and BillableUsageEvents.
  * Runs at most once per day per server process to avoid performance impact.
- * Called from layout loader (app.tsx) on every admin page load.
  */
 export async function cleanupOldLogs() {
     const today = new Date().toISOString().slice(0, 10); // "2026-02-27"

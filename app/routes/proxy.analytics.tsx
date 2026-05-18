@@ -8,7 +8,6 @@ import {
   verifyAnalyticsToken,
   type AnalyticsTokenPayload,
 } from "../utils/analytics-token.server";
-import { cleanupOldLogs } from "../utils/cleanup.server";
 import { getVisitorIP } from "../utils/request-ip.server";
 import { recordStorefrontAnalyticsEvent } from "../utils/storefront-analytics.server";
 
@@ -70,8 +69,6 @@ async function readJsonBody(request: Request) {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  cleanupOldLogs().catch(() => {});
-
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
