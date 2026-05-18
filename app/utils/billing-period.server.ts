@@ -130,7 +130,10 @@ async function getCarryForwardUsageCounts(shop: string, period: UsagePeriod) {
     where: {
       shop,
       billingPeriodKey: { not: period.key },
-      billingPeriodEnd: period.billingPeriodEnd,
+      OR: [
+        { billingPeriodEnd: period.billingPeriodEnd },
+        { billingPeriodKey: `calendar:${period.yearMonth}` },
+      ],
     },
     select: {
       totalVisitors: true,
