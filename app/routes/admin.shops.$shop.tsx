@@ -494,15 +494,19 @@ export default function AdminShopDetail() {
 
                 @media (max-width: 768px) {
                     .back-bar {
-                        flex-direction: column;
-                        align-items: stretch;
-                        gap: 10px;
+                        display: grid;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 8px;
                         margin-bottom: 14px;
                     }
                     .back-btn,
                     .adjust-trigger-btn {
                         width: 100%;
+                        min-width: 0;
                         justify-content: center;
+                        padding: 8px 10px;
+                        font-size: 12px;
+                        white-space: nowrap;
                     }
                     .hero-section {
                         flex-direction: column;
