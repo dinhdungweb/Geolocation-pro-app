@@ -216,7 +216,7 @@ export default function MessagingDashboard() {
           <span>Click</span>
           <span>Conversion</span>
           <span>Sales</span>
-          <span></span>
+          <span>Preview</span>
         </div>
 
         {filteredActivities.length === 0 ? (
@@ -573,7 +573,7 @@ export default function MessagingDashboard() {
 
         .ed-mail-grid {
           display: grid;
-          grid-template-columns: minmax(260px, 2fr) 110px 90px 90px 110px 80px 44px;
+          grid-template-columns: minmax(260px, 2fr) 110px 90px 90px 110px 80px 72px;
           gap: 12px;
           align-items: center;
         }
@@ -603,6 +603,11 @@ export default function MessagingDashboard() {
         .ed-mail-row:disabled {
           cursor: default;
           opacity: 0.72;
+        }
+
+        .ed-mail-grid-head span:last-child {
+          justify-self: center;
+          text-align: center;
         }
 
         .ed-subject-cell {
@@ -660,7 +665,7 @@ export default function MessagingDashboard() {
         }
 
         .ed-view-icon {
-          justify-self: end;
+          justify-self: center;
           color: var(--ed-color-border-muted);
         }
 
