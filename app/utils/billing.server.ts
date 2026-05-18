@@ -140,8 +140,27 @@ export async function chargeOverageUsageRecord({
     chargedVisitors: number;
     minimumChargeAmount?: number;
 }) {
-    if (await reconcilePendingChargeAttempt(shop, usagePeriod)) {
-        return { status: "reconciled" as const };
+    // Reconcile ANY unresolved attempts for this period before calculating new overages
+    // This prevents double-charging if an old attempt failed to update DB but traffic increased
+    const unresolvedAttempts = await prisma.usageChargeAttempt.findMany({
+        where: {
+            shop,
+            billingPeriodKey: usagePeriod.key,
+            status: { in: [CHARGE_STATUS.SHOPIFY_CHARGED, CHARGE_STATUS.DB_UPDATE_FAILED] }
+        }
+    });
+
+    if (unresolvedAttempts.length > 0) {
+        let reconciled = false;
+        for (const attempt of unresolvedAttempts) {
+            if (await reconcilePendingChargeAttempt(shop, usagePeriod)) {
+                reconciled = true;
+            }
+        }
+        if (reconciled) {
+            console.log(`[Billing] Reconciled unresolved charge attempts for ${shop}. Deferring new charge to next cycle.`);
+            return { status: "reconciled" as const };
+        }
     }
 
     if (hasMonthlyOverageCapReached(currentPlan, chargedVisitors)) {

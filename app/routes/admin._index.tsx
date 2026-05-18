@@ -225,24 +225,30 @@ export default function AdminDashboard() {
 
             <div className="grid-stats">
                 <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#eef2ff', color: '#6366f1' }}><Store size={24} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Total Installations</div>
-                    <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>{stats.totalShops}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>All time</div>
+                    <div className="stat-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}><Store size={22} /></div>
+                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Total Installations</div>
+                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>{stats.totalShops}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--admin-faint)', marginTop: '4px' }}>All time</div>
                 </div>
                 <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}><TrendingUp size={24} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Global Traffic</div>
-                    <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>{stats.totalVisitors.toLocaleString()}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Real-time aggregated</div>
+                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}><TrendingUp size={22} /></div>
+                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Global Traffic</div>
+                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>{stats.totalVisitors.toLocaleString()}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--admin-faint)', marginTop: '4px' }}>Real-time aggregated</div>
                 </div>
-                <div className="premium-card" style={{ borderLeft: '3px solid #059669' }}>
-                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}><Gem size={24} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Total Revenue (This Month)</div>
-                    <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>${stats.totalRevenue.toFixed(2)}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
-                        <div>Subscriptions: ${stats.subscriptionRevenue.toFixed(2)}</div>
-                        <div>Overage: ${stats.overageRevenue.toFixed(2)}</div>
+                <div className="premium-card">
+                    <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}><Store size={22} /></div>
+                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Active Rules</div>
+                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>{stats.activeRules}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--admin-faint)', marginTop: '4px' }}>Currently active redirects</div>
+                </div>
+                <div className="premium-card">
+                    <div className="stat-icon" style={{ background: '#fce7f3', color: '#db2777' }}><Gem size={22} /></div>
+                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Total Revenue</div>
+                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>${stats.totalRevenue.toFixed(2)}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--admin-faint)', marginTop: '8px', lineHeight: '1.4' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subscriptions:</span> <span style={{fontWeight:600}}>${stats.subscriptionRevenue.toFixed(2)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop:'4px' }}><span>Overage:</span> <span style={{fontWeight:600}}>${stats.overageRevenue.toFixed(2)}</span></div>
                     </div>
                 </div>
             </div>
@@ -250,7 +256,7 @@ export default function AdminDashboard() {
             <div className="grid-main">
                 <div className="premium-card">
                     <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '24px' }}>Traffic Growth Trend</h3>
-                    <div className="traffic-bars" style={{ height: '260px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '0', borderBottom: '1px solid #f1f5f9' }}>
+                    <div className="traffic-bars" style={{ height: '260px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '0', borderBottom: '1px solid var(--admin-border)' }}>
                         {fullYearTrends.map((t: any) => {
                             const total = t._sum?.totalVisitors || 0;
                             const maxVal = Math.max(...fullYearTrends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
@@ -259,7 +265,7 @@ export default function AdminDashboard() {
                             return (
                                 <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', position: 'relative' }}>
                                     {total > 0 && (
-                                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#6366f1', marginBottom: '4px' }}>
+                                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#0ea5e9', marginBottom: '4px' }}>
                                             {total > 1000 ? (total / 1000).toFixed(1) + 'k' : total}
                                         </div>
                                     )}
@@ -268,14 +274,14 @@ export default function AdminDashboard() {
                                         style={{ 
                                             width: '70%', 
                                             height: `${(heightPercentage / 100) * 180}px`,
-                                            background: total > 0 ? '#2563eb' : 'transparent',
+                                            background: total > 0 ? 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)' : 'transparent',
                                             borderRadius: '6px 6px 2px 2px',
                                             transition: 'none',
                                             boxShadow: 'none',
                                             minHeight: total > 0 ? '4px' : '0'
                                         }} 
                                     />
-                                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, paddingBottom: '8px' }}>{t.yearMonth.split('-')[1]}</div>
+                                    <div style={{ fontSize: '10px', color: 'var(--admin-muted)', fontWeight: 800, paddingBottom: '8px' }}>{t.yearMonth.split('-')[1]}</div>
                                 </div>
                             );
                         })}
@@ -292,7 +298,7 @@ export default function AdminDashboard() {
                                     <span style={{ fontWeight: 700, fontSize: '13px' }}>{c.code}</span>
                                 </div>
                                 <div className="progress-bar">
-                                    <div className="progress-fill" style={{ width: `${stats.totalVisitors > 0 ? (c.visitors / stats.totalVisitors) * 100 : 0}%` }} />
+                                    <div className="progress-fill" style={{ width: `${stats.totalVisitors > 0 ? (c.visitors / stats.totalVisitors) * 100 : 0}%`, background: "linear-gradient(90deg, #38bdf8 0%, #0284c7 100%)" }} />
                                 </div>
                                 <div style={{ fontSize: '12px', fontWeight: 600 }}>{stats.totalVisitors > 0 ? ((c.visitors / stats.totalVisitors) * 100).toFixed(1) : '0.0'}%</div>
                             </div>
@@ -304,7 +310,7 @@ export default function AdminDashboard() {
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                             {Object.entries(distributions.plans).map(([plan, count]: [any, any]) => (
                                 <div key={plan} style={{ flex: 1, minWidth: '100px', textAlign: 'center', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '4px' }}>{plan}</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--admin-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '4px' }}>{plan}</div>
                                     <div style={{ fontSize: '20px', fontWeight: 800 }}>{count}</div>
                                 </div>
                             ))}

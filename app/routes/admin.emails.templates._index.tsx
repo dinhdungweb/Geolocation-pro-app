@@ -1,188 +1,413 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
-import { requireAdminAuth } from "../utils/admin.session.server";
-import { 
-    MoreHorizontal,
-    Plus,
-    Mail
-} from "lucide-react";
-
+import { Link, useLoaderData } from "@remix-run/react";
+import { Mail, MoreHorizontal, Palette, Plus } from "lucide-react";
 import prisma from "../db.server";
+import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
-    
-    let templates: Awaited<ReturnType<typeof prisma.emailTemplate.findMany>> = [];
-    try {
-        templates = await prisma.emailTemplate.findMany({
-            where: { shop: 'GLOBAL' },
-            orderBy: { updatedAt: 'desc' }
-        });
-    } catch (e) {
-        console.error("Prisma error in Templates loader:", e);
-    }
+  await requireAdminAuth(request);
 
-    return json({ templates });
+  let templates: Awaited<ReturnType<typeof prisma.emailTemplate.findMany>> = [];
+
+  try {
+    templates = await prisma.emailTemplate.findMany({
+      where: { shop: "GLOBAL" },
+      orderBy: { updatedAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Prisma error in Templates loader:", error);
+  }
+
+  return json({ templates });
 };
 
+const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
 export default function TemplatesGallery() {
-    const { templates } = useLoaderData<typeof loader>();
+  const { templates } = useLoaderData<typeof loader>();
 
-    return (
-        <div className="templates-dashboard-v2">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-                
-                .templates-dashboard-v2 { 
-                    padding: 0; 
-                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
-                    color: #0f172a;
-                }
-                
-                .glass-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 40px;
-                    padding: 20px 0;
-                }
-                .title-group h1 { 
-                    font-size: 32px; 
-                    font-weight: 800; 
-                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    letter-spacing: -0.03em;
-                }
-                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
-                
-                .actions-group { display: flex; gap: 12px; }
-                .btn-premium-solid {
-                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                    color: white;
-                    border: none;
-                    padding: 10px 24px;
-                    border-radius: 14px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .btn-premium-solid:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 12px 20px rgba(99, 102, 241, 0.3);
-                }
-                .btn-premium-outline {
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    padding: 10px 20px;
-                    border-radius: 14px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #475569;
-                    cursor: pointer;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: all 0.3s;
-                }
-                .btn-premium-outline:hover { border-color: #6366f1; color: #6366f1; transform: translateY(-1px); }
-
-                .templates-grid-premium {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                    gap: 32px;
-                    margin-top: 40px;
-                }
-                .template-card-premium {
-                    background: white;
-                    border-radius: 24px;
-                    border: 1px solid rgba(0,0,0,0.04);
-                    overflow: hidden;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    cursor: pointer;
-                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.01), 0 2px 4px -1px rgba(0,0,0,0.01);
-                }
-                .template-card-premium:hover {
-                    transform: translateY(-8px);
-                    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02);
-                    border-color: rgba(99, 102, 241, 0.2);
-                }
-                .template-preview-v2 {
-                    height: 240px;
-                    background: #f8fafc;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-bottom: 1px solid #f1f5f9;
-                    position: relative;
-                }
-                .template-preview-v2 img {
-                    width: 70%;
-                    height: 80%;
-                    object-fit: cover;
-                    border-radius: 8px;
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-                }
-                .template-info-v2 { padding: 20px; }
-                .template-info-v2 .name { font-weight: 700; font-size: 16px; color: #1e293b; display: block; margin-bottom: 4px; }
-                .template-info-v2 .edited { font-size: 12px; color: #94a3b8; font-weight: 500; }
-
-                @media (max-width: 768px) {
-                    .glass-header { flex-direction: column; align-items: flex-start; gap: 20px; }
-                    .actions-group { width: 100%; justify-content: space-between; }
-                    .templates-grid-premium { grid-template-columns: 1fr; gap: 20px; }
-                    .template-preview-v2 { height: 200px; }
-                }
-            `}</style>
-
-            <div className="glass-header">
-                <div className="title-group">
-                    <h1>Email Templates</h1>
-                    <p>Select a template to build your campaign or create your own custom design.</p>
-                </div>
-                <div className="actions-group">
-                    <button className="btn-premium-outline">Manage colors</button>
-                    <Link to="/admin/emails/templates/new" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
-                        <Plus size={16} /> Create template
-                    </Link>
-                </div>
-            </div>
-
-            <div className="templates-grid-premium">
-                {templates.length === 0 ? (
-                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px 0', background: 'white', borderRadius: '24px', border: '1px dashed #e2e8f0' }}>
-                        <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                            <Plus size={32} color="#94a3b8" />
-                        </div>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No templates yet</h3>
-                        <p style={{ color: '#64748b', marginBottom: '24px' }}>Build your first reusable email template to start sending campaigns.</p>
-                        <Link to="/admin/emails/templates/new" className="btn-premium-solid" style={{ margin: '0 auto', textDecoration: 'none' }}>
-                             Create your first template
-                        </Link>
-                    </div>
-                ) : (
-                    templates.map((tmp: any) => (
-                        <Link key={tmp.id} to={`/admin/emails/templates/${tmp.id}`} className="template-card-premium" style={{ textDecoration: 'none' }}>
-                            <div className="template-preview-v2">
-                                {tmp.thumb ? <img src={tmp.thumb} alt={tmp.name} /> : <Mail size={40} color="#cbd5e1" />}
-                            </div>
-                            <div className="template-info-v2">
-                                <span className="name">{tmp.name}</span>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span className="edited">Edited {new Date(tmp.updatedAt).toLocaleDateString()}</span>
-                                    <MoreHorizontal size={16} color="#94a3b8" />
-                                </div>
-                            </div>
-                        </Link>
-                    ))
-                )}
-            </div>
+  return (
+    <section className="templates-page">
+      <header className="templates-hero">
+        <div className="templates-title">
+          <span>Messaging assets</span>
+          <h2>Email templates</h2>
+          <p>
+            Keep global campaign templates organized, easy to scan, and ready for
+            new email workflows.
+          </p>
         </div>
-    );
+
+        <div className="templates-actions">
+          <button className="templates-secondary-button" type="button">
+            <Palette size={16} />
+            Manage colors
+          </button>
+          <Link className="templates-primary-button" to="/admin/emails/templates/new">
+            <Plus size={16} />
+            Create template
+          </Link>
+        </div>
+      </header>
+
+      {templates.length === 0 ? (
+        <div className="templates-empty">
+          <div className="templates-empty-icon">
+            <Mail size={24} />
+          </div>
+          <h3>No templates yet</h3>
+          <p>Create the first reusable template for product updates, billing notices, or campaigns.</p>
+          <Link className="templates-primary-button" to="/admin/emails/templates/new">
+            <Plus size={16} />
+            Create first template
+          </Link>
+        </div>
+      ) : (
+        <div className="templates-grid">
+          {templates.map((template) => (
+            <Link
+              className="template-item"
+              key={template.id}
+              to={`/admin/emails/templates/${template.id}`}
+            >
+              <div className="template-thumbnail">
+                {template.thumb ? (
+                  <img alt={template.name} src={template.thumb} />
+                ) : (
+                  <Mail size={30} />
+                )}
+              </div>
+
+              <div className="template-body">
+                <div className="template-meta">
+                  <span>Global template</span>
+                  <MoreHorizontal size={17} />
+                </div>
+                <h3>{template.name}</h3>
+                <p>Updated {dateFormatter.format(new Date(template.updatedAt))}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <style>{`
+        .templates-page {
+          display: grid;
+          gap: 18px;
+        }
+
+        .templates-hero {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 18px;
+          border: 1px solid var(--admin-border, #dbe3ef);
+          border-radius: 8px;
+          background: #ffffff;
+          box-shadow: var(--admin-shadow, 0 1px 2px rgba(16, 24, 40, 0.05));
+        }
+
+        .templates-title {
+          min-width: 0;
+        }
+
+        .templates-title span {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--admin-primary, #2563eb);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          line-height: 1.1;
+          text-transform: uppercase;
+        }
+
+        .templates-title h2 {
+          margin: 0;
+          color: var(--admin-text, #101828);
+          font-size: 22px;
+          font-weight: 800;
+          line-height: 1.2;
+        }
+
+        .templates-title p {
+          max-width: 640px;
+          margin: 7px 0 0;
+          color: var(--admin-muted, #667085);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .templates-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          flex: 0 0 auto;
+          gap: 10px;
+        }
+
+        .templates-primary-button,
+        .templates-secondary-button {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 0 14px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 750;
+          line-height: 1;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .templates-primary-button {
+          border: 1px solid #1d4ed8;
+          background: var(--admin-primary, #2563eb);
+          color: #ffffff;
+        }
+
+        .templates-primary-button:hover {
+          background: #1d4ed8;
+        }
+
+        .templates-secondary-button {
+          border: 1px solid var(--admin-border, #dbe3ef);
+          background: #ffffff;
+          color: #344054;
+        }
+
+        .templates-secondary-button:hover {
+          border-color: #93c5fd;
+          color: #1d4ed8;
+        }
+
+        .templates-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 16px;
+        }
+
+        .template-item {
+          display: block;
+          min-width: 0;
+          overflow: hidden;
+          border: 1px solid var(--admin-border, #dbe3ef);
+          border-radius: 8px;
+          background: #ffffff;
+          color: inherit;
+          text-decoration: none;
+          box-shadow: var(--admin-shadow, 0 1px 2px rgba(16, 24, 40, 0.05));
+        }
+
+        .template-item:hover {
+          border-color: #b9c5d6;
+        }
+
+        .template-thumbnail {
+          height: 174px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-bottom: 1px solid var(--admin-border-soft, #edf2f7);
+          background:
+            linear-gradient(90deg, rgba(37, 99, 235, 0.04) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(37, 99, 235, 0.04) 1px, transparent 1px),
+            #f8fafc;
+          background-size: 18px 18px;
+          color: #98a2b3;
+        }
+
+        .template-thumbnail img {
+          width: 72%;
+          height: 76%;
+          object-fit: cover;
+          border: 1px solid rgba(16, 24, 40, 0.08);
+          border-radius: 8px;
+          background: #ffffff;
+          box-shadow: 0 8px 18px rgba(16, 24, 40, 0.08);
+        }
+
+        .template-body {
+          display: grid;
+          gap: 7px;
+          padding: 14px;
+        }
+
+        .template-meta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          color: var(--admin-faint, #98a2b3);
+        }
+
+        .template-meta span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .template-body h3 {
+          margin: 0;
+          overflow: hidden;
+          color: var(--admin-text, #101828);
+          font-size: 14px;
+          font-weight: 800;
+          line-height: 1.35;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .template-body p {
+          margin: 0;
+          color: var(--admin-muted, #667085);
+          font-size: 12px;
+          font-weight: 600;
+          line-height: 1.4;
+        }
+
+        .templates-empty {
+          min-height: 320px;
+          display: grid;
+          justify-items: center;
+          align-content: center;
+          gap: 12px;
+          padding: 32px 18px;
+          border: 1px dashed #cbd5e1;
+          border-radius: 8px;
+          background: #ffffff;
+          text-align: center;
+        }
+
+        .templates-empty-icon {
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--admin-border, #dbe3ef);
+          border-radius: 8px;
+          background: #f8fafc;
+          color: var(--admin-primary, #2563eb);
+        }
+
+        .templates-empty h3 {
+          margin: 0;
+          color: var(--admin-text, #101828);
+          font-size: 17px;
+          font-weight: 800;
+        }
+
+        .templates-empty p {
+          max-width: 420px;
+          margin: 0;
+          color: var(--admin-muted, #667085);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+          .templates-page {
+            gap: 12px;
+          }
+
+          .templates-hero {
+            display: grid;
+            padding: 14px;
+          }
+
+          .templates-title h2 {
+            font-size: 19px;
+          }
+
+          .templates-title p {
+            font-size: 12px;
+          }
+
+          .templates-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            width: 100%;
+          }
+
+          .templates-primary-button,
+          .templates-secondary-button {
+            width: 100%;
+            min-height: 38px;
+            padding: 0 12px;
+            font-size: 12px;
+          }
+
+          .templates-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .template-item {
+            display: grid;
+            grid-template-columns: 108px minmax(0, 1fr);
+            min-height: 108px;
+          }
+
+          .template-thumbnail {
+            height: auto;
+            min-height: 108px;
+            border-right: 1px solid var(--admin-border-soft, #edf2f7);
+            border-bottom: 0;
+            background-size: 14px 14px;
+          }
+
+          .template-thumbnail img {
+            width: 76%;
+            height: 72%;
+          }
+
+          .template-body {
+            align-content: center;
+            padding: 12px;
+          }
+
+          .template-body h3 {
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+          }
+
+          .templates-empty {
+            min-height: 260px;
+            padding: 24px 14px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .template-item {
+            grid-template-columns: 94px minmax(0, 1fr);
+            min-height: 100px;
+          }
+
+          .template-thumbnail {
+            min-height: 100px;
+          }
+
+          .template-meta span {
+            font-size: 10px;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

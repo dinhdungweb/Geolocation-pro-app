@@ -10,38 +10,7 @@ import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
-let runtimePreloadStarted = false;
-let inAppCronStarted = false;
-
-function startRuntimePreload() {
-  if (runtimePreloadStarted || process.env.NODE_ENV === "test") return;
-
-  runtimePreloadStarted = true;
-
-  // Pre-warm MaxMind GeoIP reader so the first proxy request doesn't block
-  import("./utils/maxmind.server")
-    .then(({ preloadReader }) => preloadReader())
-    .catch((error) => console.error("[Runtime] Failed to preload MaxMind:", error));
-}
-
-function startInAppCron() {
-  if (
-    inAppCronStarted ||
-    process.env.NODE_ENV === "test" ||
-    process.env.DISABLE_IN_APP_CRON === "true"
-  ) {
-    return;
-  }
-
-  inAppCronStarted = true;
-
-  import("./utils/usage-cron.server")
-    .then(({ initUsageCron }) => initUsageCron())
-    .catch((error) => {
-      inAppCronStarted = false;
-      console.error("[Runtime] Failed to initialize in-app cron:", error);
-    });
-}
+// Background jobs are now initialized in db.server.ts
 
 export default async function handleRequest(
   request: Request,
@@ -49,8 +18,6 @@ export default async function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  startRuntimePreload();
-  startInAppCron();
   addDocumentResponseHeaders(request, responseHeaders);
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')

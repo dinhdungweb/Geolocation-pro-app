@@ -86,7 +86,7 @@ export function getUnchargedBillableOverageVisitors(
 }
 
 export function hasMonthlyUnlimitedReward(plan: string, chargedVisitors?: number | null) {
-    return isStandardPaidPlan(plan) && (chargedVisitors || 0) >= OVERAGE_MONTHLY_CAP_VISITORS;
+    return hasCappedOverage(plan) && (chargedVisitors || 0) >= getOverageMonthlyCapVisitors(plan);
 }
 
 export function hasMonthlyOverageCapReached(plan: string, chargedVisitors?: number | null) {
