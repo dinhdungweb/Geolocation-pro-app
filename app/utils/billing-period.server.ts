@@ -121,6 +121,46 @@ async function getBillableUsageCounts(shop: string, billingPeriodKey: string) {
   };
 }
 
+async function getCarryForwardUsageCounts(shop: string, period: UsagePeriod) {
+  if (period.source !== "shopify" || !period.billingPeriodEnd) {
+    return null;
+  }
+
+  const legacyRows = await prisma.monthlyUsage.findMany({
+    where: {
+      shop,
+      billingPeriodKey: { not: period.key },
+      billingPeriodEnd: period.billingPeriodEnd,
+    },
+    select: {
+      totalVisitors: true,
+      redirected: true,
+      blocked: true,
+      popupShown: true,
+      chargedVisitors: true,
+    },
+  });
+
+  if (legacyRows.length === 0) return null;
+
+  return legacyRows.reduce(
+    (carry, row) => ({
+      totalVisitors: Math.max(carry.totalVisitors, row.totalVisitors),
+      redirected: Math.max(carry.redirected, row.redirected),
+      blocked: Math.max(carry.blocked, row.blocked),
+      popupShown: Math.max(carry.popupShown, row.popupShown || 0),
+      chargedVisitors: Math.max(carry.chargedVisitors, row.chargedVisitors),
+    }),
+    {
+      totalVisitors: 0,
+      redirected: 0,
+      blocked: 0,
+      popupShown: 0,
+      chargedVisitors: 0,
+    },
+  );
+}
+
 function inferBillingPeriodStart(
   subscription: any,
   periodKey: string,
@@ -207,6 +247,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
   if (period.source !== "shopify" || !period.billingPeriodEnd) return;
 
   const usageCounts = await getBillableUsageCounts(shop, period.key);
+  const carryForwardCounts = await getCarryForwardUsageCounts(shop, period);
   const existing = await prisma.monthlyUsage.findUnique({
     where: {
       shop_billingPeriodKey: {
@@ -217,7 +258,11 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
   });
 
   if (existing) {
-    const nextChargedVisitors = Math.max(existing.chargedVisitors, period.chargedVisitors);
+    const nextChargedVisitors = Math.max(
+      existing.chargedVisitors,
+      period.chargedVisitors,
+      carryForwardCounts?.chargedVisitors || 0,
+    );
     await prisma.monthlyUsage.update({
       where: {
         shop_billingPeriodKey: {
@@ -226,10 +271,10 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
         },
       },
       data: {
-        totalVisitors: Math.max(existing.totalVisitors, usageCounts.totalVisitors),
-        redirected: Math.max(existing.redirected, usageCounts.redirected),
-        blocked: Math.max(existing.blocked, usageCounts.blocked),
-        popupShown: Math.max(existing.popupShown || 0, usageCounts.popupShown),
+        totalVisitors: Math.max(existing.totalVisitors, usageCounts.totalVisitors, carryForwardCounts?.totalVisitors || 0),
+        redirected: Math.max(existing.redirected, usageCounts.redirected, carryForwardCounts?.redirected || 0),
+        blocked: Math.max(existing.blocked, usageCounts.blocked, carryForwardCounts?.blocked || 0),
+        popupShown: Math.max(existing.popupShown || 0, usageCounts.popupShown, carryForwardCounts?.popupShown || 0),
         chargedVisitors: nextChargedVisitors,
         billingPeriodStart: period.billingPeriodStart,
         billingPeriodEnd: period.billingPeriodEnd,
@@ -240,8 +285,13 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
     return;
   }
 
-  const chargedVisitors = period.chargedVisitors;
-  if (usageCounts.totalVisitors === 0 && chargedVisitors === 0) return;
+  const chargedVisitors = Math.max(period.chargedVisitors, carryForwardCounts?.chargedVisitors || 0);
+  const totalVisitors = Math.max(usageCounts.totalVisitors, carryForwardCounts?.totalVisitors || 0);
+  const redirected = Math.max(usageCounts.redirected, carryForwardCounts?.redirected || 0);
+  const blocked = Math.max(usageCounts.blocked, carryForwardCounts?.blocked || 0);
+  const popupShown = Math.max(usageCounts.popupShown, carryForwardCounts?.popupShown || 0);
+
+  if (totalVisitors === 0 && chargedVisitors === 0) return;
 
   try {
     await prisma.monthlyUsage.create({
@@ -253,10 +303,10 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
         billingPeriodEnd: period.billingPeriodEnd,
         billingSubscriptionId: period.billingSubscriptionId,
         billingUsageLineItemId: period.billingUsageLineItemId,
-        totalVisitors: usageCounts.totalVisitors,
-        redirected: usageCounts.redirected,
-        blocked: usageCounts.blocked,
-        popupShown: usageCounts.popupShown,
+        totalVisitors,
+        redirected,
+        blocked,
+        popupShown,
         chargedVisitors,
       },
     });
