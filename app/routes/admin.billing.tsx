@@ -15,6 +15,19 @@ import {
 import { useState, useMemo } from "react";
 import { Search, X, DollarSign, AlertTriangle, Users, Clock } from "lucide-react";
 
+function formatBillingPeriodEnd(value: string | Date | null | undefined) {
+    if (!value) return null;
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return new Intl.DateTimeFormat("en", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    }).format(date);
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
@@ -377,6 +390,7 @@ export default function AdminBilling() {
                             <tr>
                                 <th>Shop</th>
                                 <th>Plan</th>
+                                <th>Period Ends</th>
                                 <th className="text-right">Limit</th>
                                 <th className="text-right">Visitors</th>
                                 <th className="text-right">Overage</th>
@@ -390,7 +404,7 @@ export default function AdminBilling() {
                         <tbody>
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                                    <td colSpan={11} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
                                         No shops match the filter
                                     </td>
                                 </tr>
@@ -400,6 +414,7 @@ export default function AdminBilling() {
                                     const isUnlimited = s.unlimitedUsage || s.limit >= Number.MAX_SAFE_INTEGER;
                                     const usagePercent = isUnlimited ? 100 : Math.min(100, Math.round((s.totalVisitors / s.limit) * 100));
                                     const barColor = isUnlimited ? '#10b981' : usagePercent >= 100 ? '#ef4444' : usagePercent >= 80 ? '#f59e0b' : '#10b981';
+                                    const periodEndLabel = formatBillingPeriodEnd(s.billingPeriodEnd);
 
                                     return (
                                         <tr key={s.shop}>
@@ -409,6 +424,14 @@ export default function AdminBilling() {
                                             </td>
                                             <td>
                                                 <span className={`plan-tag ${s.plan}`}>{s.plan}</span>
+                                            </td>
+                                            <td title={s.billingPeriodKey}>
+                                                <div className="mono" style={{ fontWeight: 700 }}>
+                                                    {periodEndLabel || (s.plan === FREE_PLAN ? "Calendar month" : "Sync pending")}
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                    {periodEndLabel ? "Shopify period" : s.billingPeriodKey}
+                                                </div>
                                             </td>
                                             <td className="mono text-right">{isUnlimited ? "Unlimited" : s.limit.toLocaleString()}</td>
                                             <td className="mono text-right">
