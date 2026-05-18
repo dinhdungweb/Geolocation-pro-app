@@ -283,6 +283,7 @@ export default function MessagingDashboard() {
         .ed-mail {
           --ed-mail-card-padding: var(--ed-card-padding);
           --ed-mail-day-padding: 12px;
+          --ed-mail-grid-min-width: 940px;
 
           display: grid;
           gap: var(--ed-space-2);
@@ -756,7 +757,7 @@ export default function MessagingDashboard() {
           }
 
           .ed-mail-grid {
-            min-width: 820px;
+            min-width: var(--ed-mail-grid-min-width);
           }
         }
 
@@ -829,7 +830,7 @@ export default function MessagingDashboard() {
           }
 
           .ed-mail-grid {
-            min-width: 820px;
+            min-width: var(--ed-mail-grid-min-width);
             gap: 8px;
           }
 
