@@ -506,7 +506,7 @@ export default function AdminShopDetail() {
                     .hero-section {
                         flex-direction: column;
                         align-items: stretch;
-                        gap: 14px;
+                        gap: 12px;
                         padding: 16px;
                         margin-bottom: 16px;
                     }
@@ -538,7 +538,7 @@ export default function AdminShopDetail() {
                     }
                     .section-grid {
                         grid-template-columns: 1fr;
-                        gap: 14px;
+                        gap: 12px;
                     }
                     .ed-shop-card-head,
                     .ed-shop-card-body {

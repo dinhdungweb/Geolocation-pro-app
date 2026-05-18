@@ -720,11 +720,29 @@ export default function AdminBilling() {
           }
 
           .ed-billing-toolbar {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px;
           }
 
           .ed-billing-search {
             grid-column: 1 / -1;
+            min-height: 38px;
+          }
+
+          .ed-billing-select,
+          .ed-billing-clear {
+            width: 100%;
+            min-width: 0;
+            min-height: 38px;
+          }
+
+          .ed-billing-clear {
+            grid-column: 1 / -1;
+          }
+
+          .ed-billing-count {
+            margin-top: -4px;
+            font-size: var(--ed-font-size-xs);
           }
         }
 
@@ -735,18 +753,22 @@ export default function AdminBilling() {
             text-align: left;
           }
 
-          .ed-billing-cards,
-          .ed-billing-toolbar {
+          .ed-billing-cards {
             grid-template-columns: 1fr;
+          }
+
+          .ed-billing-toolbar {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
           }
 
           .ed-billing-stat {
             padding: 14px;
           }
+        }
 
-          .ed-billing-select,
-          .ed-billing-clear {
-            width: 100%;
+        @media (max-width: 360px) {
+          .ed-billing-toolbar {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

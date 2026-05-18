@@ -1224,6 +1224,11 @@ export default function AdminLayout() {
         }
 
         @media (max-width: 768px) {
+          :root {
+            --ed-space-2: 12px;
+            --ed-space-3: 16px;
+          }
+
           .ed-admin-content .ed-panel,
           .ed-admin-content .ed-metric-card,
           .ed-admin-content .ed-mail-header,
@@ -1238,7 +1243,6 @@ export default function AdminLayout() {
           .ed-admin-content .ed-settings-nav,
           .ed-admin-content .ed-blacklist-table,
           .ed-admin-content .ed-blacklist-form,
-          .ed-admin-content .ed-table-card,
           .ed-admin-content .ed-billing-table-card,
           .ed-admin-content .ed-billing-stat,
           .ed-admin-content .ed-shop-card,
@@ -1246,6 +1250,10 @@ export default function AdminLayout() {
           .ed-admin-content .templates-hero,
           .ed-admin-content .template-item {
             padding: var(--ed-card-padding-mobile) !important;
+          }
+
+          .ed-admin-content .ed-table-card {
+            padding: 0 !important;
           }
 
           .ed-admin-content .ed-tabs {

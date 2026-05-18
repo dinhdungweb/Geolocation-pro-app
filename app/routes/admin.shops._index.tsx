@@ -397,25 +397,70 @@ export default function AdminShops() {
 
         @media (max-width: 980px) {
           .ed-shops-toolbar {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+          }
+
+          .ed-search-field {
+            grid-column: 1 / -1;
+            min-height: 38px;
           }
 
           .ed-filter-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
+            gap: 8px;
           }
 
+          .ed-select,
           .ed-clear-button {
+            min-height: 38px;
+          }
+
+          .ed-filter-row:has(.ed-clear-button) {
+            grid-column: 1 / -1;
+            grid-template-columns: 1fr 1fr auto;
+          }
+
+          .ed-filter-row:has(.ed-clear-button) .ed-clear-button {
             grid-column: 1 / -1;
           }
 
           .ed-result-count {
-            white-space: normal;
+            justify-self: end;
+            white-space: nowrap;
           }
         }
 
         @media (max-width: 520px) {
+          .ed-shops-toolbar {
+            grid-template-columns: 1fr;
+          }
+
           .ed-filter-row {
+            width: 100%;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          }
+
+          .ed-filter-row:has(.ed-clear-button) {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          }
+
+          .ed-select {
+            width: 100%;
+            min-width: 0;
+          }
+
+          .ed-result-count {
+            justify-self: start;
+            font-size: var(--ed-font-size-xs);
+          }
+        }
+
+        @media (max-width: 360px) {
+          .ed-filter-row,
+          .ed-filter-row:has(.ed-clear-button) {
             grid-template-columns: 1fr;
           }
         }

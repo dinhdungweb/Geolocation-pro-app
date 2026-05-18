@@ -584,7 +584,7 @@ export default function AdminDashboard() {
           .ed-dashboard-grid,
           .ed-side-stack,
           .ed-metric-grid {
-            gap: var(--ed-card-padding-mobile);
+            gap: var(--ed-space-2);
           }
 
           .ed-plan-grid {
