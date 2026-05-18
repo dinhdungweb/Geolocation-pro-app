@@ -375,18 +375,22 @@ export default function AdminShopDetail() {
 
                 .back-bar { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
                 .back-btn { 
+                    min-height: 40px;
                     display: inline-flex; align-items: center; gap: 8px; 
                     text-decoration: none; color: #64748b; font-size: 14px; font-weight: 600;
-                    padding: 8px 16px; background: white; border-radius: 8px;
+                    padding: 8px 16px; background: white; border-radius: var(--ed-radius-xl);
                     border: 1px solid #e2e8f0; transition: none;
+                    line-height: 18px;
                 }
                 .back-btn:hover { color: #1e293b; border-color: #cbd5e1; transform: none; }
 
                 .adjust-trigger-btn {
+                    min-height: 40px;
                     display: inline-flex; align-items: center; gap: 8px;
                     padding: 8px 16px; background: #1e293b; color: white;
-                    border: none; border-radius: 8px; font-weight: 700; font-size: 13px;
+                    border: 1px solid #1e293b; border-radius: var(--ed-radius-xl); font-weight: 700; font-size: 13px;
                     cursor: pointer; transition: none;
+                    line-height: 18px;
                 }
                 .adjust-trigger-btn:hover { transform: none; box-shadow: none; }
 
@@ -501,11 +505,14 @@ export default function AdminShopDetail() {
                     }
                     .back-btn,
                     .adjust-trigger-btn {
+                        height: 38px;
                         width: 100%;
                         min-width: 0;
                         justify-content: center;
                         padding: 8px 10px;
+                        border-radius: var(--ed-radius-xl) !important;
                         font-size: 12px;
+                        line-height: 16px;
                         white-space: nowrap;
                     }
                     .hero-section {
