@@ -1256,6 +1256,7 @@ export default function AdminLayout() {
 
           .ed-admin-content .ed-table-card,
           .ed-admin-content .ed-billing-table-card,
+          .ed-admin-content .ed-shop-table-card,
           .ed-admin-content .ed-automation-table,
           .ed-admin-content .ed-history-table,
           .ed-admin-content .ed-blacklist-table,

@@ -443,6 +443,7 @@ export default function AdminShopDetail() {
 
                 .stat-info .label { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
                 .stat-info .value { font-size: 22px; font-weight: 800; color: #1e293b; }
+                .stat-info { min-width: 0; }
 
                 .section-grid { 
                     display: grid; 
@@ -530,11 +531,33 @@ export default function AdminShopDetail() {
                         width: fit-content;
                     }
                     .stats-grid-v3 {
-                        grid-template-columns: 1fr;
-                        gap: 12px;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 8px;
+                        margin-bottom: 12px;
                     }
-                    .ed-shop-stat-card {
-                        padding: 14px;
+                    .shop-detail-view .stats-grid-v3 .ed-shop-stat-card {
+                        min-width: 0;
+                        min-height: 68px;
+                        gap: 8px;
+                        padding: 10px !important;
+                    }
+                    .stat-card-icon {
+                        width: 34px;
+                        height: 34px;
+                        flex: 0 0 34px;
+                    }
+                    .stat-card-icon svg {
+                        width: 18px;
+                        height: 18px;
+                    }
+                    .stat-info .label {
+                        margin-bottom: 2px;
+                        font-size: 10px;
+                        line-height: 13px;
+                    }
+                    .stat-info .value {
+                        font-size: 20px;
+                        line-height: 22px;
                     }
                     .section-grid {
                         grid-template-columns: 1fr;
@@ -573,7 +596,7 @@ export default function AdminShopDetail() {
                     }
                 }
                 @media (max-width: 480px) {
-                    .stats-grid-v3 { grid-template-columns: 1fr; }
+                    .stats-grid-v3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
                     .month-row {
                         flex-direction: column;
                     }
@@ -590,6 +613,9 @@ export default function AdminShopDetail() {
                     table {
                         min-width: 660px;
                     }
+                }
+                @media (max-width: 360px) {
+                    .stats-grid-v3 { grid-template-columns: 1fr; }
                 }
 
                 .table-container { width: 100%; overflow-x: auto; }
@@ -976,7 +1002,7 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="ed-shop-card" style={{ marginBottom: '32px' }}>
+            <div className="ed-shop-card ed-shop-table-card" style={{ marginBottom: '32px' }}>
                 <div className="ed-shop-card-head">
                     <Zap size={18} color="#82b440" />
                     Redirect & Block Rules
@@ -1014,7 +1040,7 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="ed-shop-card">
+            <div className="ed-shop-card ed-shop-table-card">
                 <div className="ed-shop-card-head">
                     <Globe size={18} color="#82b440" />
                     Live Interaction Logs
