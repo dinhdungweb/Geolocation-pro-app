@@ -61,13 +61,24 @@ export function hashIP(ip: string) {
 export function createAnalyticsToken(
   payload: Omit<AnalyticsTokenPayload, "iat" | "eventKey">
 ) {
+  return createAnalyticsEvent(payload).token;
+}
+
+export function createAnalyticsEvent(
+  payload: Omit<AnalyticsTokenPayload, "iat" | "eventKey">,
+  options: { eventKey?: string } = {},
+) {
   const fullPayload: AnalyticsTokenPayload = {
     ...payload,
     iat: Date.now(),
-    eventKey: crypto.randomUUID(),
+    eventKey: options.eventKey || crypto.randomUUID(),
   };
   const encodedPayload = base64UrlEncode(JSON.stringify(fullPayload));
-  return `${encodedPayload}.${signPayload(encodedPayload)}`;
+
+  return {
+    payload: fullPayload,
+    token: `${encodedPayload}.${signPayload(encodedPayload)}`,
+  };
 }
 
 export function verifyAnalyticsToken(token: string): AnalyticsTokenPayload | null {

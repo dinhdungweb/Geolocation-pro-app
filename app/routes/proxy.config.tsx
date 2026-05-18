@@ -5,7 +5,7 @@ import { FREE_PLAN, getPlanLimit } from "../billing.config";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
-  createAnalyticsToken,
+  createAnalyticsEvent,
   hashIP,
   type RuleSource,
   type StorefrontAction,
@@ -13,6 +13,10 @@ import {
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
+import {
+  recordBillableUsage,
+  recordStorefrontAnalyticsDetails,
+} from "../utils/storefront-analytics.server";
 
 type ProxyRule = {
   id: string;
@@ -81,6 +85,52 @@ function normalizeCountryCode(country: string | null) {
 
 function normalizeMarketValue(value: string | null) {
   return value?.trim().toLowerCase() || "";
+}
+
+function parseCookieHeader(cookieHeader: string | null) {
+  const cookies = new Map<string, string>();
+  if (!cookieHeader) return cookies;
+
+  cookieHeader.split(";").forEach((part) => {
+    const [rawName, ...rawValue] = part.trim().split("=");
+    if (!rawName) return;
+    try {
+      cookies.set(rawName, decodeURIComponent(rawValue.join("=")));
+    } catch {
+      cookies.set(rawName, rawValue.join("="));
+    }
+  });
+
+  return cookies;
+}
+
+function normalizePath(path: string) {
+  return path.replace(/\/+$/, "") || "/";
+}
+
+function getSafeOrigin(origin: string | null) {
+  if (!origin) return "https://storefront.local";
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.origin;
+    }
+  } catch {}
+  return "https://storefront.local";
+}
+
+function isAlreadyOnTargetUrl(targetUrl: string, currentPath: string, currentOrigin: string | null) {
+  if (!targetUrl) return true;
+
+  try {
+    const current = new URL(currentPath || "/", getSafeOrigin(currentOrigin));
+    const target = new URL(targetUrl, current.origin);
+
+    if (current.origin !== target.origin) return false;
+    return normalizePath(current.pathname) === normalizePath(target.pathname);
+  } catch {
+    return false;
+  }
 }
 
 function isIPMatch(visitorIP: string, ipPattern: string) {
@@ -400,6 +450,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const currentPath = url.searchParams.get("path") || "/";
+  const currentOrigin = url.searchParams.get("origin");
   const shopifyCountryCode = normalizeCountryCode(url.searchParams.get("country"));
   const shopifyMarketHandle = normalizeMarketValue(url.searchParams.get("market_handle"));
   const shopifyMarketId = normalizeMarketValue(url.searchParams.get("market_id"));
@@ -689,9 +740,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const rulePayload = selectedRule && source ? buildRulePayload(selectedRule, source) : null;
     const analyticsEvent = source ? getAnalyticsEvent(action, source) : null;
-    const eventToken =
+    const cookies = parseCookieHeader(request.headers.get("cookie"));
+    const suppressedByPopupChoice = action === "popup" && cookies.has("geo_choice");
+    const suppressedByTarget =
+      selectedRule &&
+      (action === "popup" || action === "auto_redirect") &&
+      isAlreadyOnTargetUrl(selectedRule.targetUrl, currentPath, currentOrigin);
+
+    if (selectedRule && source && (suppressedByPopupChoice || suppressedByTarget)) {
+      return json(
+        buildActionResponse({
+          action: "none",
+          analyticsEvent: null,
+          blocked,
+          countryCode,
+          currentPath,
+          currentPlan,
+          debug,
+          eventToken: null,
+          planLimit,
+          popup,
+          rule: null,
+          usage: currentUsage,
+        }),
+        { headers: corsHeaders }
+      );
+    }
+
+    const analytics =
       selectedRule && source && action !== "none"
-        ? createAnalyticsToken({
+        ? createAnalyticsEvent({
             shop,
             yearMonth: usagePeriod.yearMonth,
             billingPeriodKey: usagePeriod.key,
@@ -703,6 +781,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ipHash,
           })
         : null;
+    const eventToken = analytics?.token || null;
+
+    if (selectedRule && source && analyticsEvent && analytics?.payload) {
+      void recordBillableUsage({
+        countryCode,
+        path: currentPath,
+        type: analyticsEvent,
+        payload: analytics.payload,
+      })
+        .then((billableResult) => {
+          if (!billableResult.inserted) return null;
+          return recordStorefrontAnalyticsDetails({
+            countryCode,
+            path: currentPath,
+            request,
+            ruleId: selectedRule.id,
+            ruleName: selectedRule.name,
+            shop,
+            targetUrl: selectedRule.targetUrl || null,
+            tokenPayload: analytics.payload,
+            type: analyticsEvent,
+          });
+        })
+        .catch((error) => {
+          console.error("[Proxy] Failed to record async server-side action:", error);
+        });
+    }
 
     return json(
       buildActionResponse({

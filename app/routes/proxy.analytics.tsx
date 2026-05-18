@@ -1,17 +1,16 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { Prisma } from "@prisma/client";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
   analyticsEventAllowedForToken,
   hashIP,
-  isBillableAnalyticsEvent,
   verifyAnalyticsToken,
   type AnalyticsTokenPayload,
 } from "../utils/analytics-token.server";
 import { cleanupOldLogs } from "../utils/cleanup.server";
 import { getVisitorIP } from "../utils/request-ip.server";
+import { recordStorefrontAnalyticsEvent } from "../utils/storefront-analytics.server";
 
 const MAX_BODY_BYTES = 8 * 1024;
 const VALID_TYPES = [
@@ -67,53 +66,6 @@ async function readJsonBody(request: Request) {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  }
-}
-
-function actionFromType(type: string) {
-  if (type === "redirected") return "clicked_redirect";
-  if (type === "auto_redirected") return "auto_redirect";
-  if (type === "ip_redirected") return "ip_redirect";
-  if (type === "ip_blocked") return "ip_block";
-  if (type === "vpn_blocked") return "vpn_block";
-  if (type === "clicked_no") return "declined";
-  return type;
-}
-
-async function registerBillableEvent({
-  countryCode,
-  path,
-  payload,
-  type,
-}: {
-  countryCode: string | null;
-  path: string | null;
-  payload: AnalyticsTokenPayload;
-  type: string;
-}) {
-  try {
-    await prisma.billableUsageEvent.create({
-      data: {
-        shop: payload.shop,
-        yearMonth: payload.yearMonth,
-        billingPeriodKey: payload.billingPeriodKey || `calendar:${payload.yearMonth}`,
-        eventKey: payload.eventKey,
-        ruleId: payload.ruleId,
-        action: type,
-        countryCode,
-        path,
-        ipHash: payload.ipHash,
-      },
-    });
-    return true;
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return false;
-    }
-    throw error;
   }
 }
 
@@ -190,134 +142,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const path = tokenPayload?.path || asSafeString(data.path, 500) || null;
     const targetUrl = asSafeString(data.targetUrl, 1000) || null;
 
-    try {
-      await prisma.visitorLog.create({
-        data: {
-          shop,
-          ipAddress: visitorIP,
-          countryCode,
-          city: null,
-          action: actionFromType(type),
-          ruleName,
-          targetUrl,
-          userAgent: request.headers.get("user-agent") || "Unknown",
-          path,
-        },
-      });
-    } catch (logError) {
-      console.error("[Analytics] Error saving visitor log:", logError);
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (countryCode) {
-      const updateData: any = {};
-      if (type === "visit") updateData.visitors = { increment: 1 };
-      if (type === "popup_shown") updateData.popupShown = { increment: 1 };
-      if (["redirected", "auto_redirected", "ip_redirected"].includes(type)) {
-        updateData.redirected = { increment: 1 };
-      }
-      if (["blocked", "ip_blocked", "vpn_blocked"].includes(type)) {
-        updateData.blocked = { increment: 1 };
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await prisma.analyticsCountry.upsert({
-          where: {
-            shop_date_countryCode: { shop, date: today, countryCode },
-          },
-          update: updateData,
-          create: {
-            shop,
-            date: today,
-            countryCode,
-            visitors: type === "visit" ? 1 : 0,
-            popupShown: type === "popup_shown" ? 1 : 0,
-            redirected: ["redirected", "auto_redirected", "ip_redirected"].includes(type) ? 1 : 0,
-            blocked: ["blocked", "ip_blocked", "vpn_blocked"].includes(type) ? 1 : 0,
-          },
-        });
-      }
-    }
-
-    if (ruleId) {
-      const updateRuleData: any = {};
-      if (type === "popup_shown") updateRuleData.seen = { increment: 1 };
-      if (type === "redirected") updateRuleData.clickedYes = { increment: 1 };
-      if (["auto_redirected", "ip_redirected"].includes(type)) {
-        updateRuleData.autoRedirected = { increment: 1 };
-      }
-      if (type === "clicked_no") updateRuleData.clickedNo = { increment: 1 };
-      if (type === "dismissed") updateRuleData.dismissed = { increment: 1 };
-      if (["blocked", "ip_blocked", "vpn_blocked"].includes(type)) {
-        updateRuleData.blocked = { increment: 1 };
-      }
-
-      if (Object.keys(updateRuleData).length > 0) {
-        await prisma.analyticsRule.upsert({
-          where: { shop_date_ruleId: { shop, date: today, ruleId } },
-          update: {
-            ...updateRuleData,
-            ruleName: ruleName || undefined,
-          },
-          create: {
-            shop,
-            date: today,
-            ruleId,
-            ruleName: ruleName || "Unknown Rule",
-            seen: type === "popup_shown" ? 1 : 0,
-            clickedYes: type === "redirected" ? 1 : 0,
-            autoRedirected: ["auto_redirected", "ip_redirected"].includes(type) ? 1 : 0,
-            clickedNo: type === "clicked_no" ? 1 : 0,
-            dismissed: type === "dismissed" ? 1 : 0,
-            blocked: ["blocked", "ip_blocked", "vpn_blocked"].includes(type) ? 1 : 0,
-          },
-        });
-      }
-    }
-
-    if (tokenPayload && isBillableAnalyticsEvent(type)) {
-      const billingPeriodKey = tokenPayload.billingPeriodKey || `calendar:${tokenPayload.yearMonth}`;
-      const shouldIncrementUsage = await registerBillableEvent({
-        countryCode,
-        path,
-        payload: tokenPayload,
-        type,
-      });
-
-      if (shouldIncrementUsage) {
-        const usageUpdateData: any = { totalVisitors: { increment: 1 } };
-        if (["redirected", "auto_redirected", "ip_redirected"].includes(type)) {
-          usageUpdateData.redirected = { increment: 1 };
-        }
-        if (["blocked", "ip_blocked", "vpn_blocked"].includes(type)) {
-          usageUpdateData.blocked = { increment: 1 };
-        }
-        if (type === "popup_shown") {
-          usageUpdateData.popupShown = { increment: 1 };
-        }
-
-        await prisma.monthlyUsage.upsert({
-          where: {
-            shop_billingPeriodKey: {
-              shop,
-              billingPeriodKey,
-            },
-          },
-          update: usageUpdateData,
-          create: {
-            shop,
-            yearMonth: tokenPayload.yearMonth,
-            billingPeriodKey,
-            totalVisitors: 1,
-            redirected: ["redirected", "auto_redirected", "ip_redirected"].includes(type) ? 1 : 0,
-            blocked: ["blocked", "ip_blocked", "vpn_blocked"].includes(type) ? 1 : 0,
-            popupShown: type === "popup_shown" ? 1 : 0,
-          },
-        });
-      }
-    }
+    await recordStorefrontAnalyticsEvent({
+      countryCode,
+      path,
+      request,
+      ruleId,
+      ruleName,
+      shop,
+      targetUrl,
+      tokenPayload,
+      type,
+    });
 
     return json({ success: true }, { headers: corsHeaders });
   } catch (error) {

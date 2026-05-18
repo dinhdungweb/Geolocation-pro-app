@@ -10,7 +10,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-05-04-page-visit-per-path';
+  const SCRIPT_VERSION = '2026-05-18-server-side-action-tracking';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -84,7 +84,7 @@
   };
 
   const fetchConfig = async () => {
-    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}&market_handle=${encodeURIComponent(GEOLOCATION_CONFIG.marketHandle || '')}&market_id=${encodeURIComponent(GEOLOCATION_CONFIG.marketId || '')}&_geo_ts=${Date.now()}${DEBUG ? '&debug=true' : ''}`;
+    const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&origin=${encodeURIComponent(window.location.origin)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}&market_handle=${encodeURIComponent(GEOLOCATION_CONFIG.marketHandle || '')}&market_id=${encodeURIComponent(GEOLOCATION_CONFIG.marketId || '')}&_geo_ts=${Date.now()}${DEBUG ? '&debug=true' : ''}`;
     const response = await fetch(apiUrl, {
       cache: 'no-store',
       credentials: 'same-origin',
