@@ -587,7 +587,9 @@ export default function MessagingDashboard() {
           padding: 12px 0;
           border: 0;
           border-top: 1px solid var(--ed-color-surface-muted);
+          border-radius: 0;
           background: transparent;
+          box-shadow: none;
           color: var(--ed-color-text-primary);
           text-align: left;
           cursor: pointer;

@@ -1061,6 +1061,11 @@ export default function AdminLayout() {
           border-radius: var(--ed-radius-xl);
         }
 
+        .ed-admin-content .ed-mail-row {
+          border-radius: 0;
+          box-shadow: none;
+        }
+
         .ed-admin-content [aria-busy="true"],
         .ed-admin-content .is-loading {
           cursor: progress;
