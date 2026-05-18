@@ -563,6 +563,10 @@ export default function AdminShopDetail() {
                         grid-template-columns: 1fr;
                         gap: 12px;
                     }
+                    .ed-admin-content .shop-detail-view .section-grid > .ed-shop-card,
+                    .ed-admin-content .shop-detail-view > .ed-shop-card {
+                        padding: 0 !important;
+                    }
                     .ed-shop-card-head,
                     .ed-shop-card-body {
                         padding: 14px;
