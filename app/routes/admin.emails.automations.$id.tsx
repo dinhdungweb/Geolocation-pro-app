@@ -348,9 +348,9 @@ export default function AdminEmailAutomations() {
     return (
         <div className="flow-builder-v4">
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
                 
-                .flow-builder-v4 { position: fixed; inset: 0; background: #f4f6f8; z-index: 9999; display: flex; flex-direction: column; font-family: 'Outfit', sans-serif; color: #1a1c1d; }
+                .flow-builder-v4 { position: fixed; inset: 0; background: #f4f6f8; z-index: 9999; display: flex; flex-direction: column; font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1c1d; }
 
                 /* Header */
                 .flow-nav { height: 64px; background: white; border-bottom: 1px solid #e1e3e5; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
@@ -597,7 +597,7 @@ export default function AdminEmailAutomations() {
                 <div className="designer-overlay">
                     <style>{`
                         .modal-designer-root { 
-                            width: 100vw; height: 100vh; background: #f1f5f9; display: flex; flex-direction: column; font-family: 'Outfit', sans-serif; 
+                            width: 100vw; height: 100vh; background: #f1f5f9; display: flex; flex-direction: column; font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
                         }
                         .modal-header {
                             height: 72px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 24px; justify-content: space-between;

@@ -162,27 +162,27 @@ export default function AdminDashboard() {
                 .grid-main { 
                     display: grid; 
                     grid-template-columns: 2fr 1fr; 
-                    gap: 32px; 
+                    gap: 20px; 
                 }
                 .grid-stats { 
                     display: grid; 
-                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-                    gap: 24px; 
-                    margin-bottom: 32px; 
+                    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
+                    gap: 16px; 
+                    margin-bottom: 20px; 
                 }
                 
                 .premium-card {
-                    background: white; border-radius: 30px; border: 1px solid var(--border);
-                    padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+                    background: white; border-radius: 8px; border: 1px solid var(--border);
+                    padding: 22px; box-shadow: none;
                     position: relative; overflow: hidden;
-                    transition: transform 0.3s ease;
+                    transition: none;
                 }
-                .premium-card:hover { transform: translateY(-5px); }
+                .premium-card:hover { transform: none; }
                 
                 .stat-icon {
-                    width: 50px; height: 50px; border-radius: 15px;
+                    width: 40px; height: 40px; border-radius: 8px;
                     display: flex; align-items: center; justify-content: center;
-                    font-size: 24px; margin-bottom: 20px;
+                    font-size: 20px; margin-bottom: 16px;
                 }
                 
                 .trend-chart { width: 100%; height: 120px; margin-top: 20px; }
@@ -194,7 +194,7 @@ export default function AdminDashboard() {
                 .list-item:last-child { border-bottom: none; }
                 
                 .progress-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; flex: 1; margin: 0 16px; }
-                .progress-fill { height: 100%; background: var(--primary-gradient); border-radius: 4px; }
+                .progress-fill { height: 100%; background: var(--primary); border-radius: 4px; }
 
                 .plan-tag {
                     padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
@@ -206,10 +206,20 @@ export default function AdminDashboard() {
                 }
 
                 @media (max-width: 768px) {
-                    .grid-stats { grid-template-columns: 1fr; gap: 16px; }
-                    .premium-card { padding: 24px; border-radius: 20px; }
+                    .grid-main { gap: 16px; }
+                    .grid-stats { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+                    .premium-card { padding: 16px; border-radius: 8px; }
                     .stat-icon { width: 40px; height: 40px; font-size: 20px; margin-bottom: 16px; }
                     .grid-stats .premium-card div:nth-child(3) { font-size: 28px !important; }
+                    .traffic-bars { height: 190px !important; gap: 4px !important; overflow-x: auto; padding-bottom: 0 !important; }
+                    .traffic-bars > div { min-width: 26px; }
+                    .list-item { padding: 12px 0; gap: 8px; }
+                    .progress-bar { margin: 0 10px; }
+                }
+
+                @media (max-width: 480px) {
+                    .traffic-bars > div { min-width: 24px; }
+                    .grid-stats .premium-card div:nth-child(3) { font-size: 24px !important; }
                 }
             `}</style>
 
@@ -226,13 +236,13 @@ export default function AdminDashboard() {
                     <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>{stats.totalVisitors.toLocaleString()}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Real-time aggregated</div>
                 </div>
-                <div className="premium-card" style={{ background: 'var(--primary-gradient)', color: 'white', border: 'none' }}>
-                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}><Gem size={24} /></div>
-                    <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Total Revenue (This Month)</div>
+                <div className="premium-card" style={{ borderLeft: '3px solid #059669' }}>
+                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}><Gem size={24} /></div>
+                    <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Total Revenue (This Month)</div>
                     <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>${stats.totalRevenue.toFixed(2)}</div>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.8)', marginTop: '8px', lineHeight: '1.4' }}>
-                        <div>• Subscriptions: ${stats.subscriptionRevenue.toFixed(2)}</div>
-                        <div>• Overage: ${stats.overageRevenue.toFixed(2)}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
+                        <div>Subscriptions: ${stats.subscriptionRevenue.toFixed(2)}</div>
+                        <div>Overage: ${stats.overageRevenue.toFixed(2)}</div>
                     </div>
                 </div>
             </div>
@@ -240,7 +250,7 @@ export default function AdminDashboard() {
             <div className="grid-main">
                 <div className="premium-card">
                     <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '24px' }}>Traffic Growth Trend</h3>
-                    <div style={{ height: '260px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '0', borderBottom: '1px solid #f1f5f9' }}>
+                    <div className="traffic-bars" style={{ height: '260px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '0', borderBottom: '1px solid #f1f5f9' }}>
                         {fullYearTrends.map((t: any) => {
                             const total = t._sum?.totalVisitors || 0;
                             const maxVal = Math.max(...fullYearTrends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
@@ -258,10 +268,10 @@ export default function AdminDashboard() {
                                         style={{ 
                                             width: '70%', 
                                             height: `${(heightPercentage / 100) * 180}px`,
-                                            background: total > 0 ? 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)' : 'transparent',
+                                            background: total > 0 ? '#2563eb' : 'transparent',
                                             borderRadius: '6px 6px 2px 2px',
-                                            transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-                                            boxShadow: total > 0 ? '0 4px 10px rgba(99, 102, 241, 0.2)' : 'none',
+                                            transition: 'none',
+                                            boxShadow: 'none',
                                             minHeight: total > 0 ? '4px' : '0'
                                         }} 
                                     />
@@ -293,7 +303,7 @@ export default function AdminDashboard() {
                         <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px' }}>Plan Distribution</h3>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                             {Object.entries(distributions.plans).map(([plan, count]: [any, any]) => (
-                                <div key={plan} style={{ flex: 1, minWidth: '100px', textAlign: 'center', padding: '16px', background: '#f8fafc', borderRadius: '16px' }}>
+                                <div key={plan} style={{ flex: 1, minWidth: '100px', textAlign: 'center', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
                                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '4px' }}>{plan}</div>
                                     <div style={{ fontSize: '20px', fontWeight: 800 }}>{count}</div>
                                 </div>

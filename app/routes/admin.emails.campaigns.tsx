@@ -41,7 +41,7 @@ export default function CampaignsList() {
     return (
         <div className="campaigns-page">
             <style>{`
-                .campaigns-page { padding: 0; font-family: 'Outfit', sans-serif; }
+                .campaigns-page { padding: 0; font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
                 .header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; }
                 .header-flex h2 { font-size: 24px; font-weight: 700; color: #1e293b; letter-spacing: -0.02em; }
                 .header-flex p { color: #64748b; font-size: 14px; margin-top: 4px; }

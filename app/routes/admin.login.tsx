@@ -79,7 +79,7 @@ export default function AdminLogin() {
     return (
         <div className="login-screen">
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
                 
                 :root {
                     --primary: #6366f1;
@@ -94,10 +94,10 @@ export default function AdminLogin() {
                 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                 
                 body {
-                    font-family: 'Outfit', sans-serif;
+                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                     background: var(--bg);
                     color: var(--text);
-                    overflow: hidden;
+                    overflow: auto;
                 }
 
                 .login-screen {
@@ -194,6 +194,34 @@ export default function AdminLogin() {
 
                 .spin { animation: spin 1s linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+                @media (max-width: 480px) {
+                    .login-screen {
+                        align-items: flex-start;
+                        padding: 24px 12px;
+                    }
+                    .login-card {
+                        max-width: 100%;
+                        padding: 28px 18px;
+                        border-radius: 16px;
+                    }
+                    .logo-icon {
+                        width: 48px;
+                        height: 48px;
+                        border-radius: 12px;
+                        margin-bottom: 18px;
+                    }
+                    h1 {
+                        font-size: 21px;
+                    }
+                    p.subtitle {
+                        margin-bottom: 24px;
+                    }
+                    input,
+                    .btn-login {
+                        min-height: 46px;
+                    }
+                }
             `}</style>
 
             <div className="decorative-circle" />

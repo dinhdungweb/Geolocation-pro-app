@@ -47,7 +47,7 @@ export default function EmailHistory() {
     return (
         <div className="history-page">
             <style>{`
-                .history-page { font-family: 'Outfit', sans-serif; padding: 0; }
+                .history-page { font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 0; }
                 
                 .header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; }
                 .header-flex h2 { font-size: 24px; font-weight: 700; color: #1e293b; letter-spacing: -0.02em; }

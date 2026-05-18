@@ -61,11 +61,11 @@ export default function AutomationsList() {
     return (
         <div className="automations-dashboard-v2">
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
                 
                 .automations-dashboard-v2 { 
                     padding: 0; 
-                    font-family: 'Outfit', sans-serif; 
+                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
                     color: #0f172a;
                 }
                 
@@ -176,8 +176,8 @@ export default function AutomationsList() {
             </div>
 
             <div className="banner-premium">
-                <span className="msg">🚀 You've sent {totalSentCount.toLocaleString()} automated emails in the last 30 days.</span>
-                <Link to="/admin/emails/settings" style={{ fontSize: '14px', fontWeight: 700, color: '#0369a1', textDecoration: 'none' }}>Settings →</Link>
+                <span className="msg">Automated emails sent in the last 30 days: {totalSentCount.toLocaleString()}</span>
+                <Link to="/admin/emails/settings" style={{ fontSize: '14px', fontWeight: 700, color: '#0369a1', textDecoration: 'none' }}>Settings</Link>
             </div>
 
             <div className="stats-grid-premium">

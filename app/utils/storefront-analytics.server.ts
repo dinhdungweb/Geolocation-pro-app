@@ -57,8 +57,8 @@ export async function recordBillableUsage({
 }) {
   const billingPeriodKey = payload.billingPeriodKey || `calendar:${payload.yearMonth}`;
 
-  return prisma.$transaction(async (tx) => {
-    try {
+  try {
+    return await prisma.$transaction(async (tx) => {
       await tx.billableUsageEvent.create({
         data: {
           shop: payload.shop,
@@ -72,26 +72,9 @@ export async function recordBillableUsage({
           ipHash: payload.ipHash,
         },
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const existing = await tx.billableUsageEvent.findUnique({
-          where: { eventKey: payload.eventKey },
-          select: { action: true },
-        });
 
-        return {
-          inserted: false,
-          duplicateAction: existing?.action || null,
-        };
-      }
-      throw error;
-    }
-
-    const usageUpdateData = getUsageUpdateData(type);
-    await tx.monthlyUsage.upsert({
+      const usageUpdateData = getUsageUpdateData(type);
+      await tx.monthlyUsage.upsert({
       where: {
         shop_billingPeriodKey: {
           shop: payload.shop,
@@ -110,11 +93,28 @@ export async function recordBillableUsage({
       },
     });
 
-    return {
-      inserted: true,
-      duplicateAction: null,
-    };
-  });
+      return {
+        inserted: true,
+        duplicateAction: null,
+      };
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await prisma.billableUsageEvent.findUnique({
+        where: { eventKey: payload.eventKey },
+        select: { action: true },
+      });
+
+      return {
+        inserted: false,
+        duplicateAction: existing?.action || null,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function recordStorefrontAnalyticsDetails({

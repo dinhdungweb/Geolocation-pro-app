@@ -146,7 +146,7 @@ export default function TemplateEditor() {
                     z-index: 9999; 
                     display: flex; 
                     flex-direction: column;
-                    font-family: 'Outfit', sans-serif;
+                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 }
                 
                 .editor-header {

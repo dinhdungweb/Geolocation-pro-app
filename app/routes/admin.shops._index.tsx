@@ -83,7 +83,7 @@ export default function AdminShops() {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 32px;
+                    margin-bottom: 20px;
                     gap: 16px;
                     flex-wrap: wrap;
                 }
@@ -92,7 +92,7 @@ export default function AdminShops() {
                     background: white;
                     border: 1px solid var(--border);
                     padding: 12px 20px;
-                    border-radius: 12px;
+                    border-radius: 8px;
                     display: flex;
                     align-items: center;
                     gap: 12px;
@@ -112,7 +112,7 @@ export default function AdminShops() {
                 .filter-select {
                     appearance: none;
                     background: white; border: 1px solid var(--border);
-                    border-radius: 12px; padding: 12px 36px 12px 16px;
+                    border-radius: 8px; padding: 12px 36px 12px 16px;
                     font-size: 13px; font-weight: 600; color: var(--text);
                     cursor: pointer; transition: all 0.2s;
                     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
@@ -124,28 +124,28 @@ export default function AdminShops() {
                 .btn-clear {
                     display: flex; align-items: center; gap: 6px;
                     color: #ec4899; background: #fdf2f8; border: 1px solid #fbcfe8;
-                    padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+                    padding: 11px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
                     cursor: pointer; transition: all 0.2s;
                 }
                 .btn-clear:hover { background: #fce7f3; transform: translateY(-1px); }
                 
                 .shops-table-card {
                     background: white;
-                    border-radius: 24px;
+                    border-radius: 8px;
                     border: 1px solid var(--border);
                     overflow: hidden;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+                    box-shadow: none;
                 }
                 
                 .table-container { width: 100%; overflow-x: auto; }
                 table { width: 100%; border-collapse: collapse; min-width: 900px; }
                 th { 
-                    text-align: left; padding: 18px 24px; background: #f8fafc;
+                    text-align: left; padding: 14px 20px; background: #f8fafc;
                     font-size: 12px; font-weight: 700; color: var(--text-muted);
                     text-transform: uppercase; letter-spacing: 0.05em;
                     border-bottom: 1px solid var(--border);
                 }
-                td { padding: 20px 24px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+                td { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
                 tr:last-child td { border-bottom: none; }
                 tr:hover td { background: #f9fafb; }
  
@@ -154,7 +154,7 @@ export default function AdminShops() {
 
                 .plan-badge {
                     padding: 6px 12px;
-                    border-radius: 8px;
+                    border-radius: 999px;
                     font-size: 11px;
                     font-weight: 800;
                     text-transform: uppercase;
@@ -185,7 +185,7 @@ export default function AdminShops() {
                     padding: 8px 16px;
                     background: white;
                     border: 1px solid #e2e8f0;
-                    border-radius: 10px;
+                    border-radius: 8px;
                     text-decoration: none;
                     color: var(--text);
                     font-size: 13px;
@@ -203,35 +203,49 @@ export default function AdminShops() {
                     .shops-header { 
                         flex-direction: column; 
                         align-items: stretch; 
-                        margin-bottom: 24px; 
+                        margin-bottom: 14px; 
                         gap: 12px;
                     }
                     .header-left { 
                         min-width: 100%; 
                         flex-direction: column; 
-                        gap: 12px;
+                        gap: 10px;
                     }
                     .filters-row { 
-                        flex-wrap: wrap; 
-                        gap: 12px;
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 10px;
                     }
                     .filter-select {
-                        flex: 1;
-                        min-width: 120px;
+                        width: 100%;
+                        min-width: 0;
+                        padding: 10px 32px 10px 12px;
                     }
                     .btn-clear {
+                        grid-column: 1 / -1;
                         width: 100%;
                         justify-content: center;
                     }
-                    .shops-table-card { border-radius: 16px; }
-                    td, th { padding: 16px; }
-                    
-                    div[style*="var(--text-muted)"] {
+                    .search-box {
+                        padding: 10px 12px;
+                    }
+                    .shops-table-card { border-radius: 10px; }
+                    table { min-width: 760px; }
+                    td, th { padding: 12px; }
+                    .action-btn { padding: 7px 10px; }
+                    .shops-header > div[style*="var(--text-muted)"] {
                         text-align: center;
                         border-top: 1px solid var(--border);
                         padding-top: 12px;
                         margin-top: 4px;
                     }
+                }
+
+                @media (max-width: 480px) {
+                    .filters-row {
+                        grid-template-columns: 1fr;
+                    }
+                    table { min-width: 700px; }
                 }
             `}</style>
 

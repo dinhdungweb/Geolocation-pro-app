@@ -227,15 +227,15 @@ export default function AdminBilling() {
             <style>{`
                 .billing-cards {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                    gap: 20px;
-                    margin-bottom: 32px;
+                    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+                    gap: 16px;
+                    margin-bottom: 24px;
                 }
                 .stat-card {
                     background: white;
                     border: 1px solid var(--border);
-                    border-radius: 20px;
-                    padding: 24px;
+                    border-radius: 8px;
+                    padding: 20px;
                     position: relative;
                     overflow: hidden;
                 }
@@ -252,13 +252,13 @@ export default function AdminBilling() {
                 .stat-card.issues::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
 
                 .stat-icon {
-                    width: 44px; height: 44px;
-                    border-radius: 14px;
+                    width: 38px; height: 38px;
+                    border-radius: 8px;
                     display: flex; align-items: center; justify-content: center;
-                    margin-bottom: 16px;
+                    margin-bottom: 14px;
                 }
                 .stat-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-                .stat-value { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+                .stat-value { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: 0; }
 
                 .billing-toolbar {
                     display: grid;
@@ -268,7 +268,7 @@ export default function AdminBilling() {
                     align-items: center;
                 }
                 .billing-search {
-                    background: white; border: 1px solid var(--border); border-radius: 12px;
+                    background: white; border: 1px solid var(--border); border-radius: 8px;
                     padding: 12px 20px; display: flex; align-items: center; gap: 12px;
                     transition: all 0.2s;
                 }
@@ -277,7 +277,7 @@ export default function AdminBilling() {
 
                 .b-filter {
                     appearance: none; background: white; border: 1px solid var(--border);
-                    border-radius: 12px; padding: 12px 36px 12px 16px; font-size: 13px; font-weight: 600;
+                    border-radius: 8px; padding: 12px 36px 12px 16px; font-size: 13px; font-weight: 600;
                     cursor: pointer; color: var(--text); min-width: 140px;
                     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
                     background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
@@ -287,13 +287,13 @@ export default function AdminBilling() {
                 .b-clear {
                     display: flex; align-items: center; gap: 6px;
                     color: #ec4899; background: #fdf2f8; border: 1px solid #fbcfe8;
-                    padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+                    padding: 11px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
                     cursor: pointer; transition: all 0.2s;
                 }
                 .b-clear:hover { background: #fce7f3; }
 
                 .billing-table-card {
-                    background: white; border-radius: 24px; border: 1px solid var(--border);
+                    background: white; border-radius: 8px; border: 1px solid var(--border);
                     overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.03);
                 }
                 .billing-table-wrap { width: 100%; overflow-x: auto; }
@@ -342,7 +342,7 @@ export default function AdminBilling() {
                 .month-badge {
                     display: inline-flex; align-items: center; gap: 8px;
                     background: #f8fafc; border: 1px solid var(--border);
-                    padding: 8px 16px; border-radius: 10px; font-size: 14px; font-weight: 700;
+                    padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 700;
                     color: var(--text); margin-bottom: 24px;
                 }
 
@@ -354,12 +354,66 @@ export default function AdminBilling() {
                 }
 
                 @media (max-width: 768px) {
-                    .billing-cards { grid-template-columns: repeat(2, 1fr); }
+                    .month-badge {
+                        width: 100%;
+                        justify-content: center;
+                        margin-bottom: 14px;
+                        font-size: 12px;
+                    }
+                    .billing-cards {
+                        grid-template-columns: 1fr;
+                        gap: 12px;
+                        margin-bottom: 16px;
+                    }
+                    .stat-card {
+                        padding: 14px;
+                        display: grid;
+                        grid-template-columns: 38px 1fr;
+                        column-gap: 12px;
+                        align-items: center;
+                    }
+                    .stat-icon {
+                        margin-bottom: 0;
+                    }
+                    .stat-label {
+                        margin-bottom: 2px;
+                        font-size: 11px;
+                    }
+                    .stat-value {
+                        font-size: 22px;
+                    }
                     .billing-toolbar { 
                         grid-template-columns: 1fr;
+                        gap: 10px;
+                        margin-bottom: 12px;
+                    }
+                    .billing-search,
+                    .b-filter,
+                    .b-clear {
+                        width: 100%;
                     }
                     .billing-search { grid-column: span 1; }
                     .shops-count { text-align: left !important; margin-top: 8px; }
+                    .billing-table-card {
+                        margin: 0 -2px;
+                    }
+                    .billing-table {
+                        min-width: 980px;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    .stat-card {
+                        grid-template-columns: 34px 1fr;
+                        padding: 12px;
+                    }
+                    .stat-icon {
+                        width: 34px;
+                        height: 34px;
+                    }
+                    .stat-value {
+                        font-size: 20px;
+                    }
                 }
             `}</style>
 
