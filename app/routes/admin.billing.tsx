@@ -469,9 +469,9 @@ export default function AdminBilling() {
 
         .ed-billing-stat {
           display: grid;
-          grid-template-columns: 38px minmax(0, 1fr);
-          align-items: center;
-          gap: 10px;
+          grid-template-columns: 52px minmax(0, 1fr);
+          align-items: start;
+          gap: 12px;
           padding: var(--ed-space-2);
           border: 1px solid var(--ed-color-surface-muted);
           border-radius: var(--ed-radius-xl);
@@ -479,8 +479,8 @@ export default function AdminBilling() {
         }
 
         .ed-billing-icon {
-          width: 38px;
-          height: 38px;
+          width: 52px;
+          height: 52px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -497,6 +497,11 @@ export default function AdminBilling() {
         .ed-billing-stat.danger .ed-billing-icon {
           background: #fff2f2;
           color: #ef4444;
+        }
+
+        .ed-billing-icon svg {
+          width: 22px;
+          height: 22px;
         }
 
         .ed-billing-stat span:not(.ed-billing-icon) {
@@ -804,20 +809,20 @@ export default function AdminBilling() {
           }
 
           .ed-billing-stat {
-            grid-template-columns: 32px minmax(0, 1fr);
+            grid-template-columns: 42px minmax(0, 1fr);
             gap: 8px;
             padding: 10px;
           }
 
           .ed-billing-icon {
-            width: 32px;
-            height: 32px;
+            width: 42px;
+            height: 42px;
             border-radius: var(--ed-radius-lg);
           }
 
           .ed-billing-icon svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
           }
 
           .ed-billing-stat span:not(.ed-billing-icon) {

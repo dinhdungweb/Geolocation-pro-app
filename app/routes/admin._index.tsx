@@ -352,21 +352,23 @@ export default function AdminDashboard() {
 
         .ed-metric-card {
           display: grid;
-          gap: 8px;
+          grid-template-columns: 52px minmax(0, 1fr);
+          column-gap: 12px;
+          row-gap: 4px;
+          align-items: start;
           padding: var(--ed-space-2);
         }
 
         .ed-metric-head {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          min-width: 0;
+          display: contents;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
           font-weight: 500;
         }
 
         .ed-metric-head > span:last-child {
+          grid-column: 2;
+          align-self: end;
           min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -374,8 +376,9 @@ export default function AdminDashboard() {
         }
 
         .ed-metric-icon {
-          width: 34px;
-          height: 34px;
+          grid-row: 1 / 3;
+          width: 52px;
+          height: 52px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -384,7 +387,13 @@ export default function AdminDashboard() {
           color: var(--ed-color-border-muted);
         }
 
+        .ed-metric-icon svg {
+          width: 22px;
+          height: 22px;
+        }
+
         .ed-metric-card strong {
+          grid-column: 2;
           min-width: 0;
           overflow-wrap: anywhere;
           color: var(--ed-color-text-primary);
@@ -394,6 +403,7 @@ export default function AdminDashboard() {
         }
 
         .ed-metric-card small {
+          grid-column: 2;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
           line-height: 16px;
@@ -598,12 +608,12 @@ export default function AdminDashboard() {
           }
 
           .ed-metric-card {
-            gap: 6px;
+            grid-template-columns: 42px minmax(0, 1fr);
+            column-gap: 8px;
+            row-gap: 2px;
           }
 
           .ed-metric-head {
-            align-items: flex-start;
-            gap: 8px;
             font-size: var(--ed-font-size-xs);
             line-height: 16px;
           }
@@ -613,15 +623,14 @@ export default function AdminDashboard() {
           }
 
           .ed-metric-icon {
-            width: 32px;
-            height: 32px;
-            flex: 0 0 32px;
+            width: 42px;
+            height: 42px;
             border-radius: var(--ed-radius-lg);
           }
 
           .ed-metric-icon svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
           }
 
           .ed-metric-card strong {

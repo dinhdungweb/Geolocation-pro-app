@@ -746,9 +746,14 @@ export default function MessagingDashboard() {
         }
 
         @media (max-width: 640px) {
+          .ed-admin-content .ed-mail .ed-mail-header,
+          .ed-admin-content .ed-mail .ed-panel:not(.ed-mail-table) {
+            padding: 12px !important;
+          }
+
           .ed-mail-header,
           .ed-panel {
-            padding: 14px;
+            padding: 12px;
           }
 
           .ed-mail-actions,
@@ -757,14 +762,91 @@ export default function MessagingDashboard() {
             width: 100%;
           }
 
-          .ed-stat-strip,
-          .ed-mail-calendar {
-            grid-template-columns: 1fr;
+          .ed-stat-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
           }
 
-          .ed-tabs {
-            margin: -14px -14px 0;
-            padding: 10px 14px;
+          .ed-mail-calendar {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+          }
+
+          .ed-stat-strip div,
+          .ed-day-cell {
+            padding: 10px;
+          }
+
+          .ed-day-cell {
+            min-height: 76px;
+          }
+
+          .ed-panel-head {
+            gap: 8px;
+            margin-bottom: 10px;
+          }
+
+          .ed-mail-table {
+            padding: 0 !important;
+            overflow: hidden;
+          }
+
+          .ed-admin-content .ed-mail-table .ed-tabs,
+          .ed-mail-table .ed-tabs {
+            margin: 0 !important;
+            padding: 8px 10px !important;
+          }
+
+          .ed-tabs button,
+          .ed-tabs a {
+            padding: 7px 9px;
+            font-size: var(--ed-font-size-xs);
+          }
+
+          .ed-mail-grid {
+            min-width: 0;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+          }
+
+          .ed-mail-grid-head {
+            padding: 10px 12px 8px;
+          }
+
+          .ed-mail-row {
+            padding: 10px 12px;
+          }
+
+          .ed-mail-grid-head span:nth-child(n + 3),
+          .ed-mail-row > span:nth-child(n + 3) {
+            display: none;
+          }
+
+          .ed-subject-cell {
+            gap: 8px;
+          }
+
+          .ed-row-icon {
+            width: 30px;
+            height: 30px;
+          }
+
+          .ed-subject-cell > span:last-child {
+            min-width: 0;
+          }
+
+          .ed-subject-cell strong {
+            display: -webkit-box;
+            overflow: hidden;
+            white-space: normal;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+          }
+
+          .ed-status {
+            padding: 3px 7px;
+            font-size: 10px;
+            line-height: 14px;
           }
 
           .ed-modal-overlay {
@@ -774,6 +856,13 @@ export default function MessagingDashboard() {
           .ed-modal {
             width: 100vw;
             height: 100vh;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .ed-stat-strip,
+          .ed-mail-calendar {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
