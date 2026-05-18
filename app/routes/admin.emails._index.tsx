@@ -796,7 +796,9 @@ export default function MessagingDashboard() {
 
           .ed-mail-table {
             padding: 0 !important;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
           }
 
           .ed-admin-content .ed-mail-table .ed-tabs,
@@ -812,8 +814,7 @@ export default function MessagingDashboard() {
           }
 
           .ed-mail-grid {
-            min-width: 0;
-            grid-template-columns: minmax(0, 1fr) auto;
+            min-width: 820px;
             gap: 8px;
           }
 
@@ -823,11 +824,6 @@ export default function MessagingDashboard() {
 
           .ed-mail-row {
             padding: 10px var(--ed-mail-card-padding);
-          }
-
-          .ed-mail-grid-head span:nth-child(n + 3),
-          .ed-mail-row > span:nth-child(n + 3) {
-            display: none;
           }
 
           .ed-subject-cell {
