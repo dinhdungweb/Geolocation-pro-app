@@ -281,7 +281,8 @@ export default function MessagingDashboard() {
 
       <style>{`
         .ed-mail {
-          --ed-mail-day-padding: var(--ed-card-padding-mobile);
+          --ed-mail-card-padding: var(--ed-card-padding);
+          --ed-mail-day-padding: 12px;
 
           display: grid;
           gap: var(--ed-space-2);
@@ -298,7 +299,7 @@ export default function MessagingDashboard() {
         .ed-mail-header {
           justify-content: space-between;
           gap: var(--ed-space-2);
-          padding: var(--ed-space-2);
+          padding: var(--ed-mail-card-padding);
           border: 1px solid var(--ed-color-surface-muted);
           border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-strong);
@@ -411,7 +412,7 @@ export default function MessagingDashboard() {
 
         .ed-panel {
           min-width: 0;
-          padding: var(--ed-space-2);
+          padding: var(--ed-mail-card-padding);
           border: 1px solid var(--ed-color-surface-muted);
           border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-strong);
@@ -537,8 +538,8 @@ export default function MessagingDashboard() {
 
         .ed-tabs {
           gap: 6px;
-          margin: calc(var(--ed-space-2) * -1) calc(var(--ed-space-2) * -1) 0;
-          padding: 10px var(--ed-space-2);
+          margin: calc(var(--ed-mail-card-padding) * -1) calc(var(--ed-mail-card-padding) * -1) 0;
+          padding: 10px var(--ed-mail-card-padding);
           border-bottom: 1px solid var(--ed-color-surface-muted);
           overflow-x: auto;
         }
@@ -748,14 +749,19 @@ export default function MessagingDashboard() {
         }
 
         @media (max-width: 640px) {
+          .ed-mail {
+            --ed-mail-card-padding: var(--ed-card-padding-mobile);
+            --ed-mail-day-padding: 10px;
+          }
+
           .ed-admin-content .ed-mail .ed-mail-header,
           .ed-admin-content .ed-mail .ed-panel:not(.ed-mail-table) {
-            padding: var(--ed-space-2) !important;
+            padding: var(--ed-mail-card-padding) !important;
           }
 
           .ed-mail-header,
           .ed-panel {
-            padding: var(--ed-space-2);
+            padding: var(--ed-mail-card-padding);
           }
 
           .ed-mail-actions,
@@ -776,7 +782,7 @@ export default function MessagingDashboard() {
 
           .ed-stat-strip div,
           .ed-day-cell {
-            padding: 10px;
+            padding: var(--ed-mail-day-padding);
           }
 
           .ed-day-cell {
@@ -796,7 +802,7 @@ export default function MessagingDashboard() {
           .ed-admin-content .ed-mail-table .ed-tabs,
           .ed-mail-table .ed-tabs {
             margin: 0 !important;
-            padding: 8px 10px !important;
+            padding: 8px var(--ed-mail-card-padding) !important;
           }
 
           .ed-tabs button,
@@ -812,11 +818,11 @@ export default function MessagingDashboard() {
           }
 
           .ed-mail-grid-head {
-            padding: 10px var(--ed-space-2) 8px;
+            padding: 10px var(--ed-mail-card-padding) 8px;
           }
 
           .ed-mail-row {
-            padding: 10px var(--ed-space-2);
+            padding: 10px var(--ed-mail-card-padding);
           }
 
           .ed-mail-grid-head span:nth-child(n + 3),

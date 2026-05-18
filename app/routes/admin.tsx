@@ -330,6 +330,7 @@ export default function AdminLayout() {
 
           --ed-space-1: 5px;
           --ed-space-2: 20px;
+          --ed-card-padding: var(--ed-space-2);
           --ed-space-3: 24px;
           --ed-space-4: 28px;
           --ed-space-5: 32px;
