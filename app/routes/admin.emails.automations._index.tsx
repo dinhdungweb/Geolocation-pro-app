@@ -1,264 +1,463 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
+import { MoreHorizontal, Zap } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
-import { 
-    Zap, 
-    MoreHorizontal,
-} from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
-    
-    try {
-        // Fetch real automations
-        const automations = await prisma.automation.findMany({
-            where: { shop: 'GLOBAL' }
-        });
+  await requireAdminAuth(request);
 
-        // Fetch sent counts from log
-        const logs = await prisma.adminEmailLog.groupBy({
-            by: ['type'],
-            _count: { _all: true }
-        });
+  try {
+    const automations = await prisma.automation.findMany({
+      where: { shop: "GLOBAL" },
+    });
 
-        const sentMap = logs.reduce((acc: any, curr: any) => {
-            acc[curr.type] = curr._count._all;
-            return acc;
-        }, {});
+    const logs = await prisma.adminEmailLog.groupBy({
+      by: ["type"],
+      _count: { _all: true },
+    });
 
-        const totalSentCount = logs.reduce((sum: number, curr: any) => sum + curr._count._all, 0);
+    const sentMap = logs.reduce<Record<string, number>>((acc, curr) => {
+      acc[curr.type] = curr._count._all;
+      return acc;
+    }, {});
 
-        return json({
-            automations: automations.map((a: any) => ({
-                id: a.id,
-                name: a.subject || (a.type === 'welcome' ? 'Welcome new subscribers with a discount email' : 
-                      a.type === 'limit80' ? '80% Usage limit notification' : 
-                      a.type === 'limit100' ? '100% Usage limit notification' : 
-                      a.type === 'limit_80' ? '80% Usage limit notification' :
-                      a.type === 'limit_100' ? '100% Usage limit notification' :
-                      'Custom automation'),
-                type: a.type,
-                status: a.isActive ? 'Active' : 'Inactive',
-                sent: sentMap[a.type] || 0,
-                click: '-',
-                orders: 0,
-                conv: '-',
-                sales: '₫0'
-            })),
-            totalSentCount
-        });
-    } catch (e) {
-        console.error("Prisma error in Automations List loader:", e);
-        return json({ automations: [], totalSentCount: 0 });
-    }
+    const totalSentCount = logs.reduce((sum, curr) => sum + curr._count._all, 0);
+
+    return json({
+      automations: automations.map((automation) => ({
+        id: automation.id,
+        name:
+          automation.subject ||
+          (automation.type === "welcome"
+            ? "Welcome new subscribers"
+            : automation.type === "limit80" || automation.type === "limit_80"
+              ? "80% usage limit notification"
+              : automation.type === "limit100" || automation.type === "limit_100"
+                ? "100% usage limit notification"
+                : "Custom automation"),
+        type: automation.type,
+        status: automation.isActive ? "Active" : "Inactive",
+        sent: sentMap[automation.type] || 0,
+      })),
+      totalSentCount,
+    });
+  } catch (error) {
+    console.error("Prisma error in Automations List loader:", error);
+    return json({ automations: [], totalSentCount: 0 });
+  }
 };
 
+function getTriggerLabel(type: string) {
+  if (type === "welcome") return "App installation";
+  if (type === "limit80" || type === "limit_80") return "80% usage";
+  if (type === "limit100" || type === "limit_100") return "100% usage";
+  if (type === "manual") return "Manual";
+  return type;
+}
+
 export default function AutomationsList() {
-    const { automations, totalSentCount } = useLoaderData<typeof loader>();
+  const { automations, totalSentCount } = useLoaderData<typeof loader>();
+  const activeCount = automations.filter((automation) => automation.status === "Active").length;
+  const inactiveCount = automations.length - activeCount;
 
-    return (
-        <div className="automations-dashboard-v2">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-                
-                .automations-dashboard-v2 { 
-                    padding: 0; 
-                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
-                    color: #0f172a;
-                }
-                
-                .glass-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 40px;
-                    padding: 20px 0;
-                }
-                .title-group h1 { 
-                    font-size: 32px; 
-                    font-weight: 800; 
-                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    letter-spacing: -0.03em;
-                }
-                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
-                
-                .btn-premium-solid {
-                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                    color: white;
-                    border: none;
-                    padding: 10px 24px;
-                    border-radius: 14px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .btn-premium-solid:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 12px 20px rgba(99, 102, 241, 0.3);
-                }
-
-                .banner-premium {
-                    background: linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%);
-                    padding: 24px 32px;
-                    border-radius: 24px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 40px;
-                    border: 1px solid rgba(186, 230, 253, 0.5);
-                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.02);
-                }
-                .banner-premium .msg { font-size: 15px; color: #075985; font-weight: 600; }
-                
-                .stats-grid-premium {
-                    background: white;
-                    border: 1px solid rgba(0,0,0,0.04);
-                    border-radius: 24px;
-                    display: grid;
-                    grid-template-columns: repeat(6, 1fr);
-                    margin-bottom: 40px;
-                    padding: 32px;
-                    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.04);
-                }
-                .stat-box-premium { padding: 0 24px; border-right: 1px solid #f1f5f9; }
-                .stat-box-premium:last-child { border-right: none; }
-                .stat-box-premium .label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 12px; }
-                .stat-box-premium .value { font-size: 22px; font-weight: 800; color: #1e293b; letter-spacing: -0.02em; display: block; }
-
-                .table-premium { background: white; border-radius: 24px; border: 1px solid rgba(0,0,0,0.04); overflow: hidden; box-shadow: 0 12px 30px -10px rgba(0,0,0,0.04); }
-                .tab-header-premium { display: flex; gap: 32px; padding: 0 32px; border-bottom: 1px solid #f1f5f9; }
-                .tab-v2 { padding: 24px 0; font-size: 15px; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
-                .tab-v2.active { color: #6366f1; border-bottom-color: #6366f1; }
-                
-                .t-header-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 16px 32px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-                .t-row { display: grid; grid-template-columns: 2fr 120px 100px 120px 100px 120px 120px 40px; padding: 24px 32px; border-bottom: 1px solid #f1f5f9; align-items: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: #1e293b; }
-                .t-row:hover { background: #fafaff; }
-                
-                .auto-name { font-weight: 700; font-size: 15px; }
-                .tag-status { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-                .tag-active { background: #ecfdf5; color: #059669; }
-                .tag-inactive { background: #f1f5f9; color: #94a3b8; }
-
-                @media (max-width: 1024px) {
-                    .glass-header { flex-direction: column; align-items: flex-start; gap: 20px; }
-                    .banner-premium { flex-direction: column; gap: 12px; align-items: flex-start; padding: 20px; }
-                    .stats-grid-premium { grid-template-columns: repeat(2, 1fr); gap: 24px; padding: 24px; }
-                    .stat-box-premium { border-right: none; border-bottom: 1px solid #f1f5f9; padding: 0 0 16px 0; }
-                    .stat-box-premium:nth-child(2n) { border-right: none; }
-                    .stat-box-premium:last-child { border-bottom: none; }
-                    .table-premium { overflow-x: auto; }
-                    .t-header-row, .t-row { grid-template-columns: 200px 150px 100px 80px 80px 80px 80px 40px; width: fit-content; padding: 16px 20px; }
-                }
-
-                @media (max-width: 480px) {
-                    .stats-grid-premium { grid-template-columns: 1fr; }
-                    .title-group h1 { font-size: 24px; }
-                }
-            `}</style>
-
-            <div className="glass-header">
-                <div className="title-group">
-                    <h1>Automations</h1>
-                    <p>Build and manage automated messaging flows to engage your customers.</p>
-                </div>
-                <Link to="/admin/emails/automations/new" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
-                    <Zap size={16} /> Create automation
-                </Link>
-            </div>
-
-            <div className="banner-premium">
-                <span className="msg">Automated emails sent in the last 30 days: {totalSentCount.toLocaleString()}</span>
-                <Link to="/admin/emails/settings" style={{ fontSize: '14px', fontWeight: 700, color: '#0369a1', textDecoration: 'none' }}>Settings</Link>
-            </div>
-
-            <div className="stats-grid-premium">
-                <div className="stat-box-premium">
-                    <span className="label">Total Sent</span>
-                    <span className="value">{totalSentCount.toLocaleString()}</span>
-                </div>
-                <div className="stat-box-premium">
-                    <span className="label">Open Rate</span>
-                    <span className="value">0.0%</span>
-                </div>
-                <div className="stat-box-premium">
-                    <span className="label">Click Rate</span>
-                    <span className="value">0.0%</span>
-                </div>
-                <div className="stat-box-premium">
-                    <span className="label">Orders</span>
-                    <span className="value">0</span>
-                </div>
-                <div className="stat-box-premium">
-                    <span className="label">Conv. Rate</span>
-                    <span className="value">0.0%</span>
-                </div>
-                <div className="stat-box-premium">
-                    <span className="label">Attr. Sales</span>
-                    <span className="value">₫0</span>
-                </div>
-            </div>
-
-            <div className="table-premium">
-                <div className="tab-header-premium">
-                    <div className="tab-v2 active">All automations</div>
-                    <div className="tab-v2">Active</div>
-                    <div className="tab-v2">Inactive</div>
-                </div>
-                
-                <div className="t-header-row">
-                    <span>Automation name</span>
-                    <span>Trigger</span>
-                    <span>Status</span>
-                    <span>Sent</span>
-                    <span>Open rate</span>
-                    <span>Click rate</span>
-                    <span></span>
-                </div>
-
-                {automations.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '80px 0', background: 'white', borderTop: '1px solid #f1f5f9' }}>
-                         <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                            <Zap size={32} color="#94a3b8" />
-                        </div>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No automation flows yet</h3>
-                        <p style={{ color: '#64748b', marginBottom: '24px' }}>Create your first automated flow to engage customers based on their actions.</p>
-                        <Link to="/admin/emails/automations/new" className="btn-premium-solid" style={{ margin: '0 auto', textDecoration: 'none' }}>
-                           Setup first flow
-                        </Link>
-                    </div>
-                ) : (
-                    automations.map((a: any) => (
-                        <Link key={a.id} to={`/admin/emails/automations/${a.id}`} className="t-row">
-                            <div className="auto-name">{a.name}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6366f1', fontWeight: 600, fontSize: '13px' }}>
-                                <Zap size={14} /> 
-                                {a.type === 'welcome' && 'App Installation'}
-                                {a.type === 'limit_80' && '80% Usage'}
-                                {a.type === 'limit_100' && '100% Usage'}
-                                {a.type === 'manual' && 'Manual'}
-                            </div>
-                            <div>
-                                <span className={`tag-status ${a.status === 'Active' ? 'tag-active' : 'tag-inactive'}`}>
-                                    {a.status}
-                                </span>
-                            </div>
-                            <div style={{ fontWeight: 700 }}>{a.sent === 0 ? '-' : a.sent.toLocaleString()}</div>
-                            <div style={{ fontWeight: 600 }}>-</div>
-                            <div style={{ fontWeight: 600 }}>-</div>
-                            <div><MoreHorizontal size={18} color="#94a3b8" /></div>
-                        </Link>
-                    ))
-                )}
-            </div>
+  return (
+    <section className="ed-automations">
+      <header className="ed-automation-header">
+        <div>
+          <span className="ed-eyebrow">Messaging flows</span>
+          <h2>Automations</h2>
+          <p>Build and monitor automated email flows triggered by install and usage events.</p>
         </div>
-    );
+        <Link className="ed-button-primary" to="/admin/emails/automations/new">
+          <Zap size={16} />
+          Create automation
+        </Link>
+      </header>
+
+      <div className="ed-automation-summary">
+        <div>
+          <strong>{totalSentCount.toLocaleString()}</strong>
+          <span>Automated emails sent</span>
+        </div>
+        <Link to="/admin/emails/settings">Review settings</Link>
+      </div>
+
+      <div className="ed-automation-metrics">
+        <article>
+          <span>Total flows</span>
+          <strong>{automations.length.toLocaleString()}</strong>
+        </article>
+        <article>
+          <span>Active</span>
+          <strong>{activeCount.toLocaleString()}</strong>
+        </article>
+        <article>
+          <span>Inactive</span>
+          <strong>{inactiveCount.toLocaleString()}</strong>
+        </article>
+        <article>
+          <span>Open rate</span>
+          <strong>0.0%</strong>
+        </article>
+        <article>
+          <span>Click rate</span>
+          <strong>0.0%</strong>
+        </article>
+        <article>
+          <span>Orders</span>
+          <strong>0</strong>
+        </article>
+      </div>
+
+      <section className="ed-automation-table">
+        <div className="ed-tabs" role="tablist" aria-label="Automation filter">
+          <button aria-selected="true" className="is-active" role="tab" type="button">
+            All automations
+          </button>
+          <button aria-selected="false" role="tab" type="button">
+            Active
+          </button>
+          <button aria-selected="false" role="tab" type="button">
+            Inactive
+          </button>
+        </div>
+
+        <div className="ed-automation-grid ed-automation-grid-head">
+          <span>Automation name</span>
+          <span>Trigger</span>
+          <span>Status</span>
+          <span>Sent</span>
+          <span>Open</span>
+          <span>Click</span>
+          <span></span>
+        </div>
+
+        {automations.length === 0 ? (
+          <div className="ed-empty-state">
+            <Zap size={28} />
+            <h3>No automation flows yet</h3>
+            <p>Create the first flow to send onboarding and usage-limit emails automatically.</p>
+            <Link className="ed-button-primary" to="/admin/emails/automations/new">
+              Set up first flow
+            </Link>
+          </div>
+        ) : (
+          automations.map((automation) => (
+            <Link
+              className="ed-automation-grid ed-automation-row"
+              key={automation.id}
+              to={`/admin/emails/automations/${automation.id}`}
+            >
+              <span className="ed-auto-name">{automation.name}</span>
+              <span className="ed-trigger">
+                <Zap size={14} />
+                {getTriggerLabel(automation.type)}
+              </span>
+              <span>
+                <mark className={`ed-status ${automation.status === "Active" ? "success" : "neutral"}`}>
+                  {automation.status}
+                </mark>
+              </span>
+              <span>{automation.sent === 0 ? "-" : automation.sent.toLocaleString()}</span>
+              <span>-</span>
+              <span>-</span>
+              <span className="ed-row-action">
+                <MoreHorizontal size={18} />
+              </span>
+            </Link>
+          ))
+        )}
+      </section>
+
+      <style>{`
+        .ed-automations {
+          display: grid;
+          gap: var(--ed-space-2);
+        }
+
+        .ed-automation-header,
+        .ed-automation-summary,
+        .ed-automation-metrics,
+        .ed-tabs {
+          display: flex;
+          align-items: center;
+        }
+
+        .ed-automation-header {
+          justify-content: space-between;
+          gap: var(--ed-space-2);
+          padding: var(--ed-space-2);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-eyebrow {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--ed-color-border-muted);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          line-height: 1.1;
+          text-transform: uppercase;
+        }
+
+        .ed-automation-header h2 {
+          margin: 0;
+          color: var(--ed-color-text-primary);
+          font-size: 22px;
+          font-weight: 700;
+          line-height: 28px;
+        }
+
+        .ed-automation-header p {
+          max-width: 660px;
+          margin: 7px 0 0;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 1.5;
+        }
+
+        .ed-button-primary {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 0 14px;
+          border: 1px solid var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-border-muted);
+          color: var(--ed-text-inverse);
+          box-shadow: var(--ed-shadow-2);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 1;
+          text-decoration: none;
+        }
+
+        .ed-button-primary:hover {
+          background: #6f9a37;
+          border-color: #6f9a37;
+        }
+
+        .ed-button-primary:focus-visible,
+        .ed-tabs button:focus-visible,
+        .ed-automation-row:focus-visible {
+          outline: 3px solid var(--ed-color-border-muted);
+          outline-offset: 2px;
+        }
+
+        .ed-automation-summary {
+          justify-content: space-between;
+          gap: var(--ed-space-2);
+          padding: 16px var(--ed-space-2);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: #f2f6ee;
+        }
+
+        .ed-automation-summary strong,
+        .ed-automation-summary span {
+          display: block;
+        }
+
+        .ed-automation-summary strong {
+          color: var(--ed-color-text-primary);
+          font-size: 22px;
+          line-height: 28px;
+        }
+
+        .ed-automation-summary span,
+        .ed-automation-summary a {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 20px;
+        }
+
+        .ed-automation-summary a:hover {
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-automation-metrics {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .ed-automation-metrics article {
+          min-width: 0;
+          padding: 16px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-automation-metrics span,
+        .ed-automation-grid-head {
+          color: var(--ed-color-text-tertiary);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .ed-automation-metrics strong {
+          display: block;
+          margin-top: 8px;
+          color: var(--ed-color-text-primary);
+          font-size: 22px;
+          font-weight: 700;
+          line-height: 28px;
+        }
+
+        .ed-automation-table {
+          overflow: hidden;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-tabs {
+          gap: 6px;
+          padding: 10px var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+          overflow-x: auto;
+        }
+
+        .ed-tabs button {
+          flex: 0 0 auto;
+          padding: 8px 10px;
+          border: 1px solid transparent;
+          border-radius: var(--ed-radius-xl);
+          background: transparent;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .ed-tabs button.is-active,
+        .ed-tabs button:hover {
+          border-color: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-text-primary);
+        }
+
+        .ed-automation-grid {
+          display: grid;
+          grid-template-columns: minmax(260px, 2fr) 150px 110px 80px 80px 80px 42px;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .ed-automation-grid-head {
+          padding: 14px var(--ed-space-2);
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-automation-row {
+          padding: 14px var(--ed-space-2);
+          border-top: 1px solid var(--ed-color-surface-muted);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 500;
+          text-decoration: none;
+        }
+
+        .ed-automation-row:hover {
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-auto-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-weight: 700;
+        }
+
+        .ed-trigger {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: var(--ed-color-border-muted);
+          font-weight: 700;
+        }
+
+        .ed-status {
+          display: inline-flex;
+          padding: 4px 8px;
+          border-radius: var(--ed-radius-xl);
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 16px;
+          text-transform: uppercase;
+        }
+
+        .ed-status.success {
+          background: #eef7e9;
+          color: #37630f;
+        }
+
+        .ed-status.neutral {
+          background: #f2f4f1;
+          color: var(--ed-color-text-tertiary);
+        }
+
+        .ed-row-action {
+          justify-self: end;
+          color: var(--ed-color-text-tertiary);
+        }
+
+        .ed-empty-state {
+          display: grid;
+          justify-items: center;
+          gap: 10px;
+          padding: 54px 16px;
+          border-top: 1px solid var(--ed-color-surface-muted);
+          color: var(--ed-color-text-tertiary);
+          text-align: center;
+        }
+
+        .ed-empty-state h3,
+        .ed-empty-state p {
+          margin: 0;
+        }
+
+        @media (max-width: 1120px) {
+          .ed-automation-metrics {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .ed-automation-table {
+            overflow-x: auto;
+          }
+
+          .ed-automation-grid {
+            min-width: 840px;
+          }
+        }
+
+        @media (max-width: 720px) {
+          .ed-automation-header,
+          .ed-automation-summary {
+            display: grid;
+            align-items: start;
+          }
+
+          .ed-button-primary {
+            width: 100%;
+          }
+
+          .ed-automation-metrics {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

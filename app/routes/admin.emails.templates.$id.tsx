@@ -146,7 +146,7 @@ export default function TemplateEditor() {
                     z-index: 9999; 
                     display: flex; 
                     flex-direction: column;
-                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
                 }
                 
                 .editor-header {
@@ -217,7 +217,7 @@ export default function TemplateEditor() {
                     width: 600px;
                     min-height: 800px;
                     background: white;
-                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+                    box-shadow: var(--ed-shadow-1, rgb(111, 154, 55) 0px 2px 0px 0px);
                     border-radius: 8px;
                     overflow: hidden;
                 }
@@ -234,7 +234,7 @@ export default function TemplateEditor() {
                     padding: 16px;
                     background: #f8fafc;
                     border: 1px solid #e2e8f0;
-                    border-radius: 12px;
+                    border-radius: var(--ed-radius, 4px);
                     display: flex;
                     flex-direction: column;
                     align-items: center;
@@ -244,9 +244,9 @@ export default function TemplateEditor() {
                     color: #475569;
                 }
                 .block-button:hover {
-                    background: #f0f7ff;
-                    border-color: #6366f1;
-                    color: #6366f1;
+                    background: #f2f6ee;
+                    border-color: #82b440;
+                    color: #82b440;
                     transform: translateY(-2px);
                 }
                 .block-button strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
@@ -258,7 +258,7 @@ export default function TemplateEditor() {
                     transition: all 0.2s;
                 }
                 .canvas-block:hover { border-color: #e2e8f0; }
-                .canvas-block.selected { border-color: #6366f1; background: rgba(99, 102, 241, 0.02); }
+                .canvas-block.selected { border-color: #82b440; background: rgba(130, 180, 64, 0.02); }
 
                 .block-tools {
                     position: absolute;
@@ -284,14 +284,14 @@ export default function TemplateEditor() {
                     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
                     cursor: pointer;
                 }
-                .tool-btn:hover { color: #6366f1; border-color: #6366f1; }
+                .tool-btn:hover { color: #82b440; border-color: #82b440; }
                 .tool-btn.delete:hover { color: #ef4444; border-color: #ef4444; }
 
                 .prop-input {
                     width: 100%;
                     padding: 12px;
                     border: 1px solid #e2e8f0;
-                    border-radius: 10px;
+                    border-radius: var(--ed-radius, 4px);
                     font-size: 14px;
                     margin-bottom: 20px;
                 }
@@ -304,10 +304,10 @@ export default function TemplateEditor() {
                 }
 
                 .btn-save {
-                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                    background: var(--ed-surface-muted, #82b440);
                     color: white;
                     padding: 10px 24px;
-                    border-radius: 12px;
+                    border-radius: var(--ed-radius, 4px);
                     border: none;
                     font-weight: 700;
                     cursor: pointer;
@@ -316,11 +316,11 @@ export default function TemplateEditor() {
                     gap: 10px;
                     transition: all 0.2s;
                 }
-                .btn-save:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+                .btn-save:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(130, 180, 64, 0.3); }
 
                 .var-badge {
                     background: #f1f5f9;
-                    color: #6366f1;
+                    color: #82b440;
                     padding: 2px 6px;
                     border-radius: 4px;
                     font-size: 11px;
@@ -434,7 +434,7 @@ export default function TemplateEditor() {
                             if(!block) return null;
                             return (
                                 <div>
-                                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', marginBottom: '24px' }}>
+                                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '4px', marginBottom: '24px' }}>
                                         <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>OBJECT TYPE</div>
                                         <div style={{ fontSize: '14px', fontWeight: 800, color: '#1e293b', textTransform: 'capitalize' }}>{block.type} Element</div>
                                     </div>
@@ -468,7 +468,7 @@ export default function TemplateEditor() {
                                             <button 
                                                 key={align} 
                                                 className="tool-btn" 
-                                                style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#6366f1' : '#e2e8f0', background: block.style?.textAlign === align ? '#f0f7ff' : 'white' }}
+                                                style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#82b440' : '#e2e8f0', background: block.style?.textAlign === align ? '#f2f6ee' : 'white' }}
                                                 onClick={() => updateBlockStyle(block.id, { textAlign: align })}
                                             >
                                                 {align[0].toUpperCase()}
@@ -488,7 +488,7 @@ export default function TemplateEditor() {
                             
                             <hr style={{ border: 0, borderTop: '1px solid #f1f5f9', margin: '32px 0' }} />
                             
-                            <div style={{ background: '#fdf2f2', padding: '16px', borderRadius: '12px', border: '1px solid #fee2e2' }}>
+                            <div style={{ background: '#fdf2f2', padding: '16px', borderRadius: '4px', border: '1px solid #fee2e2' }}>
                                 <div style={{ fontWeight: 800, fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', marginBottom: '8px' }}>Danger Zone</div>
                                 <fetcher.Form method="post">
                                     <input type="hidden" name="action" value="delete" />
@@ -519,7 +519,7 @@ function getDefaultContent(type: EmailBlockType) {
 }
 
 function getDefaultStyle(type: EmailBlockType) {
-    if (type === 'button') return { buttonColor: '#6366f1', textAlign: 'center' };
+    if (type === 'button') return { buttonColor: '#82b440', textAlign: 'center' };
     if (type === 'heading') return { fontSize: '24px', textAlign: 'left', color: '#1e293b' };
     return { textAlign: 'left' };
 }
@@ -529,17 +529,17 @@ function renderBlockPreview(block: EmailBlock): string {
     const style = block.style || {};
     switch(type) {
         case 'header': 
-            return `<div style="padding: 24px; text-align: center; border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 900; font-size: 20px;">${content.logoText || 'LOGO'}</div>`;
+            return `<div style="padding: 24px; text-align: center; border-bottom: 2px solid #82b440; color: #82b440; font-weight: 900; font-size: 20px;">${content.logoText || 'LOGO'}</div>`;
         case 'heading':
             return `<div style="padding: 24px 40px; font-size: 24px; font-weight: 800; text-align: ${style.textAlign || 'left'}; color: #1e293b;">${content.text}</div>`;
         case 'text':
             return `<div style="padding: 10px 40px 24px; font-size: 15px; line-height: 1.6; color: #475569; text-align: ${style.textAlign || 'left'};">${content.text.replace(/\n/g, '<br>')}</div>`;
         case 'button':
-            return `<div style="padding: 24px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#6366f1'}; color: white; padding: 12px 32px; border-radius: 8px; font-weight: 700; display: inline-block;">${content.label}</div></div>`;
+            return `<div style="padding: 24px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#82b440'}; color: white; padding: 12px 32px; border-radius: 8px; font-weight: 700; display: inline-block;">${content.label}</div></div>`;
         case 'divider':
             return `<div style="padding: 20px 40px;"><hr style="border: 0; border-top: 1px solid #f1f5f9;"></div>`;
         case 'coupon':
-            return `<div style="padding: 24px 40px;"><div style="background: #fdfdfd; border: 2px dashed #6366f1; padding: 24px; text-align: center; font-size: 24px; font-weight: 900; color: #6366f1; letter-spacing: 2px;">${content.code}</div></div>`;
+            return `<div style="padding: 24px 40px;"><div style="background: #fdfdfd; border: 2px dashed #82b440; padding: 24px; text-align: center; font-size: 24px; font-weight: 900; color: #82b440; letter-spacing: 2px;">${content.code}</div></div>`;
         case 'hero':
             return `<div style="padding: 0; text-align: center;"><img src="https://via.placeholder.com/600x300?text=Banner+Image" style="width: 100%; max-width: 600px; display: block;" /></div>`;
         case 'footer':

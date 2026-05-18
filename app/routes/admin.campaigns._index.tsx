@@ -5,199 +5,320 @@ import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
+  await requireAdminAuth(request);
 
-    // Aggregate AnalyticsRule data
-    const ruleStats = await prisma.analyticsRule.groupBy({
-        by: ['ruleName', 'ruleId'],
-        _sum: {
-            seen: true,
-            clickedYes: true,
-            clickedNo: true,
-            dismissed: true,
-            autoRedirected: true,
-        },
-    });
+  const ruleStats = await prisma.analyticsRule.groupBy({
+    by: ["ruleName", "ruleId"],
+    _sum: {
+      seen: true,
+      clickedYes: true,
+      clickedNo: true,
+      dismissed: true,
+      autoRedirected: true,
+    },
+  });
 
-    // Top Countries for Marketing
-    const countryStats = await prisma.analyticsCountry.groupBy({
-        by: ['countryCode'],
-        _sum: {
-            visitors: true,
-            popupShown: true,
-            redirected: true,
-        },
-        orderBy: {
-            _sum: {
-                visitors: 'desc',
-            },
-        },
-        take: 10,
-    });
+  const countryStats = await prisma.analyticsCountry.groupBy({
+    by: ["countryCode"],
+    _sum: {
+      visitors: true,
+      popupShown: true,
+      redirected: true,
+    },
+    orderBy: {
+      _sum: {
+        visitors: "desc",
+      },
+    },
+    take: 10,
+  });
 
-    return json({ 
-        campaigns: ruleStats.map((r: any) => ({
-            ...r,
-            name: r.ruleName,
-            id: r.ruleId,
-            seen: r._sum.seen || 0,
-            conversions: r._sum.clickedYes || 0,
-            auto: r._sum.autoRedirected || 0,
-            cr: r._sum.seen > 0 ? ((r._sum.clickedYes / r._sum.seen) * 100).toFixed(1) : '0'
-        })),
-        reach: countryStats.map((c: any) => ({
-            code: c.countryCode,
-            visitors: c._sum.visitors || 0,
-            engaged: (c._sum.popupShown || 0) + (c._sum.redirected || 0)
-        }))
-    });
+  return json({
+    campaigns: ruleStats.map((rule: any) => ({
+      ...rule,
+      name: rule.ruleName,
+      id: rule.ruleId,
+      seen: rule._sum.seen || 0,
+      conversions: rule._sum.clickedYes || 0,
+      auto: rule._sum.autoRedirected || 0,
+      cr: rule._sum.seen > 0 ? ((rule._sum.clickedYes / rule._sum.seen) * 100).toFixed(1) : "0",
+    })),
+    reach: countryStats.map((country: any) => ({
+      code: country.countryCode,
+      visitors: country._sum.visitors || 0,
+      engaged: (country._sum.popupShown || 0) + (country._sum.redirected || 0),
+    })),
+  });
 };
 
 export default function AdminCampaigns() {
-    const { campaigns, reach } = useLoaderData<typeof loader>();
+  const { campaigns, reach } = useLoaderData<typeof loader>();
+  const totalReach = campaigns.reduce((sum: number, item: any) => sum + item.seen, 0);
+  const totalAuto = campaigns.reduce((sum: number, item: any) => sum + item.auto, 0);
+  const avgConversion =
+    campaigns.length > 0
+      ? (campaigns.reduce((sum: number, item: any) => sum + parseFloat(item.cr), 0) / campaigns.length).toFixed(1)
+      : "0.0";
 
-    return (
-        <div className="marketing-view">
-            <style>{`
-                .grid-2 { 
-                    display: grid; 
-                    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); 
-                    gap: 24px; 
-                    margin-bottom: 32px; 
-                }
-                .campaign-card {
-                    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
-                    display: flex; flex-direction: column;
-                }
-                .header-flex { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); gap: 12px; }
-                
-                .metrics-row {
-                    display: flex;
-                    gap: 24px;
-                    flex-wrap: wrap;
-                    margin-bottom: 32px;
-                }
-                .metric-box { 
-                    padding: 20px; 
-                    background: #f8fafc; 
-                    border-radius: 16px; 
-                    text-align: center; 
-                    flex: 1; 
-                    min-width: 150px;
-                    border: 1px solid var(--border);
-                }
-                .metric-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.05em; }
-                .metric-val { font-size: 24px; font-weight: 700; color: var(--text); }
-                
-                .table-container { width: 100%; overflow-x: auto; }
-                table { width: 100%; border-collapse: collapse; min-width: 500px; }
-                th { text-align: left; padding: 12px 24px; background: #f8fafc; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); text-transform: uppercase; }
-                td { padding: 16px 24px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  return (
+    <section className="ed-campaigns">
+      <div className="ed-campaign-metrics">
+        <article>
+          <span>Avg. Conversion</span>
+          <strong>{avgConversion}%</strong>
+        </article>
+        <article>
+          <span>Total Reach</span>
+          <strong>{totalReach.toLocaleString()}</strong>
+        </article>
+        <article>
+          <span>Auto Redirects</span>
+          <strong>{totalAuto.toLocaleString()}</strong>
+        </article>
+      </div>
 
-                @media (max-width: 600px) {
-                    .header-flex { flex-direction: column; align-items: flex-start; padding: 16px; }
-                    .metrics-row { gap: 12px; }
-                    .metric-box { padding: 16px; min-width: 120px; }
-                    .metric-val { font-size: 20px; }
-                    td, th { padding: 12px 16px; }
-                }
-            `}</style>
+      <div className="ed-campaign-grid">
+        <article className="ed-campaign-panel">
+          <div className="ed-panel-head">
+            <h2>Campaign Performance</h2>
+            <p>Active rules and popup campaigns ranked by conversion rate.</p>
+          </div>
 
-            <div className="metrics-row">
-                <div className="metric-box" style={{ background: '#f5f7ff', borderColor: '#e0e7ff' }}>
-                    <div className="metric-label" style={{ color: '#6366f1' }}>Avg. Conversion</div>
-                    <div className="metric-val">
-                        {campaigns.length > 0 
-                            ? (campaigns.reduce((a: any, b: any) => a + parseFloat(b.cr), 0) / campaigns.length).toFixed(1)
-                            : 0}%
-                    </div>
-                </div>
-                <div className="metric-box" style={{ background: '#f0fdf4', borderColor: '#dcfce7' }}>
-                    <div className="metric-label" style={{ color: '#10b981' }}>Total Reach</div>
-                    <div className="metric-val">{campaigns.reduce((a: any, b: any) => a + b.seen, 0).toLocaleString()}</div>
-                </div>
-                <div className="metric-box" style={{ background: '#fef2f2', borderColor: '#fee2e2' }}>
-                    <div className="metric-label" style={{ color: '#ef4444' }}>Auto-Redirects</div>
-                    <div className="metric-val">{campaigns.reduce((a: any, b: any) => a + b.auto, 0).toLocaleString()}</div>
-                </div>
-            </div>
+          <div className="ed-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campaign / Rule</th>
+                  <th>Reach</th>
+                  <th>Conversions</th>
+                  <th>CR %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>
+                      <div className="ed-empty">No campaign data available.</div>
+                    </td>
+                  </tr>
+                ) : (
+                  campaigns.map((campaign: any) => (
+                    <tr key={campaign.id}>
+                      <td>
+                        <strong>{campaign.name}</strong>
+                        <small>{campaign.auto > 0 ? "Auto Redirect" : "Popup Campaign"}</small>
+                      </td>
+                      <td>{campaign.seen.toLocaleString()}</td>
+                      <td>{campaign.conversions.toLocaleString()}</td>
+                      <td>
+                        <div className="ed-cr-cell">
+                          <strong>{campaign.cr}%</strong>
+                          <span>
+                            <i style={{ width: `${Math.min(parseFloat(campaign.cr), 100)}%` }} />
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </article>
 
-            <div className="grid-2">
-                <div className="campaign-card">
-                    <div className="header-flex">
-                        <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Campaign Performance</h3>
-                        <span className="badge-primary badge">Active Rules</span>
-                    </div>
-                    <div className="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Campaign / Rule</th>
-                                    <th>Reach</th>
-                                    <th>Conversions</th>
-                                    <th>CR %</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {campaigns.map((c: any) => (
-                                    <tr key={c.id}>
-                                        <td>
-                                            <div style={{ fontWeight: 600 }}>{c.name}</div>
-                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.auto > 0 ? 'Auto-Redirect' : 'Popup Campaign'}</div>
-                                        </td>
-                                        <td>{c.seen.toLocaleString()}</td>
-                                        <td>{c.conversions.toLocaleString()}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <strong>{c.cr}%</strong>
-                                                <div style={{ width: '60px', height: '6px', background: '#e2e8f0', borderRadius: '3px', position: 'relative' }}>
-                                                    <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${Math.min(parseFloat(c.cr), 100)}%`, background: 'var(--primary)', borderRadius: '3px' }} />
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <article className="ed-campaign-panel">
+          <div className="ed-panel-head">
+            <h2>Market Reach</h2>
+            <p>Top markets by total visitor engagement.</p>
+          </div>
 
-                <div className="campaign-card">
-                    <div className="header-flex">
-                        <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Market Reach (Top 10)</h3>
-                    </div>
-                    <div className="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Market (Country)</th>
-                                    <th>Total Visitors</th>
-                                    <th>Engagement</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {reach.map((r: any) => (
-                                    <tr key={r.code}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <img src={`https://flagcdn.com/w40/${r.code.toLowerCase()}.png`} width="20" alt={r.code} />
-                                                <strong>{r.code}</strong>
-                                            </div>
-                                        </td>
-                                        <td>{r.visitors.toLocaleString()}</td>
-                                        <td>
-                                            <div style={{ color: '#10b981', fontWeight: 600 }}>
-                                                {r.engaged.toLocaleString()}
-                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px', fontWeight: 400 }}>actions</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+          <div className="ed-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Market</th>
+                  <th>Total Visitors</th>
+                  <th>Engagement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reach.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>
+                      <div className="ed-empty">No market data available.</div>
+                    </td>
+                  </tr>
+                ) : (
+                  reach.map((market: any) => (
+                    <tr key={market.code}>
+                      <td>
+                        <div className="ed-market">
+                          <img src={`https://flagcdn.com/w40/${market.code.toLowerCase()}.png`} width="20" alt="" />
+                          <strong>{market.code}</strong>
+                        </div>
+                      </td>
+                      <td>{market.visitors.toLocaleString()}</td>
+                      <td>
+                        <strong>{market.engaged.toLocaleString()}</strong>
+                        <small>actions</small>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+
+      <style>{`
+        .ed-campaigns {
+          display: grid;
+          gap: var(--ed-space-2);
+        }
+
+        .ed-campaign-metrics {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: var(--ed-space-2);
+        }
+
+        .ed-campaign-metrics article,
+        .ed-campaign-panel {
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-campaign-metrics article {
+          display: grid;
+          gap: var(--ed-space-1);
+          padding: var(--ed-space-2);
+        }
+
+        .ed-campaign-metrics span {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+
+        .ed-campaign-metrics strong {
+          color: var(--ed-color-text-primary);
+          font-size: 26px;
+          line-height: 32px;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ed-campaign-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
+          gap: var(--ed-space-2);
+          align-items: start;
+        }
+
+        .ed-campaign-panel {
+          overflow: hidden;
+        }
+
+        .ed-panel-head {
+          display: grid;
+          gap: var(--ed-space-1);
+          padding: var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+        }
+
+        .ed-panel-head h2,
+        .ed-panel-head p {
+          margin: 0;
+        }
+
+        .ed-panel-head h2 {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-md);
+          line-height: var(--ed-line-height-base);
+        }
+
+        .ed-panel-head p {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-table-scroll {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .ed-campaign-panel table {
+          min-width: 560px;
+        }
+
+        .ed-campaign-panel td strong,
+        .ed-campaign-panel td small {
+          display: block;
+        }
+
+        .ed-campaign-panel td small {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          line-height: 16px;
+        }
+
+        .ed-cr-cell {
+          display: grid;
+          gap: 6px;
+          min-width: 84px;
+        }
+
+        .ed-cr-cell span {
+          display: block;
+          height: 7px;
+          overflow: hidden;
+          border-radius: var(--ed-radius-xl);
+          background: #eef1ef;
+        }
+
+        .ed-cr-cell i {
+          display: block;
+          height: 100%;
+          background: var(--ed-color-border-muted);
+        }
+
+        .ed-market {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .ed-market img {
+          border: 1px solid var(--ed-color-surface-muted);
+        }
+
+        .ed-empty {
+          padding: 50px 20px;
+          color: var(--ed-color-text-tertiary);
+          text-align: center;
+        }
+
+        @media (max-width: 1100px) {
+          .ed-campaign-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ed-campaign-metrics {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-campaign-metrics article,
+          .ed-panel-head {
+            padding: 14px;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

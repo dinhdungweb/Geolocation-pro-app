@@ -1,325 +1,589 @@
-
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { requireAdminAuth } from "../utils/admin.session.server";
+import { Gem, Store, TrendingUp } from "lucide-react";
 import prisma from "../db.server";
-import { Store, TrendingUp, Gem } from "lucide-react";
+import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
+  await requireAdminAuth(request);
 
-    try {
-        const now = new Date();
-        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const yearStart = new Date(now.getFullYear(), 0, 1);
+  try {
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const yearStart = new Date(now.getFullYear(), 0, 1);
 
-        const [
-            totalShops,
-            activeRules,
-            totalVisitors,
-            countryStats,
-            settings,
-            trendRows
-        ] = await Promise.all([
-            prisma.settings.count({ where: { NOT: { shop: 'GLOBAL' } } }),
-            prisma.redirectRule.count({ where: { isActive: true } }),
-            prisma.analyticsCountry.aggregate({ _sum: { visitors: true } }),
-            prisma.analyticsCountry.groupBy({
-                by: ['countryCode'],
-                _sum: { visitors: true, redirected: true },
-                orderBy: { _sum: { visitors: 'desc' } },
-                take: 5
-            }),
-            prisma.settings.findMany({
-                where: { NOT: { shop: 'GLOBAL' } },
-                select: { shop: true, currentPlan: true, mode: true, customPlanPrice: true, billingPeriodKey: true },
-            }),
-            prisma.analyticsCountry.findMany({
-                where: { date: { gte: yearStart } },
-                select: { date: true, visitors: true, redirected: true },
-            })
-        ]);
+    const [totalShops, activeRules, totalVisitors, countryStats, settings, trendRows] =
+      await Promise.all([
+        prisma.settings.count({ where: { NOT: { shop: "GLOBAL" } } }),
+        prisma.redirectRule.count({ where: { isActive: true } }),
+        prisma.analyticsCountry.aggregate({ _sum: { visitors: true } }),
+        prisma.analyticsCountry.groupBy({
+          by: ["countryCode"],
+          _sum: { visitors: true, redirected: true },
+          orderBy: { _sum: { visitors: "desc" } },
+          take: 5,
+        }),
+        prisma.settings.findMany({
+          where: { NOT: { shop: "GLOBAL" } },
+          select: {
+            shop: true,
+            currentPlan: true,
+            mode: true,
+            customPlanPrice: true,
+            billingPeriodKey: true,
+          },
+        }),
+        prisma.analyticsCountry.findMany({
+          where: { date: { gte: yearStart } },
+          select: { date: true, visitors: true, redirected: true },
+        }),
+      ]);
 
-        const trendMap = new Map<string, { totalVisitors: number; redirected: number }>();
-        (trendRows as any[]).forEach((row) => {
-            const rowMonth = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`;
-            const current = trendMap.get(rowMonth) || { totalVisitors: 0, redirected: 0 };
-            current.totalVisitors += row.visitors || 0;
-            current.redirected += row.redirected || 0;
-            trendMap.set(rowMonth, current);
-        });
-        const monthlyTrends = Array.from(trendMap.entries())
-            .map(([trendMonth, sums]) => ({
-                yearMonth: trendMonth,
-                _sum: {
-                    totalVisitors: sums.totalVisitors,
-                    redirected: sums.redirected,
-                },
-            }))
-            .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
+    const trendMap = new Map<string, { totalVisitors: number; redirected: number }>();
 
-        const currentPeriodKeys = settings.map((s: any) => s.billingPeriodKey || `calendar:${yearMonth}`);
-        const currentPeriodUsage = await prisma.monthlyUsage.findMany({
-            where: { billingPeriodKey: { in: currentPeriodKeys } },
-        });
+    (trendRows as any[]).forEach((row) => {
+      const rowMonth = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, "0")}`;
+      const current = trendMap.get(rowMonth) || { totalVisitors: 0, redirected: 0 };
+      current.totalVisitors += row.visitors || 0;
+      current.redirected += row.redirected || 0;
+      trendMap.set(rowMonth, current);
+    });
 
-        // 1. Calculate Subscription Revenue
-        const planPrices: Record<string, number> = {
-            'ELITE': 14.99,
-            'PLUS': 7.99,
-            'PREMIUM': 4.99,
-            'FREE': 0
-        };
-        const OVERAGE_RATE = 100 / 50000; // $0.002
+    const monthlyTrends = Array.from(trendMap.entries())
+      .map(([trendMonth, sums]) => ({
+        yearMonth: trendMonth,
+        _sum: {
+          totalVisitors: sums.totalVisitors,
+          redirected: sums.redirected,
+        },
+      }))
+      .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
 
-        const subscriptionRevenue = settings.reduce((sum, s) => {
-            const planKey = (s.currentPlan || 'FREE').toUpperCase();
-            if (planKey === 'CUSTOM') return sum + Number(s.customPlanPrice || 0);
-            return sum + (planPrices[planKey] || 0);
-        }, 0);
+    const currentPeriodKeys = settings.map((setting: any) => setting.billingPeriodKey || `calendar:${yearMonth}`);
+    const currentPeriodUsage = await prisma.monthlyUsage.findMany({
+      where: { billingPeriodKey: { in: currentPeriodKeys } },
+    });
 
-        // 2. Calculate Overage Revenue (Current Month)
-        const usageMap = new Map((currentPeriodUsage as any[]).map(u => [`${u.shop}:${u.billingPeriodKey}`, u]));
-        const overageRevenue = settings.reduce((sum, s) => {
-            const planKey = (s.currentPlan || 'FREE').toUpperCase();
-            if (planKey === 'FREE') return sum;
+    const planPrices: Record<string, number> = {
+      ELITE: 14.99,
+      PLUS: 7.99,
+      PREMIUM: 4.99,
+      FREE: 0,
+    };
+    const overageRate = 100 / 50000;
 
-            const usage = usageMap.get(`${s.shop}:${(s as any).billingPeriodKey || `calendar:${yearMonth}`}`);
-            if (!usage) return sum;
+    const subscriptionRevenue = settings.reduce((sum, setting) => {
+      const planKey = (setting.currentPlan || "FREE").toUpperCase();
+      if (planKey === "CUSTOM") return sum + Number(setting.customPlanPrice || 0);
+      return sum + (planPrices[planKey] || 0);
+    }, 0);
 
-            // Only count successfully charged visitors in revenue
-            const chargedAmount = (usage.chargedVisitors || 0) * OVERAGE_RATE;
-            return sum + chargedAmount;
-        }, 0);
+    const usageMap = new Map(
+      (currentPeriodUsage as any[]).map((usage) => [`${usage.shop}:${usage.billingPeriodKey}`, usage]),
+    );
 
-        // Calculate distributions
-        const plans = settings.reduce((acc: any, s) => {
-            const planKey = (s.currentPlan || 'FREE').toUpperCase();
-            acc[planKey] = (acc[planKey] || 0) + 1;
-            return acc;
-        }, { 'FREE': 0, 'PREMIUM': 0, 'PLUS': 0, 'ELITE': 0, 'CUSTOM': 0 });
+    const overageRevenue = settings.reduce((sum, setting) => {
+      const planKey = (setting.currentPlan || "FREE").toUpperCase();
+      if (planKey === "FREE") return sum;
 
-        const modes = settings.reduce((acc: any, s) => {
-            const modeKey = s.mode || 'popup';
-            acc[modeKey] = (acc[modeKey] || 0) + 1;
-            return acc;
-        }, {});
+      const usage = usageMap.get(`${setting.shop}:${(setting as any).billingPeriodKey || `calendar:${yearMonth}`}`);
+      if (!usage) return sum;
 
-        return json({ 
-            stats: {
-                totalShops,
-                activeRules,
-                totalVisitors: totalVisitors._sum.visitors || 0,
-                subscriptionRevenue,
-                overageRevenue,
-                totalRevenue: subscriptionRevenue + overageRevenue
-            },
-            countries: countryStats.map(c => ({
-                code: c.countryCode,
-                visitors: c._sum.visitors || 0,
-                redirects: c._sum.redirected || 0
-            })),
-            distributions: { plans, modes },
-            trends: monthlyTrends
-        });
-    } catch (error) {
-        console.error("Dashboard Loader Error:", error);
-        return json({
-            stats: { totalShops: 0, activeRules: 0, totalVisitors: 0, subscriptionRevenue: 0, overageRevenue: 0, totalRevenue: 0 },
-            countries: [],
-            distributions: { plans: {}, modes: {} },
-            trends: []
-        });
-    }
+      return sum + (usage.chargedVisitors || 0) * overageRate;
+    }, 0);
+
+    const plans = settings.reduce(
+      (acc: Record<string, number>, setting) => {
+        const planKey = (setting.currentPlan || "FREE").toUpperCase();
+        acc[planKey] = (acc[planKey] || 0) + 1;
+        return acc;
+      },
+      { FREE: 0, PREMIUM: 0, PLUS: 0, ELITE: 0, CUSTOM: 0 },
+    );
+
+    const modes = settings.reduce((acc: Record<string, number>, setting) => {
+      const modeKey = setting.mode || "popup";
+      acc[modeKey] = (acc[modeKey] || 0) + 1;
+      return acc;
+    }, {});
+
+    return json({
+      stats: {
+        totalShops,
+        activeRules,
+        totalVisitors: totalVisitors._sum.visitors || 0,
+        subscriptionRevenue,
+        overageRevenue,
+        totalRevenue: subscriptionRevenue + overageRevenue,
+      },
+      countries: countryStats.map((country) => ({
+        code: country.countryCode,
+        visitors: country._sum.visitors || 0,
+        redirects: country._sum.redirected || 0,
+      })),
+      distributions: { plans, modes },
+      trends: monthlyTrends,
+    });
+  } catch (error) {
+    console.error("Dashboard Loader Error:", error);
+    return json({
+      stats: {
+        totalShops: 0,
+        activeRules: 0,
+        totalVisitors: 0,
+        subscriptionRevenue: 0,
+        overageRevenue: 0,
+        totalRevenue: 0,
+      },
+      countries: [],
+      distributions: { plans: {}, modes: {} },
+      trends: [],
+    });
+  }
 };
 
-// Helper to fill all 12 months of the current year
 function getFullYearTrends(monthlyTrends: any[]) {
-    const currentYear = new Date().getFullYear();
-    const fullYear: any[] = [];
-    
-    for (let month = 1; month <= 12; month++) {
-        const yearMonth = `${currentYear}-${String(month).padStart(2, '0')}`;
-        const existing = monthlyTrends.find(t => t.yearMonth === yearMonth);
-        
-        fullYear.push(existing || {
-            yearMonth,
-            _sum: { totalVisitors: 0, redirected: 0 }
-        });
-    }
-    
-    return fullYear;
+  const currentYear = new Date().getFullYear();
+  const fullYear: any[] = [];
+
+  for (let month = 1; month <= 12; month++) {
+    const yearMonth = `${currentYear}-${String(month).padStart(2, "0")}`;
+    const existing = monthlyTrends.find((trend) => trend.yearMonth === yearMonth);
+
+    fullYear.push(
+      existing || {
+        yearMonth,
+        _sum: { totalVisitors: 0, redirected: 0 },
+      },
+    );
+  }
+
+  return fullYear;
 }
 
 export default function AdminDashboard() {
-    const { stats, countries, distributions, trends } = useLoaderData<typeof loader>();
-    const fullYearTrends = getFullYearTrends(trends);
+  const { stats, countries, distributions, trends } = useLoaderData<typeof loader>();
+  const fullYearTrends = getFullYearTrends(trends);
+  const maxTrendVisitors =
+    Math.max(...fullYearTrends.map((trend) => trend._sum?.totalVisitors || 0)) || 1;
 
-    return (
-        <div className="dashboard-v2">
-            <style>{`
-                .grid-main { 
-                    display: grid; 
-                    grid-template-columns: 2fr 1fr; 
-                    gap: 20px; 
-                }
-                .grid-stats { 
-                    display: grid; 
-                    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
-                    gap: 16px; 
-                    margin-bottom: 20px; 
-                }
-                
-                .premium-card {
-                    background: white; border-radius: 8px; border: 1px solid var(--border);
-                    padding: 22px; box-shadow: none;
-                    position: relative; overflow: hidden;
-                    transition: none;
-                }
-                .premium-card:hover { transform: none; }
-                
-                .stat-icon {
-                    width: 40px; height: 40px; border-radius: 8px;
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: 20px; margin-bottom: 16px;
-                }
-                
-                .trend-chart { width: 100%; height: 120px; margin-top: 20px; }
-                
-                .list-item {
-                    display: flex; align-items: center; justify-content: space-between;
-                    padding: 16px 0; border-bottom: 1px solid #f1f5f9;
-                }
-                .list-item:last-child { border-bottom: none; }
-                
-                .progress-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; flex: 1; margin: 0 16px; }
-                .progress-fill { height: 100%; background: var(--primary); border-radius: 4px; }
+  const cards = [
+    {
+      label: "Total Installations",
+      value: stats.totalShops.toLocaleString(),
+      note: "All active merchant records",
+      icon: <Store size={18} />,
+    },
+    {
+      label: "Global Traffic",
+      value: stats.totalVisitors.toLocaleString(),
+      note: "Aggregated visitor events",
+      icon: <TrendingUp size={18} />,
+    },
+    {
+      label: "Active Rules",
+      value: stats.activeRules.toLocaleString(),
+      note: "Redirect and block rules",
+      icon: <Store size={18} />,
+    },
+    {
+      label: "Total Revenue",
+      value: `$${stats.totalRevenue.toFixed(2)}`,
+      note: `Subs $${stats.subscriptionRevenue.toFixed(2)} / Overage $${stats.overageRevenue.toFixed(2)}`,
+      icon: <Gem size={18} />,
+    },
+  ];
 
-                .plan-tag {
-                    padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
-                    background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;
-                }
+  return (
+    <section className="ed-dashboard">
+      <div className="ed-metric-grid">
+        {cards.map((card) => (
+          <article className="ed-metric-card" key={card.label}>
+            <div className="ed-metric-head">
+              <span className="ed-metric-icon">{card.icon}</span>
+              <span>{card.label}</span>
+            </div>
+            <strong>{card.value}</strong>
+            <small>{card.note}</small>
+          </article>
+        ))}
+      </div>
 
-                @media (max-width: 1200px) {
-                    .grid-main { grid-template-columns: 1fr; }
-                }
+      <div className="ed-dashboard-grid">
+        <article className="ed-panel">
+          <div className="ed-panel-head">
+            <h2>Traffic Growth Trend</h2>
+            <p>Monthly visitor volume across the current year.</p>
+          </div>
 
-                @media (max-width: 768px) {
-                    .grid-main { gap: 16px; }
-                    .grid-stats { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
-                    .premium-card { padding: 16px; border-radius: 8px; }
-                    .stat-icon { width: 40px; height: 40px; font-size: 20px; margin-bottom: 16px; }
-                    .grid-stats .premium-card div:nth-child(3) { font-size: 28px !important; }
-                    .traffic-bars { height: 190px !important; gap: 4px !important; overflow-x: auto; padding-bottom: 0 !important; }
-                    .traffic-bars > div { min-width: 26px; }
-                    .list-item { padding: 12px 0; gap: 8px; }
-                    .progress-bar { margin: 0 10px; }
-                }
+          <div className="ed-trend-chart" aria-label="Traffic growth by month">
+            {fullYearTrends.map((trend) => {
+              const visitors = trend._sum?.totalVisitors || 0;
+              const percentage = visitors > 0 ? Math.max((visitors / maxTrendVisitors) * 100, 4) : 0;
 
-                @media (max-width: 480px) {
-                    .traffic-bars > div { min-width: 24px; }
-                    .grid-stats .premium-card div:nth-child(3) { font-size: 24px !important; }
-                }
-            `}</style>
-
-            <div className="grid-stats">
-                <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}><Store size={22} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Total Installations</div>
-                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>{stats.totalShops}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--admin-faint)', marginTop: '4px' }}>All time</div>
+              return (
+                <div className="ed-trend-column" key={trend.yearMonth}>
+                  <span>{visitors > 1000 ? `${(visitors / 1000).toFixed(1)}k` : visitors || ""}</span>
+                  <div
+                    className="ed-trend-bar"
+                    style={{ height: `${(percentage / 100) * 180}px` }}
+                    title={`${trend.yearMonth}: ${visitors.toLocaleString()} visitors`}
+                  />
+                  <small>{trend.yearMonth.split("-")[1]}</small>
                 </div>
-                <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}><TrendingUp size={22} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Global Traffic</div>
-                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>{stats.totalVisitors.toLocaleString()}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--admin-faint)', marginTop: '4px' }}>Real-time aggregated</div>
-                </div>
-                <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}><Store size={22} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Active Rules</div>
-                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>{stats.activeRules}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--admin-faint)', marginTop: '4px' }}>Currently active redirects</div>
-                </div>
-                <div className="premium-card">
-                    <div className="stat-icon" style={{ background: '#fce7f3', color: '#db2777' }}><Gem size={22} /></div>
-                    <div style={{ fontSize: '14px', color: 'var(--admin-muted)', fontWeight: 600 }}>Total Revenue</div>
-                    <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '8px', color: 'var(--admin-text)' }}>${stats.totalRevenue.toFixed(2)}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--admin-faint)', marginTop: '8px', lineHeight: '1.4' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subscriptions:</span> <span style={{fontWeight:600}}>${stats.subscriptionRevenue.toFixed(2)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop:'4px' }}><span>Overage:</span> <span style={{fontWeight:600}}>${stats.overageRevenue.toFixed(2)}</span></div>
-                    </div>
-                </div>
+              );
+            })}
+          </div>
+        </article>
+
+        <div className="ed-side-stack">
+          <article className="ed-panel">
+            <div className="ed-panel-head">
+              <h2>Market Distribution</h2>
+              <p>Top countries by visitor share.</p>
             </div>
 
-            <div className="grid-main">
-                <div className="premium-card">
-                    <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '24px' }}>Traffic Growth Trend</h3>
-                    <div className="traffic-bars" style={{ height: '260px', width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '0', borderBottom: '1px solid var(--admin-border)' }}>
-                        {fullYearTrends.map((t: any) => {
-                            const total = t._sum?.totalVisitors || 0;
-                            const maxVal = Math.max(...fullYearTrends.map((x: any) => x._sum?.totalVisitors || 0)) || 1;
-                            const heightPercentage = total > 0 ? Math.max((total / maxVal) * 100, 4) : 0;
-                            
-                            return (
-                                <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', position: 'relative' }}>
-                                    {total > 0 && (
-                                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#0ea5e9', marginBottom: '4px' }}>
-                                            {total > 1000 ? (total / 1000).toFixed(1) + 'k' : total}
-                                        </div>
-                                    )}
-                                    <div 
-                                        title={`${t.yearMonth}: ${total.toLocaleString()}`}
-                                        style={{ 
-                                            width: '70%', 
-                                            height: `${(heightPercentage / 100) * 180}px`,
-                                            background: total > 0 ? 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)' : 'transparent',
-                                            borderRadius: '6px 6px 2px 2px',
-                                            transition: 'none',
-                                            boxShadow: 'none',
-                                            minHeight: total > 0 ? '4px' : '0'
-                                        }} 
-                                    />
-                                    <div style={{ fontSize: '10px', color: 'var(--admin-muted)', fontWeight: 800, paddingBottom: '8px' }}>{t.yearMonth.split('-')[1]}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+            <div className="ed-list">
+              {countries.length === 0 ? (
+                <div className="ed-empty">No country data available.</div>
+              ) : (
+                countries.map((country) => {
+                  const share =
+                    stats.totalVisitors > 0 ? (country.visitors / stats.totalVisitors) * 100 : 0;
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                    <div className="premium-card">
-                        <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px' }}>Market Distribution</h3>
-                        {countries.map(c => (
-                            <div className="list-item" key={c.code}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '60px' }}>
-                                    <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} width="20" alt={c.code} />
-                                    <span style={{ fontWeight: 700, fontSize: '13px' }}>{c.code}</span>
-                                </div>
-                                <div className="progress-bar">
-                                    <div className="progress-fill" style={{ width: `${stats.totalVisitors > 0 ? (c.visitors / stats.totalVisitors) * 100 : 0}%`, background: "linear-gradient(90deg, #38bdf8 0%, #0284c7 100%)" }} />
-                                </div>
-                                <div style={{ fontSize: '12px', fontWeight: 600 }}>{stats.totalVisitors > 0 ? ((c.visitors / stats.totalVisitors) * 100).toFixed(1) : '0.0'}%</div>
-                            </div>
-                        ))}
+                  return (
+                    <div className="ed-list-row" key={country.code}>
+                      <div className="ed-country">
+                        <img
+                          src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
+                          width="20"
+                          alt=""
+                        />
+                        <strong>{country.code}</strong>
+                      </div>
+                      <div className="ed-progress" aria-hidden="true">
+                        <span style={{ width: `${share}%` }} />
+                      </div>
+                      <span>{share.toFixed(1)}%</span>
                     </div>
-
-                    <div className="premium-card">
-                        <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px' }}>Plan Distribution</h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                            {Object.entries(distributions.plans).map(([plan, count]: [any, any]) => (
-                                <div key={plan} style={{ flex: 1, minWidth: '100px', textAlign: 'center', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
-                                    <div style={{ fontSize: '11px', color: 'var(--admin-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '4px' }}>{plan}</div>
-                                    <div style={{ fontSize: '20px', fontWeight: 800 }}>{count}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                  );
+                })
+              )}
             </div>
+          </article>
+
+          <article className="ed-panel">
+            <div className="ed-panel-head">
+              <h2>Plan Distribution</h2>
+              <p>Merchant count grouped by plan.</p>
+            </div>
+
+            <div className="ed-plan-grid">
+              {Object.entries(distributions.plans).map(([plan, count]: [string, any]) => (
+                <div className="ed-plan-cell" key={plan}>
+                  <span>{plan}</span>
+                  <strong>{count}</strong>
+                </div>
+              ))}
+            </div>
+          </article>
         </div>
-    );
+      </div>
+
+      <style>{`
+        .ed-dashboard {
+          width: 100%;
+          min-width: 0;
+          display: grid;
+          gap: var(--ed-space-2);
+        }
+
+        .ed-metric-grid {
+          min-width: 0;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+          gap: var(--ed-space-2);
+        }
+
+        .ed-metric-card,
+        .ed-panel {
+          min-width: 0;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-metric-card {
+          display: grid;
+          gap: 8px;
+          padding: var(--ed-space-2);
+        }
+
+        .ed-metric-head {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 500;
+        }
+
+        .ed-metric-head > span:last-child {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .ed-metric-icon {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: var(--ed-radius-xl);
+          background: #f2f8ee;
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-metric-card strong {
+          min-width: 0;
+          overflow-wrap: anywhere;
+          color: var(--ed-color-text-primary);
+          font-size: clamp(22px, 2.5vw, 28px);
+          line-height: 1.2;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ed-metric-card small {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          line-height: 16px;
+        }
+
+        .ed-dashboard-grid {
+          min-width: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 2fr) minmax(min(100%, 320px), 1fr);
+          gap: var(--ed-space-2);
+          align-items: start;
+        }
+
+        .ed-panel {
+          padding: var(--ed-space-2);
+        }
+
+        .ed-panel-head {
+          display: grid;
+          gap: var(--ed-space-1);
+          margin-bottom: var(--ed-space-2);
+        }
+
+        .ed-panel-head h2 {
+          margin: 0;
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-md);
+          line-height: var(--ed-line-height-base);
+        }
+
+        .ed-panel-head p {
+          margin: 0;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-trend-chart {
+          width: 100%;
+          max-width: 100%;
+          min-height: 240px;
+          display: flex;
+          align-items: flex-end;
+          gap: 8px;
+          padding-top: var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .ed-trend-column {
+          min-width: 42px;
+          flex: 1;
+          display: grid;
+          justify-items: center;
+          align-items: end;
+          gap: 6px;
+        }
+
+        .ed-trend-column span {
+          min-height: 16px;
+          color: var(--ed-color-border-muted);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          line-height: 16px;
+        }
+
+        .ed-trend-bar {
+          width: 72%;
+          min-height: 0;
+          border-radius: var(--ed-radius-xl) var(--ed-radius-xl) 0 0;
+          background: var(--ed-color-border-muted);
+          box-shadow: var(--ed-shadow-2);
+        }
+
+        .ed-trend-column small {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 500;
+        }
+
+        .ed-side-stack {
+          min-width: 0;
+          display: grid;
+          gap: var(--ed-space-2);
+        }
+
+        .ed-list {
+          display: grid;
+          gap: 12px;
+        }
+
+        .ed-list-row {
+          display: grid;
+          grid-template-columns: minmax(64px, auto) minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 12px;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+        }
+
+        .ed-country {
+          display: flex;
+          align-items: center;
+          min-width: 0;
+          gap: 8px;
+        }
+
+        .ed-country strong {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .ed-country img {
+          border: 1px solid var(--ed-color-surface-muted);
+        }
+
+        .ed-country strong {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+        }
+
+        .ed-progress {
+          min-width: 72px;
+          height: 8px;
+          overflow: hidden;
+          border-radius: var(--ed-radius-xl);
+          background: #eef1ef;
+        }
+
+        .ed-progress span {
+          display: block;
+          height: 100%;
+          min-width: 2px;
+          background: var(--ed-color-border-muted);
+        }
+
+        .ed-plan-grid {
+          min-width: 0;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .ed-plan-cell {
+          display: grid;
+          gap: var(--ed-space-1);
+          padding: 12px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-plan-cell span {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+
+        .ed-plan-cell strong {
+          color: var(--ed-color-text-primary);
+          font-size: 22px;
+          line-height: 28px;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ed-empty {
+          padding: var(--ed-space-2);
+          border: 1px dashed var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          color: var(--ed-color-text-tertiary);
+          text-align: center;
+        }
+
+        @media (max-width: 1180px) {
+          .ed-dashboard-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ed-dashboard,
+          .ed-dashboard-grid,
+          .ed-side-stack,
+          .ed-metric-grid {
+            gap: var(--ed-card-padding-mobile);
+          }
+
+          .ed-plan-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-panel,
+          .ed-metric-card {
+            padding: var(--ed-card-padding-mobile);
+          }
+
+          .ed-trend-chart {
+            min-height: 210px;
+            margin-inline: calc(var(--ed-card-padding-mobile) * -1);
+            width: calc(100% + (var(--ed-card-padding-mobile) * 2));
+            padding-inline: var(--ed-card-padding-mobile);
+          }
+        }
+
+        @media (max-width: 420px) {
+          .ed-metric-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-list-row {
+            grid-template-columns: 1fr auto;
+          }
+
+          .ed-progress {
+            grid-column: 1 / -1;
+            min-width: 0;
+            order: 3;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }
-
-

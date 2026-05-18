@@ -1,458 +1,782 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
-import { useState } from "react";
-import { requireAdminAuth } from "../utils/admin.session.server";
-import { 
-    Mail, 
-    Zap, 
-    MoreHorizontal,
-    Plus,
-    ArrowUpRight,
-    ArrowDownRight,
-    Rocket,
-    Eye,
-    X
+import { Link, useLoaderData } from "@remix-run/react";
+import { useMemo, useState } from "react";
+import {
+  ArrowUpRight,
+  Eye,
+  Mail,
+  MoreHorizontal,
+  Rocket,
+  X,
+  Zap,
 } from "lucide-react";
-
 import prisma from "../db.server";
+import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
-    
-    // Fetch logs (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  await requireAdminAuth(request);
 
-    const logs = await prisma.adminEmailLog.findMany({
-        where: { createdAt: { gte: thirtyDaysAgo } },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, type: true, subject: true, status: true, html: true, createdAt: true }
-    });
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const totalSent = logs.filter((l: any) => l.status === 'sent').length;
+  const logs = await prisma.adminEmailLog.findMany({
+    where: { createdAt: { gte: thirtyDaysAgo } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, type: true, subject: true, status: true, html: true, createdAt: true },
+  });
 
-    // Mapping for calendar
-    const activityDays = logs.map((l: any) => {
-        const d = new Date(l.createdAt);
-        return `${d.getMonth()+1}/${d.getDate()}`;
-    });
+  const totalSent = logs.filter((log) => log.status === "sent").length;
+  const activityDays = logs.map((log) => {
+    const date = new Date(log.createdAt);
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  });
 
-    return json({
-        stats: {
-            email: { 
-                sent: totalSent.toLocaleString(), 
-                sentChange: 0, 
-                open: "0%", 
-                openChange: 0, 
-                click: "0%",
-                clickChange: 0,
-                conv: "0%", 
-                convChange: 0, 
-                sales: "₫0", 
-                salesChange: 0 
-            },
-            sms: { sent: 0, click: "0%", conv: "0%", sales: "₫0" },
-            sales: { total: "₫0", count: 0 }
-        },
-        activities: logs.map((l: any) => ({
-            id: l.id,
-            subject: l.subject || `Campaign: ${l.type}`,
-            channel: "Email",
-            status: l.status === 'sent' ? 'Sent' : 'Draft',
-            date: new Date(l.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            open: "-",
-            click: "-",
-            conv: "-",
-            sales: "-",
-            html: l.html
-        })),
-        activityDays,
-        campaigns: await (async () => {
-            try {
-                return await prisma.campaign.findMany({
-                    where: { shop: 'GLOBAL' },
-                    orderBy: { createdAt: 'desc' },
-                    take: 10
-                });
-            } catch (e) {
-                console.error("Prisma error in Dashboard loader:", e);
-                return [];
-            }
-        })()
-    });
+  return json({
+    stats: {
+      email: {
+        sent: totalSent.toLocaleString(),
+        sentChange: 0,
+        open: "0%",
+        openChange: 0,
+        click: "0%",
+        clickChange: 0,
+        conv: "0%",
+        convChange: 0,
+      },
+      sales: { total: "0", count: 0 },
+    },
+    activities: logs.map((log) => ({
+      id: log.id,
+      subject: log.subject || `Campaign: ${log.type}`,
+      channel: "Email",
+      status: log.status === "sent" ? "Sent" : "Draft",
+      date: new Date(log.createdAt).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      open: "-",
+      click: "-",
+      conv: "-",
+      sales: "-",
+      html: log.html,
+    })),
+    activityDays,
+  });
 };
 
+const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 export default function MessagingDashboard() {
-    const { stats, activities, activityDays } = useLoaderData<typeof loader>();
-    const [activeTab, setActiveTab] = useState("All");
-    const [viewingHtml, setViewingHtml] = useState<string | null>(null);
+  const { stats, activities, activityDays } = useLoaderData<typeof loader>();
+  const [activeTab, setActiveTab] = useState("All");
+  const [viewingHtml, setViewingHtml] = useState<string | null>(null);
 
-    return (
-        <div className="messaging-dashboard-v2">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-                
-                .messaging-dashboard-v2 { 
-                    padding: 0; 
-                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
-                    color: #0f172a;
-                    background: transparent;
-                }
+  const filteredActivities = useMemo(() => {
+    if (activeTab === "All") return activities;
+    return activities.filter((activity) => activity.status === activeTab);
+  }, [activities, activeTab]);
 
-                /* Modal Review */
-                .modal-overlay-v2 { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-                .modal-content-v2 { width: 90vw; height: 90vh; background: white; border-radius: 24px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
-                .modal-header-v2 { padding: 20px 32px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; }
-                .modal-body-v2 { flex: 1; overflow: auto; background: #f1f5f9; padding: 40px; display: flex; justify-content: center; }
-                .iframe-container-v2 { width: 600px; min-height: 800px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-                .iframe-container-v2 iframe { width: 100%; height: 100%; border: none; }
-                .btn-close-v2 { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 8px; cursor: pointer; color: #64748b; transition: all 0.2s; }
-                .btn-close-v2:hover { color: #ef4444; border-color: #ef4444; transform: rotate(90deg); }
-                
-                /* --- Header Section --- */
-                .glass-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 40px;
-                    padding: 20px 0;
-                }
-                .title-group h1 { 
-                    font-size: 32px; 
-                    font-weight: 800; 
-                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    letter-spacing: -0.03em;
-                }
-                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
-                
-                .actions-group { display: flex; gap: 12px; }
-                .btn-premium-outline {
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    padding: 10px 20px;
-                    border-radius: 14px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #475569;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-                }
-                .btn-premium-outline:hover {
-                    border-color: #6366f1;
-                    color: #6366f1;
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-                }
-                .btn-premium-solid {
-                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                    color: white;
-                    border: none;
-                    padding: 10px 24px;
-                    border-radius: 14px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-                }
-                .btn-premium-solid:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 12px 20px rgba(99, 102, 241, 0.4);
-                }
+  const activitySet = new Set(activityDays);
+  const calendarDays = activityDays
+    .slice(0, 7)
+    .concat(["4/13", "4/14", "4/15", "4/16", "4/17", "4/18", "4/19"])
+    .slice(0, 14);
 
-                /* --- Metrics Grid --- */
-                .metrics-grid-v2 {
-                    display: grid;
-                    grid-template-columns: 1.6fr 1fr;
-                    gap: 32px;
-                    margin-bottom: 40px;
-                }
-                .premium-card {
-                    background: white;
-                    border-radius: 24px;
-                    border: 1px solid rgba(0,0,0,0.04);
-                    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.03);
-                    padding: 32px;
-                    transition: all 0.3s ease;
-                }
-                .premium-card:hover { border-color: rgba(99, 102, 241, 0.1); }
-                
-                .card-header-v2 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
-                .card-title-v2 { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 18px; color: #1e293b; }
-                .icon-circle { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #f5f3ff; color: #7c3aed; }
-
-                .stats-grid-v2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
-                .stat-box-v2 .label { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 12px; }
-                .stat-box-v2 .value { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.04em; display: block; }
-                .stat-box-v2 .trend { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 4px; margin-top: 8px; }
-                .trend.up { color: #10b981; }
-                .trend.down { color: #ef4444; }
-
-                /* --- Calendar Section --- */
-                .calendar-wrap { margin-bottom: 40px; }
-                .calendar-header-v2 { 
-                    display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; 
-                }
-                .calendar-grid-v2 {
-                    display: grid;
-                    grid-template-columns: repeat(7, 1fr);
-                    gap: 16px;
-                }
-                .day-card-v2 {
-                    background: #f8fafc;
-                    border-radius: 20px;
-                    padding: 18px;
-                    min-height: 120px;
-                    border: 1px solid transparent;
-                    transition: all 0.2s;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-between;
-                }
-                .day-card-v2:hover { background: white; border-color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-                .day-header-v2 { display: flex; justify-content: space-between; align-items: center; }
-                .day-name { font-size: 12px; font-weight: 700; color: #94a3b8; }
-                .day-num-v2 { 
-                    font-size: 14px; font-weight: 800; color: #1e293b; 
-                    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-                }
-                .day-card-v2.is-today .day-num-v2 { background: #6366f1; color: white; border-radius: 50%; }
-                
-                .activity-indicator {
-                    background: #6366f1; 
-                    color: white; 
-                    padding: 4px 8px; 
-                    border-radius: 8px; 
-                    font-size: 10px; 
-                    font-weight: 700;
-                    text-align: center;
-                    animation: fadeIn 0.5s ease;
-                }
-
-                /* --- Data Table --- */
-                .table-premium { background: white; border-radius: 24px; border: 1px solid rgba(0,0,0,0.04); overflow: hidden; }
-                .table-tabs-v2 { display: flex; gap: 32px; padding: 0 32px; border-bottom: 1px solid #f1f5f9; }
-                .tab-v2 { padding: 24px 0; font-size: 15px; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
-                .tab-v2:hover { color: #1e293b; }
-                .tab-v2.active { color: #6366f1; border-bottom-color: #6366f1; }
-                
-                .t-header-v2 { 
-                    display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr 1fr 1fr 1fr 40px; 
-                    padding: 16px 32px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; 
-                }
-                .t-row-v2 { 
-                    display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr 1fr 1fr 1fr 40px; 
-                    padding: 24px 32px; border-bottom: 1px solid #f1f5f9; align-items: center; transition: all 0.2s; cursor: pointer;
-                }
-                .t-row-v2:hover { background: #fafaff; }
-                
-                .subj-group { display: flex; align-items: center; gap: 16px; }
-                .subj-thumb { width: 52px; height: 52px; border-radius: 14px; background: #0f172a; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-                .subj-info .name { font-weight: 700; font-size: 15px; color: #1e293b; display: block; }
-                .subj-info .date { font-size: 12px; color: #94a3b8; font-weight: 500; }
-                
-                .tag-premium {
-                    padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase;
-                }
-                .tag-sent { background: #ecfdf5; color: #059669; }
-                .tag-draft { background: #f1f1f1; color: #64748b; }
-
-                @media (max-width: 1024px) {
-                    .glass-header { flex-direction: column; align-items: flex-start; gap: 20px; }
-                    .metrics-grid-v2 { grid-template-columns: 1fr; }
-                    .stats-grid-v2 { grid-template-columns: repeat(2, 1fr); gap: 20px; }
-                    .calendar-grid-v2 { grid-template-columns: repeat(4, 1fr); gap: 12px; }
-                    .table-premium { overflow-x: auto; }
-                    .table-tabs-v2 { min-width: 600px; }
-                    .t-header-v2, .t-row-v2 { grid-template-columns: 250px 100px 80px 100px 100px 80px 80px 120px 40px; width: fit-content; padding: 16px 20px; }
-                }
-
-                @media (max-width: 640px) {
-                    .stats-grid-v2 { grid-template-columns: 1fr; }
-                    .stat-box-v2 .value { font-size: 24px; }
-                    .calendar-grid-v2 { grid-template-columns: repeat(2, 1fr); }
-                    .title-group h1 { font-size: 24px; }
-                }
-
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-            `}</style>
-
-            <div className="glass-header">
-                <div className="title-group">
-                    <h1>Messaging Dashboard</h1>
-                    <p>Track your campaign performance and customer engagement in real-time.</p>
-                </div>
-                <div className="actions-group">
-                    <Link to="/admin/emails/automations" className="btn-premium-outline" style={{ textDecoration: 'none' }}>
-                        <Zap size={16} /> Automations
-                    </Link>
-                    <Link to="/admin/emails/composer" className="btn-premium-solid" style={{ textDecoration: 'none' }}>
-                        <Rocket size={16} /> Create Campaign
-                    </Link>
-                    <button className="btn-premium-outline">
-                        <MoreHorizontal size={18} />
-                    </button>
-                </div>
-            </div>
-
-            <div className="metrics-grid-v2">
-                <div className="premium-card">
-                    <div className="card-header-v2">
-                        <div className="card-title-v2">
-                            <div className="icon-circle"><Mail size={20} /></div>
-                            Email Performance
-                        </div>
-                    </div>
-                    <div className="stats-grid-v2">
-                        <div className="stat-box-v2">
-                            <span className="label">Sent</span>
-                            <span className="value">{stats.email.sent}</span>
-                            <span className="trend up"><ArrowUpRight size={14} /> {stats.email.sentChange}%</span>
-                        </div>
-                        <div className="stat-box-v2">
-                            <span className="label">Open rate</span>
-                            <span className="value">{stats.email.open}</span>
-                            <span className="trend down"><ArrowDownRight size={14} /> {stats.email.openChange}%</span>
-                        </div>
-                        <div className="stat-box-v2">
-                            <span className="label">Click rate</span>
-                            <span className="value">{stats.email.click}</span>
-                            <span className="trend up"><ArrowUpRight size={14} /> {stats.email.sentChange}%</span>
-                        </div>
-                        <div className="stat-box-v2">
-                            <span className="label">Conversion</span>
-                            <span className="value">{stats.email.conv}</span>
-                            <span className="trend up"><Plus size={12} /> {stats.email.convChange}%</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="premium-card">
-                    <div className="card-header-v2">
-                        <div className="card-title-v2">
-                            <div className="icon-circle" style={{ background: '#ecfdf5', color: '#10b981' }}><Zap size={20} /></div>
-                            Total Sales
-                        </div>
-                    </div>
-                    <div className="stat-box-v2">
-                        <span className="label">Revenue generated</span>
-                        <span className="value" style={{ fontSize: '36px' }}>{stats.sales?.total ?? '₫0'}</span>
-                        <p style={{ color: '#64748b', fontSize: '13px', marginTop: '8px', fontWeight: 500 }}>
-                            From {stats.sales?.count ?? 0} attributed orders
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="calendar-wrap">
-                <div className="calendar-header-v2">
-                    <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>Activity Calendar</h2>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn-premium-outline" style={{ padding: '6px 14px' }}>April 2026</button>
-                    </div>
-                </div>
-                <div className="calendar-grid-v2">
-                    {activityDays.slice(0, 7).concat(['4/13','4/14','4/15','4/16','4/17','4/18','4/19']).map((day: string, idx: number) => {
-                        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                        const dayNum = day.split('/')[1];
-                        return (
-                            <div key={day} className={`day-card-v2 ${day.includes('8') ? 'is-today' : ''}`}>
-                                <div className="day-header-v2">
-                                    <span className="day-name">{dayNames[idx % 7]}</span>
-                                    <span className="day-num-v2">{dayNum}</span>
-                                </div>
-                                {activityDays.includes(day) && (
-                                    <div className="activity-indicator">
-                                        Email Sent
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="table-premium">
-                <div className="table-tabs-v2">
-                    <div className={`tab-v2 ${activeTab === 'All' ? 'active' : ''}`} onClick={() => setActiveTab('All')}>All history</div>
-                    <Link to="/admin/emails/automations" className="tab-v2" style={{ textDecoration: 'none' }}>Automations</Link>
-                    <Link to="/admin/emails/campaigns" className="tab-v2" style={{ textDecoration: 'none' }}>Campaigns</Link>
-                    <div className="tab-v2">Settings</div>
-                </div>
-                
-                <div className="t-header-v2">
-                    <span>Subject / Campaign</span>
-                    <span>Status</span>
-                    <span>Sent</span>
-                    <span>Open rate</span>
-                    <span>Click rate</span>
-                    <span>Orders</span>
-                    <span>Conv.</span>
-                    <span>Sales</span>
-                    <span></span>
-                </div>
-
-                {activities.map((act: any) => (
-                    <div key={act.id} className="t-row-v2" onClick={() => act.html ? setViewingHtml(act.html) : null}>
-                        <div className="subj-group">
-                            <div className="subj-thumb">
-                                <Mail size={20} color="white" />
-                            </div>
-                            <div className="subj-info">
-                                <span className="name">{act.subject}</span>
-                                <span className="date">{act.date}</span>
-                            </div>
-                        </div>
-                        <div>
-                            <span className={`tag-premium ${act.status === 'Sent' ? 'tag-sent' : 'tag-draft'}`}>
-                                {act.status}
-                            </span>
-                        </div>
-                        <div style={{ fontWeight: 700 }}>{act.sent?.toLocaleString() ?? 0}</div>
-                        <div style={{ fontWeight: 600 }}>{act.open}</div>
-                        <div style={{ fontWeight: 600 }}>{act.click}</div>
-                        <div style={{ fontWeight: 600 }}>{act.orders}</div>
-                        <div style={{ fontWeight: 600 }}>{act.conv}</div>
-                        <div style={{ fontWeight: 700, color: '#1e293b' }}>{act.sales}</div>
-                        <div className="action-view">
-                            <Eye size={18} color={act.html ? "#6366f1" : "#e2e8f0"} />
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {viewingHtml && (
-                <div className="modal-overlay-v2" onClick={() => setViewingHtml(null)}>
-                    <div className="modal-content-v2" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header-v2">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ background: '#e0f2fe', padding: '10px', borderRadius: '12px' }}>
-                                    <Mail size={24} color="#0369a1" />
-                                </div>
-                                <div>
-                                    <h3 style={{ fontWeight: 800, fontSize: '18px', color: '#1e293b' }}>Email Content Preview</h3>
-                                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Audit Trail: Reviewing sent campaign payload</span>
-                                </div>
-                            </div>
-                            <button className="btn-close-v2" onClick={() => setViewingHtml(null)}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="modal-body-v2">
-                            <div className="iframe-container-v2">
-                                <iframe title="Email Content" srcDoc={viewingHtml} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+  return (
+    <section className="ed-mail">
+      <header className="ed-mail-header">
+        <div>
+          <span className="ed-eyebrow">Messaging</span>
+          <h2>Email operations</h2>
+          <p>Monitor campaign output, automation activity, and recent email payloads.</p>
         </div>
-    );
+        <div className="ed-mail-actions">
+          <Link className="ed-button-secondary" to="/admin/emails/automations">
+            <Zap size={16} />
+            Automations
+          </Link>
+          <Link className="ed-button-primary" to="/admin/emails/composer">
+            <Rocket size={16} />
+            Create campaign
+          </Link>
+          <button className="ed-icon-button" type="button" aria-label="More messaging actions">
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+      </header>
+
+      <div className="ed-mail-metrics">
+        <article className="ed-panel ed-mail-performance">
+          <div className="ed-panel-head">
+            <div>
+              <span className="ed-eyebrow">Last 30 days</span>
+              <h3>Email performance</h3>
+            </div>
+            <span className="ed-panel-icon">
+              <Mail size={18} />
+            </span>
+          </div>
+
+          <div className="ed-stat-strip">
+            <div>
+              <span>Sent</span>
+              <strong>{stats.email.sent}</strong>
+              <small>
+                <ArrowUpRight size={13} /> {stats.email.sentChange}%
+              </small>
+            </div>
+            <div>
+              <span>Open rate</span>
+              <strong>{stats.email.open}</strong>
+              <small>{stats.email.openChange}% change</small>
+            </div>
+            <div>
+              <span>Click rate</span>
+              <strong>{stats.email.click}</strong>
+              <small>{stats.email.clickChange}% change</small>
+            </div>
+            <div>
+              <span>Conversion</span>
+              <strong>{stats.email.conv}</strong>
+              <small>{stats.email.convChange}% change</small>
+            </div>
+          </div>
+        </article>
+
+        <article className="ed-panel">
+          <div className="ed-panel-head">
+            <div>
+              <span className="ed-eyebrow">Attributed</span>
+              <h3>Revenue</h3>
+            </div>
+            <span className="ed-panel-icon">
+              <Zap size={18} />
+            </span>
+          </div>
+          <div className="ed-single-metric">
+            <strong>{stats.sales?.total ?? "0"}</strong>
+            <span>From {stats.sales?.count ?? 0} attributed orders</span>
+          </div>
+        </article>
+      </div>
+
+      <section className="ed-panel">
+        <div className="ed-panel-head">
+          <div>
+            <span className="ed-eyebrow">Schedule</span>
+            <h3>Activity calendar</h3>
+          </div>
+          <span className="ed-muted-label">Rolling view</span>
+        </div>
+
+        <div className="ed-mail-calendar">
+          {calendarDays.map((day, index) => {
+            const dayNumber = day.split("/")[1];
+            const hasActivity = activitySet.has(day);
+
+            return (
+              <div className={`ed-day-cell ${hasActivity ? "has-activity" : ""}`} key={`${day}-${index}`}>
+                <div className="ed-day-head">
+                  <span>{dayNames[index % 7]}</span>
+                  <strong>{dayNumber}</strong>
+                </div>
+                <small>{hasActivity ? "Email sent" : "No activity"}</small>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="ed-panel ed-mail-table">
+        <div className="ed-tabs" role="tablist" aria-label="Email activity filter">
+          {["All", "Sent", "Draft"].map((tab) => (
+            <button
+              aria-selected={activeTab === tab}
+              className={activeTab === tab ? "is-active" : ""}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              role="tab"
+              type="button"
+            >
+              {tab} history
+            </button>
+          ))}
+          <Link to="/admin/emails/campaigns">Campaigns</Link>
+          <Link to="/admin/emails/settings">Settings</Link>
+        </div>
+
+        <div className="ed-mail-grid ed-mail-grid-head">
+          <span>Subject</span>
+          <span>Status</span>
+          <span>Open</span>
+          <span>Click</span>
+          <span>Conversion</span>
+          <span>Sales</span>
+          <span></span>
+        </div>
+
+        {filteredActivities.length === 0 ? (
+          <div className="ed-empty-state">
+            <Mail size={28} />
+            <h3>No email activity</h3>
+            <p>Activity will appear here after campaigns or automations send emails.</p>
+          </div>
+        ) : (
+          filteredActivities.map((activity) => (
+            <button
+              className="ed-mail-grid ed-mail-row"
+              disabled={!activity.html}
+              key={activity.id}
+              onClick={() => activity.html && setViewingHtml(activity.html)}
+              type="button"
+            >
+              <span className="ed-subject-cell">
+                <span className="ed-row-icon">
+                  <Mail size={16} />
+                </span>
+                <span>
+                  <strong>{activity.subject}</strong>
+                  <small>{activity.date}</small>
+                </span>
+              </span>
+              <span>
+                <mark className={`ed-status ${activity.status === "Sent" ? "success" : "neutral"}`}>
+                  {activity.status}
+                </mark>
+              </span>
+              <span>{activity.open}</span>
+              <span>{activity.click}</span>
+              <span>{activity.conv}</span>
+              <span>{activity.sales}</span>
+              <span className="ed-view-icon">
+                <Eye size={17} />
+              </span>
+            </button>
+          ))
+        )}
+      </section>
+
+      {viewingHtml && (
+        <div className="ed-modal-overlay" onClick={() => setViewingHtml(null)}>
+          <section className="ed-modal" onClick={(event) => event.stopPropagation()}>
+            <header className="ed-modal-head">
+              <div>
+                <h3>Email content preview</h3>
+                <p>Sent campaign payload audit</p>
+              </div>
+              <button className="ed-icon-button" onClick={() => setViewingHtml(null)} type="button">
+                <X size={20} />
+              </button>
+            </header>
+            <div className="ed-modal-body">
+              <iframe title="Email Content" srcDoc={viewingHtml} />
+            </div>
+          </section>
+        </div>
+      )}
+
+      <style>{`
+        .ed-mail {
+          display: grid;
+          gap: var(--ed-space-2);
+        }
+
+        .ed-mail-header,
+        .ed-panel-head,
+        .ed-mail-actions,
+        .ed-tabs {
+          display: flex;
+          align-items: center;
+        }
+
+        .ed-mail-header {
+          justify-content: space-between;
+          gap: var(--ed-space-2);
+          padding: var(--ed-space-2);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-eyebrow {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--ed-color-border-muted);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          line-height: 1.1;
+          text-transform: uppercase;
+        }
+
+        .ed-mail-header h2,
+        .ed-panel h3,
+        .ed-modal-head h3 {
+          margin: 0;
+          color: var(--ed-color-text-primary);
+          font-weight: 700;
+          letter-spacing: 0;
+        }
+
+        .ed-mail-header h2 {
+          font-size: 22px;
+          line-height: 28px;
+        }
+
+        .ed-mail-header p,
+        .ed-modal-head p {
+          margin: 7px 0 0;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 1.5;
+        }
+
+        .ed-mail-actions {
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .ed-button-primary,
+        .ed-button-secondary,
+        .ed-icon-button {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border-radius: var(--ed-radius-xl);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 1;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .ed-button-primary {
+          padding: 0 14px;
+          border: 1px solid var(--ed-color-border-muted);
+          background: var(--ed-color-border-muted);
+          color: var(--ed-text-inverse);
+          box-shadow: var(--ed-shadow-2);
+        }
+
+        .ed-button-secondary,
+        .ed-icon-button {
+          border: 1px solid var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+        }
+
+        .ed-button-secondary {
+          padding: 0 14px;
+        }
+
+        .ed-icon-button {
+          width: 40px;
+          padding: 0;
+        }
+
+        .ed-button-primary:hover {
+          background: #6f9a37;
+          border-color: #6f9a37;
+        }
+
+        .ed-button-secondary:hover,
+        .ed-icon-button:hover {
+          border-color: var(--ed-color-border-muted);
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-button-primary:focus-visible,
+        .ed-button-secondary:focus-visible,
+        .ed-icon-button:focus-visible,
+        .ed-tabs button:focus-visible,
+        .ed-mail-row:focus-visible {
+          outline: 3px solid var(--ed-color-border-muted);
+          outline-offset: 2px;
+        }
+
+        .ed-mail-metrics {
+          display: grid;
+          grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.7fr);
+          gap: var(--ed-space-2);
+        }
+
+        .ed-panel {
+          min-width: 0;
+          padding: var(--ed-space-2);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-panel-head {
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 18px;
+        }
+
+        .ed-panel h3 {
+          font-size: 18px;
+          line-height: 24px;
+        }
+
+        .ed-panel-icon,
+        .ed-row-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: var(--ed-radius-xl);
+          background: #f2f6ee;
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-panel-icon {
+          width: 38px;
+          height: 38px;
+        }
+
+        .ed-stat-strip {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .ed-stat-strip div {
+          min-width: 0;
+          padding: 14px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-stat-strip span,
+        .ed-single-metric span,
+        .ed-muted-label,
+        .ed-day-cell small {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          line-height: 18px;
+        }
+
+        .ed-stat-strip strong,
+        .ed-single-metric strong {
+          display: block;
+          margin-top: 8px;
+          color: var(--ed-color-text-primary);
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 30px;
+        }
+
+        .ed-stat-strip small {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          margin-top: 7px;
+          color: var(--ed-color-border-muted);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          line-height: 18px;
+        }
+
+        .ed-single-metric strong {
+          font-size: 34px;
+          line-height: 40px;
+        }
+
+        .ed-mail-calendar {
+          display: grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .ed-day-cell {
+          min-height: 94px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 12px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-day-cell.has-activity {
+          border-color: var(--ed-color-border-muted);
+          box-shadow: var(--ed-shadow-2);
+        }
+
+        .ed-day-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .ed-day-head span {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          line-height: 18px;
+        }
+
+        .ed-day-head strong {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-md);
+          line-height: var(--ed-line-height-base);
+        }
+
+        .ed-tabs {
+          gap: 6px;
+          margin: calc(var(--ed-space-2) * -1) calc(var(--ed-space-2) * -1) 0;
+          padding: 10px var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+          overflow-x: auto;
+        }
+
+        .ed-tabs button,
+        .ed-tabs a {
+          flex: 0 0 auto;
+          padding: 8px 10px;
+          border: 1px solid transparent;
+          border-radius: var(--ed-radius-xl);
+          background: transparent;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .ed-tabs button.is-active,
+        .ed-tabs a:hover,
+        .ed-tabs button:hover {
+          border-color: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-text-primary);
+        }
+
+        .ed-mail-grid {
+          display: grid;
+          grid-template-columns: minmax(260px, 2fr) 110px 90px 90px 110px 80px 44px;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .ed-mail-grid-head {
+          padding: 14px 0 10px;
+          color: var(--ed-color-text-tertiary);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .ed-mail-row {
+          width: 100%;
+          padding: 12px 0;
+          border: 0;
+          border-top: 1px solid var(--ed-color-surface-muted);
+          background: transparent;
+          color: var(--ed-color-text-primary);
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .ed-mail-row:disabled {
+          cursor: default;
+          opacity: 0.72;
+        }
+
+        .ed-subject-cell {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+        }
+
+        .ed-row-icon {
+          width: 34px;
+          height: 34px;
+          flex: 0 0 auto;
+        }
+
+        .ed-subject-cell strong,
+        .ed-subject-cell small {
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .ed-subject-cell strong {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-subject-cell small {
+          margin-top: 2px;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          line-height: 18px;
+        }
+
+        .ed-status {
+          display: inline-flex;
+          padding: 4px 8px;
+          border-radius: var(--ed-radius-xl);
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 16px;
+          text-transform: uppercase;
+        }
+
+        .ed-status.success {
+          background: #eef7e9;
+          color: #37630f;
+        }
+
+        .ed-status.neutral {
+          background: #f2f4f1;
+          color: var(--ed-color-text-tertiary);
+        }
+
+        .ed-view-icon {
+          justify-self: end;
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-empty-state {
+          display: grid;
+          justify-items: center;
+          gap: 8px;
+          padding: 44px 14px;
+          border-top: 1px solid var(--ed-color-surface-muted);
+          color: var(--ed-color-text-tertiary);
+          text-align: center;
+        }
+
+        .ed-empty-state h3,
+        .ed-empty-state p {
+          margin: 0;
+        }
+
+        .ed-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(0, 0, 0, 0.62);
+        }
+
+        .ed-modal {
+          width: min(900px, 96vw);
+          height: min(760px, 92vh);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-modal-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 16px var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+        }
+
+        .ed-modal-body {
+          flex: 1;
+          padding: var(--ed-space-2);
+          overflow: auto;
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-modal-body iframe {
+          width: 100%;
+          min-height: 100%;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        @media (max-width: 1024px) {
+          .ed-mail-header {
+            align-items: flex-start;
+            display: grid;
+          }
+
+          .ed-mail-actions {
+            justify-content: flex-start;
+          }
+
+          .ed-mail-metrics {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-stat-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .ed-mail-calendar {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+
+          .ed-mail-table {
+            overflow-x: auto;
+          }
+
+          .ed-mail-grid {
+            min-width: 820px;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ed-mail-header,
+          .ed-panel {
+            padding: 14px;
+          }
+
+          .ed-mail-actions,
+          .ed-button-primary,
+          .ed-button-secondary {
+            width: 100%;
+          }
+
+          .ed-stat-strip,
+          .ed-mail-calendar {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-tabs {
+            margin: -14px -14px 0;
+            padding: 10px 14px;
+          }
+
+          .ed-modal-overlay {
+            padding: 0;
+          }
+
+          .ed-modal {
+            width: 100vw;
+            height: 100vh;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

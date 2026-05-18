@@ -10,7 +10,41 @@ import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
-// Background jobs are now initialized in db.server.ts
+let runtimePreloadStarted = false;
+let inAppCronStarted = false;
+
+function startRuntimePreload() {
+  if (runtimePreloadStarted || process.env.NODE_ENV === "test") return;
+
+  runtimePreloadStarted = true;
+
+  import("./utils/maxmind.server")
+    .then(({ preloadReader }) => preloadReader())
+    .catch((error) => {
+      runtimePreloadStarted = false;
+      console.error("[Runtime] Failed to preload MaxMind:", error);
+    });
+}
+
+function startInAppCron() {
+  if (
+    inAppCronStarted ||
+    process.env.NODE_ENV === "test" ||
+    process.env.DISABLE_IN_APP_CRON === "true" ||
+    process.env.ENABLE_IN_APP_CRON !== "true"
+  ) {
+    return;
+  }
+
+  inAppCronStarted = true;
+
+  import("./utils/usage-cron.server")
+    .then(({ initUsageCron }) => initUsageCron())
+    .catch((error) => {
+      inAppCronStarted = false;
+      console.error("[Runtime] Failed to initialize in-app cron:", error);
+    });
+}
 
 export default async function handleRequest(
   request: Request,
@@ -18,6 +52,8 @@ export default async function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
+  startRuntimePreload();
+  startInAppCron();
   addDocumentResponseHeaders(request, responseHeaders);
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')

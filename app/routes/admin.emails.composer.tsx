@@ -23,7 +23,7 @@ import {
 import { getWelcomeEmailHtml, getLimit80EmailHtml } from "../utils/email-templates";
 
 const PROMO_TEMPLATE = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e1e1e1; border-radius: 8px; overflow: hidden;">
-    <div style="background-color: #6366f1; padding: 20px; text-align: center;">
+    <div style="background-color: #82b440; padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">Special Offer for You!</h1>
     </div>
     <div style="padding: 30px; line-height: 1.6; color: #333;">
@@ -31,7 +31,7 @@ const PROMO_TEMPLATE = `<div style="font-family: sans-serif; max-width: 600px; m
         <p>Unlock new features and boost your international sales with Geo: Redirect & Country Block.</p>
         <p>For a limited time, upgrade your plan and enjoy premium benefits.</p>
         <div style="text-align: center; margin: 30px 0;">
-            <a href="#" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Upgrade Now</a>
+            <a href="#" style="background-color: #82b440; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Upgrade Now</a>
         </div>
         <p>Best regards,<br>The Geo Support Team</p>
     </div>
@@ -275,7 +275,7 @@ export default function EmailComposer() {
                     display: flex;
                     align-items: center;
                     background: #f1f5f9;
-                    border-radius: 12px;
+                    border-radius: var(--ed-radius, 4px);
                     padding: 8px 16px;
                     margin-bottom: 16px;
                     border: 1px solid transparent;
@@ -284,7 +284,7 @@ export default function EmailComposer() {
                 .search-pill:focus-within {
                     background: white;
                     border-color: var(--primary);
-                    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+                    box-shadow: 0 0 0 4px rgba(130, 180, 64, 0.1);
                 }
                 .search-pill input {
                     background: transparent;
@@ -307,7 +307,7 @@ export default function EmailComposer() {
                 
                 .plan-chip {
                     padding: 6px 14px;
-                    border-radius: 20px;
+                    border-radius: var(--ed-radius, 4px);
                     font-size: 12px;
                     font-weight: 700;
                     cursor: pointer;
@@ -318,14 +318,14 @@ export default function EmailComposer() {
                     border: 1px solid transparent;
                 }
                 .plan-chip.active {
-                    background: #f0f7ff;
+                    background: #f2f6ee;
                     color: var(--primary);
-                    border-color: rgba(99, 102, 241, 0.2);
+                    border-color: rgba(130, 180, 64, 0.2);
                 }
                 
                 .audience-list {
                     background: #f8fafc;
-                    border-radius: 16px;
+                    border-radius: var(--ed-radius, 4px);
                     border: 1px solid rgba(0,0,0,0.05);
                     max-height: 280px;
                     overflow-y: auto;
@@ -348,7 +348,7 @@ export default function EmailComposer() {
                     width: 32px;
                     height: 32px;
                     border-radius: 8px;
-                    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+                    background: var(--ed-surface-muted, #82b440);
                     color: white;
                     display: flex;
                     align-items: center;
@@ -392,7 +392,7 @@ export default function EmailComposer() {
                     width: 100%;
                     padding: 12px 16px;
                     border: 1.5px solid #e2e8f0;
-                    border-radius: 12px;
+                    border-radius: var(--ed-radius, 4px);
                     font-size: 14px;
                     color: #1e293b;
                     transition: all 0.2s;
@@ -428,7 +428,7 @@ export default function EmailComposer() {
                 /* Preview Panel */
                 .preview-viewport {
                     padding: 60px;
-                    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+                    background: #f2f4f1;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
@@ -440,7 +440,7 @@ export default function EmailComposer() {
                     gap: 8px;
                     background: white;
                     padding: 6px;
-                    border-radius: 12px;
+                    border-radius: var(--ed-radius, 4px);
                     margin-bottom: 40px;
                     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
                 }
@@ -467,7 +467,7 @@ export default function EmailComposer() {
                 .mac-window {
                     width: 100%;
                     background: white;
-                    border-radius: 16px;
+                    border-radius: var(--ed-radius, 4px);
                     box-shadow: 0 50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
                     overflow: hidden;
                     display: flex;
@@ -515,26 +515,26 @@ export default function EmailComposer() {
                 .preview-subj { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
                 .preview-from { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #64748b; }
                 
-                .btn-submit-premium {
-                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                .ed-submit-button {
+                    background: var(--ed-surface-muted, #82b440);
                     color: white;
                     border: none;
                     padding: 14px 32px;
-                    border-radius: 14px;
+                    border-radius: var(--ed-radius, 4px);
                     font-weight: 700;
                     font-size: 15px;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+                    box-shadow: 0 10px 15px -3px rgba(111, 154, 55, 0.3);
                     transition: all 0.3s;
                 }
-                .btn-submit-premium:hover {
+                .ed-submit-button:hover {
                     transform: translateY(-2px);
-                    box-shadow: 0 20px 25px -5px rgba(79, 70, 229, 0.4);
+                    box-shadow: var(--ed-shadow-1, rgb(111, 154, 55) 0px 2px 0px 0px);
                 }
-                .btn-submit-premium:disabled {
+                .ed-submit-button:disabled {
                     background: #cbd5e1;
                     box-shadow: none;
                     cursor: not-allowed;
@@ -579,7 +579,7 @@ export default function EmailComposer() {
                         align-items: stretch;
                         padding: 20px;
                     }
-                    .btn-submit-premium { width: 100%; justify-content: center; }
+                    .ed-submit-button { width: 100%; justify-content: center; }
                 }
             `}</style>
 
@@ -588,7 +588,7 @@ export default function EmailComposer() {
                     {fetcherData?.message || fetcherData?.error ? (
                         <div style={{ 
                             padding: '16px', 
-                            borderRadius: '12px', 
+                            borderRadius: '4px',
                             background: fetcherData.success ? '#f0fdf4' : '#fef2f2', 
                             color: fetcherData.success ? '#16a34a' : '#dc2626',
                             border: '1px solid',
@@ -709,7 +709,7 @@ export default function EmailComposer() {
                     <button 
                         type="submit" 
                         form="email-form" 
-                        className="btn-submit-premium"
+                        className="ed-submit-button"
                         disabled={isSending || selectedShops.length === 0 || !subject || !body}
                     >
                         {isSending ? "Processing..." : "Launch Campaign"}
@@ -741,7 +741,7 @@ export default function EmailComposer() {
                         <div className="preview-email-header">
                             <div className="preview-subj">{subject || "Add a subject line..."}</div>
                             <div className="preview-from">
-                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 800 }}>G</div>
+                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#82b440', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 800 }}>G</div>
                                 <span><strong>Geo: Redirect & Country Block</strong> &lt;send@geopro.bluepeaks.top&gt;</span>
                             </div>
                         </div>

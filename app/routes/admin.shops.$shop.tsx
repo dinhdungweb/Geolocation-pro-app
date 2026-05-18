@@ -325,15 +325,15 @@ export default function AdminShopDetail() {
         `${getUsagePeriodTitle(usage)} - ${usage.totalVisitors.toLocaleString()} views - charged ${usage.chargedVisitors.toLocaleString()}`;
 
     const modeColor = (mode: string) => {
-        if (mode === "popup") return "#6366f1";
+        if (mode === "popup") return "#82b440";
         if (mode === "auto_redirect") return "#10b981";
         return "#64748b";
     };
 
     const actionColor = (action: string) => {
         const m: Record<string, string> = {
-            visit: "#64748b", redirected: "#6366f1", blocked: "#ef4444",
-            auto_redirect: "#10b981", popup_show: "#6366f1",
+            visit: "#64748b", redirected: "#82b440", blocked: "#ef4444",
+            auto_redirect: "#10b981", popup_show: "#82b440",
         };
         return m[action] ?? "#64748b";
     };
@@ -401,24 +401,24 @@ export default function AdminShopDetail() {
                 .hero-icon { 
                     width: 58px; height: 58px; border-radius: 8px; 
                     background: #f1f5f9; display: flex; align-items: center; justify-content: center;
-                    color: #6366f1; border: 1px solid #e2e8f0;
+                    color: #82b440; border: 1px solid #e2e8f0;
                 }
 
                 .shop-title-group h1 { font-size: 22px; font-weight: 800; color: #1e293b; margin: 0; letter-spacing: 0; }
                 .shop-title-group .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
                 .shop-link-hover { transition: color 0.2s; cursor: pointer; }
-                .shop-link-hover:hover { color: #6366f1; text-decoration: underline; }
+                .shop-link-hover:hover { color: #82b440; text-decoration: underline; }
 
-                .plan-badge-premium {
+                .ed-shop-plan-badge {
                     padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 800;
                     display: flex; align-items: center; gap: 8px;
                     ${(() => {
                         const plan = (currentPlan || 'FREE').toUpperCase();
-                        if (plan === 'ELITE') return 'background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); color: #7c3aed; border: 1px solid #7c3aed33; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);';
-                        if (plan === 'UNLIMITED') return 'background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border: 1px solid #2563eb33; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);';
-                        if (plan === 'CUSTOM') return 'background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border: 1px solid #2563eb33; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);';
-                        if (plan === 'PLUS') return 'background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #059669; border: 1px solid #05966933;';
-                        if (plan === 'PREMIUM') return 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #4f46e5; border: 1px solid #4f46e533;';
+                        if (plan === 'ELITE') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
+                        if (plan === 'UNLIMITED') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
+                        if (plan === 'CUSTOM') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
+                        if (plan === 'PLUS') return 'background: #eef7e9; color: #37630f; border: 1px solid #b7df9e;';
+                        if (plan === 'PREMIUM') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
                         return 'background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0;';
                     })()}
                 }
@@ -430,7 +430,7 @@ export default function AdminShopDetail() {
                     margin-bottom: 20px; 
                 }
                 
-                .premium-stat-card {
+                .ed-shop-stat-card {
                     background: white; border-radius: 8px; padding: 20px;
                     border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px;
                     transition: none;
@@ -451,17 +451,17 @@ export default function AdminShopDetail() {
                     margin-bottom: 24px; 
                 }
                 
-                .card-v3 {
+                .ed-shop-card {
                     background: white; border: 1px solid #e2e8f0; border-radius: 8px; 
                     display: flex; flex-direction: column; overflow: hidden;
                     box-shadow: none;
                 }
-                .card-v3-header { 
+                .ed-shop-card-head {
                     padding: 16px 20px; border-bottom: 1px solid #f1f5f9; 
                     background: #fcfdfe; font-weight: 700; font-size: 14px; color: #1e293b;
                     display: flex; align-items: center; gap: 10px;
                 }
-                .card-v3-body { padding: 20px; flex: 1; }
+                .ed-shop-card-body { padding: 20px; flex: 1; }
 
                 .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
                 .info-item:last-child { border-bottom: none; }
@@ -477,7 +477,7 @@ export default function AdminShopDetail() {
                 .custom-plan-pill { padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
                 .custom-plan-pill.enabled { background: #ecfdf5; color: #059669; }
                 .custom-plan-pill.disabled { background: #f1f5f9; color: #64748b; }
-                .custom-plan-pill.active { background: #eff6ff; color: #2563eb; }
+                .custom-plan-pill.active { background: #eff6ff; color: #5f8f2f; }
                 .custom-plan-meta { color: #64748b; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .custom-plan-note {
                     margin-top: 8px; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 8px;
@@ -488,7 +488,7 @@ export default function AdminShopDetail() {
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
                 .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border: 1px solid transparent; transition: none; }
                 .month-row:hover { border-color: #e2e8f0; background: #f1f5f9; }
-                .month-name { font-weight: 800; font-size: 14px; color: #6366f1; }
+                .month-name { font-weight: 800; font-size: 14px; color: #82b440; }
                 .month-stats { display: flex; gap: 16px; font-size: 12px; color: #64748b; font-weight: 600; }
 
                 @media (max-width: 768px) {
@@ -526,22 +526,22 @@ export default function AdminShopDetail() {
                         font-size: 17px;
                         overflow-wrap: anywhere;
                     }
-                    .plan-badge-premium {
+                    .ed-shop-plan-badge {
                         width: fit-content;
                     }
                     .stats-grid-v3 {
                         grid-template-columns: 1fr;
                         gap: 12px;
                     }
-                    .premium-stat-card {
+                    .ed-shop-stat-card {
                         padding: 14px;
                     }
                     .section-grid {
                         grid-template-columns: 1fr;
                         gap: 14px;
                     }
-                    .card-v3-header,
-                    .card-v3-body {
+                    .ed-shop-card-head,
+                    .ed-shop-card-body {
                         padding: 14px;
                     }
                     .info-item,
@@ -607,14 +607,14 @@ export default function AdminShopDetail() {
                 .billing-input-group { margin-bottom: 16px; }
                 .billing-input-group label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
                 .billing-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; transition: none; }
-                .billing-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+                .billing-input:focus { border-color: #82b440; outline: none; box-shadow: 0 0 0 3px rgba(130, 180, 64, 0.1); }
                 
                 .primary-btn { 
-                    width: 100%; padding: 12px; background: #6366f1; color: white; border: none; border-radius: 8px;
+                    width: 100%; padding: 12px; background: #82b440; color: white; border: none; border-radius: 8px;
                     font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
                     transition: none;
                 }
-                .primary-btn:hover { background: #4f46e5; }
+                .primary-btn:hover { background: #6f9a37; }
                 .primary-btn:disabled { background: #94a3b8; cursor: not-allowed; }
                 .inline-action-form { margin: 0; }
                 .inline-toggle-btn {
@@ -622,7 +622,7 @@ export default function AdminShopDetail() {
                     background: white; color: #334155; font-size: 12px; font-weight: 700;
                     cursor: pointer; transition: all 0.2s;
                 }
-                .inline-toggle-btn:hover { border-color: #6366f1; color: #4f46e5; }
+                .inline-toggle-btn:hover { border-color: #82b440; color: #6f9a37; }
                 .inline-toggle-btn.enabled { border-color: #10b98133; background: #ecfdf5; color: #059669; }
                 .inline-toggle-btn.disabled { border-color: #ef444433; background: #fef2f2; color: #ef4444; }
 
@@ -692,7 +692,7 @@ export default function AdminShopDetail() {
                         </a>
                     </div>
                 </div>
-                <div className="plan-badge-premium">
+                <div className="ed-shop-plan-badge">
                     <Zap size={14} fill={hasProPlan ? "#059669" : "none"} />
                     {currentPlan.toUpperCase()}
                 </div>
@@ -820,7 +820,7 @@ export default function AdminShopDetail() {
             )}
 
             <div className="stats-grid-v3">
-                <div className="premium-stat-card">
+                <div className="ed-shop-stat-card">
                     <div className="stat-card-icon" style={{ background: '#e0f2fe', color: '#0ea5e9' }}>
                         <Eye size={22} />
                     </div>
@@ -829,8 +829,8 @@ export default function AdminShopDetail() {
                         <div className="value">{stats.totalVisitors.toLocaleString()}</div>
                     </div>
                 </div>
-                <div className="premium-stat-card">
-                    <div className="stat-card-icon" style={{ background: '#eef2ff', color: '#6366f1' }}>
+                <div className="ed-shop-stat-card">
+                    <div className="stat-card-icon" style={{ background: '#f2f6ee', color: '#82b440' }}>
                         <Zap size={22} />
                     </div>
                     <div className="stat-info">
@@ -838,7 +838,7 @@ export default function AdminShopDetail() {
                         <div className="value">{stats.totalRedirected.toLocaleString()}</div>
                     </div>
                 </div>
-                <div className="premium-stat-card">
+                <div className="ed-shop-stat-card">
                     <div className="stat-card-icon" style={{ background: '#fef2f2', color: '#ef4444' }}>
                         <ShieldAlert size={22} />
                     </div>
@@ -847,7 +847,7 @@ export default function AdminShopDetail() {
                         <div className="value">{stats.totalBlocked.toLocaleString()}</div>
                     </div>
                 </div>
-                <div className="premium-stat-card">
+                <div className="ed-shop-stat-card">
                     <div className="stat-card-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
                         <SettingsIcon size={22} />
                     </div>
@@ -859,12 +859,12 @@ export default function AdminShopDetail() {
             </div>
 
             <div className="section-grid">
-                <div className="card-v3">
-                    <div className="card-v3-header">
-                        <SettingsIcon size={18} color="#6366f1" />
+                <div className="ed-shop-card">
+                    <div className="ed-shop-card-head">
+                        <SettingsIcon size={18} color="#82b440" />
                         App Configurations
                     </div>
-                    <div className="card-v3-body">
+                    <div className="ed-shop-card-body">
                         {!hasSettings ? (
                             <div style={{ padding: '24px', textAlign: 'center', color: '#f59e0b', fontSize: '13px', fontWeight: 600 }}>
                                 <ShieldAlert size={24} style={{ marginBottom: '12px', opacity: 0.5 }} />
@@ -937,12 +937,12 @@ export default function AdminShopDetail() {
                     </div>
                 </div>
 
-                <div className="card-v3">
-                    <div className="card-v3-header">
-                        <History size={18} color="#6366f1" />
+                <div className="ed-shop-card">
+                    <div className="ed-shop-card-head">
+                        <History size={18} color="#82b440" />
                         Usage Period History
                     </div>
-                    <div className="card-v3-body">
+                    <div className="ed-shop-card-body">
                         <div className="monthly-list">
                             {monthlyUsage.length === 0 ? (
                                 <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No usage data recorded.</div>
@@ -976,9 +976,9 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="card-v3" style={{ marginBottom: '32px' }}>
-                <div className="card-v3-header">
-                    <Zap size={18} color="#6366f1" />
+            <div className="ed-shop-card" style={{ marginBottom: '32px' }}>
+                <div className="ed-shop-card-head">
+                    <Zap size={18} color="#82b440" />
                     Redirect & Block Rules
                 </div>
                 <div className="table-container">
@@ -1004,7 +1004,7 @@ export default function AdminShopDetail() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : '#eef2ff', color: r.ruleType === 'block' ? '#ef4444' : '#6366f1' }}>{r.ruleType.toUpperCase()}</span></td>
+                                    <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : '#f2f6ee', color: r.ruleType === 'block' ? '#ef4444' : '#82b440' }}>{r.ruleType.toUpperCase()}</span></td>
                                     <td>{r.isActive ? <span style={{ color: '#10b981' }}>Active</span> : <span style={{ color: '#94a3b8' }}>Inactive</span>}</td>
                                     <td>{r.priority}</td>
                                 </tr>
@@ -1014,9 +1014,9 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="card-v3">
-                <div className="card-v3-header">
-                    <Globe size={18} color="#6366f1" />
+            <div className="ed-shop-card">
+                <div className="ed-shop-card-head">
+                    <Globe size={18} color="#82b440" />
                     Live Interaction Logs
                 </div>
                 <div className="table-container">

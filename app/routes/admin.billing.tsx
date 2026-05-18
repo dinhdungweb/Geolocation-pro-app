@@ -1,621 +1,755 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { requireAdminAuth } from "../utils/admin.session.server";
-import prisma from "../db.server";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Clock, DollarSign, Search, Users, X } from "lucide-react";
 import {
-    FREE_PLAN,
-    OVERAGE_RATE,
-    getBillableOverageVisitors,
-    getPlanLimit,
-    getUnchargedBillableOverageVisitors,
-    hasMonthlyUnlimitedReward,
-    hasUnlimitedUsage,
+  FREE_PLAN,
+  OVERAGE_RATE,
+  getBillableOverageVisitors,
+  getPlanLimit,
+  getUnchargedBillableOverageVisitors,
+  hasMonthlyUnlimitedReward,
+  hasUnlimitedUsage,
 } from "../billing.config";
-import { useState, useMemo } from "react";
-import { Search, X, DollarSign, AlertTriangle, Users, Clock } from "lucide-react";
+import prisma from "../db.server";
+import { requireAdminAuth } from "../utils/admin.session.server";
 
 function formatBillingPeriodEnd(value: string | Date | null | undefined) {
-    if (!value) return null;
+  if (!value) return null;
 
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
 
-    return new Intl.DateTimeFormat("en", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    }).format(date);
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 function getYearMonth(date: Date) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function getBillingWindowMonths(periodEnd: Date | string | null | undefined) {
-    if (!periodEnd) return [];
+  if (!periodEnd) return [];
 
-    const end = periodEnd instanceof Date ? periodEnd : new Date(periodEnd);
-    if (Number.isNaN(end.getTime())) return [];
+  const end = periodEnd instanceof Date ? periodEnd : new Date(periodEnd);
+  if (Number.isNaN(end.getTime())) return [];
 
-    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const months: string[] = [];
-    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+  const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const months: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
 
-    while (cursor <= endMonth) {
-        months.push(getYearMonth(cursor));
-        cursor.setMonth(cursor.getMonth() + 1);
-    }
+  while (cursor <= endMonth) {
+    months.push(getYearMonth(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
 
-    return months;
+  return months;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
+  await requireAdminAuth(request);
 
-    const now = new Date();
-    const calendarYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const now = new Date();
+  const calendarYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevYearMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(prevDate.getFullYear(), prevDate.getMonth(), 1);
 
-    // Previous month for comparison
-    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevYearMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const prevMonthStart = new Date(prevDate.getFullYear(), prevDate.getMonth(), 1);
+  const allSettings = await prisma.settings.findMany({ where: { NOT: { shop: "GLOBAL" } } });
+  const currentPeriodKeys = allSettings.map((setting: any) => setting.billingPeriodKey || `calendar:${calendarYearMonth}`);
+  const shopsWithSettings = allSettings.map((setting: any) => setting.shop);
+  const legacyMonthsToCheck = Array.from(
+    new Set([
+      calendarYearMonth,
+      prevYearMonth,
+      ...allSettings.flatMap((setting: any) => getBillingWindowMonths(setting.billingPeriodEnd)),
+    ]),
+  );
 
-    const allSettings = await prisma.settings.findMany({ where: { NOT: { shop: 'GLOBAL' } } });
-    const currentPeriodKeys = allSettings.map((s: any) => s.billingPeriodKey || `calendar:${calendarYearMonth}`);
-    const shopsWithSettings = allSettings.map((s: any) => s.shop);
-    const legacyMonthsToCheck = Array.from(new Set([
-        calendarYearMonth,
-        prevYearMonth,
-        ...allSettings.flatMap((s: any) => getBillingWindowMonths(s.billingPeriodEnd)),
-    ]));
+  const [currentUsage, prevUsage, legacyCalendarUsage] = await Promise.all([
+    prisma.monthlyUsage.findMany({
+      where: {
+        billingPeriodKey: { in: currentPeriodKeys },
+      },
+    }),
+    prisma.analyticsCountry.groupBy({
+      by: ["shop"],
+      where: {
+        shop: { in: shopsWithSettings },
+        date: {
+          gte: prevMonthStart,
+          lt: currentMonthStart,
+        },
+      },
+      _sum: { visitors: true },
+    }),
+    prisma.monthlyUsage.findMany({
+      where: {
+        shop: { in: shopsWithSettings },
+        yearMonth: { in: legacyMonthsToCheck },
+        billingPeriodKey: { startsWith: "calendar:" },
+      },
+      select: {
+        shop: true,
+        yearMonth: true,
+      },
+    }),
+  ]);
 
-    const [currentUsage, prevUsage, legacyCalendarUsage] = await Promise.all([
-        prisma.monthlyUsage.findMany({
-            where: {
-                billingPeriodKey: { in: currentPeriodKeys },
-            },
-        }),
-        prisma.analyticsCountry.groupBy({
-            by: ['shop'],
-            where: {
-                shop: { in: shopsWithSettings },
-                date: {
-                    gte: prevMonthStart,
-                    lt: currentMonthStart,
-                },
-            },
-            _sum: { visitors: true },
-        }),
-        prisma.monthlyUsage.findMany({
-            where: {
-                shop: { in: shopsWithSettings },
-                yearMonth: { in: legacyMonthsToCheck },
-                billingPeriodKey: { startsWith: "calendar:" },
-            },
-            select: {
-                shop: true,
-                yearMonth: true,
-            },
-        }),
-    ]);
+  const usageMap = new Map((currentUsage as any[]).map((usage) => [`${usage.shop}:${usage.billingPeriodKey}`, usage]));
+  const legacyCalendarMap = new Set((legacyCalendarUsage as any[]).map((usage) => `${usage.shop}:${usage.yearMonth}`));
+  const prevUsageMap = new Map<string, number>();
 
-    const usageMap = new Map((currentUsage as any[]).map((u) => [`${u.shop}:${u.billingPeriodKey}`, u]));
-    const legacyCalendarMap = new Set((legacyCalendarUsage as any[]).map((u) => `${u.shop}:${u.yearMonth}`));
-    const prevUsageMap = new Map<string, number>();
-    (prevUsage as any[]).forEach((u) => {
-        prevUsageMap.set(u.shop, u._sum?.visitors || 0);
-    });
+  (prevUsage as any[]).forEach((usage) => {
+    prevUsageMap.set(usage.shop, usage._sum?.visitors || 0);
+  });
 
-    const shops = allSettings.map((s: any) => {
-        const plan = s.currentPlan || FREE_PLAN;
-        const limit = getPlanLimit(plan, s);
-        const billingPeriodKey = s.billingPeriodKey || `calendar:${calendarYearMonth}`;
-        const usage = usageMap.get(`${s.shop}:${billingPeriodKey}`);
+  const shops = allSettings.map((setting: any) => {
+    const plan = setting.currentPlan || FREE_PLAN;
+    const limit = getPlanLimit(plan, setting);
+    const billingPeriodKey = setting.billingPeriodKey || `calendar:${calendarYearMonth}`;
+    const usage = usageMap.get(`${setting.shop}:${billingPeriodKey}`);
+    const totalVisitors = usage?.totalVisitors || 0;
+    const chargedVisitors = usage?.chargedVisitors || 0;
+    const hasLegacyCalendarOverlap = Boolean(
+      setting.billingPeriodEnd &&
+        getBillingWindowMonths(setting.billingPeriodEnd).some((month) =>
+          legacyCalendarMap.has(`${setting.shop}:${month}`),
+        ),
+    );
+    const planUnlimitedUsage = hasUnlimitedUsage(plan, setting);
+    const monthlyUnlimitedReward = hasMonthlyUnlimitedReward(plan, chargedVisitors);
+    const unlimitedUsage = planUnlimitedUsage || monthlyUnlimitedReward;
+    const billableOverage = planUnlimitedUsage
+      ? 0
+      : getBillableOverageVisitors(plan, totalVisitors, limit);
+    const overage = planUnlimitedUsage ? 0 : billableOverage;
+    const uncharged = unlimitedUsage
+      ? 0
+      : getUnchargedBillableOverageVisitors(plan, totalVisitors, limit, chargedVisitors);
+    const chargedAmount = Number((chargedVisitors * OVERAGE_RATE).toFixed(2));
+    const unchargedAmount = Number((uncharged * OVERAGE_RATE).toFixed(2));
+    const prevTotal = prevUsageMap.get(setting.shop) || 0;
+    const actualOverage = planUnlimitedUsage ? 0 : billableOverage;
+    const overcharged = chargedVisitors > actualOverage ? chargedVisitors - actualOverage : 0;
+    const needsLegacyReview = overcharged > 0 && hasLegacyCalendarOverlap;
+    const overchargedAmount = needsLegacyReview ? 0 : Number((overcharged * OVERAGE_RATE).toFixed(2));
+    const chargeReviewAmount = needsLegacyReview ? Number((overcharged * OVERAGE_RATE).toFixed(2)) : 0;
 
-        const totalVisitors = usage?.totalVisitors || 0;
-        const chargedVisitors = usage?.chargedVisitors || 0;
-        const hasLegacyCalendarOverlap = Boolean(
-            s.billingPeriodEnd &&
-            getBillingWindowMonths(s.billingPeriodEnd).some((month) => legacyCalendarMap.has(`${s.shop}:${month}`))
-        );
-        const planUnlimitedUsage = hasUnlimitedUsage(plan, s);
-        const monthlyUnlimitedReward = hasMonthlyUnlimitedReward(plan, chargedVisitors);
-        const unlimitedUsage = planUnlimitedUsage || monthlyUnlimitedReward;
-        const billableOverage = planUnlimitedUsage ? 0 : getBillableOverageVisitors(plan, totalVisitors, limit);
-        const overage = planUnlimitedUsage ? 0 : billableOverage;
-        const uncharged = unlimitedUsage ? 0 : getUnchargedBillableOverageVisitors(plan, totalVisitors, limit, chargedVisitors);
-        const chargedAmount = Number((chargedVisitors * OVERAGE_RATE).toFixed(2));
-        const unchargedAmount = Number((uncharged * OVERAGE_RATE).toFixed(2));
-        const prevTotal = prevUsageMap.get(s.shop) || 0;
+    let status: "ok" | "pending" | "waiting" | "overcharged" | "charge_review" | "free_exceeded" =
+      "ok";
+    if (needsLegacyReview) status = "charge_review";
+    else if (overcharged > 0) status = "overcharged";
+    else if (plan === FREE_PLAN && totalVisitors > limit) status = "free_exceeded";
+    else if (uncharged > 0 && unchargedAmount >= 1.0) status = "pending";
+    else if (uncharged > 0 && unchargedAmount < 1.0) status = "waiting";
 
-        // Detect overcharge: chargedVisitors > actual overage
-        const actualOverage = planUnlimitedUsage ? 0 : billableOverage;
-        const overcharged = chargedVisitors > actualOverage ? chargedVisitors - actualOverage : 0;
-        const needsLegacyReview = overcharged > 0 && hasLegacyCalendarOverlap;
-        const overchargedAmount = needsLegacyReview ? 0 : Number((overcharged * OVERAGE_RATE).toFixed(2));
-        const chargeReviewAmount = needsLegacyReview ? Number((overcharged * OVERAGE_RATE).toFixed(2)) : 0;
+    return {
+      shop: setting.shop,
+      plan,
+      billingPeriodKey,
+      billingPeriodEnd: setting.billingPeriodEnd,
+      limit,
+      unlimitedUsage,
+      monthlyUnlimitedReward,
+      totalVisitors,
+      chargedVisitors,
+      overage,
+      uncharged,
+      chargedAmount,
+      unchargedAmount,
+      overcharged,
+      overchargedAmount,
+      chargeReviewAmount,
+      hasLegacyCalendarOverlap,
+      prevTotal,
+      status,
+    };
+  });
 
-        let status: 'ok' | 'pending' | 'waiting' | 'overcharged' | 'charge_review' | 'free_exceeded' = 'ok';
-        if (needsLegacyReview) status = 'charge_review';
-        else if (overcharged > 0) status = 'overcharged';
-        else if (plan === FREE_PLAN && totalVisitors > limit) status = 'free_exceeded';
-        else if (uncharged > 0 && unchargedAmount >= 1.00) status = 'pending';
-        else if (uncharged > 0 && unchargedAmount < 1.00) status = 'waiting';
+  shops.sort((a: any, b: any) => {
+    const priority: Record<string, number> = {
+      overcharged: 0,
+      charge_review: 1,
+      pending: 2,
+      free_exceeded: 3,
+      waiting: 4,
+      ok: 5,
+    };
+    const diff = (priority[a.status] ?? 5) - (priority[b.status] ?? 5);
+    if (diff !== 0) return diff;
+    return b.totalVisitors - a.totalVisitors;
+  });
 
-        return {
-            shop: s.shop,
-            plan,
-            billingPeriodKey,
-            billingPeriodEnd: s.billingPeriodEnd,
-            limit,
-            unlimitedUsage,
-            monthlyUnlimitedReward,
-            totalVisitors,
-            chargedVisitors,
-            overage,
-            uncharged,
-            chargedAmount,
-            unchargedAmount,
-            overcharged,
-            overchargedAmount,
-            chargeReviewAmount,
-            hasLegacyCalendarOverlap,
-            prevTotal,
-            status,
-        };
-    });
+  const totalRevenue = shops.reduce((sum: number, shop: any) => sum + shop.chargedAmount, 0);
+  const totalPending = shops.reduce(
+    (sum: number, shop: any) => sum + (shop.status === "pending" ? shop.unchargedAmount : 0),
+    0,
+  );
+  const totalOvercharged = shops.reduce((sum: number, shop: any) => sum + shop.overchargedAmount, 0);
+  const paidShops = shops.filter((shop: any) => shop.plan !== FREE_PLAN).length;
+  const issueCount = shops.filter((shop: any) =>
+    ["overcharged", "pending", "charge_review"].includes(shop.status),
+  ).length;
 
-    // Sort: issues first, then by totalVisitors desc
-    shops.sort((a: any, b: any) => {
-        const priority: Record<string, number> = { overcharged: 0, charge_review: 1, pending: 2, free_exceeded: 3, waiting: 4, ok: 5 };
-        const diff = (priority[a.status] ?? 5) - (priority[b.status] ?? 5);
-        if (diff !== 0) return diff;
-        return b.totalVisitors - a.totalVisitors;
-    });
-
-    // Summary stats
-    const totalRevenue = shops.reduce((s: number, x: any) => s + x.chargedAmount, 0);
-    const totalPending = shops.reduce((s: number, x: any) => s + (x.status === 'pending' ? x.unchargedAmount : 0), 0);
-    const totalOvercharged = shops.reduce((s: number, x: any) => s + x.overchargedAmount, 0);
-    const paidShops = shops.filter((x: any) => x.plan !== FREE_PLAN).length;
-    const issueCount = shops.filter((x: any) => x.status === 'overcharged' || x.status === 'pending' || x.status === 'charge_review').length;
-
-    return json({
-        shops,
-        yearMonth: "current Shopify billing periods",
-        prevYearMonth,
-        summary: {
-            totalRevenue: totalRevenue.toFixed(2),
-            totalPending: totalPending.toFixed(2),
-            totalOvercharged: totalOvercharged.toFixed(2),
-            paidShops,
-            issueCount,
-            totalShops: shops.length,
-        }
-    });
+  return json({
+    shops,
+    yearMonth: "current Shopify billing periods",
+    summary: {
+      totalRevenue: totalRevenue.toFixed(2),
+      totalPending: totalPending.toFixed(2),
+      totalOvercharged: totalOvercharged.toFixed(2),
+      paidShops,
+      issueCount,
+      totalShops: shops.length,
+    },
+  });
 };
 
+const statusLabel: Record<string, string> = {
+  ok: "OK",
+  waiting: "Waiting (< $1)",
+  pending: "Pending Charge",
+  overcharged: "Overcharged",
+  charge_review: "Review Legacy",
+  free_exceeded: "Free Exceeded",
+};
+
+function planClass(plan: string) {
+  return `is-${(plan || FREE_PLAN).toLowerCase()}`;
+}
+
 export default function AdminBilling() {
-    const { shops, yearMonth, summary } = useLoaderData<typeof loader>();
-    const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
-    const [planFilter, setPlanFilter] = useState("all");
+  const { shops, yearMonth, summary } = useLoaderData<typeof loader>();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
 
-    const filtered = useMemo(() => {
-        return (shops as any[]).filter((s) => {
-            const matchSearch = s.shop.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchStatus = statusFilter === "all" || s.status === statusFilter;
-            const matchPlan = planFilter === "all" || s.plan === planFilter;
-            return matchSearch && matchStatus && matchPlan;
-        });
-    }, [shops, searchQuery, statusFilter, planFilter]);
+  const filtered = useMemo(() => {
+    return (shops as any[]).filter((shop) => {
+      const matchSearch = shop.shop.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchStatus = statusFilter === "all" || shop.status === statusFilter;
+      const matchPlan = planFilter === "all" || shop.plan?.toLowerCase() === planFilter;
+      return matchSearch && matchStatus && matchPlan;
+    });
+  }, [shops, searchQuery, statusFilter, planFilter]);
 
-    const statusConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
-        ok: { label: 'OK', color: '#10b981', bg: '#ecfdf5', border: '#a7f3d0' },
-        waiting: { label: 'Waiting (< $1)', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-        pending: { label: 'Pending Charge', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
-        overcharged: { label: 'Overcharged', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
-        charge_review: { label: 'Review Legacy', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-        free_exceeded: { label: 'Free Exceeded', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
-    };
+  const clearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setPlanFilter("all");
+  };
 
-    return (
-        <div>
-            <style>{`
-                .billing-cards {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-                    gap: 16px;
-                    margin-bottom: 24px;
-                }
-                .stat-card {
-                    background: white;
-                    border: 1px solid var(--border);
-                    border-radius: 8px;
-                    padding: 20px;
-                    position: relative;
-                    overflow: hidden;
-                }
-                .stat-card::before {
-                    content: '';
-                    position: absolute;
-                    top: 0; left: 0; right: 0;
-                    height: 4px;
-                }
-                .stat-card.revenue::before { background: linear-gradient(90deg, #10b981, #34d399); }
-                .stat-card.pending::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-                .stat-card.overcharged::before { background: linear-gradient(90deg, #ef4444, #f87171); }
-                .stat-card.shops::before { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
-                .stat-card.issues::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+  const summaryCards = [
+    {
+      label: "Overage Revenue",
+      value: `$${summary.totalRevenue}`,
+      icon: <DollarSign size={18} />,
+      tone: "success",
+    },
+    {
+      label: "Pending Charges",
+      value: `$${summary.totalPending}`,
+      icon: <Clock size={18} />,
+      tone: "warning",
+    },
+    {
+      label: "Overcharged",
+      value: `$${summary.totalOvercharged}`,
+      icon: <AlertTriangle size={18} />,
+      tone: "danger",
+    },
+    {
+      label: "Paid Shops",
+      value: summary.paidShops.toLocaleString(),
+      icon: <Users size={18} />,
+      tone: "neutral",
+    },
+    {
+      label: "Issues",
+      value: summary.issueCount.toLocaleString(),
+      icon: <AlertTriangle size={18} />,
+      tone: "danger",
+    },
+  ];
 
-                .stat-icon {
-                    width: 38px; height: 38px;
-                    border-radius: 8px;
-                    display: flex; align-items: center; justify-content: center;
-                    margin-bottom: 14px;
-                }
-                .stat-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-                .stat-value { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: 0; }
+  return (
+    <section className="ed-billing">
+      <div className="ed-period-label">
+        <Clock size={16} />
+        Billing Period: {yearMonth}
+      </div>
 
-                .billing-toolbar {
-                    display: grid;
-                    grid-template-columns: 1fr auto auto auto;
-                    gap: 12px;
-                    margin-bottom: 24px;
-                    align-items: center;
-                }
-                .billing-search {
-                    background: white; border: 1px solid var(--border); border-radius: 8px;
-                    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
-                    transition: all 0.2s;
-                }
-                .billing-search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1); }
-                .billing-search input { border: none; outline: none; width: 100%; font-size: 14px; font-family: inherit; }
-
-                .b-filter {
-                    appearance: none; background: white; border: 1px solid var(--border);
-                    border-radius: 8px; padding: 12px 36px 12px 16px; font-size: 13px; font-weight: 600;
-                    cursor: pointer; color: var(--text); min-width: 140px;
-                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-                    background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
-                }
-                .b-filter:focus { outline: none; border-color: var(--primary); }
-
-                .b-clear {
-                    display: flex; align-items: center; gap: 6px;
-                    color: #ec4899; background: #fdf2f8; border: 1px solid #fbcfe8;
-                    padding: 11px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
-                    cursor: pointer; transition: all 0.2s;
-                }
-                .b-clear:hover { background: #fce7f3; }
-
-                .billing-table-card {
-                    background: white; border-radius: 8px; border: 1px solid var(--border);
-                    overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-                }
-                .billing-table-wrap { width: 100%; overflow-x: auto; }
-                .billing-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
-                .billing-table th {
-                    padding: 16px 20px; background: #f8fafc;
-                    font-size: 11px; font-weight: 700; color: var(--text-muted);
-                    text-transform: uppercase; letter-spacing: 0.06em;
-                    border-bottom: 1px solid var(--border);
-                    text-align: left;
-                }
-                .billing-table th.text-right { text-align: right; }
-                .billing-table td { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 14px; }
-                .billing-table tr:last-child td { border-bottom: none; }
-                .billing-table tr:hover td { background: #f9fafb; }
-
-                .plan-tag {
-                    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
-                    text-transform: uppercase; letter-spacing: 0.02em; display: inline-block;
-                }
-                .plan-tag.free { background: #f1f5f9; color: #64748b; }
-                .plan-tag.premium { background: #eef2ff; color: #6366f1; }
-                .plan-tag.plus { background: #ecfdf5; color: #10b981; }
-                .plan-tag.elite { background: #faf5ff; color: #a855f7; }
-                .plan-tag.custom { background: #eff6ff; color: #2563eb; }
-                .plan-tag.unlimited { background: #eff6ff; color: #2563eb; }
-
-                .status-tag {
-                    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
-                    display: inline-block;
-                    white-space: nowrap;
-                }
-
-                .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
-                .text-right { text-align: right; }
-                .text-green { color: #10b981; }
-                .text-red { color: #ef4444; }
-                .text-amber { color: #f59e0b; }
-                .text-muted { color: var(--text-muted); }
-
-                .progress-bar {
-                    height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-top: 6px;
-                }
-                .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-
-                .month-badge {
-                    display: inline-flex; align-items: center; gap: 8px;
-                    background: #f8fafc; border: 1px solid var(--border);
-                    padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 700;
-                    color: var(--text); margin-bottom: 24px;
-                }
-
-                @media (max-width: 1024px) {
-                    .billing-toolbar {
-                        grid-template-columns: 1fr 1fr;
-                    }
-                    .billing-search { grid-column: span 2; }
-                }
-
-                @media (max-width: 768px) {
-                    .month-badge {
-                        width: 100%;
-                        justify-content: center;
-                        margin-bottom: 14px;
-                        font-size: 12px;
-                    }
-                    .billing-cards {
-                        grid-template-columns: 1fr;
-                        gap: 12px;
-                        margin-bottom: 16px;
-                    }
-                    .stat-card {
-                        padding: 14px;
-                        display: grid;
-                        grid-template-columns: 38px 1fr;
-                        column-gap: 12px;
-                        align-items: center;
-                    }
-                    .stat-icon {
-                        margin-bottom: 0;
-                    }
-                    .stat-label {
-                        margin-bottom: 2px;
-                        font-size: 11px;
-                    }
-                    .stat-value {
-                        font-size: 22px;
-                    }
-                    .billing-toolbar { 
-                        grid-template-columns: 1fr;
-                        gap: 10px;
-                        margin-bottom: 12px;
-                    }
-                    .billing-search,
-                    .b-filter,
-                    .b-clear {
-                        width: 100%;
-                    }
-                    .billing-search { grid-column: span 1; }
-                    .shops-count { text-align: left !important; margin-top: 8px; }
-                    .billing-table-card {
-                        margin: 0 -2px;
-                    }
-                    .billing-table {
-                        min-width: 980px;
-                    }
-                }
-
-                @media (max-width: 480px) {
-                    .stat-card {
-                        grid-template-columns: 34px 1fr;
-                        padding: 12px;
-                    }
-                    .stat-icon {
-                        width: 34px;
-                        height: 34px;
-                    }
-                    .stat-value {
-                        font-size: 20px;
-                    }
-                }
-            `}</style>
-
-            <div className="month-badge">
-                <Clock size={16} />
-                Billing Period: {yearMonth}
+      <div className="ed-billing-cards">
+        {summaryCards.map((card) => (
+          <article className={`ed-billing-stat ${card.tone}`} key={card.label}>
+            <span className="ed-billing-icon">{card.icon}</span>
+            <div>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
             </div>
+          </article>
+        ))}
+      </div>
 
-            {/* Summary Cards */}
-            <div className="billing-cards">
-                <div className="stat-card revenue">
-                    <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
-                        <DollarSign size={22} />
-                    </div>
-                    <div className="stat-label">Overage Revenue</div>
-                    <div className="stat-value text-green">${summary.totalRevenue}</div>
-                </div>
-                <div className="stat-card pending">
-                    <div className="stat-icon" style={{ background: '#fffbeb', color: '#f59e0b' }}>
-                        <Clock size={22} />
-                    </div>
-                    <div className="stat-label">Pending Charges</div>
-                    <div className="stat-value text-amber">${summary.totalPending}</div>
-                </div>
-                <div className="stat-card overcharged">
-                    <div className="stat-icon" style={{ background: '#fef2f2', color: '#ef4444' }}>
-                        <AlertTriangle size={22} />
-                    </div>
-                    <div className="stat-label">Overcharged</div>
-                    <div className="stat-value text-red">${summary.totalOvercharged}</div>
-                </div>
-                <div className="stat-card shops">
-                    <div className="stat-icon" style={{ background: '#eef2ff', color: '#6366f1' }}>
-                        <Users size={22} />
-                    </div>
-                    <div className="stat-label">Paid Shops</div>
-                    <div className="stat-value">{summary.paidShops}</div>
-                </div>
-                <div className="stat-card issues">
-                    <div className="stat-icon" style={{ background: '#fdf2f8', color: '#ec4899' }}>
-                        <AlertTriangle size={22} />
-                    </div>
-                    <div className="stat-label">Issues</div>
-                    <div className="stat-value">{summary.issueCount}</div>
-                </div>
-            </div>
+      <div className="ed-billing-toolbar">
+        <label className="ed-billing-search">
+          <Search size={18} />
+          <input
+            type="search"
+            placeholder="Search shop"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </label>
 
-            {/* Toolbar */}
-            <div className="billing-toolbar">
-                <div className="billing-search">
-                    <Search size={18} color="var(--text-muted)" />
-                    <input
-                        type="text"
-                        placeholder="Search shop..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
-                <select className="b-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                    <option value="all">All Status</option>
-                    <option value="ok">OK</option>
-                    <option value="waiting">Waiting (&lt; $1)</option>
-                    <option value="pending">Pending Charge</option>
-                    <option value="overcharged">Overcharged</option>
-                    <option value="charge_review">Review Legacy</option>
-                    <option value="free_exceeded">Free Exceeded</option>
-                </select>
-                <select className="b-filter" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
-                    <option value="all">All Plans</option>
-                    <option value="free">Free</option>
-                    <option value="premium">Premium</option>
-                    <option value="plus">Plus</option>
-                    <option value="elite">Elite</option>
-                    <option value="custom">Custom</option>
-                    <option value="unlimited">Unlimited</option>
-                </select>
-                {(searchQuery || statusFilter !== "all" || planFilter !== "all") && (
-                    <button className="b-clear" onClick={() => { setSearchQuery(""); setStatusFilter("all"); setPlanFilter("all"); }}>
-                        <X size={14} /> Clear
-                    </button>
-                )}
-            </div>
-            <div className="shops-count" style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600, marginBottom: '16px', textAlign: 'right' }}>
-                {filtered.length} / {(shops as any[]).length} shops
-            </div>
+        <select
+          className="ed-billing-select"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          aria-label="Filter by billing status"
+        >
+          <option value="all">All Status</option>
+          <option value="ok">OK</option>
+          <option value="waiting">Waiting (&lt; $1)</option>
+          <option value="pending">Pending Charge</option>
+          <option value="overcharged">Overcharged</option>
+          <option value="charge_review">Review Legacy</option>
+          <option value="free_exceeded">Free Exceeded</option>
+        </select>
 
-            {/* Table */}
-            <div className="billing-table-card">
-                <div className="billing-table-wrap">
-                    <table className="billing-table">
-                        <thead>
-                            <tr>
-                                <th>Shop</th>
-                                <th>Plan</th>
-                                <th>Period Ends</th>
-                                <th className="text-right">Limit</th>
-                                <th className="text-right">Visitors</th>
-                                <th className="text-right">Overage</th>
-                                <th className="text-right">Charged</th>
-                                <th className="text-right">Uncharged</th>
-                                <th className="text-right">Revenue</th>
-                                <th>Usage</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={11} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-                                        No shops match the filter
-                                    </td>
-                                </tr>
-                            ) : (
-                                (filtered as any[]).map((s) => {
-                                    const sc = statusConfig[s.status] || statusConfig.ok;
-                                    const isUnlimited = s.unlimitedUsage || s.limit >= Number.MAX_SAFE_INTEGER;
-                                    const usagePercent = isUnlimited ? 100 : Math.min(100, Math.round((s.totalVisitors / s.limit) * 100));
-                                    const barColor = isUnlimited ? '#10b981' : usagePercent >= 100 ? '#ef4444' : usagePercent >= 80 ? '#f59e0b' : '#10b981';
-                                    const periodEndLabel = formatBillingPeriodEnd(s.billingPeriodEnd);
+        <select
+          className="ed-billing-select"
+          value={planFilter}
+          onChange={(event) => setPlanFilter(event.target.value)}
+          aria-label="Filter by plan"
+        >
+          <option value="all">All Plans</option>
+          <option value="free">Free</option>
+          <option value="premium">Premium</option>
+          <option value="plus">Plus</option>
+          <option value="elite">Elite</option>
+          <option value="custom">Custom</option>
+          <option value="unlimited">Unlimited</option>
+        </select>
 
-                                    return (
-                                        <tr key={s.shop}>
-                                            <td>
-                                                <div style={{ fontWeight: 600, fontSize: '13px' }}>{s.shop.replace('.myshopify.com', '')}</div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>.myshopify.com</div>
-                                            </td>
-                                            <td>
-                                                <span className={`plan-tag ${s.plan}`}>{s.plan}</span>
-                                            </td>
-                                            <td title={s.billingPeriodKey}>
-                                                <div className="mono" style={{ fontWeight: 700 }}>
-                                                    {periodEndLabel || (s.plan === FREE_PLAN ? "Calendar month" : "Sync pending")}
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                    {periodEndLabel ? "Shopify period" : s.billingPeriodKey}
-                                                </div>
-                                            </td>
-                                            <td className="mono text-right">{isUnlimited ? "Unlimited" : s.limit.toLocaleString()}</td>
-                                            <td className="mono text-right">
-                                                <b>{s.totalVisitors.toLocaleString()}</b>
-                                                {s.prevTotal > 0 && (
-                                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                        prev: {s.prevTotal.toLocaleString()}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="mono text-right">
-                                                {s.overage > 0 ? (
-                                                    <span style={{ color: '#ef4444', fontWeight: 600 }}>+{s.overage.toLocaleString()}</span>
-                                                ) : (
-                                                    <span className="text-muted">0</span>
-                                                )}
-                                            </td>
-                                            <td className="mono text-right">
-                                                {s.chargedVisitors > 0 ? s.chargedVisitors.toLocaleString() : <span className="text-muted">0</span>}
-                                            </td>
-                                            <td className="mono text-right">
-                                                {s.uncharged > 0 ? (
-                                                    <span style={{ color: '#f59e0b', fontWeight: 600 }}>{s.uncharged.toLocaleString()}</span>
-                                                ) : (
-                                                    <span className="text-muted">0</span>
-                                                )}
-                                            </td>
-                                            <td className="mono text-right">
-                                                {s.chargedAmount > 0 ? (
-                                                    <span className="text-green" style={{ fontWeight: 700 }}>${s.chargedAmount.toFixed(2)}</span>
-                                                ) : (
-                                                    <span className="text-muted">$0.00</span>
-                                                )}
-                                                {s.overchargedAmount > 0 && (
-                                                    <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
-                                                        +${s.overchargedAmount.toFixed(2)} excess
-                                                    </div>
-                                                )}
-                                                {s.chargeReviewAmount > 0 && (
-                                                    <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600 }}>
-                                                        legacy review
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td style={{ minWidth: '100px' }}>
-                                                <div style={{ fontSize: '11px', fontWeight: 700, color: barColor }}>{isUnlimited ? "Unlimited" : `${usagePercent}%`}</div>
-                                                <div className="progress-bar">
-                                                    <div className="progress-fill" style={{ width: `${usagePercent}%`, background: barColor }} />
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span
-                                                    className="status-tag"
-                                                    style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}
-                                                >
-                                                    {sc.label}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        {(searchQuery || statusFilter !== "all" || planFilter !== "all") && (
+          <button className="ed-billing-clear" type="button" onClick={clearFilters}>
+            <X size={14} /> Clear
+          </button>
+        )}
+      </div>
+
+      <div className="ed-billing-count">
+        {filtered.length} / {(shops as any[]).length} shops
+      </div>
+
+      <div className="ed-billing-table-card">
+        <div className="ed-billing-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Shop</th>
+                <th>Plan</th>
+                <th>Period Ends</th>
+                <th>Limit</th>
+                <th>Visitors</th>
+                <th>Overage</th>
+                <th>Charged</th>
+                <th>Uncharged</th>
+                <th>Revenue</th>
+                <th>Usage</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={11}>
+                    <div className="ed-billing-empty">No shops match the filter.</div>
+                  </td>
+                </tr>
+              ) : (
+                (filtered as any[]).map((shop) => {
+                  const isUnlimited = shop.unlimitedUsage || shop.limit >= Number.MAX_SAFE_INTEGER;
+                  const usagePercent = isUnlimited
+                    ? 100
+                    : Math.min(100, Math.round((shop.totalVisitors / shop.limit) * 100));
+                  const periodEndLabel = formatBillingPeriodEnd(shop.billingPeriodEnd);
+
+                  return (
+                    <tr key={shop.shop}>
+                      <td>
+                        <strong>{shop.shop.replace(".myshopify.com", "")}</strong>
+                        <small>.myshopify.com</small>
+                      </td>
+                      <td>
+                        <span className={`ed-plan-badge ${planClass(shop.plan)}`}>{shop.plan}</span>
+                      </td>
+                      <td title={shop.billingPeriodKey}>
+                        <strong>{periodEndLabel || (shop.plan === FREE_PLAN ? "Calendar month" : "Sync pending")}</strong>
+                        <small>{periodEndLabel ? "Shopify period" : shop.billingPeriodKey}</small>
+                      </td>
+                      <td className="ed-number">{isUnlimited ? "Unlimited" : shop.limit.toLocaleString()}</td>
+                      <td className="ed-number">
+                        <strong>{shop.totalVisitors.toLocaleString()}</strong>
+                        {shop.prevTotal > 0 ? <small>prev: {shop.prevTotal.toLocaleString()}</small> : null}
+                      </td>
+                      <td className="ed-number">
+                        {shop.overage > 0 ? <span className="ed-danger">+{shop.overage.toLocaleString()}</span> : "0"}
+                      </td>
+                      <td className="ed-number">{shop.chargedVisitors.toLocaleString()}</td>
+                      <td className="ed-number">
+                        {shop.uncharged > 0 ? <span className="ed-warning">{shop.uncharged.toLocaleString()}</span> : "0"}
+                      </td>
+                      <td className="ed-number">
+                        <strong>${shop.chargedAmount.toFixed(2)}</strong>
+                        {shop.overchargedAmount > 0 ? (
+                          <small className="ed-danger">+${shop.overchargedAmount.toFixed(2)} excess</small>
+                        ) : null}
+                        {shop.chargeReviewAmount > 0 ? (
+                          <small className="ed-review">legacy review</small>
+                        ) : null}
+                      </td>
+                      <td>
+                        <span className="ed-usage-label">{isUnlimited ? "Unlimited" : `${usagePercent}%`}</span>
+                        <span className="ed-usage-bar">
+                          <span
+                            className={isUnlimited ? "is-unlimited" : usagePercent >= 100 ? "is-danger" : usagePercent >= 80 ? "is-warning" : ""}
+                            style={{ width: `${usagePercent}%` }}
+                          />
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`ed-status ${shop.status}`}>{statusLabel[shop.status]}</span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-    );
+      </div>
+
+      <style>{`
+        .ed-billing {
+          display: grid;
+          gap: var(--ed-space-2);
+        }
+
+        .ed-period-label {
+          width: fit-content;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 38px;
+          padding: 0 12px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+        }
+
+        .ed-billing-cards {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: var(--ed-space-2);
+        }
+
+        .ed-billing-stat {
+          display: grid;
+          grid-template-columns: 38px minmax(0, 1fr);
+          align-items: center;
+          gap: 10px;
+          padding: var(--ed-space-2);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-billing-icon {
+          width: 38px;
+          height: 38px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: var(--ed-radius-xl);
+          background: #f2f8ee;
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-billing-stat.warning .ed-billing-icon {
+          background: #fff8e8;
+          color: #f59e0b;
+        }
+
+        .ed-billing-stat.danger .ed-billing-icon {
+          background: #fff2f2;
+          color: #ef4444;
+        }
+
+        .ed-billing-stat span:not(.ed-billing-icon) {
+          display: block;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          line-height: 16px;
+          text-transform: uppercase;
+        }
+
+        .ed-billing-stat strong {
+          display: block;
+          margin-top: var(--ed-space-1);
+          color: var(--ed-color-text-primary);
+          font-size: 22px;
+          line-height: 28px;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ed-billing-toolbar {
+          display: grid;
+          grid-template-columns: minmax(280px, 1fr) auto auto auto;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ed-billing-search,
+        .ed-billing-select,
+        .ed-billing-clear {
+          min-height: 42px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+        }
+
+        .ed-billing-search {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 12px;
+          color: var(--ed-color-text-tertiary);
+        }
+
+        .ed-billing-search:focus-within {
+          outline: 2px solid var(--ed-color-border-muted);
+          outline-offset: 2px;
+          border-color: var(--ed-color-border-muted);
+        }
+
+        .ed-billing-search input {
+          width: 100%;
+          min-width: 0;
+          border: 0 !important;
+          outline: 0 !important;
+          background: transparent !important;
+        }
+
+        .ed-billing-select {
+          min-width: 150px;
+          padding: 0 12px;
+          font-weight: 500;
+        }
+
+        .ed-billing-clear {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 0 12px;
+          font-weight: 500;
+        }
+
+        .ed-billing-clear:hover {
+          border-color: var(--ed-color-border-muted);
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-billing-count {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          text-align: right;
+        }
+
+        .ed-billing-table-card {
+          overflow: hidden;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-billing-table-scroll {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .ed-billing-table-card table {
+          min-width: 1180px;
+        }
+
+        .ed-billing-table-card td strong {
+          display: block;
+          color: var(--ed-color-text-primary);
+          font-weight: 700;
+          line-height: 18px;
+        }
+
+        .ed-billing-table-card td small {
+          display: block;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          line-height: 16px;
+        }
+
+        .ed-number {
+          text-align: right;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ed-danger {
+          color: #ef4444 !important;
+          font-weight: 700;
+        }
+
+        .ed-warning {
+          color: #f59e0b !important;
+          font-weight: 700;
+        }
+
+        .ed-review {
+          color: #5b3b9b !important;
+          font-weight: 700;
+        }
+
+        .ed-usage-label {
+          display: block;
+          margin-bottom: 5px;
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+        }
+
+        .ed-usage-bar {
+          display: block;
+          width: 96px;
+          height: 7px;
+          overflow: hidden;
+          border-radius: var(--ed-radius-xl);
+          background: #eef1ef;
+        }
+
+        .ed-usage-bar span {
+          display: block;
+          height: 100%;
+          min-width: 2px;
+          background: var(--ed-color-border-muted);
+        }
+
+        .ed-usage-bar span.is-warning {
+          background: #f59e0b;
+        }
+
+        .ed-usage-bar span.is-danger {
+          background: #ef4444;
+        }
+
+        .ed-usage-bar span.is-unlimited {
+          background: #10b981;
+        }
+
+        .ed-status {
+          display: inline-flex;
+          align-items: center;
+          min-height: 26px;
+          padding: 0 9px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: #f6f8f5;
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .ed-status.ok {
+          border-color: #d9e9cd;
+          background: #f2f8ee;
+          color: #10b981;
+        }
+
+        .ed-status.waiting,
+        .ed-status.pending {
+          border-color: #f4d49f;
+          background: #fff8e8;
+          color: #f59e0b;
+        }
+
+        .ed-status.overcharged,
+        .ed-status.free_exceeded {
+          border-color: #efc8c8;
+          background: #fff2f2;
+          color: #ef4444;
+        }
+
+        .ed-status.charge_review {
+          border-color: #ddd4ef;
+          background: #f8f5ff;
+          color: #5b3b9b;
+        }
+
+        .ed-billing-empty {
+          padding: 60px 20px;
+          color: var(--ed-color-text-tertiary);
+          text-align: center;
+        }
+
+        @media (max-width: 1180px) {
+          .ed-billing-cards {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .ed-billing-toolbar {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .ed-billing-search {
+            grid-column: 1 / -1;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ed-period-label,
+          .ed-billing-count {
+            width: 100%;
+            text-align: left;
+          }
+
+          .ed-billing-cards,
+          .ed-billing-toolbar {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-billing-stat {
+            padding: 14px;
+          }
+
+          .ed-billing-select,
+          .ed-billing-clear {
+            width: 100%;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

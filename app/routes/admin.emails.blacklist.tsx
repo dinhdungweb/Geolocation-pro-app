@@ -1,273 +1,502 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, Form, useActionData, useNavigation } from "@remix-run/react";
-import { requireAdminAuth } from "../utils/admin.session.server";
+import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { useMemo, useState } from "react";
+import { CheckCircle, Info, Plus, ShieldAlert, Store, Trash2, XCircle } from "lucide-react";
 import prisma from "../db.server";
-import { 
-    ShieldAlert, 
-    Plus, 
-    Trash2, 
-    Info,
-    CheckCircle,
-    XCircle,
-    Store
-} from "lucide-react";
-import { useState, useMemo } from "react";
+import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
-    
-    // Fetch all blacklisted shops
-    const blacklist = await prisma.emailBlacklist.findMany({
-        orderBy: { createdAt: 'desc' }
-    });
+  await requireAdminAuth(request);
 
-    // Fetch all known shops from Settings to populate the selector
-    // Excluding 'GLOBAL' record
-    const knownShops = await prisma.settings.findMany({
-        where: {
-            NOT: { shop: 'GLOBAL' }
-        },
-        select: { shop: true }
-    });
+  const blacklist = await prisma.emailBlacklist.findMany({
+    orderBy: { createdAt: "desc" },
+  });
 
-    return json({ blacklist, knownShops });
+  const knownShops = await prisma.settings.findMany({
+    where: {
+      NOT: { shop: "GLOBAL" },
+    },
+    select: { shop: true },
+  });
+
+  return json({ blacklist, knownShops });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    await requireAdminAuth(request);
-    const formData = await request.formData();
-    const action = formData.get("_action");
+  await requireAdminAuth(request);
+  const formData = await request.formData();
+  const action = formData.get("_action");
 
-    if (action === "add") {
-        const shop = formData.get("shop") as string;
-        if (!shop) return json({ error: "Shop domain is required" }, { status: 400 });
-        
-        try {
-            await prisma.emailBlacklist.create({
-                data: { shop: shop.trim() }
-            });
-            return json({ success: true, message: "Shop added to blacklist" });
-        } catch (e) {
-            return json({ error: "Shop is already in the blacklist or an error occurred" }, { status: 400 });
-        }
+  if (action === "add") {
+    const shop = formData.get("shop") as string;
+    if (!shop) return json({ error: "Shop domain is required" }, { status: 400 });
+
+    try {
+      await prisma.emailBlacklist.create({
+        data: { shop: shop.trim() },
+      });
+      return json({ success: true, message: "Shop added to blacklist" });
+    } catch {
+      return json({ error: "Shop is already in the blacklist or an error occurred" }, { status: 400 });
     }
+  }
 
-    if (action === "delete") {
-        const id = formData.get("id") as string;
-        await prisma.emailBlacklist.delete({
-            where: { id }
-        });
-        return json({ success: true, message: "Shop removed from blacklist" });
-    }
+  if (action === "delete") {
+    const id = formData.get("id") as string;
+    await prisma.emailBlacklist.delete({
+      where: { id },
+    });
+    return json({ success: true, message: "Shop removed from blacklist" });
+  }
 
-    return json({});
+  return json({});
 };
 
 export default function EmailBlacklist() {
-    const { blacklist, knownShops } = useLoaderData<typeof loader>();
-    const actionData = useActionData<{ success?: boolean; error?: string; message?: string }>();
-    const navigation = useNavigation();
-    const [searchTerm] = useState("");
-    const [selectedShop, setSelectedShop] = useState("");
-    const [manualShop, setManualShop] = useState("");
+  const { blacklist, knownShops } = useLoaderData<typeof loader>();
+  const actionData = useActionData<{ success?: boolean; error?: string; message?: string }>();
+  const navigation = useNavigation();
+  const [searchTerm] = useState("");
+  const [selectedShop, setSelectedShop] = useState("");
+  const [manualShop, setManualShop] = useState("");
 
-    const isSubmitting = navigation.state === "submitting";
+  const isSubmitting = navigation.state === "submitting";
 
-    // Filter known shops that are not already in the blacklist
-    const availableShops = useMemo(() => {
-        const blacklistedDomains = new Set(blacklist.map((b: any) => b.shop));
-        return knownShops
-            .filter((s: any) => !blacklistedDomains.has(s.shop))
-            .filter((s: any) => s.shop.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [knownShops, blacklist, searchTerm]);
+  const availableShops = useMemo(() => {
+    const blacklistedDomains = new Set(blacklist.map((item: any) => item.shop));
+    return knownShops
+      .filter((shop: any) => !blacklistedDomains.has(shop.shop))
+      .filter((shop: any) => shop.shop.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [knownShops, blacklist, searchTerm]);
 
-    return (
-        <div className="blacklist-page">
-            <style>{`
-                .blacklist-page { animation: fadeIn 0.4s ease-out; }
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                
-                .header-section { margin-bottom: 32px; }
-                .header-section h1 { font-size: 28px; font-weight: 800; color: #1e293b; letter-spacing: -0.02em; margin-bottom: 8px; }
-                .header-section p { color: #64748b; font-size: 15px; }
+  return (
+    <section className="ed-blacklist">
+      <section className="ed-blacklist-table">
+        <header className="ed-card-head">
+          <div>
+            <span className="ed-eyebrow">Email controls</span>
+            <h2>Blacklisted stores</h2>
+          </div>
+          <span className="ed-count">{blacklist.length.toLocaleString()} blocked</span>
+        </header>
 
-                .grid-layout { display: grid; grid-template-columns: 1fr 380px; gap: 32px; align-items: start; }
+        {blacklist.length > 0 ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Store domain</th>
+                <th>Added date</th>
+                <th aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {blacklist.map((item: any) => (
+                <tr key={item.id}>
+                  <td>
+                    <span className="ed-shop-cell">
+                      <span className="ed-shop-icon">
+                        <Store size={14} />
+                      </span>
+                      {item.shop}
+                    </span>
+                  </td>
+                  <td>
+                    {new Date(item.createdAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td>
+                    <Form method="post">
+                      <input type="hidden" name="id" value={item.id} />
+                      <input type="hidden" name="_action" value="delete" />
+                      <button className="ed-delete-button" type="submit" aria-label={`Remove ${item.shop}`}>
+                        <Trash2 size={17} />
+                      </button>
+                    </Form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="ed-empty-state">
+            <ShieldAlert size={28} />
+            <h3>No shops blacklisted</h3>
+            <p>All eligible shops can receive automated emails.</p>
+          </div>
+        )}
+      </section>
 
-                .card-v3 { background: white; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; }
-                .card-header { padding: 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; }
-                .card-header h3 { font-size: 18px; font-weight: 700; color: #1e293b; }
-                
-                .blacklist-table { width: 100%; border-collapse: collapse; }
-                .blacklist-table th { text-align: left; padding: 16px 24px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-                .blacklist-table td { padding: 16px 24px; border-top: 1px solid #f1f5f9; font-size: 14px; color: #334155; }
-                .blacklist-table tr:hover td { background: #fcfdfe; }
+      <aside className="ed-blacklist-form">
+        <header className="ed-card-head">
+          <div>
+            <span className="ed-eyebrow">Exception</span>
+            <h2>Add store</h2>
+          </div>
+        </header>
 
-                .shop-badge { display: flex; align-items: center; gap: 10px; font-weight: 600; color: #1e293b; }
-                .shop-icon { padding: 6px; background: #eff6ff; color: #3b82f6; border-radius: 8px; }
-
-                .btn-delete { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 8px; border-radius: 8px; transition: all 0.2s; }
-                .btn-delete:hover { background: #fef2f2; color: #ef4444; }
-
-                .form-section { padding: 24px; }
-                .instruction-box { background: #fffbeb; border: 1px solid #fef3c7; padding: 16px; border-radius: 12px; margin-bottom: 24px; display: flex; gap: 12px; }
-                .instruction-box p { font-size: 13px; color: #92400e; line-height: 1.5; }
-
-                .input-group { margin-bottom: 20px; }
-                .input-group label { display: block; font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; }
-                
-                .select-premium { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-family: inherit; font-size: 14px; background: #f8fafc; transition: all 0.2s; }
-                .select-premium:focus { border-color: #6366f1; background: white; outline: none; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
-
-                .input-premium { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-family: inherit; font-size: 14px; background: #f8fafc; transition: all 0.2s; }
-                .input-premium:focus { border-color: #6366f1; background: white; outline: none; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
-
-                .divider { text-align: center; margin: 24px 0; position: relative; }
-                .divider::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e2e8f0; z-index: 1; }
-                .divider span { position: relative; z-index: 2; background: white; padding: 0 12px; color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; }
-
-                .btn-add { width: 100%; background: #1e293b; color: white; border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
-                .btn-add:hover { background: #0f172a; transform: translateY(-1px); }
-                .btn-add:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-
-                @media (max-width: 1100px) {
-                    .grid-layout { grid-template-columns: 1fr; }
-                    .form-section-sticky { position: static !important; }
-                }
-
-                .empty-state { padding: 60px 40px; text-align: center; color: #94a3b8; }
-                .empty-icon { margin: 0 auto 16px; width: 64px; height: 64px; background: #f8fafc; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #cbd5e1; }
-            `}</style>
-            
-
-            <div className="grid-layout">
-                {/* Left: Blacklist Table */}
-                <div className="card-v3">
-                    <div className="card-header">
-                        <ShieldAlert className="shop-icon" style={{ background: '#fef2f2', color: '#ef4444' }} />
-                        <h3>Blacklisted Stores</h3>
-                    </div>
-                    
-                    {blacklist.length > 0 ? (
-                        <table className="blacklist-table">
-                            <thead>
-                                <tr>
-                                    <th>Store Domain</th>
-                                    <th>Added Date</th>
-                                    <th style={{ width: '50px' }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {blacklist.map((item: any) => (
-                                    <tr key={item.id}>
-                                        <td>
-                                            <div className="shop-badge">
-                                                <div className="shop-icon"><Store size={14} /></div>
-                                                {item.shop}
-                                            </div>
-                                        </td>
-                                        <td style={{ color: '#64748b' }}>
-                                            {new Date(item.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                        </td>
-                                        <td>
-                                            <Form method="post">
-                                                <input type="hidden" name="id" value={item.id} />
-                                                <input type="hidden" name="_action" value="delete" />
-                                                <button type="submit" className="btn-delete" title="Remove from blacklist">
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </Form>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : (
-                        <div className="empty-state">
-                            <div className="empty-icon"><ShieldAlert size={32} /></div>
-                            <p style={{ fontWeight: 600, fontSize: '16px', color: '#64748b' }}>No shops blacklisted</p>
-                            <p style={{ fontSize: '13px', marginTop: '4px' }}>All shops will receive automated emails.</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Right: Add Form */}
-                <div className="form-section-sticky" style={{ position: 'sticky', top: '100px' }}>
-                    <div className="card-v3">
-                        <div className="card-header">
-                            <Plus size={20} color="#6366f1" />
-                            <h3>Add to Blacklist</h3>
-                        </div>
-                        
-                        <div className="form-section">
-                            <div className="instruction-box">
-                                <Info size={20} style={{ flexShrink: 0 }} />
-                                <p>Blacklisted shops will not receive Welcome, 80%, or 100% usage emails.</p>
-                            </div>
-
-                            <Form method="post">
-                                <input type="hidden" name="_action" value="add" />
-                                
-                                <div className="input-group">
-                                    <label>Select from known shops</label>
-                                    <select 
-                                        name="shop" 
-                                        className="select-premium"
-                                        value={selectedShop}
-                                        onChange={(e) => {
-                                            setSelectedShop(e.target.value);
-                                            if (e.target.value) setManualShop("");
-                                        }}
-                                    >
-                                        <option value="">-- Choose a store --</option>
-                                        {availableShops.map((s: any) => (
-                                            <option key={s.shop} value={s.shop}>{s.shop}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="divider">
-                                    <span>OR</span>
-                                </div>
-
-                                <div className="input-group">
-                                    <label>Enter domain manually</label>
-                                    <input 
-                                        type="text" 
-                                        name="shop" 
-                                        className="input-premium" 
-                                        placeholder="e.g. store.myshopify.com"
-                                        value={manualShop}
-                                        onChange={(e) => {
-                                            setManualShop(e.target.value);
-                                            if (e.target.value) setSelectedShop("");
-                                        }}
-                                    />
-                                </div>
-
-                                <button 
-                                    type="submit" 
-                                    className="btn-add" 
-                                    disabled={isSubmitting || (!selectedShop && !manualShop)}
-                                >
-                                    {isSubmitting ? "Adding..." : <><Plus size={18} /> Add to Blacklist</>}
-                                </button>
-
-                                {actionData?.error && (
-                                    <div style={{ marginTop: '16px', padding: '12px', background: '#fef2f2', color: '#b91c1c', borderRadius: '8px', fontSize: '13px', display: 'flex', gap: '8px' }}>
-                                        <XCircle size={16} /> {actionData.error}
-                                    </div>
-                                )}
-                                {actionData?.success && (
-                                    <div style={{ marginTop: '16px', padding: '12px', background: '#f0fdf4', color: '#15803d', borderRadius: '8px', fontSize: '13px', display: 'flex', gap: '8px' }}>
-                                        <CheckCircle size={16} /> {actionData.message}
-                                    </div>
-                                )}
-                            </Form>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div className="ed-note">
+          <Info size={18} />
+          <p>Blacklisted shops will not receive Welcome, 80%, or 100% usage emails.</p>
         </div>
-    );
+
+        <Form method="post" className="ed-form">
+          <input type="hidden" name="_action" value="add" />
+
+          <label className="ed-field">
+            <span>Select from known shops</span>
+            <select
+              name="shop"
+              value={selectedShop}
+              onChange={(event) => {
+                setSelectedShop(event.target.value);
+                if (event.target.value) setManualShop("");
+              }}
+            >
+              <option value="">Choose a store</option>
+              {availableShops.map((shop: any) => (
+                <option key={shop.shop} value={shop.shop}>
+                  {shop.shop}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="ed-divider">
+            <span>or</span>
+          </div>
+
+          <label className="ed-field">
+            <span>Enter domain manually</span>
+            <input
+              type="text"
+              name="shop"
+              placeholder="store.myshopify.com"
+              value={manualShop}
+              onChange={(event) => {
+                setManualShop(event.target.value);
+                if (event.target.value) setSelectedShop("");
+              }}
+            />
+          </label>
+
+          <button
+            className="ed-button-primary"
+            type="submit"
+            disabled={isSubmitting || (!selectedShop && !manualShop)}
+            aria-busy={isSubmitting}
+          >
+            {isSubmitting ? "Adding..." : <><Plus size={18} /> Add to blacklist</>}
+          </button>
+
+          {actionData?.error && (
+            <div className="ed-alert danger" role="alert">
+              <XCircle size={16} /> {actionData.error}
+            </div>
+          )}
+          {actionData?.success && (
+            <div className="ed-alert success" role="status">
+              <CheckCircle size={16} /> {actionData.message}
+            </div>
+          )}
+        </Form>
+      </aside>
+
+      <style>{`
+        .ed-blacklist {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 360px;
+          gap: var(--ed-space-2);
+          align-items: start;
+        }
+
+        .ed-blacklist-table,
+        .ed-blacklist-form {
+          overflow: hidden;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-blacklist-form {
+          position: sticky;
+          top: 96px;
+          display: grid;
+          gap: 16px;
+          padding: var(--ed-space-2);
+        }
+
+        .ed-card-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+        }
+
+        .ed-blacklist-form .ed-card-head {
+          padding: 0 0 14px;
+        }
+
+        .ed-eyebrow {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--ed-color-border-muted);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          line-height: 1.1;
+          text-transform: uppercase;
+        }
+
+        .ed-card-head h2 {
+          margin: 0;
+          color: var(--ed-color-text-primary);
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 26px;
+        }
+
+        .ed-count {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .ed-blacklist-table table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .ed-blacklist-table th,
+        .ed-blacklist-table td {
+          padding: 14px var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+          text-align: left;
+        }
+
+        .ed-blacklist-table th {
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-text-tertiary);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .ed-blacklist-table td {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-shop-cell {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+          font-weight: 700;
+        }
+
+        .ed-shop-icon {
+          width: 30px;
+          height: 30px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-delete-button {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-tertiary);
+          cursor: pointer;
+        }
+
+        .ed-delete-button:hover {
+          border-color: #ffccc7;
+          background: #fff1f0;
+          color: #b42318;
+        }
+
+        .ed-note {
+          display: flex;
+          gap: 10px;
+          padding: 12px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-text-tertiary);
+        }
+
+        .ed-note p {
+          margin: 0;
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-form,
+        .ed-field {
+          display: grid;
+          gap: 10px;
+        }
+
+        .ed-field span {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 20px;
+        }
+
+        .ed-field input,
+        .ed-field select {
+          min-height: 40px;
+          padding: 8px 10px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-divider {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: var(--ed-color-text-tertiary);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .ed-divider::before,
+        .ed-divider::after {
+          content: "";
+          height: 1px;
+          flex: 1;
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-button-primary {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 0 14px;
+          border: 1px solid var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-border-muted);
+          color: var(--ed-text-inverse);
+          box-shadow: var(--ed-shadow-2);
+          cursor: pointer;
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 1;
+        }
+
+        .ed-button-primary:hover {
+          background: #6f9a37;
+          border-color: #6f9a37;
+        }
+
+        .ed-button-primary:disabled {
+          cursor: not-allowed;
+          opacity: 0.62;
+          box-shadow: none;
+        }
+
+        .ed-field input:focus-visible,
+        .ed-field select:focus-visible,
+        .ed-delete-button:focus-visible,
+        .ed-button-primary:focus-visible {
+          outline: 3px solid var(--ed-color-border-muted);
+          outline-offset: 2px;
+        }
+
+        .ed-alert {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px;
+          border-radius: var(--ed-radius-xl);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 20px;
+        }
+
+        .ed-alert.success {
+          border: 1px solid #b7df9e;
+          background: #eef7e9;
+          color: #37630f;
+        }
+
+        .ed-alert.danger {
+          border: 1px solid #ffccc7;
+          background: #fff1f0;
+          color: #b42318;
+        }
+
+        .ed-empty-state {
+          display: grid;
+          justify-items: center;
+          gap: 8px;
+          padding: 54px 16px;
+          color: var(--ed-color-text-tertiary);
+          text-align: center;
+        }
+
+        .ed-empty-state h3,
+        .ed-empty-state p {
+          margin: 0;
+        }
+
+        @media (max-width: 980px) {
+          .ed-blacklist {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-blacklist-form {
+            position: static;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ed-card-head,
+          .ed-blacklist-form {
+            padding: 14px;
+          }
+
+          .ed-blacklist-table {
+            overflow-x: auto;
+          }
+
+          .ed-blacklist-table table {
+            min-width: 620px;
+          }
+
+          .ed-button-primary {
+            width: 100%;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

@@ -1,260 +1,431 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, Form, useActionData } from "@remix-run/react";
-import { requireAdminAuth } from "../utils/admin.session.server";
+import { Form, useActionData, useLoaderData } from "@remix-run/react";
+import { Bell, CheckCircle, Mail, Shield } from "lucide-react";
 import prisma from "../db.server";
+import { requireAdminAuth } from "../utils/admin.session.server";
 import { encryptSecret } from "../utils/secret-crypto.server";
-import { 
-    Mail,
-    Shield,
-    Bell,
-    CheckCircle
-} from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    await requireAdminAuth(request);
-    let settings = null;
-    try {
-        const dbSettings = await prisma.settings.findUnique({
-            where: { shop: 'GLOBAL' }
-        });
-        settings = dbSettings
-            ? { ...dbSettings, smtpPass: undefined, hasSmtpPass: Boolean(dbSettings.smtpPass) }
-            : null;
-    } catch (e) {
-        console.error("Prisma error in Settings loader:", e);
-    }
-    return json({ settings });
+  await requireAdminAuth(request);
+
+  let settings = null;
+  try {
+    const dbSettings = await prisma.settings.findUnique({
+      where: { shop: "GLOBAL" },
+    });
+    settings = dbSettings
+      ? { ...dbSettings, smtpPass: undefined, hasSmtpPass: Boolean(dbSettings.smtpPass) }
+      : null;
+  } catch (error) {
+    console.error("Prisma error in Settings loader:", error);
+  }
+
+  return json({ settings });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    await requireAdminAuth(request);
-    const formData = await request.formData();
-    const name = formData.get("senderName") as string;
-    const email = formData.get("senderEmail") as string;
-    const smtpHost = formData.get("smtpHost") as string;
-    const smtpPort = parseInt(formData.get("smtpPort") as string) || 587;
-    const smtpUser = formData.get("smtpUser") as string;
-    const smtpPass = ((formData.get("smtpPass") as string) || "").trim();
-    const smtpSecure = formData.get("smtpSecure") === "true";
+  await requireAdminAuth(request);
+  const formData = await request.formData();
+  const name = formData.get("senderName") as string;
+  const email = formData.get("senderEmail") as string;
+  const smtpHost = formData.get("smtpHost") as string;
+  const smtpPort = parseInt(formData.get("smtpPort") as string) || 587;
+  const smtpUser = formData.get("smtpUser") as string;
+  const smtpPass = ((formData.get("smtpPass") as string) || "").trim();
+  const smtpSecure = formData.get("smtpSecure") === "true";
 
-    try {
-        const existing = await prisma.settings.findUnique({
-            where: { shop: 'GLOBAL' },
-            select: { smtpPass: true },
-        });
-        const encryptedSmtpPass = smtpPass ? encryptSecret(smtpPass) : existing?.smtpPass ?? null;
+  try {
+    const existing = await prisma.settings.findUnique({
+      where: { shop: "GLOBAL" },
+      select: { smtpPass: true },
+    });
+    const encryptedSmtpPass = smtpPass ? encryptSecret(smtpPass) : existing?.smtpPass ?? null;
 
-        await prisma.settings.upsert({
-            where: { shop: 'GLOBAL' },
-            update: {
-                emailSenderName: name,
-                emailSenderEmail: email,
-                smtpHost,
-                smtpPort,
-                smtpUser,
-                smtpPass: encryptedSmtpPass,
-                smtpSecure
-            },
-            create: {
-                shop: 'GLOBAL',
-                emailSenderName: name,
-                emailSenderEmail: email,
-                smtpHost,
-                smtpPort,
-                smtpUser,
-                smtpPass: encryptedSmtpPass,
-                smtpSecure
-            }
-        });
+    await prisma.settings.upsert({
+      where: { shop: "GLOBAL" },
+      update: {
+        emailSenderName: name,
+        emailSenderEmail: email,
+        smtpHost,
+        smtpPort,
+        smtpUser,
+        smtpPass: encryptedSmtpPass,
+        smtpSecure,
+      },
+      create: {
+        shop: "GLOBAL",
+        emailSenderName: name,
+        emailSenderEmail: email,
+        smtpHost,
+        smtpPort,
+        smtpUser,
+        smtpPass: encryptedSmtpPass,
+        smtpSecure,
+      },
+    });
 
-        return json({ success: true });
-    } catch (error: any) {
-        console.error("Failed to save email settings:", error);
-        return json({ success: false, error: error.message || "Failed to save settings" }, { status: 500 });
-    }
+    return json({ success: true });
+  } catch (error: any) {
+    console.error("Failed to save email settings:", error);
+    return json(
+      { success: false, error: error.message || "Failed to save settings" },
+      { status: 500 },
+    );
+  }
 };
 
 export default function EmailSettings() {
-    const { settings } = useLoaderData<typeof loader>();
-    const actionData = useActionData<typeof action>();
-    const actionError = actionData && "error" in actionData ? String(actionData.error ?? "") : "";
+  const { settings } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const actionError = actionData && "error" in actionData ? String(actionData.error ?? "") : "";
 
-    return (
-        <div className="settings-dashboard-v2">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-                
-                .settings-dashboard-v2 { 
-                    padding: 0; 
-                    font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
-                    color: #0f172a;
-                    animation: fadeIn 0.5s ease-out;
-                }
-                
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-                
-                .glass-header {
-                    margin-bottom: 40px;
-                    padding: 20px 0;
-                }
-                .title-group h1 { 
-                    font-size: 32px; 
-                    font-weight: 800; 
-                    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    letter-spacing: -0.03em;
-                }
-                .title-group p { color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px; }
-                
-                .settings-layout-premium { display: grid; grid-template-columns: 280px 1fr; gap: 48px; }
-                
-                .premium-nav { display: flex; flex-direction: column; gap: 12px; }
-                .nav-link-v2 { 
-                    padding: 14px 20px; 
-                    border-radius: 16px; 
-                    font-size: 15px; 
-                    font-weight: 600; 
-                    color: #64748b; 
-                    cursor: pointer; 
-                    display: flex; 
-                    align-items: center; 
-                    gap: 14px; 
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    border: 1px solid transparent;
-                }
-                .nav-link-v2:hover { background: white; color: #1e293b; border-color: rgba(0,0,0,0.04); }
-                .nav-link-v2.active { 
-                    background: white; 
-                    color: #6366f1; 
-                    border-color: rgba(99, 102, 241, 0.2); 
-                    box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.05);
-                }
-                
-                .card-premium-v2 { 
-                    background: white; 
-                    border-radius: 24px; 
-                    border: 1px solid rgba(0,0,0,0.04); 
-                    padding: 40px; 
-                    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.04); 
-                }
-                .card-premium-v2 .title { font-size: 20px; font-weight: 800; color: #1e293b; margin-bottom: 32px; letter-spacing: -0.02em; }
-                
-                .form-group-v2 { margin-bottom: 28px; }
-                .form-group-v2 label { display: block; font-size: 13px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
-                .input-premium { 
-                    width: 100%; 
-                    padding: 14px 18px; 
-                    border: 1.5px solid #f1f5f9; 
-                    border-radius: 14px; 
-                    font-size: 15px; 
-                    font-weight: 500;
-                    font-family: inherit; 
-                    transition: all 0.2s; 
-                    color: #1e293b;
-                    background: #f8fafc;
-                }
-                .input-premium:focus { 
-                    background: white;
-                    border-color: #6366f1; 
-                    outline: none; 
-                    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); 
-                }
-                .input-premium[readonly] { color: #64748b; cursor: not-allowed; }
+  return (
+    <section className="ed-settings">
+      <aside className="ed-settings-nav" aria-label="Email settings sections">
+        <button className="is-active" type="button">
+          <Mail size={18} />
+          General
+        </button>
+        <button type="button">
+          <Shield size={18} />
+          Domain verification
+        </button>
+        <button type="button">
+          <Bell size={18} />
+          Notifications
+        </button>
+      </aside>
 
-                .btn-premium-solid {
-                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                    color: white;
-                    border: none;
-                    padding: 12px 32px;
-                    border-radius: 16px;
-                    font-size: 15px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s;
-                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-                }
-                .btn-premium-solid:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3); }
-
-                .success-banner {
-                    background: #ecfdf5;
-                    border: 1px solid #10b981;
-                    padding: 16px;
-                    border-radius: 16px;
-                    color: #059669;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    margin-bottom: 24px;
-                }
-            `}</style>
-
-
-            <div className="settings-layout-premium">
-                <div className="premium-nav">
-                    <div className="nav-link-v2 active"><Mail size={18} /> General</div>
-                    <div className="nav-link-v2"><Shield size={18} /> Domain verification</div>
-                    <div className="nav-link-v2"><Bell size={18} /> Notifications</div>
-                </div>
-                
-                <Form method="post" className="card-premium-v2">
-                    {actionData?.success && (
-                        <div className="success-banner">
-                            <CheckCircle size={20} /> Settings saved successfully!
-                        </div>
-                    )}
-                    {actionError && (
-                        <div className="success-banner" style={{ background: '#fef2f2', borderColor: '#ef4444', color: '#dc2626' }}>
-                            {actionError}
-                        </div>
-                    )}
-                    <div className="title">Sender profile</div>
-                    <div className="form-group-v2">
-                        <label>Display name</label>
-                        <input name="senderName" className="input-premium" defaultValue={(settings as any)?.emailSenderName || "Geo Admin"} placeholder="Enter sender name" />
-                    </div>
-                    <div className="form-group-v2">
-                        <label>Sender email</label>
-                        <input name="senderEmail" className="input-premium" defaultValue={(settings as any)?.emailSenderEmail || "noreply@geopro.bluepeaks.top"} placeholder="Enter sender email" />
-                    </div>
-
-                    <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #f1f5f9' }}>
-                        <div className="title" style={{ marginBottom: '16px' }}>SMTP Credentials</div>
-                        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>Configure your own email server for better deliverability and custom domain support.</p>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '20px' }}>
-                            <div className="form-group-v2">
-                                <label>SMTP Host</label>
-                                <input type="text" name="smtpHost" className="input-premium" defaultValue={(settings as any)?.smtpHost || ""} placeholder="e.g. smtp.gmail.com" />
-                            </div>
-                            <div className="form-group-v2">
-                                <label>Port</label>
-                                <input type="number" name="smtpPort" className="input-premium" defaultValue={(settings as any)?.smtpPort || 587} />
-                            </div>
-                        </div>
-                        
-                        <div className="form-group-v2">
-                            <label>SMTP Username</label>
-                            <input type="text" name="smtpUser" className="input-premium" defaultValue={(settings as any)?.smtpUser || ""} />
-                        </div>
-                        <div className="form-group-v2">
-                            <label>SMTP Password</label>
-                            <input type="password" name="smtpPass" className="input-premium" defaultValue="" placeholder={(settings as any)?.hasSmtpPass ? "Leave blank to keep current password" : ""} />
-                        </div>
-                        
-                        <div className="form-group-v2" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
-                            <input type="checkbox" name="smtpSecure" value="true" defaultChecked={(settings as any)?.smtpSecure} style={{ width: '20px', height: '20px' }} />
-                            <label style={{ marginBottom: 0 }}>Use Secure Connection (SSL/TLS)</label>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-                        <button type="submit" className="btn-premium-solid">Save Changes</button>
-                    </div>
-                </Form>
-            </div>
+      <Form method="post" className="ed-settings-card">
+        <div className="ed-settings-head">
+          <span className="ed-eyebrow">Messaging settings</span>
+          <h2>Sender profile</h2>
+          <p>Configure the global sender identity and SMTP transport used by admin emails.</p>
         </div>
-    );
+
+        {actionData?.success && (
+          <div className="ed-alert success" role="status">
+            <CheckCircle size={18} /> Settings saved successfully.
+          </div>
+        )}
+        {actionError && (
+          <div className="ed-alert danger" role="alert">
+            {actionError}
+          </div>
+        )}
+
+        <div className="ed-form-grid">
+          <label className="ed-field">
+            <span>Display name</span>
+            <input
+              name="senderName"
+              defaultValue={(settings as any)?.emailSenderName || "Geo Admin"}
+              placeholder="Enter sender name"
+            />
+          </label>
+          <label className="ed-field">
+            <span>Sender email</span>
+            <input
+              name="senderEmail"
+              defaultValue={(settings as any)?.emailSenderEmail || "noreply@geopro.bluepeaks.top"}
+              placeholder="Enter sender email"
+            />
+          </label>
+        </div>
+
+        <div className="ed-section-divider" />
+
+        <div className="ed-settings-head compact">
+          <h3>SMTP credentials</h3>
+          <p>Use a trusted SMTP server for deliverability and custom-domain sending.</p>
+        </div>
+
+        <div className="ed-form-grid smtp">
+          <label className="ed-field">
+            <span>SMTP host</span>
+            <input
+              type="text"
+              name="smtpHost"
+              defaultValue={(settings as any)?.smtpHost || ""}
+              placeholder="e.g. smtp.gmail.com"
+            />
+          </label>
+          <label className="ed-field">
+            <span>Port</span>
+            <input type="number" name="smtpPort" defaultValue={(settings as any)?.smtpPort || 587} />
+          </label>
+        </div>
+
+        <label className="ed-field">
+          <span>SMTP username</span>
+          <input type="text" name="smtpUser" defaultValue={(settings as any)?.smtpUser || ""} />
+        </label>
+
+        <label className="ed-field">
+          <span>SMTP password</span>
+          <input
+            type="password"
+            name="smtpPass"
+            defaultValue=""
+            placeholder={(settings as any)?.hasSmtpPass ? "Leave blank to keep current password" : ""}
+          />
+        </label>
+
+        <label className="ed-checkbox-row">
+          <input
+            type="checkbox"
+            name="smtpSecure"
+            value="true"
+            defaultChecked={(settings as any)?.smtpSecure}
+          />
+          <span>Use secure connection (SSL/TLS)</span>
+        </label>
+
+        <div className="ed-settings-actions">
+          <button className="ed-button-primary" type="submit">
+            Save changes
+          </button>
+        </div>
+      </Form>
+
+      <style>{`
+        .ed-settings {
+          display: grid;
+          grid-template-columns: 260px minmax(0, 1fr);
+          gap: var(--ed-space-2);
+          align-items: start;
+        }
+
+        .ed-settings-nav,
+        .ed-settings-card {
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+        }
+
+        .ed-settings-nav {
+          display: grid;
+          gap: 6px;
+          padding: 10px;
+          position: sticky;
+          top: 96px;
+        }
+
+        .ed-settings-nav button {
+          min-height: 42px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 12px;
+          border: 1px solid transparent;
+          border-radius: var(--ed-radius-xl);
+          background: transparent;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .ed-settings-nav button:hover,
+        .ed-settings-nav button.is-active {
+          border-color: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-border-muted);
+        }
+
+        .ed-settings-nav button:focus-visible,
+        .ed-button-primary:focus-visible,
+        .ed-field input:focus-visible,
+        .ed-checkbox-row input:focus-visible {
+          outline: 3px solid var(--ed-color-border-muted);
+          outline-offset: 2px;
+        }
+
+        .ed-settings-card {
+          display: grid;
+          gap: 18px;
+          padding: var(--ed-space-2);
+        }
+
+        .ed-eyebrow {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--ed-color-border-muted);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          line-height: 1.1;
+          text-transform: uppercase;
+        }
+
+        .ed-settings-head h2,
+        .ed-settings-head h3 {
+          margin: 0;
+          color: var(--ed-color-text-primary);
+          font-weight: 700;
+          letter-spacing: 0;
+        }
+
+        .ed-settings-head h2 {
+          font-size: 22px;
+          line-height: 28px;
+        }
+
+        .ed-settings-head h3 {
+          font-size: 18px;
+          line-height: 24px;
+        }
+
+        .ed-settings-head p {
+          max-width: 680px;
+          margin: 7px 0 0;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 1.5;
+        }
+
+        .ed-settings-head.compact {
+          margin-top: 2px;
+        }
+
+        .ed-alert {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          border-radius: var(--ed-radius-xl);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 20px;
+        }
+
+        .ed-alert.success {
+          border: 1px solid #b7df9e;
+          background: #eef7e9;
+          color: #37630f;
+        }
+
+        .ed-alert.danger {
+          border: 1px solid #ffccc7;
+          background: #fff1f0;
+          color: #b42318;
+        }
+
+        .ed-form-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .ed-form-grid.smtp {
+          grid-template-columns: minmax(0, 1fr) 120px;
+        }
+
+        .ed-field {
+          display: grid;
+          gap: 7px;
+        }
+
+        .ed-field span,
+        .ed-checkbox-row span {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 20px;
+        }
+
+        .ed-field input {
+          width: 100%;
+          min-height: 42px;
+          padding: 9px 11px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-md);
+          line-height: var(--ed-line-height-base);
+        }
+
+        .ed-field input:focus-visible {
+          border-color: var(--ed-color-border-muted);
+        }
+
+        .ed-section-divider {
+          height: 1px;
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-checkbox-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-checkbox-row input {
+          width: 18px;
+          height: 18px;
+          accent-color: var(--ed-color-border-muted);
+        }
+
+        .ed-settings-actions {
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .ed-button-primary {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 16px;
+          border: 1px solid var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-border-muted);
+          color: var(--ed-text-inverse);
+          box-shadow: var(--ed-shadow-2);
+          cursor: pointer;
+          font-size: var(--ed-font-size-sm);
+          font-weight: 700;
+          line-height: 1;
+        }
+
+        .ed-button-primary:hover {
+          background: #6f9a37;
+          border-color: #6f9a37;
+        }
+
+        @media (max-width: 900px) {
+          .ed-settings {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-settings-nav {
+            position: static;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ed-settings-card {
+            padding: 14px;
+          }
+
+          .ed-form-grid,
+          .ed-form-grid.smtp {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-settings-actions,
+          .ed-button-primary {
+            width: 100%;
+          }
+        }
+      `}</style>
+    </section>
+  );
 }

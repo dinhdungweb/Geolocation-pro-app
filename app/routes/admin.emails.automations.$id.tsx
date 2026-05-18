@@ -324,7 +324,7 @@ export default function AdminEmailAutomations() {
                         <div className="add-btn-mini" onClick={() => setIsAddingStep(isActiveBranch ? null : { parentId, branch })}><Plus size={14} /></div>
                         
                         {isActiveBranch && (
-                            <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', background: 'white', border: '1px solid #e1e3e5', padding: '12px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', display: 'flex', gap: '12px', zIndex: 100 }}>
+                            <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', background: 'white', border: '1px solid #e1e3e5', padding: '12px', borderRadius: '4px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', display: 'flex', gap: '12px', zIndex: 100 }}>
                                 <div style={{ textAlign: 'center', cursor: 'pointer', width: '50px' }} onClick={() => addNode('action', parentId, branch)}>
                                     <MessageSquare size={20} color="#7e22ce" />
                                     <div style={{ fontSize: '9px', fontWeight: 700 }}>Action</div>
@@ -348,9 +348,7 @@ export default function AdminEmailAutomations() {
     return (
         <div className="flow-builder-v4">
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-                
-                .flow-builder-v4 { position: fixed; inset: 0; background: #f4f6f8; z-index: 9999; display: flex; flex-direction: column; font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1c1d; }
+                .flow-builder-v4 { position: fixed; inset: 0; background: #f4f6f8; z-index: 9999; display: flex; flex-direction: column; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1a1c1d; }
 
                 /* Header */
                 .flow-nav { height: 64px; background: white; border-bottom: 1px solid #e1e3e5; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
@@ -366,7 +364,7 @@ export default function AdminEmailAutomations() {
                 .canvas-area { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 80px 200px; background-image: radial-gradient(#d2d5d8 1px, transparent 1px); background-size: 20px 20px; }
                 .branch-container { display: flex; flex-direction: column; align-items: center; }
                 
-                .node-v3 { width: 300px; background: white; border-radius: 12px; border: 1px solid #e1e3e5; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; overflow: hidden; transition: all 0.2s; position: relative; z-index: 5; }
+                .node-v3 { width: 300px; background: white; border-radius: var(--ed-radius, 4px); border: 1px solid #e1e3e5; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; overflow: hidden; transition: all 0.2s; position: relative; z-index: 5; }
                 .node-v3:hover { transform: translateY(-2px); border-color: #008060; }
                 .node-v3.active { border-color: #008060; box-shadow: 0 0 0 2px rgba(0,128,96,0.2); }
 
@@ -407,14 +405,14 @@ export default function AdminEmailAutomations() {
                 .form-label { font-size: 13px; font-weight: 600; margin-bottom: 8px; display: block; }
                 .form-input { width: 100%; padding: 10px; border: 1px solid #d2d5d8; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
                 
-                .template-preview-card { border: 1px solid #e1e3e5; border-radius: 12px; overflow: hidden; margin-top: 12px; }
+                .template-preview-card { border: 1px solid #e1e3e5; border-radius: var(--ed-radius, 4px); overflow: hidden; margin-top: 12px; }
                 .preview-header { padding: 10px; background: #f6f6f7; border-bottom: 1px solid #e1e3e5; font-size: 11px; font-weight: 800; display: flex; justify-content: space-between; }
                 .preview-body { height: 180px; background: white; overflow: hidden; position: relative; }
                 .preview-body iframe { width: 100%; height: 100%; border: none; transform: scale(0.4); transform-origin: top left; width: 250%; height: 250%; }
 
                 /* Designer Modal */
                 .designer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-                .designer-modal { width: 95vw; height: 90vh; background: #f4f6f8; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+                .designer-modal { width: 95vw; height: 90vh; background: #f4f6f8; border-radius: var(--ed-radius, 4px); overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--ed-shadow-1, rgb(111, 154, 55) 0px 2px 0px 0px); }
                 .designer-main { flex: 1; display: grid; grid-template-columns: 240px 1fr 340px; overflow: hidden; }
                 .canvas-inner { width: 600px; min-height: 800px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin: 40px auto; border-radius: 8px; overflow: hidden; }
                 .designer-block { position: relative; border: 2px solid transparent; cursor: pointer; }
@@ -423,11 +421,11 @@ export default function AdminEmailAutomations() {
                 .block-tools { position: absolute; right: -40px; top: 0; display: flex; flex-direction: column; gap: 4px; }
                 .tool-btn { width: 32px; height: 32px; background: white; border: 1px solid #d2d5d8; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
-                .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+                .status-badge { padding: 4px 10px; border-radius: var(--ed-radius, 4px); font-size: 11px; font-weight: 700; text-transform: uppercase; }
                 .status-active { background: #e6f4ea; color: #008060; }
                 .status-inactive { background: #f1f2f3; color: #6d7175; }
 
-                .logic-card { padding: 12px; border: 1px solid #d2d5d8; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+                .logic-card { padding: 12px; border: 1px solid #d2d5d8; border-radius: var(--ed-radius, 4px); margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
                 .logic-card:hover { border-color: #008060; background: #f6fbf9; }
                 .logic-card.selected { border-color: #008060; background: #f6fbf9; box-shadow: 0 0 0 1px #008060; }
             `}</style>
@@ -597,7 +595,7 @@ export default function AdminEmailAutomations() {
                 <div className="designer-overlay">
                     <style>{`
                         .modal-designer-root { 
-                            width: 100vw; height: 100vh; background: #f1f5f9; display: flex; flex-direction: column; font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
+                            width: 100vw; height: 100vh; background: #f1f5f9; display: flex; flex-direction: column; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
                         }
                         .modal-header {
                             height: 72px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 24px; justify-content: space-between;
@@ -605,16 +603,16 @@ export default function AdminEmailAutomations() {
                         .modal-editor-main { flex: 1; display: grid; grid-template-columns: 280px 1fr 340px; overflow: hidden; }
                         .modal-sidebar-left { background: white; border-right: 1px solid #e2e8f0; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
                         .modal-canvas-area { overflow-y: auto; padding: 40px; display: flex; justify-content: center; background: #f1f5f9; }
-                        .modal-canvas-inner { width: 600px; min-height: 800px; background: white; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }
+                        .modal-canvas-inner { width: 600px; min-height: 800px; background: white; box-shadow: var(--ed-shadow-1, rgb(111, 154, 55) 0px 2px 0px 0px); border-radius: 8px; overflow: hidden; }
                         .modal-sidebar-right { background: white; border-left: 1px solid #e2e8f0; padding: 24px; overflow-y: auto; }
                         
-                        .block-button-v3 { width: 100%; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #475569; }
-                        .block-button-v3:hover { background: #f0f7ff; border-color: #6366f1; color: #6366f1; transform: translateY(-2px); }
+                        .block-button-v3 { width: 100%; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--ed-radius, 4px); display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #475569; }
+                        .block-button-v3:hover { background: #f2f6ee; border-color: #82b440; color: #82b440; transform: translateY(-2px); }
                         .block-button-v3 strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
                         
                         .canvas-block-v3 { position: relative; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
                         .canvas-block-v3:hover { border-color: #e2e8f0; }
-                        .canvas-block-v3.selected { border-color: #6366f1; background: rgba(99, 102, 241, 0.02); }
+                        .canvas-block-v3.selected { border-color: #82b440; background: rgba(130, 180, 64, 0.02); }
                         
                         .modal-block-tools { 
                             position: absolute; 
@@ -627,14 +625,14 @@ export default function AdminEmailAutomations() {
                         }
                         .canvas-block-v3.selected .modal-block-tools { display: flex; }
                         
-                        .btn-save-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 10px 24px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
-                        .btn-save-indigo:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+                        .btn-save-indigo { background: var(--ed-surface-muted, #82b440); color: white; padding: 10px 24px; border-radius: var(--ed-radius, 4px); border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
+                        .btn-save-indigo:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(130, 180, 64, 0.3); }
                     `}</style>
                     <div className="modal-designer-root">
                         <div className="modal-header">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                <div style={{ background: '#f0f7ff', padding: '10px', borderRadius: '12px' }}>
-                                    <Mail size={24} color="#6366f1" />
+                                <div style={{ background: '#f2f6ee', padding: '10px', borderRadius: '4px' }}>
+                                    <Mail size={24} color="#82b440" />
                                 </div>
                                 <div>
                                     <div style={{ fontWeight: 800, fontSize: '18px' }}>Customizing Automation Email</div>
@@ -717,7 +715,7 @@ export default function AdminEmailAutomations() {
                                         if(!block) return null;
                                         return (
                                             <div>
-                                                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', marginBottom: '24px' }}>
+                                                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '4px', marginBottom: '24px' }}>
                                                     <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>OBJECT TYPE</div>
                                                     <div style={{ fontSize: '14px', fontWeight: 800, color: '#1e293b', textTransform: 'capitalize' }}>{block.type} Element</div>
                                                 </div>
@@ -765,7 +763,7 @@ export default function AdminEmailAutomations() {
                                                         <button 
                                                             key={align} 
                                                             className="tool-btn" 
-                                                            style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#6366f1' : '#e2e8f0', background: block.style?.textAlign === align ? '#f0f7ff' : 'white' }}
+                                                            style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#82b440' : '#e2e8f0', background: block.style?.textAlign === align ? '#f2f6ee' : 'white' }}
                                                             onClick={() => updateDesignBlockStyle(block.id, { textAlign: align })}
                                                         >
                                                             {align[0].toUpperCase()}
@@ -791,7 +789,7 @@ export default function AdminEmailAutomations() {
             )}
 
             {(fetcher.data as any)?.success && (
-                <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: '#008060', color: 'white', padding: '12px 24px', borderRadius: '30px', fontWeight: 700, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 20000 }}>
+                <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: '#008060', color: 'white', padding: '12px 24px', borderRadius: '4px', fontWeight: 700, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 20000 }}>
                     <CheckCircle2 size={16} /> Saved!
                 </div>
             )}
@@ -813,7 +811,7 @@ function getDefaultContent(type: EmailBlockType) {
 }
 
 function getDefaultStyle(type: EmailBlockType) {
-    if (type === 'button') return { buttonColor: '#6366f1', textAlign: 'center' };
+    if (type === 'button') return { buttonColor: '#82b440', textAlign: 'center' };
     if (type === 'heading') return { fontSize: '24px', textAlign: 'left', color: '#1e293b' };
     return { textAlign: 'left' };
 }
@@ -823,17 +821,17 @@ function renderBlockPreview(block: EmailBlock): string {
     const style = block.style || {};
     switch(type) {
         case 'header': 
-            return `<div style="padding: 24px; text-align: center; border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 900; font-size: 20px;">${(content as any).logoText || 'LOGO'}</div>`;
+            return `<div style="padding: 24px; text-align: center; border-bottom: 2px solid #82b440; color: #82b440; font-weight: 900; font-size: 20px;">${(content as any).logoText || 'LOGO'}</div>`;
         case 'heading':
             return `<div style="padding: 24px 40px; font-size: 24px; font-weight: 800; text-align: ${style.textAlign || 'left'}; color: #1e293b;">${(content as any).text}</div>`;
         case 'text':
             return `<div style="padding: 10px 40px 24px; font-size: 15px; line-height: 1.6; color: #475569; text-align: ${style.textAlign || 'left'};">${(content as any).text.replace(/\n/g, '<br>')}</div>`;
         case 'button':
-            return `<div style="padding: 24px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#6366f1'}; color: white; padding: 12px 32px; border-radius: 8px; font-weight: 700; display: inline-block;">${(content as any).label}</div></div>`;
+            return `<div style="padding: 24px; text-align: ${style.textAlign || 'center'}"><div style="background: ${style.buttonColor || '#82b440'}; color: white; padding: 12px 32px; border-radius: 8px; font-weight: 700; display: inline-block;">${(content as any).label}</div></div>`;
         case 'divider':
             return `<div style="padding: 20px 40px;"><hr style="border: 0; border-top: 1px solid #f1f5f9;"></div>`;
         case 'coupon':
-            return `<div style="padding: 24px 40px;"><div style="background: #fdfdfd; border: 2px dashed #6366f1; padding: 24px; text-align: center; font-size: 24px; font-weight: 900; color: #6366f1; letter-spacing: 2px;">${(content as any).code}</div></div>`;
+            return `<div style="padding: 24px 40px;"><div style="background: #fdfdfd; border: 2px dashed #82b440; padding: 24px; text-align: center; font-size: 24px; font-weight: 900; color: #82b440; letter-spacing: 2px;">${(content as any).code}</div></div>`;
         case 'hero':
             return `<div style="padding: 0; text-align: center;"><img src="https://via.placeholder.com/600x300?text=Banner+Image" style="width: 100%; max-width: 600px; display: block;" /></div>`;
         case 'footer':

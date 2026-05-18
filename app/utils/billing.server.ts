@@ -152,7 +152,7 @@ export async function chargeOverageUsageRecord({
 
     if (unresolvedAttempts.length > 0) {
         let reconciled = false;
-        for (const attempt of unresolvedAttempts) {
+        for (let attemptIndex = 0; attemptIndex < unresolvedAttempts.length; attemptIndex++) {
             if (await reconcilePendingChargeAttempt(shop, usagePeriod)) {
                 reconciled = true;
             }
