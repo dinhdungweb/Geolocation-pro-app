@@ -6,7 +6,7 @@ import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
 import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
-import { getUsagePeriodForShop } from './billing-period.server';
+import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server';
 
 const USAGE_JOB_LOCK_KEY = 'usage-cron:check-all-shops';
 const USAGE_JOB_LOCK_TTL_MS = 5 * 60 * 60 * 1000;
@@ -51,6 +51,34 @@ async function releaseJobLock(lock: { key: string; owner: string }) {
             lockedUntil: new Date(),
         },
     });
+}
+
+async function hasSentUsageEmail(shop: string, type: 'limit_80' | 'limit_100' | 'limit_unlimited', usagePeriod: UsagePeriod) {
+    const directSent = await hasSentEmail(shop, type, usagePeriod.key);
+    if (directSent) return true;
+
+    const legacyCalendarKey = `calendar:${usagePeriod.yearMonth}`;
+    if (legacyCalendarKey !== usagePeriod.key && await hasSentEmail(shop, type, legacyCalendarKey)) {
+        return true;
+    }
+
+    if (!usagePeriod.billingPeriodStart || !usagePeriod.billingPeriodEnd) {
+        return false;
+    }
+
+    const previousPeriodLog = await prisma.adminEmailLog.findFirst({
+        where: {
+            shop,
+            status: { in: ['sent', 'simulated'] },
+            type: { startsWith: `${type}:` },
+            createdAt: {
+                gte: usagePeriod.billingPeriodStart,
+                lt: usagePeriod.billingPeriodEnd,
+            },
+        },
+    });
+
+    return Boolean(previousPeriodLog);
 }
 
 /**
@@ -142,7 +170,7 @@ export async function checkAllShopsUsage() {
 
             // 0. Check for monthly overage cap (Unlimited Reward)
             if (hasMonthlyReward) {
-                const sentUnlimited = await hasSentEmail(shop, 'limit_unlimited', usagePeriod.key);
+                const sentUnlimited = await hasSentUsageEmail(shop, 'limit_unlimited', usagePeriod);
                 if (!sentUnlimited) {
                     console.log(`[Cron] Sending Unlimited Reward email to ${shop}`);
                     await sendAdminEmail({
@@ -156,7 +184,7 @@ export async function checkAllShopsUsage() {
             }
             // 1. Check for 100% threshold
             else if (usagePercent >= 100) {
-                const sent100 = await hasSentEmail(shop, 'limit_100', usagePeriod.key);
+                const sent100 = await hasSentUsageEmail(shop, 'limit_100', usagePeriod);
                 if (!sent100) {
                     console.log(`[Cron] Sending 100% usage email to ${shop}`);
                     await sendAdminEmail({
@@ -170,7 +198,7 @@ export async function checkAllShopsUsage() {
             }
             // 2. Check for 80% threshold
             else if (usagePercent >= 80) {
-                const sent80 = await hasSentEmail(shop, 'limit_80', usagePeriod.key);
+                const sent80 = await hasSentUsageEmail(shop, 'limit_80', usagePeriod);
                 if (!sent80) {
                     console.log(`[Cron] Sending 80% usage email to ${shop}`);
                     await sendAdminEmail({
