@@ -587,13 +587,71 @@ export default function AdminDashboard() {
             gap: var(--ed-space-2);
           }
 
+          .ed-metric-grid,
           .ed-plan-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .ed-panel,
           .ed-metric-card {
-            padding: var(--ed-card-padding-mobile);
+            padding: 12px;
+          }
+
+          .ed-metric-card {
+            gap: 6px;
+          }
+
+          .ed-metric-head {
+            align-items: flex-start;
+            gap: 8px;
+            font-size: var(--ed-font-size-xs);
+            line-height: 16px;
+          }
+
+          .ed-metric-head > span:last-child {
+            white-space: normal;
+          }
+
+          .ed-metric-icon {
+            width: 32px;
+            height: 32px;
+            flex: 0 0 32px;
+            border-radius: var(--ed-radius-lg);
+          }
+
+          .ed-metric-icon svg {
+            width: 16px;
+            height: 16px;
+          }
+
+          .ed-metric-card strong {
+            font-size: 20px;
+            line-height: 24px;
+          }
+
+          .ed-metric-card small {
+            display: -webkit-box;
+            overflow: hidden;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+          }
+
+          .ed-panel-head {
+            margin-bottom: 10px;
+          }
+
+          .ed-plan-grid,
+          .ed-list {
+            gap: 8px;
+          }
+
+          .ed-plan-cell {
+            padding: 10px;
+          }
+
+          .ed-plan-cell strong {
+            font-size: 18px;
+            line-height: 22px;
           }
 
           .ed-trend-chart {
@@ -605,10 +663,6 @@ export default function AdminDashboard() {
         }
 
         @media (max-width: 420px) {
-          .ed-metric-grid {
-            grid-template-columns: 1fr;
-          }
-
           .ed-list-row {
             grid-template-columns: 1fr auto;
           }
@@ -617,6 +671,13 @@ export default function AdminDashboard() {
             grid-column: 1 / -1;
             min-width: 0;
             order: 3;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .ed-metric-grid,
+          .ed-plan-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
