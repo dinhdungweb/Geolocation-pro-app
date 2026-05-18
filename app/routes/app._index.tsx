@@ -69,6 +69,19 @@ function formatPlanLabel(planName: string) {
   return planName.charAt(0).toUpperCase() + planName.slice(1);
 }
 
+function formatUsagePeriodEnd(value: string | null) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
@@ -142,6 +155,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const isUnlimitedUsage =
     hasUnlimitedUsage(currentPlan, settings) ||
     hasMonthlyUnlimitedReward(currentPlan, chargedVisitors);
+  const usagePeriodEnd = usagePeriod.billingPeriodEnd?.toISOString() || null;
 
   // Keep proxy limit checks up to date without delaying the dashboard response.
   prisma.settings.upsert({
@@ -203,6 +217,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     planLimit,
     isUnlimitedUsage,
     currentUsage,
+    usagePeriod: {
+      source: usagePeriod.source,
+      billingPeriodEnd: usagePeriodEnd,
+    },
     stats: {
       totalRules: rulesCount,
       activeRules: activeRulesCount,
@@ -220,17 +238,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 export default function Index() {
-  const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
+  const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
   const { smUp } = useBreakpoints();
 
   // Calculate usage percentage
   const isUnlimitedPlan = isUnlimitedUsage;
   const usagePercent = isUnlimitedPlan ? 100 : Math.min(100, Math.round((currentUsage / planLimit) * 100));
   const isNearLimit = !isUnlimitedPlan && usagePercent >= 80;
-  const isOverLimit = !isUnlimitedPlan && currentUsage > planLimit;
+  const isAtLimit = !isUnlimitedPlan && currentUsage >= planLimit;
   const upgradeTarget = STANDARD_PLAN_UPGRADES[currentPlan];
   const canRequestCustomPlan = currentPlan !== FREE_PLAN && currentPlan !== CUSTOM_PLAN && !isUnlimitedPlan;
   const currentPlanLabel = formatPlanLabel(planDisplayName || currentPlan);
+  const billingPeriodEndLabel = formatUsagePeriodEnd(usagePeriod.billingPeriodEnd);
+  const usageHeading =
+    usagePeriod.source === "shopify" || usagePeriod.source === "cached"
+      ? "Billing Period Usage"
+      : "Monthly Usage";
+  const usageScopeText = billingPeriodEndLabel
+    ? `Current Shopify billing period, resets on ${billingPeriodEndLabel}.`
+    : usagePeriod.source === "unresolved"
+      ? "Current billing period usage. Shopify billing dates will sync when available."
+      : "Current calendar month usage.";
   const usageBannerAction = upgradeTarget
     ? { content: upgradeTarget.actionContent, url: "/app/pricing" }
     : canRequestCustomPlan
@@ -239,17 +267,17 @@ export default function Index() {
   const usageBannerSecondaryAction = upgradeTarget && canRequestCustomPlan
     ? CUSTOM_PLAN_REQUEST_ACTION
     : undefined;
-  const overLimitMessage = upgradeTarget && canRequestCustomPlan
-    ? `You have exceeded your ${currentPlanLabel} plan limit. Upgrade to ${upgradeTarget.label} for more visitors, or request a custom plan for heavier traffic.`
+  const limitReachedMessage = upgradeTarget && canRequestCustomPlan
+    ? `You have reached your ${currentPlanLabel} plan limit. Upgrade to ${upgradeTarget.label} for more visitors, or request a custom plan for heavier traffic.`
     : upgradeTarget
-      ? `You have exceeded your ${currentPlanLabel} plan limit. Upgrade to ${upgradeTarget.label} for a higher monthly visitor limit.`
+      ? `You have reached your ${currentPlanLabel} plan limit. Upgrade to ${upgradeTarget.label} for a higher visitor limit.`
       : canRequestCustomPlan
-        ? `You have exceeded your ${currentPlanLabel} plan limit. Request a custom plan for higher monthly traffic.`
-        : `You have exceeded your ${currentPlanLabel} plan limit. Review available plans to manage overage charges.`;
+        ? `You have reached your ${currentPlanLabel} plan limit. Request a custom plan for higher traffic.`
+        : `You have reached your ${currentPlanLabel} plan limit. Review available plans to manage overage charges.`;
   const nearLimitMessage = upgradeTarget && canRequestCustomPlan
     ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Upgrade to ${upgradeTarget.label}, or request a custom plan for heavier traffic.`
     : upgradeTarget
-      ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Upgrade to ${upgradeTarget.label} for more monthly visitors.`
+      ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Upgrade to ${upgradeTarget.label} for more visitors.`
       : canRequestCustomPlan
         ? `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Request a custom plan for higher monthly traffic.`
         : `You're approaching your ${currentPlanLabel} plan limit (${usagePercent}% used). Review available plans before overage applies.`;
@@ -362,10 +390,10 @@ export default function Index() {
           <InlineStack align="space-between" blockAlign="center" gap="400">
             <BlockStack gap="100">
               <Text as="h2" variant="headingMd">
-                Visitors: {stats.totalRedirected} redirected, {stats.totalBlocked} blocked
+                Last 30 days: {stats.totalRedirected} redirected, {stats.totalBlocked} blocked
               </Text>
               <Text as="p" tone="subdued">
-                In the last 30 days: <strong>{stats.totalRedirected}</strong> visitors redirected, <strong>{stats.totalBlocked}</strong> visitors blocked.
+                Analytics totals are shown for the last 30 days. Billing usage is tracked by the current billing period.
               </Text>
             </BlockStack>
             <Button
@@ -380,32 +408,35 @@ export default function Index() {
         <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between">
-              <Text as="h3" variant="headingSm">Monthly Usage</Text>
-              <Badge tone={isOverLimit ? "critical" : isNearLimit ? "warning" : "success"}>
-                {planDisplayName}
+              <BlockStack gap="100">
+                <Text as="h3" variant="headingSm">{usageHeading}</Text>
+                <Text as="p" variant="bodySm" tone="subdued">{usageScopeText}</Text>
+              </BlockStack>
+              <Badge tone={isAtLimit ? "critical" : isNearLimit ? "warning" : "success"}>
+                {formatPlanLabel(planDisplayName)}
               </Badge>
             </InlineStack>
             <BlockStack gap="200">
               <InlineStack align="space-between">
                 <Text as="p" variant="bodySm">
-                  <strong>{currentUsage.toLocaleString()}</strong> / {isUnlimitedPlan ? "Unlimited" : planLimit.toLocaleString()} visitors (includes redirects, blocks & popups)
+                  <strong>{currentUsage.toLocaleString()}</strong> / {isUnlimitedPlan ? "Unlimited" : planLimit.toLocaleString()} billable visitors (redirects, blocks & popups)
                 </Text>
-                <Text as="p" variant="bodySm" tone={isOverLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
+                <Text as="p" variant="bodySm" tone={isAtLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
                   {isUnlimitedPlan ? "Unlimited" : `${usagePercent}%`}
                 </Text>
               </InlineStack>
               <ProgressBar
                 progress={usagePercent}
-                tone={isOverLimit ? "critical" : undefined}
+                tone={isAtLimit ? "critical" : undefined}
                 size="small"
               />
             </BlockStack>
-            {isOverLimit && (
+            {isAtLimit && (
               <Banner tone="critical" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
-                {overLimitMessage}
+                {limitReachedMessage}
               </Banner>
             )}
-            {isNearLimit && !isOverLimit && (
+            {isNearLimit && !isAtLimit && (
               <Banner tone="warning" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
                 {nearLimitMessage}
               </Banner>
@@ -423,14 +454,14 @@ export default function Index() {
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ padding: '16px' }}>
                   <Text as="h3" variant="headingMd">Traffic Overview</Text>
-                  <Text as="p" tone="subdued">Unique visitors by country in the last 30 days.</Text>
+                  <Text as="p" tone="subdued">Visits and actions by country in the last 30 days.</Text>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                   <table className="traffic-table">
                     <thead>
                       <tr>
                         <th>Country</th>
-                        <th className="text-right">Visitors</th>
+                        <th className="text-right">Visits</th>
                         <th className="text-right">Popup/banners</th>
                         <th className="text-right">Redirected</th>
                         <th className="text-right">Blocked</th>
