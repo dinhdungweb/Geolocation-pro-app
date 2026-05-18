@@ -9,13 +9,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   // Webhook requests can trigger multiple times and may arrive after the session is gone.
   // Always clean by shop so uninstall remains idempotent.
-  await Promise.all([
+  // Use allSettled so a single table-delete failure does not prevent the others.
+  const results = await Promise.allSettled([
     db.session.deleteMany({ where: { shop } }),
     db.settings.deleteMany({ where: { shop } }),
     db.redirectRule.deleteMany({ where: { shop } }),
     db.analyticsCountry.deleteMany({ where: { shop } }),
     db.analyticsRule.deleteMany({ where: { shop } }),
     db.monthlyUsage.deleteMany({ where: { shop } }),
+    db.usageChargeAttempt.deleteMany({ where: { shop } }),
     db.billableUsageEvent.deleteMany({ where: { shop } }),
     db.visitorLog.deleteMany({ where: { shop } }),
     db.adminEmailLog.deleteMany({ where: { shop } }),
@@ -24,6 +26,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     db.campaign.deleteMany({ where: { shop } }),
     db.emailBlacklist.deleteMany({ where: { shop } }),
   ]);
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`[Uninstall] ${failures.length} delete(s) failed for ${shop}:`, failures);
+  }
   console.log(`[Uninstall] Cleaned up all data for ${shop}`);
 
   return new Response();

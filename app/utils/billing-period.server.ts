@@ -8,6 +8,7 @@ export type UsagePeriodSource = "calendar" | "shopify" | "cached" | "unresolved"
 export interface UsagePeriod {
   key: string;
   yearMonth: string;
+  billingPeriodStart: Date | null;
   billingPeriodEnd: Date | null;
   billingSubscriptionId: string | null;
   billingUsageLineItemId: string | null;
@@ -17,6 +18,7 @@ export interface UsagePeriod {
 
 type BillingPeriodSettings = CustomPlanLimitSettings & {
   billingPeriodKey?: string | null;
+  billingPeriodStart?: Date | string | null;
   billingPeriodEnd?: Date | string | null;
   billingSubscriptionId?: string | null;
   billingUsageLineItemId?: string | null;
@@ -30,6 +32,7 @@ export function getCalendarUsagePeriod(date = new Date()): UsagePeriod {
   return {
     key: `calendar:${yearMonth}`,
     yearMonth,
+    billingPeriodStart: new Date(date.getFullYear(), date.getMonth(), 1),
     billingPeriodEnd: null,
     billingSubscriptionId: null,
     billingUsageLineItemId: null,
@@ -43,6 +46,7 @@ function getUnresolvedUsagePeriod(shop: string, currentPlan: string, date = new 
   return {
     key: `unresolved:${shop}:${currentPlan}`,
     yearMonth,
+    billingPeriodStart: null,
     billingPeriodEnd: null,
     billingSubscriptionId: null,
     billingUsageLineItemId: null,
@@ -65,10 +69,12 @@ function yearMonthFromDate(value: Date | string | null | undefined) {
 function cachedUsagePeriod(settings?: BillingPeriodSettings | null): UsagePeriod | null {
   if (!settings?.billingPeriodKey) return null;
 
+  const billingPeriodStart = asDate(settings.billingPeriodStart);
   const billingPeriodEnd = asDate(settings.billingPeriodEnd);
   return {
     key: settings.billingPeriodKey,
     yearMonth: yearMonthFromDate(billingPeriodEnd),
+    billingPeriodStart,
     billingPeriodEnd,
     billingSubscriptionId: settings.billingSubscriptionId || null,
     billingUsageLineItemId: settings.billingUsageLineItemId || null,
@@ -94,18 +100,11 @@ function getUsageLineItem(subscription: any) {
   );
 }
 
-function getBillingPeriodStart(periodEnd: Date) {
-  return new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000);
-}
-
-async function getBillableUsageCounts(shop: string, periodStart: Date, periodEnd: Date) {
+async function getBillableUsageCounts(shop: string, billingPeriodKey: string) {
   const events = await prisma.billableUsageEvent.findMany({
     where: {
       shop,
-      createdAt: {
-        gte: periodStart,
-        lt: periodEnd,
-      },
+      billingPeriodKey,
     },
     select: { action: true },
   });
@@ -122,8 +121,41 @@ async function getBillableUsageCounts(shop: string, periodStart: Date, periodEnd
   };
 }
 
-function getUsageRecordChargedVisitors(usageLineItem: any, periodEnd: Date) {
-  const periodStart = getBillingPeriodStart(periodEnd);
+function inferBillingPeriodStart(
+  subscription: any,
+  periodKey: string,
+  periodEnd: Date,
+  settings?: BillingPeriodSettings | null,
+) {
+  const usageLineItem = getUsageLineItem(subscription);
+  const cachedStart = asDate(settings?.billingPeriodStart);
+  const cachedEnd = asDate(settings?.billingPeriodEnd);
+  const sameSubscription =
+    settings?.billingSubscriptionId === subscription?.id &&
+    settings?.billingUsageLineItemId === usageLineItem?.id;
+
+  if (sameSubscription && settings?.billingPeriodKey === periodKey && cachedStart) {
+    return cachedStart;
+  }
+
+  if (sameSubscription && settings?.billingPeriodKey !== periodKey && cachedEnd && cachedEnd < periodEnd) {
+    return cachedEnd;
+  }
+
+  const createdAt = asDate(subscription?.createdAt);
+  if (createdAt && createdAt < periodEnd) {
+    const maxFirstPeriodMs = 32 * 24 * 60 * 60 * 1000;
+    if (periodEnd.getTime() - createdAt.getTime() <= maxFirstPeriodMs) {
+      return createdAt;
+    }
+  }
+
+  return null;
+}
+
+function getUsageRecordChargedVisitors(usageLineItem: any, periodStart: Date | null, periodEnd: Date) {
+  if (!periodStart) return 0;
+
   const records = usageLineItem?.usageRecords?.nodes || [];
   const chargedAmount = records.reduce((sum: number, record: any) => {
     const createdAt = asDate(record.createdAt);
@@ -133,10 +165,20 @@ function getUsageRecordChargedVisitors(usageLineItem: any, periodEnd: Date) {
     return Number.isFinite(amount) ? sum + amount : sum;
   }, 0);
 
+  // Note: Small floating point errors (±1 visitor) from amount/OVERAGE_RATE are
+  // acceptable. This value seeds chargedVisitors from Shopify records; the DB
+  // value takes precedence after the initial sync.
   return Math.max(0, Math.round(chargedAmount / OVERAGE_RATE));
 }
 
-export function usagePeriodFromSubscription(subscription: any): UsagePeriod | null {
+function truncateToDay(date: Date): string {
+  return date.toISOString().slice(0, 10); // e.g. "2026-06-15"
+}
+
+export function usagePeriodFromSubscription(
+  subscription: any,
+  settings?: BillingPeriodSettings | null,
+): UsagePeriod | null {
   const usageLineItem = getUsageLineItem(subscription);
   const currentPeriodEnd = subscription?.currentPeriodEnd;
 
@@ -146,14 +188,17 @@ export function usagePeriodFromSubscription(subscription: any): UsagePeriod | nu
 
   const billingPeriodEnd = new Date(currentPeriodEnd);
   if (Number.isNaN(billingPeriodEnd.getTime())) return null;
+  const key = `shopify:${subscription.id}:${usageLineItem.id}:${truncateToDay(billingPeriodEnd)}`;
+  const billingPeriodStart = inferBillingPeriodStart(subscription, key, billingPeriodEnd, settings);
 
   return {
-    key: `shopify:${subscription.id}:${usageLineItem.id}:${billingPeriodEnd.toISOString()}`,
+    key,
     yearMonth: getYearMonth(billingPeriodEnd),
+    billingPeriodStart,
     billingPeriodEnd,
     billingSubscriptionId: subscription.id,
     billingUsageLineItemId: usageLineItem.id,
-    chargedVisitors: getUsageRecordChargedVisitors(usageLineItem, billingPeriodEnd),
+    chargedVisitors: getUsageRecordChargedVisitors(usageLineItem, billingPeriodStart, billingPeriodEnd),
     source: "shopify",
   };
 }
@@ -161,8 +206,7 @@ export function usagePeriodFromSubscription(subscription: any): UsagePeriod | nu
 async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
   if (period.source !== "shopify" || !period.billingPeriodEnd) return;
 
-  const periodStart = getBillingPeriodStart(period.billingPeriodEnd);
-  const usageCounts = await getBillableUsageCounts(shop, periodStart, period.billingPeriodEnd);
+  const usageCounts = await getBillableUsageCounts(shop, period.key);
   const existing = await prisma.monthlyUsage.findUnique({
     where: {
       shop_billingPeriodKey: {
@@ -187,6 +231,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
         blocked: Math.max(existing.blocked, usageCounts.blocked),
         popupShown: Math.max(existing.popupShown || 0, usageCounts.popupShown),
         chargedVisitors: nextChargedVisitors,
+        billingPeriodStart: period.billingPeriodStart,
         billingPeriodEnd: period.billingPeriodEnd,
         billingSubscriptionId: period.billingSubscriptionId,
         billingUsageLineItemId: period.billingUsageLineItemId,
@@ -204,6 +249,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
         shop,
         yearMonth: period.yearMonth,
         billingPeriodKey: period.key,
+        billingPeriodStart: period.billingPeriodStart,
         billingPeriodEnd: period.billingPeriodEnd,
         billingSubscriptionId: period.billingSubscriptionId,
         billingUsageLineItemId: period.billingUsageLineItemId,
@@ -228,6 +274,7 @@ export async function syncUsagePeriodForShop(shop: string, plan: string, period:
       currentPlan: plan,
       billingPlanName: plan,
       billingPeriodKey: period.key,
+      billingPeriodStart: period.billingPeriodStart,
       billingPeriodEnd: period.billingPeriodEnd,
       billingSubscriptionId: period.billingSubscriptionId,
       billingUsageLineItemId: period.billingUsageLineItemId,
@@ -237,6 +284,7 @@ export async function syncUsagePeriodForShop(shop: string, plan: string, period:
       currentPlan: plan,
       billingPlanName: plan,
       billingPeriodKey: period.key,
+      billingPeriodStart: period.billingPeriodStart,
       billingPeriodEnd: period.billingPeriodEnd,
       billingSubscriptionId: period.billingSubscriptionId,
       billingUsageLineItemId: period.billingUsageLineItemId,
@@ -246,7 +294,10 @@ export async function syncUsagePeriodForShop(shop: string, plan: string, period:
   await seedUsagePeriodRow(shop, period);
 }
 
-export async function fetchShopifyUsagePeriod(shop: string): Promise<{ plan: string; period: UsagePeriod } | null> {
+export async function fetchShopifyUsagePeriod(
+  shop: string,
+  settings?: BillingPeriodSettings | null,
+): Promise<{ plan: string; period: UsagePeriod } | null> {
   const context = await unauthenticated.admin(shop);
   const admin = context.admin;
   if (!admin) return null;
@@ -259,6 +310,7 @@ export async function fetchShopifyUsagePeriod(shop: string): Promise<{ plan: str
           id
           name
           status
+          createdAt
           currentPeriodEnd
           lineItems {
             id
@@ -294,7 +346,7 @@ export async function fetchShopifyUsagePeriod(shop: string): Promise<{ plan: str
 
   if (!subscription) return null;
 
-  const period = usagePeriodFromSubscription(subscription);
+  const period = usagePeriodFromSubscription(subscription, settings);
   if (!period) return null;
 
   return {
@@ -323,7 +375,7 @@ export async function getUsagePeriodForShop({
   }
 
   try {
-    const shopifyPeriod = await fetchShopifyUsagePeriod(shop);
+    const shopifyPeriod = await fetchShopifyUsagePeriod(shop, settings);
     if (shopifyPeriod?.period) {
       await syncUsagePeriodForShop(shop, shopifyPeriod.plan || currentPlan, shopifyPeriod.period);
       return shopifyPeriod.period;

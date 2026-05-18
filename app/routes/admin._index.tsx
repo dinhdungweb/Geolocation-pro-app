@@ -218,7 +218,7 @@ export default function AdminDashboard() {
                     <div className="stat-icon" style={{ background: '#eef2ff', color: '#6366f1' }}><Store size={24} /></div>
                     <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 600 }}>Total Installations</div>
                     <div style={{ fontSize: '36px', fontWeight: 800, marginTop: '8px' }}>{stats.totalShops}</div>
-                    <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontWeight: 600 }}>↑ 12% from last month</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>All time</div>
                 </div>
                 <div className="premium-card">
                     <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}><TrendingUp size={24} /></div>
@@ -282,9 +282,9 @@ export default function AdminDashboard() {
                                     <span style={{ fontWeight: 700, fontSize: '13px' }}>{c.code}</span>
                                 </div>
                                 <div className="progress-bar">
-                                    <div className="progress-fill" style={{ width: `${(c.visitors / stats.totalVisitors) * 100}%` }} />
+                                    <div className="progress-fill" style={{ width: `${stats.totalVisitors > 0 ? (c.visitors / stats.totalVisitors) * 100 : 0}%` }} />
                                 </div>
-                                <div style={{ fontSize: '12px', fontWeight: 600 }}>{((c.visitors / stats.totalVisitors) * 100).toFixed(1)}%</div>
+                                <div style={{ fontSize: '12px', fontWeight: 600 }}>{stats.totalVisitors > 0 ? ((c.visitors / stats.totalVisitors) * 100).toFixed(1) : '0.0'}%</div>
                             </div>
                         ))}
                     </div>

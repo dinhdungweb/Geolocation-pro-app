@@ -1,26 +1,29 @@
 import prisma from "../db.server";
 import crypto from "crypto";
 import {
-    ALL_PAID_PLANS,
     FREE_PLAN,
     OVERAGE_RATE,
     getPlanLimit,
     getUnchargedBillableOverageVisitors,
-    hasMonthlyUnlimitedReward,
+    hasMonthlyOverageCapReached,
     hasUnlimitedUsage,
     isFinalMonthlyOverageCapCharge,
 } from "../billing.config";
 import { unauthenticated } from "../shopify.server";
 import {
-    getUsagePeriodForShop,
     syncUsagePeriodForShop,
     usagePeriodFromSubscription,
 } from "./billing-period.server";
 
-function usageChargeIdempotencyKey(shop: string, billingPeriodKey: string, chargedVisitors: number, overageVisitors: number) {
+function usageChargeIdempotencyKey(
+    shop: string,
+    billingPeriodKey: string,
+    fromChargedVisitors: number,
+    toChargedVisitors: number,
+) {
     return crypto
         .createHash("sha256")
-        .update(`${shop}:${billingPeriodKey}:${chargedVisitors}:${overageVisitors}`)
+        .update(`${shop}:${billingPeriodKey}:${fromChargedVisitors}:${toChargedVisitors}`)
         .digest("hex");
 }
 
@@ -28,80 +31,250 @@ function graphQLErrorMessage(errors: any[] | undefined) {
     return errors?.map((error: any) => error.message).filter(Boolean).join("; ") || "Unknown GraphQL error";
 }
 
-/**
- * Check and charge overage for a shop.
- * This should be called from any admin loader that has access to billing.
- * It ensures overage is charged even if the admin doesn't visit the dashboard.
- */
-export async function checkAndChargeOverage(
-    shop: string,
-    billing: any,
-    isTest: boolean,
+const CHARGE_STATUS = {
+    PENDING: "pending",
+    SHOPIFY_CHARGED: "shopify_charged",
+    SUCCEEDED: "succeeded",
+    DB_UPDATE_FAILED: "db_update_failed",
+    CAPPED: "capped",
+    FAILED: "failed",
+} as const;
+
+function isCappedAmountError(error: unknown) {
+    const errorMsg = String((error as any)?.message || error).toLowerCase();
+    return errorMsg.includes("capped") || errorMsg.includes("exceed");
+}
+
+async function markChargeAttempt(
+    idempotencyKey: string,
+    data: {
+        status: string;
+        shopifyUsageRecordId?: string | null;
+        error?: string | null;
+    },
 ) {
+    await prisma.usageChargeAttempt.update({
+        where: { idempotencyKey },
+        data,
+    });
+}
+
+async function reconcilePendingChargeAttempt(shop: string, usagePeriod: {
+    key: string;
+    yearMonth: string;
+    billingPeriodStart: Date | null;
+    billingPeriodEnd: Date | null;
+    billingSubscriptionId: string | null;
+    billingUsageLineItemId: string | null;
+}) {
+    const attempt = await prisma.usageChargeAttempt.findFirst({
+        where: {
+            shop,
+            billingPeriodKey: usagePeriod.key,
+            status: { in: [CHARGE_STATUS.SHOPIFY_CHARGED, CHARGE_STATUS.DB_UPDATE_FAILED] },
+            shopifyUsageRecordId: { not: null },
+        },
+        orderBy: { createdAt: "asc" },
+    });
+
+    if (!attempt) return false;
+
+    const updateResult = await prisma.monthlyUsage.updateMany({
+        where: {
+            shop,
+            billingPeriodKey: usagePeriod.key,
+            chargedVisitors: { lt: attempt.toChargedVisitors },
+        },
+        data: {
+            chargedVisitors: attempt.toChargedVisitors,
+            billingPeriodStart: usagePeriod.billingPeriodStart,
+            billingPeriodEnd: usagePeriod.billingPeriodEnd,
+            billingSubscriptionId: usagePeriod.billingSubscriptionId,
+            billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
+        },
+    });
+
+    if (updateResult.count === 0) {
+        const current = await prisma.monthlyUsage.findUnique({
+            where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
+        });
+        if (!current || current.chargedVisitors < attempt.toChargedVisitors) {
+            console.error(`[Cron Billing] Pending Shopify charge could not be reconciled for ${shop}. Attempt: ${attempt.idempotencyKey}`);
+            return false;
+        }
+    }
+
+    await markChargeAttempt(attempt.idempotencyKey, {
+        status: CHARGE_STATUS.SUCCEEDED,
+        error: null,
+    });
+    console.log(`[Cron Billing] Reconciled prior Shopify charge for ${shop}: ${attempt.overageVisitors} visitors`);
+    return true;
+}
+
+export async function chargeOverageUsageRecord({
+    admin,
+    chargedVisitors,
+    currentPlan,
+    currentUsage,
+    minimumChargeAmount = 1,
+    planLimit,
+    shop,
+    usageLineItemId,
+    usagePeriod,
+}: {
+    admin: any;
+    shop: string;
+    currentPlan: string;
+    usagePeriod: {
+        key: string;
+        yearMonth: string;
+        billingPeriodStart: Date | null;
+        billingPeriodEnd: Date | null;
+        billingSubscriptionId: string | null;
+        billingUsageLineItemId: string | null;
+    };
+    usageLineItemId?: string | null;
+    planLimit: number;
+    currentUsage: number;
+    chargedVisitors: number;
+    minimumChargeAmount?: number;
+}) {
+    if (await reconcilePendingChargeAttempt(shop, usagePeriod)) {
+        return { status: "reconciled" as const };
+    }
+
+    if (hasMonthlyOverageCapReached(currentPlan, chargedVisitors)) {
+        console.log(`[Billing] Shop ${shop} reached monthly overage cap. Overage charging completed.`);
+        return { status: "cap_reached" as const };
+    }
+
+    if (currentUsage <= planLimit) return { status: "within_limit" as const };
+
+    const overageVisitors = getUnchargedBillableOverageVisitors(
+        currentPlan,
+        currentUsage,
+        planLimit,
+        chargedVisitors,
+    );
+    if (overageVisitors <= 0) return { status: "already_charged" as const };
+
+    const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+    const isFinalCapCharge = isFinalMonthlyOverageCapCharge(currentPlan, chargedVisitors, overageVisitors);
+
+    if (chargeAmount < minimumChargeAmount && !isFinalCapCharge) {
+        return { status: "below_threshold" as const, overageVisitors, chargeAmount };
+    }
+
+    const subscriptionLineItemId = usageLineItemId || usagePeriod.billingUsageLineItemId;
+    if (!subscriptionLineItemId) {
+        throw new Error("Missing Shopify usage subscription line item id.");
+    }
+
+    const toChargedVisitors = chargedVisitors + overageVisitors;
+    const idempotencyKey = usageChargeIdempotencyKey(
+        shop,
+        usagePeriod.key,
+        chargedVisitors,
+        toChargedVisitors,
+    );
+
+    const existingAttempt = await prisma.usageChargeAttempt.findUnique({
+        where: { idempotencyKey },
+    });
+
+    if (existingAttempt?.status === CHARGE_STATUS.SUCCEEDED) {
+        return { status: "already_charged" as const };
+    }
+
+    if (existingAttempt?.status === CHARGE_STATUS.CAPPED) {
+        return { status: "capped" as const };
+    }
+
+    if (
+        existingAttempt?.status === CHARGE_STATUS.SHOPIFY_CHARGED ||
+        existingAttempt?.status === CHARGE_STATUS.DB_UPDATE_FAILED
+    ) {
+        await reconcilePendingChargeAttempt(shop, usagePeriod);
+        return { status: "reconciled" as const };
+    }
+
+    if (existingAttempt) {
+        await prisma.usageChargeAttempt.update({
+            where: { idempotencyKey },
+            data: {
+                status: CHARGE_STATUS.PENDING,
+                error: null,
+                billingUsageLineItemId: subscriptionLineItemId,
+                amount: chargeAmount,
+            },
+        });
+    } else {
+        await prisma.usageChargeAttempt.create({
+            data: {
+                shop,
+                billingPeriodKey: usagePeriod.key,
+                billingUsageLineItemId: subscriptionLineItemId,
+                fromChargedVisitors: chargedVisitors,
+                toChargedVisitors,
+                overageVisitors,
+                amount: chargeAmount,
+                idempotencyKey,
+                status: CHARGE_STATUS.PENDING,
+            },
+        });
+    }
+
     try {
-        // Check for active subscription
-        const billingConfig = await billing.check({
-            plans: ALL_PAID_PLANS as any,
-            isTest,
-        });
-
-        const hasProPlan = billingConfig.hasActivePayment;
-        if (!hasProPlan) return; // No overage for free plans
-
-        const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
-        const settings = await prisma.settings.findUnique({
-            where: { shop },
-            select: {
-                customPlanVisitorLimit: true,
-                customPlanNoOverage: true,
-            },
-        });
-        if (hasUnlimitedUsage(currentPlan, settings)) return;
-
-        const planLimit = getPlanLimit(currentPlan, settings);
-
-        const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
-        const monthlyUsage = await prisma.monthlyUsage.findUnique({
-            where: {
-                shop_billingPeriodKey: {
-                    shop,
-                    billingPeriodKey: usagePeriod.key,
-                },
-            },
-        });
-
-        const currentUsage = monthlyUsage?.totalVisitors || 0;
-        const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
-
-        if (hasMonthlyUnlimitedReward(currentPlan, chargedVisitors)) return;
-        if (currentUsage <= planLimit) return; // Within limits
-
-        const overageVisitors = getUnchargedBillableOverageVisitors(
-            currentPlan,
-            currentUsage,
-            planLimit,
-            chargedVisitors,
-        );
-        if (overageVisitors <= 0) return; // Already charged
-
-        const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
-        const isFinalCapCharge = isFinalMonthlyOverageCapCharge(currentPlan, chargedVisitors, overageVisitors);
-        
-        // Enforce a minimum charge of $1.00 to avoid spamming Shopify API with micro-charges (e.g., $0.01 or $0.002)
-        // This effectively batches overage charges in increments of 500 visitors.
-        if (chargeAmount < 1.00 && !isFinalCapCharge) return;
-
-        try {
-            // Create usage record in Shopify
-            await billing.createUsageRecord({
+        const chargeResponse = await admin.graphql(`
+            #graphql
+            mutation appUsageRecordCreate($description: String!, $price: MoneyInput!, $subscriptionLineItemId: ID!, $idempotencyKey: String) {
+                appUsageRecordCreate(description: $description, price: $price, subscriptionLineItemId: $subscriptionLineItemId, idempotencyKey: $idempotencyKey) {
+                    appUsageRecord {
+                        id
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+        `, {
+            variables: {
                 description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
                 price: {
-                    amount: chargeAmount,
+                    amount: chargeAmount.toFixed(2),
                     currencyCode: "USD",
                 },
-                isTest,
-            });
+                subscriptionLineItemId,
+                idempotencyKey,
+            },
+        });
 
+        const chargeData: any = await chargeResponse.json();
+        if (chargeData?.errors?.length) {
+            throw new Error(`Shopify usage record mutation failed: ${graphQLErrorMessage(chargeData.errors)}`);
+        }
+
+        const userErrors = chargeData?.data?.appUsageRecordCreate?.userErrors;
+        if (userErrors && userErrors.length > 0) {
+            throw new Error(userErrors[0].message);
+        }
+
+        const usageRecordId = chargeData?.data?.appUsageRecordCreate?.appUsageRecord?.id;
+        if (!usageRecordId) {
+            throw new Error("Shopify did not return an app usage record id.");
+        }
+
+        await markChargeAttempt(idempotencyKey, {
+            status: CHARGE_STATUS.SHOPIFY_CHARGED,
+            shopifyUsageRecordId: usageRecordId,
+            error: null,
+        });
+
+        const MAX_DB_RETRIES = 3;
+        let dbUpdated = false;
+        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
             const updateResult = await prisma.monthlyUsage.updateMany({
                 where: {
                     shop,
@@ -109,36 +282,66 @@ export async function checkAndChargeOverage(
                     chargedVisitors,
                 },
                 data: {
-                    chargedVisitors: chargedVisitors + overageVisitors,
+                    chargedVisitors: toChargedVisitors,
+                    billingPeriodStart: usagePeriod.billingPeriodStart,
                     billingPeriodEnd: usagePeriod.billingPeriodEnd,
                     billingSubscriptionId: usagePeriod.billingSubscriptionId,
                     billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
                 },
             });
 
-            if (updateResult.count === 0) {
-                console.log(`[Billing] Shopify charge succeeded for ${shop}, but DB usage was already updated by another worker.`);
-                return;
+            if (updateResult.count > 0) {
+                dbUpdated = true;
+                break;
             }
 
-            console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
-        } catch (error: any) {
-            console.error("[Billing] Failed to create usage record in Shopify:", error);
-            
-            // The app must not grant unlimited usage unless Shopify accepted the usage record.
-            const errorMsg = String(error?.message || error).toLowerCase();
-            if (errorMsg.includes("capped") || errorMsg.includes("exceed")) {
-                console.log(`[Billing] Shop ${shop} hit their spending limit. DB was not marked as charged.`);
-                return;
+            const current = await prisma.monthlyUsage.findUnique({
+                where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
+            });
+            if (current && current.chargedVisitors >= toChargedVisitors) {
+                dbUpdated = true;
+                break;
             }
 
-            // For other errors (like network failures), leave chargedVisitors unchanged so we can try again later.
-            throw error; // Rethrow to be caught by the outer catch block
+            if (attempt < MAX_DB_RETRIES) {
+                await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+            }
         }
+
+        if (!dbUpdated) {
+            await markChargeAttempt(idempotencyKey, {
+                status: CHARGE_STATUS.DB_UPDATE_FAILED,
+                shopifyUsageRecordId: usageRecordId,
+                error: `DB update failed after ${MAX_DB_RETRIES} retries`,
+            });
+            console.error(`[Cron Billing] CRITICAL: Shopify charged $${chargeAmount.toFixed(2)} for ${shop} but DB update failed after ${MAX_DB_RETRIES} retries. Attempt: ${idempotencyKey}`);
+            return { status: "db_update_failed" as const, overageVisitors, chargeAmount };
+        }
+
+        await markChargeAttempt(idempotencyKey, {
+            status: CHARGE_STATUS.SUCCEEDED,
+            shopifyUsageRecordId: usageRecordId,
+            error: null,
+        });
+
+        console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
+        return { status: "charged" as const, overageVisitors, chargeAmount };
     } catch (error: any) {
-        console.error("[Billing] Failed to check/charge overage:", error);
+        const status = isCappedAmountError(error) ? CHARGE_STATUS.CAPPED : CHARGE_STATUS.FAILED;
+        await markChargeAttempt(idempotencyKey, {
+            status,
+            error: String(error?.message || error),
+        });
+
+        if (status === CHARGE_STATUS.CAPPED) {
+            console.log(`[Cron Billing] Shop ${shop} hit their spending limit. Attempt marked capped.`);
+            return { status: "capped" as const, overageVisitors, chargeAmount };
+        }
+
+        throw error;
     }
 }
+
 
 /**
  * Issue an application credit to a shop (Refund) using Partner API.
@@ -297,6 +500,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
                         id
                         name
                         status
+                        createdAt
                         currentPeriodEnd
                         lineItems {
                             id
@@ -329,11 +533,25 @@ export async function checkAndChargeOverageBackground(shop: string) {
         
         if (!activeSubscriptions || activeSubscriptions.length === 0) return; // No active subscription
 
+        const settings = await prisma.settings.findUnique({
+            where: { shop },
+            select: {
+                customPlanVisitorLimit: true,
+                customPlanNoOverage: true,
+                billingPeriodKey: true,
+                billingPeriodStart: true,
+                billingPeriodEnd: true,
+                billingSubscriptionId: true,
+                billingUsageLineItemId: true,
+                billingPlanName: true,
+            },
+        });
+
         const subscription =
-            activeSubscriptions.find((sub: any) => usagePeriodFromSubscription(sub)) ||
+            activeSubscriptions.find((sub: any) => usagePeriodFromSubscription(sub, settings)) ||
             activeSubscriptions[0];
         const currentPlan = subscription.name;
-        const usagePeriod = usagePeriodFromSubscription(subscription);
+        const usagePeriod = usagePeriodFromSubscription(subscription, settings);
         if (!usagePeriod) return;
         await syncUsagePeriodForShop(shop, currentPlan, usagePeriod);
         
@@ -344,13 +562,6 @@ export async function checkAndChargeOverageBackground(shop: string) {
         
         if (!usageLineItem) return; // No usage pricing attached to this plan
 
-        const settings = await prisma.settings.findUnique({
-            where: { shop },
-            select: {
-                customPlanVisitorLimit: true,
-                customPlanNoOverage: true,
-            },
-        });
         if (hasUnlimitedUsage(currentPlan, settings)) return;
 
         const planLimit = getPlanLimit(currentPlan, settings);
@@ -368,109 +579,16 @@ export async function checkAndChargeOverageBackground(shop: string) {
         const currentUsage = monthlyUsage?.totalVisitors || 0;
         const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
 
-        if (hasMonthlyUnlimitedReward(currentPlan, chargedVisitors)) {
-            console.log(`[Billing] Shop ${shop} reached monthly overage cap. Overage charging completed.`);
-            return;
-        }
-
-        if (currentUsage <= planLimit) return; // Within limits (or no overage yet)
-
-        const overageVisitors = getUnchargedBillableOverageVisitors(
+        await chargeOverageUsageRecord({
+            admin,
+            chargedVisitors,
             currentPlan,
             currentUsage,
             planLimit,
-            chargedVisitors,
-        );
-        if (overageVisitors <= 0) return; // Already charged or capped
-
-        const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
-        const isFinalCapCharge = isFinalMonthlyOverageCapCharge(currentPlan, chargedVisitors, overageVisitors);
-        
-        // Enforce minimum charge batching ($1.00 minimum)
-        if (chargeAmount < 1.00 && !isFinalCapCharge) return;
-
-        try {
-            const idempotencyKey = usageChargeIdempotencyKey(
-                shop,
-                usagePeriod.key,
-                chargedVisitors,
-                overageVisitors,
-            );
-
-            // 3. Create usage record in Shopify via GraphQL Mutation
-            const chargeResponse = await admin.graphql(`
-                #graphql
-                mutation appUsageRecordCreate($description: String!, $price: MoneyInput!, $subscriptionLineItemId: ID!, $idempotencyKey: String) {
-                    appUsageRecordCreate(description: $description, price: $price, subscriptionLineItemId: $subscriptionLineItemId, idempotencyKey: $idempotencyKey) {
-                        appUsageRecord {
-                            id
-                        }
-                        userErrors {
-                            field
-                            message
-                        }
-                    }
-                }
-            `, {
-                variables: {
-                    description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
-                    price: {
-                        amount: chargeAmount.toFixed(2),
-                        currencyCode: "USD"
-                    },
-                    subscriptionLineItemId: usageLineItem.id,
-                    idempotencyKey,
-                }
-            });
-            
-            const chargeData: any = await chargeResponse.json();
-            if (chargeData?.errors?.length) {
-                throw new Error(`Shopify usage record mutation failed: ${graphQLErrorMessage(chargeData.errors)}`);
-            }
-
-            const userErrors = chargeData?.data?.appUsageRecordCreate?.userErrors;
-            
-            if (userErrors && userErrors.length > 0) {
-                throw new Error(userErrors[0].message);
-            }
-
-            const usageRecordId = chargeData?.data?.appUsageRecordCreate?.appUsageRecord?.id;
-            if (!usageRecordId) {
-                throw new Error("Shopify did not return an app usage record id.");
-            }
-
-            const updateResult = await prisma.monthlyUsage.updateMany({
-                where: {
-                    shop,
-                    billingPeriodKey: usagePeriod.key,
-                    chargedVisitors,
-                },
-                data: {
-                    chargedVisitors: chargedVisitors + overageVisitors,
-                    billingPeriodEnd: usagePeriod.billingPeriodEnd,
-                    billingSubscriptionId: usagePeriod.billingSubscriptionId,
-                    billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
-                },
-            });
-
-            if (updateResult.count === 0) {
-                console.log(`[Cron Billing] Shopify charge succeeded for ${shop}, but DB usage was already updated by another worker.`);
-                return;
-            }
-            
-            console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
-        } catch (error: any) {
-            console.error(`[Cron Billing] Failed to create usage record for ${shop}:`, error);
-            
-            // Handle capped amount errors safely
-            const errorMsg = String(error?.message || error).toLowerCase();
-            if (errorMsg.includes("capped") || errorMsg.includes("exceed")) {
-                console.log(`[Cron Billing] Shop ${shop} hit their spending limit. DB was not marked as charged.`);
-                return;
-            }
-
-            // Leave chargedVisitors unchanged so temporary failures can be retried.
-        }
+            shop,
+            usageLineItemId: usageLineItem.id,
+            usagePeriod,
+        });
     } catch (error: any) {
         const statusCode = error?.response?.code || error?.networkStatusCode;
         const errorStr = String(error).toLowerCase();

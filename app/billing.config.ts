@@ -25,6 +25,8 @@ export const PLAN_LIMITS = {
 export const OVERAGE_RATE = 100 / 50000; // $0.002 per visitor
 export const OVERAGE_MONTHLY_CAP_AMOUNT = 99.99;
 export const OVERAGE_MONTHLY_CAP_VISITORS = 49995;
+export const CUSTOM_OVERAGE_MONTHLY_CAP_AMOUNT = 100;
+export const CUSTOM_OVERAGE_MONTHLY_CAP_VISITORS = Math.floor(CUSTOM_OVERAGE_MONTHLY_CAP_AMOUNT / OVERAGE_RATE);
 
 export type PlanName = typeof ALL_PLANS[number];
 
@@ -53,14 +55,24 @@ export function isStandardPaidPlan(plan: string) {
     return STANDARD_PAID_PLANS.includes(plan);
 }
 
+export function hasCappedOverage(plan: string) {
+    return isStandardPaidPlan(plan) || plan === CUSTOM_PLAN;
+}
+
+export function getOverageMonthlyCapVisitors(plan: string) {
+    if (plan === CUSTOM_PLAN) return CUSTOM_OVERAGE_MONTHLY_CAP_VISITORS;
+    if (isStandardPaidPlan(plan)) return OVERAGE_MONTHLY_CAP_VISITORS;
+    return Number.MAX_SAFE_INTEGER;
+}
+
 export function getBillableOverageVisitors(plan: string, totalVisitors: number, planLimit: number) {
     const overageVisitors = Math.max(0, totalVisitors - planLimit);
 
-    if (!isStandardPaidPlan(plan)) {
+    if (!hasCappedOverage(plan)) {
         return overageVisitors;
     }
 
-    return Math.min(overageVisitors, OVERAGE_MONTHLY_CAP_VISITORS);
+    return Math.min(overageVisitors, getOverageMonthlyCapVisitors(plan));
 }
 
 export function getUnchargedBillableOverageVisitors(
@@ -77,10 +89,15 @@ export function hasMonthlyUnlimitedReward(plan: string, chargedVisitors?: number
     return isStandardPaidPlan(plan) && (chargedVisitors || 0) >= OVERAGE_MONTHLY_CAP_VISITORS;
 }
 
+export function hasMonthlyOverageCapReached(plan: string, chargedVisitors?: number | null) {
+    return hasCappedOverage(plan) && (chargedVisitors || 0) >= getOverageMonthlyCapVisitors(plan);
+}
+
 export function isFinalMonthlyOverageCapCharge(plan: string, chargedVisitors: number, overageVisitors: number) {
+    const capVisitors = getOverageMonthlyCapVisitors(plan);
     return (
-        isStandardPaidPlan(plan) &&
-        chargedVisitors < OVERAGE_MONTHLY_CAP_VISITORS &&
-        chargedVisitors + overageVisitors >= OVERAGE_MONTHLY_CAP_VISITORS
+        hasCappedOverage(plan) &&
+        chargedVisitors < capVisitors &&
+        chargedVisitors + overageVisitors >= capVisitors
     );
 }

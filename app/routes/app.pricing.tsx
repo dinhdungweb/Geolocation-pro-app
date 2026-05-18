@@ -26,15 +26,14 @@ import {
     PLAN_LIMITS,
     OVERAGE_RATE,
     OVERAGE_MONTHLY_CAP_AMOUNT,
+    CUSTOM_OVERAGE_MONTHLY_CAP_AMOUNT,
     DEFAULT_TRIAL_DAYS,
-    getUnchargedBillableOverageVisitors,
     getPlanLimit,
-    hasMonthlyUnlimitedReward,
-    isFinalMonthlyOverageCapCharge,
 } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { loadCrisp } from "../utils/crisp";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
+import { chargeOverageUsageRecord } from "../utils/billing.server";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
     const requestUrl = new URL(request.url);
@@ -171,7 +170,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     plan: {
                         appUsagePricingDetails: {
                             cappedAmount: {
-                                amount: 100,
+                                amount: CUSTOM_OVERAGE_MONTHLY_CAP_AMOUNT,
                                 currencyCode: "USD",
                             },
                             terms: "Overage: $100 per 50,000 visitors (~$0.002/visitor) exceeded.",
@@ -247,6 +246,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     select: {
                         customPlanVisitorLimit: true,
                         customPlanNoOverage: true,
+                        billingPeriodKey: true,
+                        billingPeriodStart: true,
+                        billingPeriodEnd: true,
+                        billingSubscriptionId: true,
+                        billingUsageLineItemId: true,
+                        billingPlanName: true,
                     },
                 });
                 const planLimit = getPlanLimit(activePlan, settings);
@@ -266,52 +271,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 });
 
                 if (monthlyUsage) {
-                    if (hasMonthlyUnlimitedReward(activePlan, monthlyUsage.chargedVisitors)) {
-                        console.log(`[Billing] Skipping final overage for ${shop}: monthly overage cap already reached`);
-                    } else {
-                        const overageVisitors = getUnchargedBillableOverageVisitors(
-                            activePlan,
-                            monthlyUsage.totalVisitors,
+                    try {
+                        const chargeResult = await chargeOverageUsageRecord({
+                            admin,
+                            chargedVisitors: monthlyUsage.chargedVisitors,
+                            currentPlan: activePlan,
+                            currentUsage: monthlyUsage.totalVisitors,
+                            minimumChargeAmount: 0.5,
                             planLimit,
-                            monthlyUsage.chargedVisitors,
-                        );
-                        if (overageVisitors > 0) {
-                            const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
-                            const isFinalCapCharge = isFinalMonthlyOverageCapCharge(
-                                activePlan,
-                                monthlyUsage.chargedVisitors,
-                                overageVisitors,
-                            );
-                            // Skip if charge amount is too small (< $0.50) to avoid Shopify API issues
-                            if (chargeAmount > 0 && (chargeAmount >= 0.50 || isFinalCapCharge)) {
-                                try {
-                                    await billing.createUsageRecord({
-                                        description: `Final overage before downgrade: ${overageVisitors} visitors beyond ${planLimit} limit`,
-                                        price: { amount: chargeAmount, currencyCode: "USD" },
-                                        isTest,
-                                    });
-                                    await prisma.monthlyUsage.update({
-                                        where: {
-                                            shop_billingPeriodKey: {
-                                                shop,
-                                                billingPeriodKey: usagePeriod.key,
-                                            },
-                                        },
-                                        data: {
-                                            chargedVisitors: { increment: overageVisitors },
-                                            billingPeriodEnd: usagePeriod.billingPeriodEnd,
-                                            billingSubscriptionId: usagePeriod.billingSubscriptionId,
-                                            billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
-                                        },
-                                    });
-                                    console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
-                                } catch (error) {
-                                    console.error("[Billing] Failed to charge final overage:", error);
-                                }
-                            } else {
-                                console.log(`[Billing] Skipping final overage for ${shop}: $${chargeAmount.toFixed(2)} below minimum threshold`);
-                            }
+                            shop,
+                            usageLineItemId: usagePeriod.billingUsageLineItemId,
+                            usagePeriod,
+                        });
+
+                        if (chargeResult.status === "charged") {
+                            console.log(`[Billing] Final overage charge for ${shop}: $${chargeResult.chargeAmount.toFixed(2)} for ${chargeResult.overageVisitors} visitors`);
                         }
+                    } catch (error) {
+                        console.error("[Billing] Failed to charge final overage:", error);
                     }
                 }
 
@@ -339,17 +316,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         // Handling Paid Plans
         if (ALL_PAID_PLANS.includes(selectedPlan) && selectedPlan !== CUSTOM_PLAN) {
-            // Sync currentPlan to Settings for proxy limit check
-            try {
-                await prisma.settings.upsert({
-                    where: { shop },
-                    update: { currentPlan: selectedPlan },
-                    create: { shop, currentPlan: selectedPlan },
-                });
-            } catch (err) {
-                console.error("[Settings] Failed to sync currentPlan:", err);
-            }
-
             await billing.require({
                 plans: [selectedPlan] as any,
                 isTest,
@@ -360,6 +326,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     });
                 },
             });
+
+            try {
+                const syncData = selectedPlan === UNLIMITED_PLAN
+                    ? {
+                        currentPlan: selectedPlan,
+                        billingPlanName: null,
+                        billingPeriodKey: null,
+                        billingPeriodStart: null,
+                        billingPeriodEnd: null,
+                        billingSubscriptionId: null,
+                        billingUsageLineItemId: null,
+                    }
+                    : { currentPlan: selectedPlan };
+
+                await prisma.settings.upsert({
+                    where: { shop },
+                    update: syncData,
+                    create: { shop, currentPlan: selectedPlan },
+                });
+            } catch (err) {
+                console.error("[Settings] Failed to sync confirmed currentPlan:", err);
+            }
         }
     }
 
@@ -632,7 +620,7 @@ export default function PricingPage() {
         },
     ];
     const visiblePlans = plans.filter((plan) => {
-        if (plan.name === UNLIMITED_PLAN) return currentPlan === UNLIMITED_PLAN && canUseUnlimitedPlan;
+        if (plan.name === UNLIMITED_PLAN) return canUseUnlimitedPlan;
         if (plan.name === CUSTOM_PLAN) return canUseCustomPlan;
         return true;
     });

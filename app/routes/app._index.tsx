@@ -158,9 +158,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const usagePeriodEnd = usagePeriod.billingPeriodEnd?.toISOString() || null;
 
   // Keep proxy limit checks up to date without delaying the dashboard response.
+  const settingsSyncData = currentPlan === FREE_PLAN || hasUnlimitedUsage(currentPlan, settings)
+    ? {
+        currentPlan,
+        blockVpn: currentPlan === FREE_PLAN ? false : settings.blockVpn,
+        billingPlanName: null,
+        billingPeriodKey: null,
+        billingPeriodStart: null,
+        billingPeriodEnd: null,
+        billingSubscriptionId: null,
+        billingUsageLineItemId: null,
+      }
+    : { currentPlan };
+
   prisma.settings.upsert({
     where: { shop },
-    update: { currentPlan },
+    update: settingsSyncData,
     create: { shop, currentPlan },
   }).catch((error) => {
     console.error("[Settings] Failed to sync currentPlan:", error);

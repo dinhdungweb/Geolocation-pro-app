@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { FREE_PLAN } from "../billing.config";
+import { fetchShopifyUsagePeriod, syncUsagePeriodForShop } from "../utils/billing-period.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { payload, topic, shop } = await authenticate.webhook(request);
@@ -21,11 +22,44 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log(`[Subscription Update] Shop ${shop} plan updated to: ${currentPlan} (Status: ${appSubscription?.status})`);
 
     try {
+        const existingSettings = await db.settings.findUnique({ where: { shop } });
+
         await db.settings.upsert({
             where: { shop },
-            update: { currentPlan },
+            update: appSubscription?.status === "ACTIVE"
+                ? { currentPlan }
+                : {
+                    currentPlan,
+                    blockVpn: false,
+                    billingPlanName: null,
+                    billingPeriodKey: null,
+                    billingPeriodStart: null,
+                    billingPeriodEnd: null,
+                    billingSubscriptionId: null,
+                    billingUsageLineItemId: null,
+                },
             create: { shop, currentPlan },
         });
+
+        if (appSubscription?.status === "ACTIVE") {
+            const shopifyPeriod = await fetchShopifyUsagePeriod(shop, existingSettings);
+            if (shopifyPeriod?.period) {
+                await syncUsagePeriodForShop(shop, shopifyPeriod.plan || currentPlan, shopifyPeriod.period);
+            } else {
+                await db.settings.update({
+                    where: { shop },
+                    data: {
+                        billingPlanName: null,
+                        billingPeriodKey: null,
+                        billingPeriodStart: null,
+                        billingPeriodEnd: null,
+                        billingSubscriptionId: null,
+                        billingUsageLineItemId: null,
+                    },
+                });
+            }
+        }
+
         console.log(`[Subscription Update] Successfully synced plan for ${shop}`);
     } catch (error) {
         console.error(`[Subscription Update] Failed to sync plan for ${shop}:`, error);

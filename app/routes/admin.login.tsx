@@ -225,7 +225,7 @@ export default function AdminLogin() {
                 </Form>
                 
                 <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
-                    &copy; 2024 GeoAdmin. All rights reserved.
+                    &copy; {new Date().getFullYear()} GeoAdmin. All rights reserved.
                 </div>
             </div>
         </div>

@@ -2,7 +2,7 @@ import prisma from "../db.server";
 
 // Retention periods
 const LOG_RETENTION_DAYS = 30;
-const BILLABLE_EVENT_RETENTION_DAYS = 30;
+const BILLABLE_EVENT_RETENTION_DAYS = 62; // Must exceed max billing period (~30d) + buffer
 
 // In-memory tracker to avoid running cleanup too frequently
 // Only runs once per server process per day

@@ -1,4 +1,6 @@
 import cron from 'node-cron';
+import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
@@ -6,24 +8,76 @@ import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage }
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 import { getUsagePeriodForShop } from './billing-period.server';
 
+const USAGE_JOB_LOCK_KEY = 'usage-cron:check-all-shops';
+const USAGE_JOB_LOCK_TTL_MS = 5 * 60 * 60 * 1000;
+
+async function acquireJobLock(key: string, ttlMs: number) {
+    const owner = crypto.randomUUID();
+    const now = new Date();
+    const lockedUntil = new Date(now.getTime() + ttlMs);
+
+    try {
+        await prisma.jobLock.create({
+            data: { key, owner, lockedUntil },
+        });
+        return { key, owner };
+    } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+            throw error;
+        }
+    }
+
+    const updated = await prisma.jobLock.updateMany({
+        where: {
+            key,
+            lockedUntil: { lt: now },
+        },
+        data: {
+            owner,
+            lockedUntil,
+        },
+    });
+
+    return updated.count > 0 ? { key, owner } : null;
+}
+
+async function releaseJobLock(lock: { key: string; owner: string }) {
+    await prisma.jobLock.updateMany({
+        where: {
+            key: lock.key,
+            owner: lock.owner,
+        },
+        data: {
+            lockedUntil: new Date(),
+        },
+    });
+}
+
 /**
  * Checks usage for all shops and sends warning emails if needed.
  */
 export async function checkAllShopsUsage() {
+    const lock = await acquireJobLock(USAGE_JOB_LOCK_KEY, USAGE_JOB_LOCK_TTL_MS);
+    if (!lock) {
+        console.log('[Cron] Usage check skipped because another worker holds the lock.');
+        return;
+    }
+
     console.log('[Cron] Starting usage check for all shops...');
 
-    // Get all settings to find active shops
-    const allSettings = await prisma.settings.findMany({
-        where: {
-            NOT: { shop: 'GLOBAL' }
-        }
-    });
+    try {
+        // Get all settings to find active shops
+        const allSettings = await prisma.settings.findMany({
+            where: {
+                NOT: { shop: 'GLOBAL' }
+            }
+        });
 
-    for (const settings of allSettings) {
-        const shop = settings.shop;
+        for (const settings of allSettings) {
+            const shop = settings.shop;
 
-        try {
-            let currentPlan = settings.currentPlan || FREE_PLAN;
+            try {
+                let currentPlan = settings.currentPlan || FREE_PLAN;
 
             // For paid shops: query Shopify API for the REAL active plan to avoid stale DB data
             if (currentPlan !== FREE_PLAN) {
@@ -33,9 +87,22 @@ export async function checkAllShopsUsage() {
                     currentPlan = actualPlan;
                     // Sync corrected plan back to DB so proxy.config uses the right limit
                     try {
+                        const planSyncData = actualPlan === FREE_PLAN
+                            ? {
+                                currentPlan: actualPlan,
+                                blockVpn: false,
+                                billingPlanName: null,
+                                billingPeriodKey: null,
+                                billingPeriodStart: null,
+                                billingPeriodEnd: null,
+                                billingSubscriptionId: null,
+                                billingUsageLineItemId: null,
+                            }
+                            : { currentPlan: actualPlan };
+
                         await prisma.settings.update({
                             where: { shop },
-                            data: { currentPlan: actualPlan },
+                            data: planSyncData,
                         });
                     } catch (err) {
                         console.error(`[Cron] Failed to sync plan for ${shop}:`, err);
@@ -115,13 +182,17 @@ export async function checkAllShopsUsage() {
                     });
                 }
             }
-        } catch (error) {
-            console.error(`[Cron] Failed to check usage for ${shop}:`, error);
+            } catch (error) {
+                console.error(`[Cron] Failed to check usage for ${shop}:`, error);
+            }
         }
-    }
 
-    console.log('[Cron] Usage check completed.');
+        console.log('[Cron] Usage check completed.');
+    } finally {
+        await releaseJobLock(lock);
+    }
 }
+
 /**
  * Initializes the cron job scheduler.
  * Uses a global variable to ensure only one instance runs during development.
@@ -157,8 +228,10 @@ export function initUsageCron() {
     console.log('[Cron] Usage monitoring scheduled (every 6 hours).');
     console.log('[Cron] GeoIP auto-update scheduled (daily at 3:00 AM).');
     
-    // Also run once immediately on startup to catch any missed windows
-    checkAllShopsUsage().catch(err => {
-        console.error('[Cron Startup Error] Failed to running initial check:', err);
-    });
+    // Run initial check after a short delay to avoid API spam during rolling deploys.
+    setTimeout(() => {
+        checkAllShopsUsage().catch(err => {
+            console.error('[Cron Startup Error] Failed to running initial check:', err);
+        });
+    }, 30_000);
 }

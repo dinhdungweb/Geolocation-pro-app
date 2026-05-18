@@ -10,17 +10,36 @@ import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
-let backgroundJobsStarted = false;
+let runtimePreloadStarted = false;
+let inAppCronStarted = false;
 
-function startBackgroundJobs() {
-  if (backgroundJobsStarted || process.env.NODE_ENV === "test") return;
+function startRuntimePreload() {
+  if (runtimePreloadStarted || process.env.NODE_ENV === "test") return;
 
-  backgroundJobsStarted = true;
+  runtimePreloadStarted = true;
+
+  // Pre-warm MaxMind GeoIP reader so the first proxy request doesn't block
+  import("./utils/maxmind.server")
+    .then(({ preloadReader }) => preloadReader())
+    .catch((error) => console.error("[Runtime] Failed to preload MaxMind:", error));
+}
+
+function startInAppCron() {
+  if (
+    inAppCronStarted ||
+    process.env.NODE_ENV === "test" ||
+    process.env.DISABLE_IN_APP_CRON === "true"
+  ) {
+    return;
+  }
+
+  inAppCronStarted = true;
+
   import("./utils/usage-cron.server")
     .then(({ initUsageCron }) => initUsageCron())
     .catch((error) => {
-      backgroundJobsStarted = false;
-      console.error("[Runtime] Failed to initialize background jobs:", error);
+      inAppCronStarted = false;
+      console.error("[Runtime] Failed to initialize in-app cron:", error);
     });
 }
 
@@ -30,7 +49,8 @@ export default async function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  startBackgroundJobs();
+  startRuntimePreload();
+  startInAppCron();
   addDocumentResponseHeaders(request, responseHeaders);
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')
@@ -83,7 +103,6 @@ export function handleError(error: unknown, { request }: { request: Request }) {
       ".php",
       ".env",
       "wp-admin",
-      "/admin",
       "wlwmanifest.xml",
       "xmlrpc.php",
       "/.well-known/",

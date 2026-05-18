@@ -7,31 +7,50 @@ import { checkAndRunLiteUpdate } from '../services/geoip-updater.server';
 let reader: Reader<CountryResponse> | null = null;
 let initPromise: Promise<void> | null = null;
 
+const DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-Country.mmdb');
+
 /**
- * Initialize MaxMind GeoLite2-Country database reader
- * This is called once when the first request comes in
+ * Initialize MaxMind GeoLite2-Country database reader.
+ * Called lazily on first request, or eagerly from startBackgroundJobs.
  */
 async function initReader(): Promise<void> {
     if (reader) return;
 
-    // Trigger auto-update check (background or foreground depending on needs)
-    // We await it here to ensure we have a DB file if it's missing.
-    // If it exists, the check is fast (stat call).
+    // Trigger auto-update check.
+    // If the DB file exists, this is just a fast stat() call.
+    // If it's missing, it will download (~5MB) — only happens on first deploy.
     await checkAndRunLiteUpdate().catch(err => console.error('[MaxMind] Update check failed:', err));
 
-    const dbPath = path.join(process.cwd(), 'data', 'GeoLite2-Country.mmdb');
-
-    // Check if database file exists
-    if (!fs.existsSync(dbPath)) {
-        console.error('[MaxMind] Database file not found:', dbPath);
+    if (!fs.existsSync(DB_PATH)) {
+        console.error('[MaxMind] Database file not found:', DB_PATH);
         return;
     }
 
     try {
-        reader = await maxmind.open<CountryResponse>(dbPath);
+        reader = await maxmind.open<CountryResponse>(DB_PATH);
         console.log('[MaxMind] Database loaded successfully');
     } catch (error) {
         console.error('[MaxMind] Failed to load database:', error);
+    }
+}
+
+/**
+ * Force-reload the MaxMind reader after a database file update.
+ * Call this after updateGeoIPDatabase() succeeds.
+ */
+export function invalidateReader(): void {
+    reader = null;
+    initPromise = null;
+    console.log('[MaxMind] Reader invalidated — will reload on next lookup');
+}
+
+/**
+ * Pre-warm the MaxMind reader in the background (non-blocking).
+ * Called from entry.server.tsx startBackgroundJobs().
+ */
+export function preloadReader(): void {
+    if (!initPromise) {
+        initPromise = initReader();
     }
 }
 
@@ -50,7 +69,6 @@ export async function getCountryFromIP(ip: string): Promise<string> {
     }
 
     if (!reader) {
-        console.log('[MaxMind] Reader not available, returning empty');
         return '';
     }
 

@@ -98,6 +98,7 @@ model Settings {
   customPlanNoOverage Boolean @default(true)
   customPlanTrialDays Int     @default(3)
   billingPeriodKey String?
+  billingPeriodStart DateTime?
   billingPeriodEnd DateTime?
   billingSubscriptionId String?
   billingUsageLineItemId String?
@@ -144,6 +145,7 @@ model MonthlyUsage {
   shop            String
   yearMonth       String
   billingPeriodKey String
+  billingPeriodStart DateTime?
   billingPeriodEnd DateTime?
   billingSubscriptionId String?
   billingUsageLineItemId String?
@@ -158,7 +160,38 @@ model MonthlyUsage {
   @@unique([shop, billingPeriodKey])
   @@index([shop])
   @@index([shop, yearMonth])
+  @@index([shop, billingPeriodStart])
   @@index([shop, billingPeriodEnd])
+}
+
+model UsageChargeAttempt {
+  id                       String   @id @default(uuid())
+  shop                     String
+  billingPeriodKey         String
+  billingUsageLineItemId   String?
+  fromChargedVisitors      Int
+  toChargedVisitors        Int
+  overageVisitors          Int
+  amount                   Decimal  @db.Decimal(10, 2)
+  idempotencyKey           String   @unique
+  shopifyUsageRecordId     String?
+  status                   String   @default("pending")
+  error                    String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([shop, billingPeriodKey, status])
+  @@index([shop, status])
+}
+
+model JobLock {
+  key         String   @id
+  owner       String
+  lockedUntil DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([lockedUntil])
 }
 
 model BillableUsageEvent {

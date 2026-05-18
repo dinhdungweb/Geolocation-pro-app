@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import * as tar from 'tar';
 import { Readable } from 'stream';
+import { invalidateReader } from '../utils/maxmind.server';
 
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILENAME = 'GeoLite2-Country.mmdb';
@@ -78,6 +79,8 @@ export async function updateGeoIPDatabase() {
             // Rename might fail across partitions, but here it's same dir.
             // Copy then delete is safer.
             fs.copyFileSync(extractedFilePath, DB_PATH);
+            // Force the in-memory reader to reload the new DB file
+            invalidateReader();
             console.log(`[MaxMind Auto-Update] Database updated successfully at ${DB_PATH}`);
         } else {
             console.error('[MaxMind Auto-Update] Could not find .mmdb file in the downloaded archive.');
