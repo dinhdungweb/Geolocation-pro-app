@@ -536,9 +536,14 @@ export default function MessagingDashboard() {
           line-height: var(--ed-line-height-base);
         }
 
+        .ed-mail-table {
+          padding: 0;
+          overflow: hidden;
+        }
+
         .ed-tabs {
           gap: 6px;
-          margin: calc(var(--ed-mail-card-padding) * -1) calc(var(--ed-mail-card-padding) * -1) 0;
+          margin: 0;
           padding: 10px var(--ed-mail-card-padding);
           border-bottom: 1px solid var(--ed-color-surface-muted);
           overflow-x: auto;
@@ -574,7 +579,7 @@ export default function MessagingDashboard() {
         }
 
         .ed-mail-grid-head {
-          padding: 14px 0 10px;
+          padding: 14px var(--ed-mail-card-padding) 10px;
           color: var(--ed-color-text-tertiary);
           font-size: 11px;
           font-weight: 700;
@@ -584,7 +589,7 @@ export default function MessagingDashboard() {
 
         .ed-mail-row {
           width: 100%;
-          padding: 12px 0;
+          padding: 12px var(--ed-mail-card-padding);
           border: 0;
           border-top: 1px solid var(--ed-color-surface-muted);
           border-radius: 0;
@@ -796,8 +801,11 @@ export default function MessagingDashboard() {
             margin-bottom: 10px;
           }
 
-          .ed-mail-table {
+          .ed-admin-content .ed-mail-table {
             padding: 0 !important;
+          }
+
+          .ed-mail-table {
             overflow-x: auto;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
