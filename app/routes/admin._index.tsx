@@ -19,8 +19,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             totalVisitors,
             countryStats,
             settings,
-            monthlyTrends,
-            currentMonthUsage
+            monthlyTrends
         ] = await Promise.all([
             prisma.settings.count(),
             prisma.redirectRule.count({ where: { isActive: true } }),
@@ -31,17 +30,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 orderBy: { _sum: { visitors: 'desc' } },
                 take: 5
             }),
-            prisma.settings.findMany({ select: { shop: true, currentPlan: true, mode: true, customPlanPrice: true } }),
+            prisma.settings.findMany({ select: { shop: true, currentPlan: true, mode: true, customPlanPrice: true, billingPeriodKey: true } }),
             prisma.monthlyUsage.groupBy({
                 by: ['yearMonth'],
                 _sum: { totalVisitors: true, redirected: true },
                 orderBy: { yearMonth: 'desc' },
                 take: 12
-            }),
-            prisma.monthlyUsage.findMany({
-                where: { yearMonth }
             })
         ]);
+
+        const currentPeriodKeys = settings.map((s: any) => s.billingPeriodKey || `calendar:${yearMonth}`);
+        const currentPeriodUsage = await prisma.monthlyUsage.findMany({
+            where: { billingPeriodKey: { in: currentPeriodKeys } },
+        });
 
         // 1. Calculate Subscription Revenue
         const planPrices: Record<string, number> = {
@@ -59,12 +60,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }, 0);
 
         // 2. Calculate Overage Revenue (Current Month)
-        const usageMap = new Map((currentMonthUsage as any[]).map(u => [u.shop, u]));
+        const usageMap = new Map((currentPeriodUsage as any[]).map(u => [`${u.shop}:${u.billingPeriodKey}`, u]));
         const overageRevenue = settings.reduce((sum, s) => {
             const planKey = (s.currentPlan || 'FREE').toUpperCase();
             if (planKey === 'FREE') return sum;
 
-            const usage = usageMap.get(s.shop);
+            const usage = usageMap.get(`${s.shop}:${(s as any).billingPeriodKey || `calendar:${yearMonth}`}`);
             if (!usage) return sum;
 
             // Only count successfully charged visitors in revenue

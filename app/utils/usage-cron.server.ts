@@ -4,13 +4,14 @@ import { sendAdminEmail, hasSentEmail } from './email.server';
 import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
 import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
+import { getUsagePeriodForShop } from './billing-period.server';
 
 /**
  * Checks usage for all shops and sends warning emails if needed.
  */
 export async function checkAllShopsUsage() {
     console.log('[Cron] Starting usage check for all shops...');
-    
+
     // Get all settings to find active shops
     const allSettings = await prisma.settings.findMany({
         where: {
@@ -18,101 +19,107 @@ export async function checkAllShopsUsage() {
         }
     });
 
-    const now = new Date();
-    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
     for (const settings of allSettings) {
         const shop = settings.shop;
-        let currentPlan = settings.currentPlan || FREE_PLAN;
 
-        // For paid shops: query Shopify API for the REAL active plan to avoid stale DB data
-        if (currentPlan !== FREE_PLAN) {
-            const actualPlan = await getShopActivePlan(shop);
-            if (actualPlan !== null && actualPlan !== currentPlan) {
-                console.log(`[Cron] Plan sync for ${shop}: DB="${currentPlan}" → Shopify="${actualPlan}"`);
-                currentPlan = actualPlan;
-                // Sync corrected plan back to DB so proxy.config uses the right limit
-                try {
-                    await prisma.settings.update({
-                        where: { shop },
-                        data: { currentPlan: actualPlan },
-                    });
-                } catch (err) {
-                    console.error(`[Cron] Failed to sync plan for ${shop}:`, err);
+        try {
+            let currentPlan = settings.currentPlan || FREE_PLAN;
+
+            // For paid shops: query Shopify API for the REAL active plan to avoid stale DB data
+            if (currentPlan !== FREE_PLAN) {
+                const actualPlan = await getShopActivePlan(shop);
+                if (actualPlan !== null && actualPlan !== currentPlan) {
+                    console.log(`[Cron] Plan sync for ${shop}: DB="${currentPlan}" -> Shopify="${actualPlan}"`);
+                    currentPlan = actualPlan;
+                    // Sync corrected plan back to DB so proxy.config uses the right limit
+                    try {
+                        await prisma.settings.update({
+                            where: { shop },
+                            data: { currentPlan: actualPlan },
+                        });
+                    } catch (err) {
+                        console.error(`[Cron] Failed to sync plan for ${shop}:`, err);
+                    }
+                } else if (actualPlan !== null) {
+                    currentPlan = actualPlan; // Use Shopify's value even if same, to be safe
                 }
-            } else if (actualPlan !== null) {
-                currentPlan = actualPlan; // Use Shopify's value even if same, to be safe
+                // If actualPlan is null (API failed), fall back to DB value
             }
-            // If actualPlan is null (API failed), fall back to DB value
+
+            const planLimit = getPlanLimit(currentPlan, settings);
+            const hasPlanUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
+
+            // Auto-bill accumulated overage first so reward emails reflect the latest charged state.
+            // Skip Free plan shops - they have no subscription, so billing API calls would be wasted.
+            if (currentPlan !== FREE_PLAN && !hasPlanUnlimitedUsage) {
+                await checkAndChargeOverageBackground(shop);
+            }
+
+            const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
+
+            // Get current billing period usage
+            const monthlyUsage = await prisma.monthlyUsage.findUnique({
+                where: {
+                    shop_billingPeriodKey: {
+                        shop,
+                        billingPeriodKey: usagePeriod.key,
+                    },
+                }
+            });
+
+            const currentUsage = monthlyUsage?.totalVisitors || 0;
+            const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
+            const hasMonthlyReward = hasMonthlyUnlimitedReward(currentPlan, chargedVisitors);
+            const isUnlimitedPlan = hasPlanUnlimitedUsage || hasMonthlyReward;
+            const usagePercent = isUnlimitedPlan ? 0 : (currentUsage / planLimit) * 100;
+
+            // 0. Check for monthly overage cap (Unlimited Reward)
+            if (hasMonthlyReward) {
+                const sentUnlimited = await hasSentEmail(shop, 'limit_unlimited', usagePeriod.key);
+                if (!sentUnlimited) {
+                    console.log(`[Cron] Sending Unlimited Reward email to ${shop}`);
+                    await sendAdminEmail({
+                        shop,
+                        type: 'limit_unlimited',
+                        subject: `CONGRATULATIONS: ${shop} granted UNLIMITED usage this month!`,
+                        html: getLimitUnlimitedEmailHtml(shop, currentUsage),
+                        dedupeKey: usagePeriod.key,
+                    });
+                }
+            }
+            // 1. Check for 100% threshold
+            else if (usagePercent >= 100) {
+                const sent100 = await hasSentEmail(shop, 'limit_100', usagePeriod.key);
+                if (!sent100) {
+                    console.log(`[Cron] Sending 100% usage email to ${shop}`);
+                    await sendAdminEmail({
+                        shop,
+                        type: 'limit_100',
+                        subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
+                        html: getLimit100EmailHtml(shop, currentUsage, planLimit),
+                        dedupeKey: usagePeriod.key,
+                    });
+                }
+            }
+            // 2. Check for 80% threshold
+            else if (usagePercent >= 80) {
+                const sent80 = await hasSentEmail(shop, 'limit_80', usagePeriod.key);
+                if (!sent80) {
+                    console.log(`[Cron] Sending 80% usage email to ${shop}`);
+                    await sendAdminEmail({
+                        shop,
+                        type: 'limit_80',
+                        subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
+                        html: getLimit80EmailHtml(shop, currentUsage, planLimit),
+                        dedupeKey: usagePeriod.key,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error(`[Cron] Failed to check usage for ${shop}:`, error);
         }
-
-        const planLimit = getPlanLimit(currentPlan, settings);
-        const hasPlanUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
-
-        // Auto-bill accumulated overage first so reward emails reflect the latest charged state.
-        // Skip Free plan shops - they have no subscription, so billing API calls would be wasted.
-        if (currentPlan !== FREE_PLAN && !hasPlanUnlimitedUsage) {
-            await checkAndChargeOverageBackground(shop);
-        }
-
-        // Get monthly usage
-        const monthlyUsage = await prisma.monthlyUsage.findUnique({
-            where: {
-                shop_yearMonth: { shop, yearMonth }
-            }
-        });
-
-        const currentUsage = monthlyUsage?.totalVisitors || 0;
-        const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
-        const hasMonthlyReward = hasMonthlyUnlimitedReward(currentPlan, chargedVisitors);
-        const isUnlimitedPlan = hasPlanUnlimitedUsage || hasMonthlyReward;
-        const usagePercent = isUnlimitedPlan ? 0 : (currentUsage / planLimit) * 100;
-
-        // 0. Check for monthly overage cap (Unlimited Reward)
-        if (hasMonthlyReward) {
-            const sentUnlimited = await hasSentEmail(shop, 'limit_unlimited', yearMonth);
-            if (!sentUnlimited) {
-                console.log(`[Cron] Sending Unlimited Reward email to ${shop}`);
-                await sendAdminEmail({
-                    shop,
-                    type: 'limit_unlimited',
-                    subject: `CONGRATULATIONS: ${shop} granted UNLIMITED usage this month!`,
-                    html: getLimitUnlimitedEmailHtml(shop, currentUsage),
-                    dedupeKey: yearMonth,
-                });
-            }
-        } 
-        // 1. Check for 100% threshold
-        else if (usagePercent >= 100) {
-            const sent100 = await hasSentEmail(shop, 'limit_100', yearMonth);
-            if (!sent100) {
-                console.log(`[Cron] Sending 100% usage email to ${shop}`);
-                await sendAdminEmail({
-                    shop,
-                    type: 'limit_100',
-                    subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
-                    html: getLimit100EmailHtml(shop, currentUsage, planLimit),
-                    dedupeKey: yearMonth,
-                });
-            }
-        } 
-        // 2. Check for 80% threshold
-        else if (usagePercent >= 80) {
-            const sent80 = await hasSentEmail(shop, 'limit_80', yearMonth);
-            if (!sent80) {
-                console.log(`[Cron] Sending 80% usage email to ${shop}`);
-                await sendAdminEmail({
-                    shop,
-                    type: 'limit_80',
-                    subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
-                    html: getLimit80EmailHtml(shop, currentUsage, planLimit),
-                    dedupeKey: yearMonth,
-                });
-            }
-        }
-
     }
-    
+
     console.log('[Cron] Usage check completed.');
 }
 /**

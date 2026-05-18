@@ -32,6 +32,7 @@ import {
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
 import { isBillingTestMode } from "../utils/billing-mode.server";
+import { getUsagePeriodForShop } from "../utils/billing-period.server";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -72,8 +73,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const now = new Date();
-  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -82,7 +81,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     activeRulesCount,
     settings,
     billingConfig,
-    monthlyUsage,
     countryStats,
     ruleStats,
   ] = await Promise.all([
@@ -96,14 +94,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     billing.check({
       plans: ALL_PAID_PLANS as any,
       isTest: isBillingTestMode(),
-    }),
-    prisma.monthlyUsage.findUnique({
-      where: {
-        shop_yearMonth: {
-          shop,
-          yearMonth,
-        },
-      },
     }),
     prisma.analyticsCountry.groupBy({
       by: ['countryCode'],
@@ -138,6 +128,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
   const planLimit = getPlanLimit(currentPlan, settings);
   const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
+  const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
+  const monthlyUsage = await prisma.monthlyUsage.findUnique({
+    where: {
+      shop_billingPeriodKey: {
+        shop,
+        billingPeriodKey: usagePeriod.key,
+      },
+    },
+  });
   const currentUsage = monthlyUsage?.totalVisitors || 0;
   const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
   const isUnlimitedUsage =

@@ -96,6 +96,7 @@ async function registerBillableEvent({
       data: {
         shop: payload.shop,
         yearMonth: payload.yearMonth,
+        billingPeriodKey: payload.billingPeriodKey || `calendar:${payload.yearMonth}`,
         eventKey: payload.eventKey,
         ruleId: payload.ruleId,
         action: type,
@@ -277,6 +278,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     if (tokenPayload && isBillableAnalyticsEvent(type)) {
+      const billingPeriodKey = tokenPayload.billingPeriodKey || `calendar:${tokenPayload.yearMonth}`;
       const shouldIncrementUsage = await registerBillableEvent({
         countryCode,
         path,
@@ -298,15 +300,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         await prisma.monthlyUsage.upsert({
           where: {
-            shop_yearMonth: {
+            shop_billingPeriodKey: {
               shop,
-              yearMonth: tokenPayload.yearMonth,
+              billingPeriodKey,
             },
           },
           update: usageUpdateData,
           create: {
             shop,
             yearMonth: tokenPayload.yearMonth,
+            billingPeriodKey,
             totalVisitors: 1,
             redirected: ["redirected", "auto_redirected", "ip_redirected"].includes(type) ? 1 : 0,
             blocked: ["blocked", "ip_blocked", "vpn_blocked"].includes(type) ? 1 : 0,

@@ -33,12 +33,13 @@ async function backfill() {
 
   for (const [key, data] of Object.entries(grouped)) {
     const [shop, yearMonth] = key.split("#");
+    const billingPeriodKey = `calendar:${yearMonth}`;
     
     await prisma.monthlyUsage.upsert({
       where: {
-        shop_yearMonth: {
+        shop_billingPeriodKey: {
           shop,
-          yearMonth
+          billingPeriodKey,
         }
       },
       update: {
@@ -50,6 +51,7 @@ async function backfill() {
       create: {
         shop,
         yearMonth,
+        billingPeriodKey,
         totalVisitors: data.totalVisitors,
         redirected: data.redirected,
         blocked: data.blocked,

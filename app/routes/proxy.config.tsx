@@ -6,11 +6,11 @@ import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
   createAnalyticsToken,
-  getYearMonth,
   hashIP,
   type RuleSource,
   type StorefrontAction,
 } from "../utils/analytics-token.server";
+import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
 
@@ -464,9 +464,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const currentPlan = settings.currentPlan || FREE_PLAN;
     const hasPaidPlan = currentPlan !== FREE_PLAN;
     const planLimit = getPlanLimit(currentPlan, settings);
-    const yearMonth = getYearMonth();
+    const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
     const monthlyUsage = await prisma.monthlyUsage.findUnique({
-      where: { shop_yearMonth: { shop, yearMonth } },
+      where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
     });
     const currentUsage = monthlyUsage?.totalVisitors || 0;
     const popup = buildPopup(settings);
@@ -693,7 +693,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       selectedRule && source && action !== "none"
         ? createAnalyticsToken({
             shop,
-            yearMonth,
+            yearMonth: usagePeriod.yearMonth,
+            billingPeriodKey: usagePeriod.key,
             ruleId: selectedRule.id,
             action,
             source,

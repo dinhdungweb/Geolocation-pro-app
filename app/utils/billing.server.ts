@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import crypto from "crypto";
 import {
     ALL_PAID_PLANS,
     FREE_PLAN,
@@ -10,6 +11,22 @@ import {
     isFinalMonthlyOverageCapCharge,
 } from "../billing.config";
 import { unauthenticated } from "../shopify.server";
+import {
+    getUsagePeriodForShop,
+    syncUsagePeriodForShop,
+    usagePeriodFromSubscription,
+} from "./billing-period.server";
+
+function usageChargeIdempotencyKey(shop: string, billingPeriodKey: string, chargedVisitors: number, overageVisitors: number) {
+    return crypto
+        .createHash("sha256")
+        .update(`${shop}:${billingPeriodKey}:${chargedVisitors}:${overageVisitors}`)
+        .digest("hex");
+}
+
+function graphQLErrorMessage(errors: any[] | undefined) {
+    return errors?.map((error: any) => error.message).filter(Boolean).join("; ") || "Unknown GraphQL error";
+}
 
 /**
  * Check and charge overage for a shop.
@@ -43,11 +60,14 @@ export async function checkAndChargeOverage(
 
         const planLimit = getPlanLimit(currentPlan, settings);
 
-        // Get current month usage
-        const now = new Date();
-        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
         const monthlyUsage = await prisma.monthlyUsage.findUnique({
-            where: { shop_yearMonth: { shop, yearMonth } },
+            where: {
+                shop_billingPeriodKey: {
+                    shop,
+                    billingPeriodKey: usagePeriod.key,
+                },
+            },
         });
 
         const currentUsage = monthlyUsage?.totalVisitors || 0;
@@ -71,23 +91,6 @@ export async function checkAndChargeOverage(
         // This effectively batches overage charges in increments of 500 visitors.
         if (chargeAmount < 1.00 && !isFinalCapCharge) return;
 
-        // Reserve the charge by updating the database FIRST using optimistic locking
-        const updateResult = await prisma.monthlyUsage.updateMany({
-            where: { 
-                shop,
-                yearMonth,
-                chargedVisitors: chargedVisitors // Optimistic lock: ensure no one else modified it
-            },
-            data: {
-                chargedVisitors: chargedVisitors + overageVisitors
-            }
-        });
-
-        if (updateResult.count === 0) {
-            console.log(`[Billing] Race condition prevented for ${shop}. Overage already processed.`);
-            return; // Another process already charged this overage
-        }
-
         try {
             // Create usage record in Shopify
             await billing.createUsageRecord({
@@ -98,26 +101,38 @@ export async function checkAndChargeOverage(
                 },
                 isTest,
             });
+
+            const updateResult = await prisma.monthlyUsage.updateMany({
+                where: {
+                    shop,
+                    billingPeriodKey: usagePeriod.key,
+                    chargedVisitors,
+                },
+                data: {
+                    chargedVisitors: chargedVisitors + overageVisitors,
+                    billingPeriodEnd: usagePeriod.billingPeriodEnd,
+                    billingSubscriptionId: usagePeriod.billingSubscriptionId,
+                    billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
+                },
+            });
+
+            if (updateResult.count === 0) {
+                console.log(`[Billing] Shopify charge succeeded for ${shop}, but DB usage was already updated by another worker.`);
+                return;
+            }
+
             console.log(`[Billing] Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
         } catch (error: any) {
             console.error("[Billing] Failed to create usage record in Shopify:", error);
             
-            // If the error is about exceeding the capped amount (spending limit), DO NOT rollback.
-            // If we rollback, the system will infinitely retry charging the exact same amount on every page load.
+            // The app must not grant unlimited usage unless Shopify accepted the usage record.
             const errorMsg = String(error?.message || error).toLowerCase();
             if (errorMsg.includes("capped") || errorMsg.includes("exceed")) {
-                console.log(`[Billing] Shop ${shop} hit their spending limit. Skipping DB rollback to prevent retry loops.`);
+                console.log(`[Billing] Shop ${shop} hit their spending limit. DB was not marked as charged.`);
                 return;
             }
 
-            // For other errors (like network failures), rollback the DB reservation so we can try again later.
-            console.log(`[Billing] Rolling back DB reservation for ${shop}`);
-            await prisma.monthlyUsage.updateMany({
-                where: { shop, yearMonth },
-                data: {
-                    chargedVisitors: chargedVisitors // Revert back to the original value
-                }
-            });
+            // For other errors (like network failures), leave chargedVisitors unchanged so we can try again later.
             throw error; // Rethrow to be caught by the outer catch block
         }
     } catch (error: any) {
@@ -247,7 +262,11 @@ export async function getShopActivePlan(shop: string): Promise<string | null> {
             }
         `);
 
-        const subData = await subResponse.json();
+        const subData: any = await subResponse.json();
+        if (subData?.errors?.length) {
+            throw new Error(`Shopify subscription query failed: ${graphQLErrorMessage(subData.errors)}`);
+        }
+
         const activeSubscriptions = subData?.data?.currentAppInstallation?.activeSubscriptions;
 
         if (!activeSubscriptions || activeSubscriptions.length === 0) return FREE_PLAN;
@@ -278,8 +297,18 @@ export async function checkAndChargeOverageBackground(shop: string) {
                         id
                         name
                         status
+                        currentPeriodEnd
                         lineItems {
                             id
+                            usageRecords(first: 100, reverse: true, sortKey: CREATED_AT) {
+                                nodes {
+                                    createdAt
+                                    price {
+                                        amount
+                                        currencyCode
+                                    }
+                                }
+                            }
                             plan {
                                 pricingDetails {
                                     __typename
@@ -291,13 +320,22 @@ export async function checkAndChargeOverageBackground(shop: string) {
             }
         `);
         
-        const subData = await subResponse.json();
+        const subData: any = await subResponse.json();
+        if (subData?.errors?.length) {
+            throw new Error(`Shopify subscription query failed: ${graphQLErrorMessage(subData.errors)}`);
+        }
+
         const activeSubscriptions = subData?.data?.currentAppInstallation?.activeSubscriptions;
         
         if (!activeSubscriptions || activeSubscriptions.length === 0) return; // No active subscription
 
-        const subscription = activeSubscriptions[0];
+        const subscription =
+            activeSubscriptions.find((sub: any) => usagePeriodFromSubscription(sub)) ||
+            activeSubscriptions[0];
         const currentPlan = subscription.name;
+        const usagePeriod = usagePeriodFromSubscription(subscription);
+        if (!usagePeriod) return;
+        await syncUsagePeriodForShop(shop, currentPlan, usagePeriod);
         
         // Find the line item that handles usage pricing
         const usageLineItem = subscription.lineItems.find((item: any) => 
@@ -317,11 +355,14 @@ export async function checkAndChargeOverageBackground(shop: string) {
 
         const planLimit = getPlanLimit(currentPlan, settings);
 
-        // 2. Get current month usage from DB
-        const now = new Date();
-        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        // 2. Get current Shopify billing period usage from DB
         const monthlyUsage = await prisma.monthlyUsage.findUnique({
-            where: { shop_yearMonth: { shop, yearMonth } },
+            where: {
+                shop_billingPeriodKey: {
+                    shop,
+                    billingPeriodKey: usagePeriod.key,
+                },
+            },
         });
 
         const currentUsage = monthlyUsage?.totalVisitors || 0;
@@ -348,29 +389,19 @@ export async function checkAndChargeOverageBackground(shop: string) {
         // Enforce minimum charge batching ($1.00 minimum)
         if (chargeAmount < 1.00 && !isFinalCapCharge) return;
 
-        // Reserve the charge by updating the database FIRST using optimistic locking
-        const updateResult = await prisma.monthlyUsage.updateMany({
-            where: { 
-                shop,
-                yearMonth,
-                chargedVisitors: chargedVisitors
-            },
-            data: {
-                chargedVisitors: chargedVisitors + overageVisitors
-            }
-        });
-
-        if (updateResult.count === 0) {
-            console.log(`[Cron Billing] Race condition prevented for ${shop}. Overage already processed.`);
-            return; 
-        }
-
         try {
+            const idempotencyKey = usageChargeIdempotencyKey(
+                shop,
+                usagePeriod.key,
+                chargedVisitors,
+                overageVisitors,
+            );
+
             // 3. Create usage record in Shopify via GraphQL Mutation
             const chargeResponse = await admin.graphql(`
                 #graphql
-                mutation appUsageRecordCreate($description: String!, $price: MoneyInput!, $subscriptionLineItemId: ID!) {
-                    appUsageRecordCreate(description: $description, price: $price, subscriptionLineItemId: $subscriptionLineItemId) {
+                mutation appUsageRecordCreate($description: String!, $price: MoneyInput!, $subscriptionLineItemId: ID!, $idempotencyKey: String) {
+                    appUsageRecordCreate(description: $description, price: $price, subscriptionLineItemId: $subscriptionLineItemId, idempotencyKey: $idempotencyKey) {
                         appUsageRecord {
                             id
                         }
@@ -387,15 +418,44 @@ export async function checkAndChargeOverageBackground(shop: string) {
                         amount: chargeAmount.toFixed(2),
                         currencyCode: "USD"
                     },
-                    subscriptionLineItemId: usageLineItem.id
+                    subscriptionLineItemId: usageLineItem.id,
+                    idempotencyKey,
                 }
             });
             
-            const chargeData = await chargeResponse.json();
+            const chargeData: any = await chargeResponse.json();
+            if (chargeData?.errors?.length) {
+                throw new Error(`Shopify usage record mutation failed: ${graphQLErrorMessage(chargeData.errors)}`);
+            }
+
             const userErrors = chargeData?.data?.appUsageRecordCreate?.userErrors;
             
             if (userErrors && userErrors.length > 0) {
                 throw new Error(userErrors[0].message);
+            }
+
+            const usageRecordId = chargeData?.data?.appUsageRecordCreate?.appUsageRecord?.id;
+            if (!usageRecordId) {
+                throw new Error("Shopify did not return an app usage record id.");
+            }
+
+            const updateResult = await prisma.monthlyUsage.updateMany({
+                where: {
+                    shop,
+                    billingPeriodKey: usagePeriod.key,
+                    chargedVisitors,
+                },
+                data: {
+                    chargedVisitors: chargedVisitors + overageVisitors,
+                    billingPeriodEnd: usagePeriod.billingPeriodEnd,
+                    billingSubscriptionId: usagePeriod.billingSubscriptionId,
+                    billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
+                },
+            });
+
+            if (updateResult.count === 0) {
+                console.log(`[Cron Billing] Shopify charge succeeded for ${shop}, but DB usage was already updated by another worker.`);
+                return;
             }
             
             console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
@@ -405,18 +465,11 @@ export async function checkAndChargeOverageBackground(shop: string) {
             // Handle capped amount errors safely
             const errorMsg = String(error?.message || error).toLowerCase();
             if (errorMsg.includes("capped") || errorMsg.includes("exceed")) {
-                console.log(`[Cron Billing] Shop ${shop} hit their spending limit. Skipping DB rollback.`);
+                console.log(`[Cron Billing] Shop ${shop} hit their spending limit. DB was not marked as charged.`);
                 return;
             }
 
-            // Rollback the DB reservation on network/temporary errors
-            console.log(`[Cron Billing] Rolling back DB reservation for ${shop}`);
-            await prisma.monthlyUsage.updateMany({
-                where: { shop, yearMonth },
-                data: {
-                    chargedVisitors: chargedVisitors
-                }
-            });
+            // Leave chargedVisitors unchanged so temporary failures can be retried.
         }
     } catch (error: any) {
         const statusCode = error?.response?.code || error?.networkStatusCode;

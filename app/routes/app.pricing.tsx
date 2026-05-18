@@ -34,6 +34,7 @@ import {
 } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { loadCrisp } from "../utils/crisp";
+import { getUsagePeriodForShop } from "../utils/billing-period.server";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
     const requestUrl = new URL(request.url);
@@ -249,10 +250,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     },
                 });
                 const planLimit = getPlanLimit(activePlan, settings);
-                const now = new Date();
-                const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                const usagePeriod = await getUsagePeriodForShop({
+                    shop,
+                    currentPlan: activePlan,
+                    settings,
+                    forceRefresh: true,
+                });
                 const monthlyUsage = await prisma.monthlyUsage.findUnique({
-                    where: { shop_yearMonth: { shop, yearMonth } },
+                    where: {
+                        shop_billingPeriodKey: {
+                            shop,
+                            billingPeriodKey: usagePeriod.key,
+                        },
+                    },
                 });
 
                 if (monthlyUsage) {
@@ -281,8 +291,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                                         isTest,
                                     });
                                     await prisma.monthlyUsage.update({
-                                        where: { shop_yearMonth: { shop, yearMonth } },
-                                        data: { chargedVisitors: { increment: overageVisitors } },
+                                        where: {
+                                            shop_billingPeriodKey: {
+                                                shop,
+                                                billingPeriodKey: usagePeriod.key,
+                                            },
+                                        },
+                                        data: {
+                                            chargedVisitors: { increment: overageVisitors },
+                                            billingPeriodEnd: usagePeriod.billingPeriodEnd,
+                                            billingSubscriptionId: usagePeriod.billingSubscriptionId,
+                                            billingUsageLineItemId: usagePeriod.billingUsageLineItemId,
+                                        },
                                     });
                                     console.log(`[Billing] Final overage charge for ${shop}: $${chargeAmount.toFixed(2)} for ${overageVisitors} visitors`);
                                 } catch (error) {

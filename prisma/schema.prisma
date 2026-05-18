@@ -97,6 +97,11 @@ model Settings {
   customPlanVisitorLimit Int?
   customPlanNoOverage Boolean @default(true)
   customPlanTrialDays Int     @default(3)
+  billingPeriodKey String?
+  billingPeriodEnd DateTime?
+  billingSubscriptionId String?
+  billingUsageLineItemId String?
+  billingPlanName String?
 }
 
 model AnalyticsCountry {
@@ -138,6 +143,10 @@ model MonthlyUsage {
   id              String   @id @default(uuid())
   shop            String
   yearMonth       String
+  billingPeriodKey String
+  billingPeriodEnd DateTime?
+  billingSubscriptionId String?
+  billingUsageLineItemId String?
   totalVisitors   Int      @default(0)
   redirected      Int      @default(0)
   blocked         Int      @default(0)
@@ -146,14 +155,17 @@ model MonthlyUsage {
   chargedVisitors Int      @default(0)
   popupShown      Int      @default(0)
 
-  @@unique([shop, yearMonth])
+  @@unique([shop, billingPeriodKey])
   @@index([shop])
+  @@index([shop, yearMonth])
+  @@index([shop, billingPeriodEnd])
 }
 
 model BillableUsageEvent {
   id          String   @id @default(uuid())
   shop        String
   yearMonth   String
+  billingPeriodKey String?
   eventKey    String   @unique
   ruleId      String?
   action      String
@@ -163,6 +175,7 @@ model BillableUsageEvent {
   createdAt   DateTime @default(now())
 
   @@index([shop, yearMonth])
+  @@index([shop, billingPeriodKey])
   @@index([shop, createdAt])
 }
 

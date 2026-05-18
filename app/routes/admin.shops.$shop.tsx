@@ -41,16 +41,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (intent === "adjust_usage") {
-        const yearMonth = formData.get("yearMonth") as string;
+        const billingPeriodKey = formData.get("billingPeriodKey") as string;
         const chargedVisitors = parseInt(formData.get("chargedVisitors") as string);
 
-        if (isNaN(chargedVisitors) || !yearMonth) {
+        if (isNaN(chargedVisitors) || !billingPeriodKey) {
             return json({ success: false, error: "Invalid input" }, { status: 400 });
         }
 
         try {
             await prisma.monthlyUsage.update({
-                where: { shop_yearMonth: { shop, yearMonth } },
+                where: { shop_billingPeriodKey: { shop, billingPeriodKey } },
                 data: { chargedVisitors }
             });
             return json({ success: true, message: "Usage adjusted successfully" });
@@ -149,7 +149,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }),
         prisma.monthlyUsage.findMany({
             where: { shop },
-            orderBy: { yearMonth: "desc" },
+            orderBy: [
+                { billingPeriodEnd: "desc" },
+                { yearMonth: "desc" },
+            ],
             take: 6,
         }),
     ]);
@@ -532,16 +535,18 @@ export default function AdminShopDetail() {
                         </div>
                         <div className="modal-body">
                             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
-                                Manually update the "Charged Visitors" counter for a specific month in our internal database.
+                                Manually update the "Charged Visitors" counter for a specific billing period in our internal database.
                             </p>
                             <Form method="post">
                                 <input type="hidden" name="intent" value="adjust_usage" />
                                 <div className="billing-input-group">
-                                    <label>Select Month</label>
-                                    <select name="yearMonth" className="billing-input" required>
-                                        <option value="">-- Select Month --</option>
+                                    <label>Select Billing Period</label>
+                                    <select name="billingPeriodKey" className="billing-input" required>
+                                        <option value="">-- Select Billing Period --</option>
                                         {monthlyUsage.map((u: any) => (
-                                            <option key={u.id} value={u.yearMonth}>{u.yearMonth} (Logged: {u.totalVisitors})</option>
+                                            <option key={u.id} value={u.billingPeriodKey}>
+                                                {u.yearMonth} (Logged: {u.totalVisitors})
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
@@ -757,7 +762,7 @@ export default function AdminShopDetail() {
                 <div className="card-v3">
                     <div className="card-v3-header">
                         <History size={18} color="#6366f1" />
-                        Monthly Usage History
+                        Usage Period History
                     </div>
                     <div className="card-v3-body">
                         <div className="monthly-list">
@@ -765,7 +770,7 @@ export default function AdminShopDetail() {
                                 <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No usage data recorded.</div>
                             ) : (
                                 monthlyUsage.map((u: any) => (
-                                    <div className="month-row" key={u.yearMonth}>
+                                    <div className="month-row" key={u.billingPeriodKey || u.yearMonth}>
                                         <div className="month-name">{u.yearMonth}</div>
                                         <div className="month-stats">
                                             <span><b>{u.totalVisitors.toLocaleString()}</b> views</span>

@@ -6,6 +6,7 @@ export type RuleSource = "country" | "ip" | "market" | "vpn";
 export interface AnalyticsTokenPayload {
   shop: string;
   yearMonth: string;
+  billingPeriodKey?: string;
   ruleId: string;
   action: StorefrontAction;
   source: RuleSource;

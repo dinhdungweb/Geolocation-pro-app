@@ -18,14 +18,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             _count: { id: true }
         }),
         prisma.monthlyUsage.findMany({
-            orderBy: { yearMonth: "desc" }
+            orderBy: [
+                { billingPeriodEnd: "desc" },
+                { yearMonth: "desc" },
+            ]
         })
     ]);
 
     const rulesMap = new Map(ruleCounts.map((r: any) => [r.shop, r._count.id]));
     
-    // Create usage map - since usage is ordered by yearMonth DESC, 
-    // we want the FIRST occurrence for each shop (the latest month)
+    // Create usage map from the latest known billing period per shop.
     const usageMap = new Map();
     usage.forEach((u: any) => {
         if (!usageMap.has(u.shop)) {

@@ -19,26 +19,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
 
     const now = new Date();
-    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const calendarYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     // Previous month for comparison
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevYearMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const [allSettings, currentUsage, prevUsage] = await Promise.all([
-        prisma.settings.findMany({ where: { NOT: { shop: 'GLOBAL' } } }),
-        prisma.monthlyUsage.findMany({ where: { yearMonth } }),
+    const allSettings = await prisma.settings.findMany({ where: { NOT: { shop: 'GLOBAL' } } });
+    const currentPeriodKeys = allSettings.map((s: any) => s.billingPeriodKey || `calendar:${calendarYearMonth}`);
+
+    const [currentUsage, prevUsage] = await Promise.all([
+        prisma.monthlyUsage.findMany({
+            where: {
+                billingPeriodKey: { in: currentPeriodKeys },
+            },
+        }),
         prisma.monthlyUsage.findMany({ where: { yearMonth: prevYearMonth } }),
     ]);
 
-    const usageMap = new Map((currentUsage as any[]).map((u) => [u.shop, u]));
-    const prevUsageMap = new Map((prevUsage as any[]).map((u) => [u.shop, u]));
+    const usageMap = new Map((currentUsage as any[]).map((u) => [`${u.shop}:${u.billingPeriodKey}`, u]));
+    const prevUsageMap = new Map<string, number>();
+    (prevUsage as any[]).forEach((u) => {
+        prevUsageMap.set(u.shop, (prevUsageMap.get(u.shop) || 0) + (u.totalVisitors || 0));
+    });
 
     const shops = allSettings.map((s: any) => {
         const plan = s.currentPlan || FREE_PLAN;
         const limit = getPlanLimit(plan, s);
-        const usage = usageMap.get(s.shop);
-        const prev = prevUsageMap.get(s.shop);
+        const billingPeriodKey = s.billingPeriodKey || `calendar:${calendarYearMonth}`;
+        const usage = usageMap.get(`${s.shop}:${billingPeriodKey}`);
 
         const totalVisitors = usage?.totalVisitors || 0;
         const chargedVisitors = usage?.chargedVisitors || 0;
@@ -50,7 +59,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const uncharged = unlimitedUsage ? 0 : getUnchargedBillableOverageVisitors(plan, totalVisitors, limit, chargedVisitors);
         const chargedAmount = Number((chargedVisitors * OVERAGE_RATE).toFixed(2));
         const unchargedAmount = Number((uncharged * OVERAGE_RATE).toFixed(2));
-        const prevTotal = prev?.totalVisitors || 0;
+        const prevTotal = prevUsageMap.get(s.shop) || 0;
 
         // Detect overcharge: chargedVisitors > actual overage
         const actualOverage = planUnlimitedUsage ? 0 : billableOverage;
@@ -66,6 +75,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         return {
             shop: s.shop,
             plan,
+            billingPeriodKey,
+            billingPeriodEnd: s.billingPeriodEnd,
             limit,
             unlimitedUsage,
             monthlyUnlimitedReward,
@@ -99,7 +110,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     return json({
         shops,
-        yearMonth,
+        yearMonth: "current Shopify billing periods",
         prevYearMonth,
         summary: {
             totalRevenue: totalRevenue.toFixed(2),
