@@ -1235,15 +1235,11 @@ export default function AdminLayout() {
           .ed-admin-content .ed-campaign-head,
           .ed-admin-content .ed-campaign-panel,
           .ed-admin-content .ed-automation-header,
-          .ed-admin-content .ed-automation-table,
           .ed-admin-content .ed-history-head,
-          .ed-admin-content .ed-history-table,
           .ed-admin-content .ed-filter-bar,
           .ed-admin-content .ed-settings-card,
           .ed-admin-content .ed-settings-nav,
-          .ed-admin-content .ed-blacklist-table,
           .ed-admin-content .ed-blacklist-form,
-          .ed-admin-content .ed-billing-table-card,
           .ed-admin-content .ed-billing-stat,
           .ed-admin-content .ed-shop-card,
           .ed-admin-content .ed-shop-stat-card,
@@ -1252,7 +1248,15 @@ export default function AdminLayout() {
             padding: var(--ed-card-padding-mobile) !important;
           }
 
-          .ed-admin-content .ed-table-card {
+          .ed-admin-content .ed-table-card,
+          .ed-admin-content .ed-billing-table-card,
+          .ed-admin-content .ed-automation-table,
+          .ed-admin-content .ed-history-table,
+          .ed-admin-content .ed-blacklist-table,
+          .ed-admin-content .ed-mail-table,
+          .ed-admin-content .ed-campaign-table,
+          .ed-admin-content .ed-campaign-panel:has(.ed-table-scroll),
+          .ed-admin-content .table-container {
             padding: 0 !important;
           }
 

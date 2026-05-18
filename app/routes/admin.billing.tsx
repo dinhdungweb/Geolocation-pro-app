@@ -309,45 +309,47 @@ export default function AdminBilling() {
           />
         </label>
 
-        <select
-          className="ed-billing-select"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-          aria-label="Filter by billing status"
-        >
-          <option value="all">All Status</option>
-          <option value="ok">OK</option>
-          <option value="waiting">Waiting (&lt; $1)</option>
-          <option value="pending">Pending Charge</option>
-          <option value="overcharged">Overcharged</option>
-          <option value="charge_review">Review Legacy</option>
-          <option value="free_exceeded">Free Exceeded</option>
-        </select>
+        <div className="ed-billing-filter-row">
+          <select
+            className="ed-billing-select"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            aria-label="Filter by billing status"
+          >
+            <option value="all">All Status</option>
+            <option value="ok">OK</option>
+            <option value="waiting">Waiting (&lt; $1)</option>
+            <option value="pending">Pending Charge</option>
+            <option value="overcharged">Overcharged</option>
+            <option value="charge_review">Review Legacy</option>
+            <option value="free_exceeded">Free Exceeded</option>
+          </select>
 
-        <select
-          className="ed-billing-select"
-          value={planFilter}
-          onChange={(event) => setPlanFilter(event.target.value)}
-          aria-label="Filter by plan"
-        >
-          <option value="all">All Plans</option>
-          <option value="free">Free</option>
-          <option value="premium">Premium</option>
-          <option value="plus">Plus</option>
-          <option value="elite">Elite</option>
-          <option value="custom">Custom</option>
-          <option value="unlimited">Unlimited</option>
-        </select>
+          <select
+            className="ed-billing-select"
+            value={planFilter}
+            onChange={(event) => setPlanFilter(event.target.value)}
+            aria-label="Filter by plan"
+          >
+            <option value="all">All Plans</option>
+            <option value="free">Free</option>
+            <option value="premium">Premium</option>
+            <option value="plus">Plus</option>
+            <option value="elite">Elite</option>
+            <option value="custom">Custom</option>
+            <option value="unlimited">Unlimited</option>
+          </select>
 
-        {(searchQuery || statusFilter !== "all" || planFilter !== "all") && (
-          <button className="ed-billing-clear" type="button" onClick={clearFilters}>
-            <X size={14} /> Clear
-          </button>
-        )}
-      </div>
+          {(searchQuery || statusFilter !== "all" || planFilter !== "all") && (
+            <button className="ed-billing-clear" type="button" onClick={clearFilters}>
+              <X size={14} /> Clear
+            </button>
+          )}
+        </div>
 
-      <div className="ed-billing-count">
-        {filtered.length} / {(shops as any[]).length} shops
+        <div className="ed-billing-count">
+          {filtered.length} / {(shops as any[]).length} shops
+        </div>
       </div>
 
       <div className="ed-billing-table-card">
@@ -518,7 +520,13 @@ export default function AdminBilling() {
 
         .ed-billing-toolbar {
           display: grid;
-          grid-template-columns: minmax(280px, 1fr) auto auto auto;
+          grid-template-columns: minmax(280px, 1fr) auto auto;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ed-billing-filter-row {
+          display: flex;
           align-items: center;
           gap: 10px;
         }
@@ -580,6 +588,7 @@ export default function AdminBilling() {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
           text-align: right;
+          white-space: nowrap;
         }
 
         .ed-billing-table-card {
@@ -720,13 +729,23 @@ export default function AdminBilling() {
           }
 
           .ed-billing-toolbar {
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 1fr) auto;
             gap: 8px;
           }
 
           .ed-billing-search {
             grid-column: 1 / -1;
             min-height: 38px;
+          }
+
+          .ed-billing-filter-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px;
+          }
+
+          .ed-billing-filter-row:has(.ed-billing-clear) {
+            grid-column: 1 / -1;
           }
 
           .ed-billing-select,
@@ -741,7 +760,7 @@ export default function AdminBilling() {
           }
 
           .ed-billing-count {
-            margin-top: -4px;
+            justify-self: end;
             font-size: var(--ed-font-size-xs);
           }
         }
@@ -753,21 +772,71 @@ export default function AdminBilling() {
             text-align: left;
           }
 
+          .ed-period-label {
+            min-height: 34px;
+            padding-inline: 10px;
+            font-size: var(--ed-font-size-xs);
+            white-space: nowrap;
+            overflow: hidden;
+          }
+
+          .ed-period-label svg {
+            flex: 0 0 auto;
+          }
+
           .ed-billing-cards {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .ed-billing-toolbar {
+            grid-template-columns: 1fr;
+          }
+
+          .ed-billing-filter-row,
+          .ed-billing-filter-row:has(.ed-billing-clear) {
+            width: 100%;
+            grid-column: auto;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
           }
 
+          .ed-billing-count {
+            justify-self: start;
+          }
+
           .ed-billing-stat {
-            padding: 14px;
+            grid-template-columns: 32px minmax(0, 1fr);
+            gap: 8px;
+            padding: 10px;
+          }
+
+          .ed-billing-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--ed-radius-lg);
+          }
+
+          .ed-billing-icon svg {
+            width: 16px;
+            height: 16px;
+          }
+
+          .ed-billing-stat span:not(.ed-billing-icon) {
+            font-size: 10px;
+            line-height: 13px;
+          }
+
+          .ed-billing-stat strong {
+            margin-top: 2px;
+            font-size: 18px;
+            line-height: 22px;
           }
         }
 
         @media (max-width: 360px) {
-          .ed-billing-toolbar {
+          .ed-billing-cards,
+          .ed-billing-toolbar,
+          .ed-billing-filter-row,
+          .ed-billing-filter-row:has(.ed-billing-clear) {
             grid-template-columns: 1fr;
           }
         }
