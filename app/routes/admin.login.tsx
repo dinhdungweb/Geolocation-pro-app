@@ -199,7 +199,6 @@ export default function AdminLogin() {
           border: 1px solid var(--ed-color-surface-muted);
           border-radius: var(--ed-radius-xl);
           background: var(--ed-panel);
-          box-shadow: var(--ed-shadow);
         }
 
         .ed-login-card h2 {
