@@ -14,6 +14,7 @@ import {
     syncUsagePeriodForShop,
     usagePeriodFromSubscription,
 } from "./billing-period.server";
+import { resolveEffectivePlan } from "./effective-plan.server";
 
 function usageChargeIdempotencyKey(
     shop: string,
@@ -563,16 +564,19 @@ export async function checkAndChargeOverageBackground(shop: string) {
                 billingSubscriptionId: true,
                 billingUsageLineItemId: true,
                 billingPlanName: true,
+                billingOverrideEnabled: true,
+                billingOverridePlan: true,
             },
         });
 
         const subscription =
             activeSubscriptions.find((sub: any) => usagePeriodFromSubscription(sub, settings)) ||
             activeSubscriptions[0];
-        const currentPlan = subscription.name;
+        const shopifyPlan = subscription.name;
+        const { effectivePlan: currentPlan } = resolveEffectivePlan({ settings, shopifyPlan });
         const usagePeriod = usagePeriodFromSubscription(subscription, settings);
         if (!usagePeriod) return;
-        await syncUsagePeriodForShop(shop, currentPlan, usagePeriod);
+        await syncUsagePeriodForShop(shop, shopifyPlan, usagePeriod);
         
         // Find the line item that handles usage pricing
         const usageLineItem = subscription.lineItems.find((item: any) => 

@@ -11,6 +11,7 @@ import {
   type StorefrontAction,
 } from "../utils/analytics-token.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
+import { resolveEffectivePlan } from "../utils/effective-plan.server";
 import { getCountryFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
 import {
@@ -512,7 +513,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       (await prisma.settings.findUnique({ where: { shop } })) ??
       (await prisma.settings.create({ data: { shop } }));
 
-    const currentPlan = settings.currentPlan || FREE_PLAN;
+    const { effectivePlan: currentPlan } = resolveEffectivePlan({ settings });
     const hasPaidPlan = currentPlan !== FREE_PLAN;
     const planLimit = getPlanLimit(currentPlan, settings);
     const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });

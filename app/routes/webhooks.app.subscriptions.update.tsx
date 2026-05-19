@@ -23,6 +23,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         const existingSettings = await db.settings.findUnique({ where: { shop } });
+        const hasBillingOverride = Boolean(existingSettings?.billingOverrideEnabled && existingSettings?.billingOverridePlan);
 
         await db.settings.upsert({
             where: { shop },
@@ -30,7 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 ? { currentPlan }
                 : {
                     currentPlan,
-                    blockVpn: false,
+                    blockVpn: hasBillingOverride ? existingSettings?.blockVpn : false,
                     billingPlanName: null,
                     billingPeriodKey: null,
                     billingPeriodStart: null,

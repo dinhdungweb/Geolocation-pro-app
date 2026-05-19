@@ -23,6 +23,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
+import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 
 interface Settings {
     id: string;
@@ -128,10 +129,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isTest: isBillingTestMode(),
     });
 
-    // Explicitly check for active subscription, default to FREE_PLAN if none
-    const activeSubscription = billingCheck.appSubscriptions[0];
-    const currentPlan = activeSubscription ? activeSubscription.name : FREE_PLAN;
-    const isFreePlan = currentPlan === FREE_PLAN;
+    const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
 
     let settings = await prisma.settings.findUnique({
         where: { shop },
@@ -142,10 +140,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         settings = await prisma.settings.create({
             data: {
                 shop,
+                currentPlan: shopifyPlan,
                 ...defaultSettings,
             },
         });
+    } else if (settings.currentPlan !== shopifyPlan) {
+        settings = await prisma.settings.update({
+            where: { shop },
+            data: { currentPlan: shopifyPlan },
+        });
     }
+
+    const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
+    const isFreePlan = effectivePlan === FREE_PLAN;
 
     return json({ settings, shop, isFreePlan });
 };
@@ -157,13 +164,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
 
     try {
-        const billingCheck = await billing.check({
-            plans: ALL_PAID_PLANS as any,
-            isTest: isBillingTestMode(),
-        });
-        const activeSubscription = billingCheck.appSubscriptions[0];
-        const currentPlan = activeSubscription ? activeSubscription.name : FREE_PLAN;
-        const isFreePlan = currentPlan === FREE_PLAN;
+        const [billingCheck, settings] = await Promise.all([
+            billing.check({
+                plans: ALL_PAID_PLANS as any,
+                isTest: isBillingTestMode(),
+            }),
+            prisma.settings.findUnique({ where: { shop } }),
+        ]);
+        const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
+        const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
+        const isFreePlan = effectivePlan === FREE_PLAN;
 
         const isEnabled = formData.get("isEnabled") === "true";
         const mode = normalizeOption(formData.get("mode") as string | null, ["popup", "auto_redirect", "disabled"], "popup");
@@ -217,9 +227,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedSupportText,
                 blockedSupportUrl,
                 blockVpn,
+                currentPlan: shopifyPlan,
             },
             create: {
                 shop,
+                currentPlan: shopifyPlan,
                 isEnabled,
                 mode,
                 template,

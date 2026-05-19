@@ -34,6 +34,7 @@ import { isBillingTestMode } from "../utils/billing-mode.server";
 import { loadCrisp } from "../utils/crisp";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { chargeOverageUsageRecord } from "../utils/billing.server";
+import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
     const requestUrl = new URL(request.url);
@@ -70,13 +71,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isTest,
     });
 
-    const currentPlan = billingCheck.appSubscriptions[0]?.name || FREE_PLAN;
+    const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
     const settings = await prisma.settings.upsert({
         where: { shop: session.shop },
-        update: { currentPlan },
-        create: { shop: session.shop, currentPlan },
+        update: { currentPlan: shopifyPlan },
+        create: { shop: session.shop, currentPlan: shopifyPlan },
         select: {
             allowUnlimitedPlan: true,
+            billingOverrideEnabled: true,
+            billingOverridePlan: true,
+            billingOverrideReason: true,
             customPlanEnabled: true,
             customPlanName: true,
             customPlanPrice: true,
@@ -84,6 +88,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             customPlanNoOverage: true,
             customPlanTrialDays: true,
         },
+    });
+    const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
+        settings,
+        shopifyPlan,
     });
 
     return json({
@@ -99,6 +107,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         } : null,
         hasActivePayment: billingCheck.hasActivePayment,
         currentPlan,
+        shopifyPlan,
+        isBillingOverridden,
         shop: session.shop,
     });
 };
@@ -304,7 +314,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             try {
                 await prisma.settings.upsert({
                     where: { shop },
-                    update: { currentPlan: FREE_PLAN, blockVpn: false },
+                    update: {
+                        currentPlan: FREE_PLAN,
+                        blockVpn: false,
+                        billingOverrideEnabled: false,
+                        billingOverridePlan: null,
+                        billingOverrideReason: null,
+                    },
                     create: { shop, currentPlan: FREE_PLAN },
                 });
             } catch (err) {
@@ -337,8 +353,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         billingPeriodEnd: null,
                         billingSubscriptionId: null,
                         billingUsageLineItemId: null,
+                        billingOverrideEnabled: false,
+                        billingOverridePlan: null,
+                        billingOverrideReason: null,
                     }
-                    : { currentPlan: selectedPlan };
+                    : {
+                        currentPlan: selectedPlan,
+                        billingOverrideEnabled: false,
+                        billingOverridePlan: null,
+                        billingOverrideReason: null,
+                    };
 
                 await prisma.settings.upsert({
                     where: { shop },

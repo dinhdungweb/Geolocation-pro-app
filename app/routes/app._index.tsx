@@ -33,6 +33,7 @@ import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
+import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 
 const EmptyAuthState = ({ title }: { title: string }) => (
   <div style={{ padding: '32px', textAlign: 'center' }}>
@@ -137,8 +138,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   ]);
 
-  const hasProPlan = billingConfig.hasActivePayment;
-  const currentPlan = billingConfig.appSubscriptions[0]?.name || FREE_PLAN;
+  const shopifyPlan = getShopifyPlanFromBillingCheck(billingConfig);
+  const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
+    settings,
+    shopifyPlan,
+  });
   const planLimit = getPlanLimit(currentPlan, settings);
   const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
   const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
@@ -158,10 +162,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const usagePeriodEnd = usagePeriod.billingPeriodEnd?.toISOString() || null;
 
   // Keep proxy limit checks up to date without delaying the dashboard response.
-  const settingsSyncData = currentPlan === FREE_PLAN || hasUnlimitedUsage(currentPlan, settings)
+  const settingsSyncData = shopifyPlan === FREE_PLAN || hasUnlimitedUsage(shopifyPlan, settings)
     ? {
-        currentPlan,
-        blockVpn: currentPlan === FREE_PLAN ? false : settings.blockVpn,
+        currentPlan: shopifyPlan,
+        blockVpn: shopifyPlan === FREE_PLAN && !isBillingOverridden ? false : settings.blockVpn,
         billingPlanName: null,
         billingPeriodKey: null,
         billingPeriodStart: null,
@@ -169,12 +173,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         billingSubscriptionId: null,
         billingUsageLineItemId: null,
       }
-    : { currentPlan };
+    : { currentPlan: shopifyPlan };
 
   prisma.settings.upsert({
     where: { shop },
     update: settingsSyncData,
-    create: { shop, currentPlan },
+    create: { shop, currentPlan: shopifyPlan },
   }).catch((error) => {
     console.error("[Settings] Failed to sync currentPlan:", error);
   });
@@ -224,7 +228,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return json({
     shop,
-    hasProPlan,
+    hasProPlan: currentPlan !== FREE_PLAN,
+    shopifyPlan,
+    isBillingOverridden,
     currentPlan,
     planDisplayName,
     planLimit,

@@ -14,6 +14,7 @@ import {
 } from "../billing.config";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { resolveEffectivePlan } from "../utils/effective-plan.server";
 
 function formatBillingPeriodEnd(value: string | Date | null | undefined) {
   if (!value) return null;
@@ -62,7 +63,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const prevMonthStart = new Date(prevDate.getFullYear(), prevDate.getMonth(), 1);
 
   const allSettings = await prisma.settings.findMany({ where: { NOT: { shop: "GLOBAL" } } });
-  const currentPeriodKeys = allSettings.map((setting: any) => setting.billingPeriodKey || `calendar:${calendarYearMonth}`);
+  const currentPeriodKeys = allSettings.map((setting: any) => {
+    const shopifyPlan = setting.currentPlan || FREE_PLAN;
+    const { effectivePlan } = resolveEffectivePlan({ settings: setting, shopifyPlan });
+    return effectivePlan === FREE_PLAN || hasUnlimitedUsage(effectivePlan, setting)
+      ? `calendar:${calendarYearMonth}`
+      : setting.billingPeriodKey || `calendar:${calendarYearMonth}`;
+  });
   const shopsWithSettings = allSettings.map((setting: any) => setting.shop);
   const legacyMonthsToCheck = Array.from(
     new Set([
@@ -111,9 +118,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   const shops = allSettings.map((setting: any) => {
-    const plan = setting.currentPlan || FREE_PLAN;
+    const shopifyPlan = setting.currentPlan || FREE_PLAN;
+    const { effectivePlan: plan, isBillingOverridden } = resolveEffectivePlan({
+      settings: setting,
+      shopifyPlan,
+    });
     const limit = getPlanLimit(plan, setting);
-    const billingPeriodKey = setting.billingPeriodKey || `calendar:${calendarYearMonth}`;
+    const billingPeriodKey = plan === FREE_PLAN || hasUnlimitedUsage(plan, setting)
+      ? `calendar:${calendarYearMonth}`
+      : setting.billingPeriodKey || `calendar:${calendarYearMonth}`;
     const usage = usageMap.get(`${setting.shop}:${billingPeriodKey}`);
     const totalVisitors = usage?.totalVisitors || 0;
     const chargedVisitors = usage?.chargedVisitors || 0;
@@ -153,6 +166,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return {
       shop: setting.shop,
       plan,
+      shopifyPlan,
+      isBillingOverridden,
       billingPeriodKey,
       billingPeriodEnd: setting.billingPeriodEnd,
       limit,

@@ -91,6 +91,9 @@ model Settings {
   isEnabled          Boolean  @default(true)
   blockVpn           Boolean  @default(false)
   allowUnlimitedPlan Boolean  @default(false)
+  billingOverrideEnabled Boolean @default(false)
+  billingOverridePlan String?
+  billingOverrideReason String?
   customPlanEnabled  Boolean  @default(false)
   customPlanName     String   @default("Custom plan")
   customPlanPrice    Decimal  @default(79.99) @db.Decimal(10, 2)

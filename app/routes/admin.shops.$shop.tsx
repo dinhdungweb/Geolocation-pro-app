@@ -4,8 +4,22 @@ import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-
 import { useState, useEffect } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
-import { CUSTOM_PLAN, DEFAULT_TRIAL_DAYS, FREE_PLAN } from "../billing.config";
+import {
+    CUSTOM_PLAN,
+    DEFAULT_TRIAL_DAYS,
+    ELITE_PLAN,
+    FREE_PLAN,
+    PLUS_PLAN,
+    PREMIUM_PLAN,
+    UNLIMITED_PLAN,
+    hasUnlimitedUsage,
+} from "../billing.config";
 import { issueApplicationCredit } from "../utils/billing.server";
+import {
+    hasPaidPlanAccess,
+    normalizeBillingOverridePlan,
+    resolveEffectivePlan,
+} from "../utils/effective-plan.server";
 import { 
     ArrowLeft, 
     Eye, 
@@ -51,6 +65,8 @@ function sortUsageRows(rows: any[], currentBillingPeriodKey: string | null | und
     });
 }
 
+const BILLING_OVERRIDE_PLAN_OPTIONS = [PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN, CUSTOM_PLAN];
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     await requireAdminAuth(request);
     const shop = decodeURIComponent(params.shop ?? "");
@@ -83,6 +99,43 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 data: { chargedVisitors }
             });
             return json({ success: true, message: "Usage adjusted successfully" });
+        } catch (e: any) {
+            return json({ success: false, error: e.message }, { status: 500 });
+        }
+    }
+
+    if (intent === "save_billing_override") {
+        const billingOverrideEnabled = formData.get("billingOverrideEnabled") === "true";
+        const billingOverridePlan = normalizeBillingOverridePlan(
+            (formData.get("billingOverridePlan") as string) || UNLIMITED_PLAN,
+        );
+        const billingOverrideReason = ((formData.get("billingOverrideReason") as string) || "").trim();
+
+        if (billingOverrideEnabled && !billingOverridePlan) {
+            return json({ success: false, error: "Select a valid override plan" }, { status: 400 });
+        }
+
+        try {
+            await prisma.settings.upsert({
+                where: { shop },
+                update: {
+                    billingOverrideEnabled,
+                    billingOverridePlan: billingOverrideEnabled ? billingOverridePlan : null,
+                    billingOverrideReason: billingOverrideEnabled ? billingOverrideReason || null : null,
+                },
+                create: {
+                    shop,
+                    billingOverrideEnabled,
+                    billingOverridePlan: billingOverrideEnabled ? billingOverridePlan : null,
+                    billingOverrideReason: billingOverrideEnabled ? billingOverrideReason || null : null,
+                },
+            });
+            return json({
+                success: true,
+                message: billingOverrideEnabled
+                    ? "Billing override enabled for this shop"
+                    : "Billing override disabled for this shop",
+            });
         } catch (e: any) {
             return json({ success: false, error: e.message }, { status: 500 });
         }
@@ -157,7 +210,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     const settings = await prisma.settings.findUnique({ where: { shop } });
     const currentCalendarKey = `calendar:${getYearMonth()}`;
-    const currentBillingPeriodKey = settings?.billingPeriodKey || currentCalendarKey;
+    const shopifyPlan = settings?.currentPlan || FREE_PLAN;
+    const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
+        settings,
+        shopifyPlan,
+    });
+    const hasProPlan = hasPaidPlanAccess(currentPlan);
+    const currentBillingPeriodKey = !settings || currentPlan === FREE_PLAN || hasUnlimitedUsage(currentPlan, settings)
+        ? currentCalendarKey
+        : settings.billingPeriodKey || currentCalendarKey;
 
     const [rules, logs, recentUsage, currentPeriodUsage] = await Promise.all([
         prisma.redirectRule.findMany({
@@ -201,13 +262,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     if (currentPeriodUsage) usageByKey.set((currentPeriodUsage as any).billingPeriodKey, currentPeriodUsage);
     const monthlyUsage = sortUsageRows(Array.from(usageByKey.values()), currentBillingPeriodKey).slice(0, 6);
 
-    const currentPlan = settings?.currentPlan || FREE_PLAN;
-    const hasProPlan = currentPlan !== FREE_PLAN;
     const currentUsage =
-        (settings?.billingPeriodKey
-            ? monthlyUsage.find((u: any) => u.billingPeriodKey === settings.billingPeriodKey)
-            : null) ||
-        monthlyUsage.find((u: any) => u.billingPeriodKey === currentCalendarKey) ||
+        monthlyUsage.find((u: any) => u.billingPeriodKey === currentBillingPeriodKey) ||
         monthlyUsage[0] ||
         null;
 
@@ -230,12 +286,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         hasSettings: !!settings,
         hasProPlan,
         currentPlan,
+        shopifyPlan,
+        isBillingOverridden,
         settings: settings ? {
             mode: settings.mode,
             template: settings.template,
             excludeBots: settings.excludeBots,
             cookieDuration: settings.cookieDuration,
             allowUnlimitedPlan: settings.allowUnlimitedPlan,
+            billingOverrideEnabled: settings.billingOverrideEnabled,
+            billingOverridePlan: settings.billingOverridePlan,
+            billingOverrideReason: settings.billingOverrideReason,
             customPlanEnabled: settings.customPlanEnabled,
             customPlanName: settings.customPlanName,
             customPlanPrice: settings.customPlanPrice.toString(),
@@ -263,13 +324,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 
 export default function AdminShopDetail() {
-    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan, currentPlan } = useLoaderData<typeof loader>();
+    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan, currentPlan, shopifyPlan, isBillingOverridden } = useLoaderData<typeof loader>();
     const actionData = useActionData<any>();
     const navigation = useNavigation();
     const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
     
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCustomPlanModalOpen, setIsCustomPlanModalOpen] = useState(false);
+    const [isBillingOverrideModalOpen, setIsBillingOverrideModalOpen] = useState(false);
 
     // Close modal on escape key
     useEffect(() => {
@@ -277,6 +339,7 @@ export default function AdminShopDetail() {
             if (e.key === 'Escape') {
                 setIsModalOpen(false);
                 setIsCustomPlanModalOpen(false);
+                setIsBillingOverrideModalOpen(false);
             }
         };
         window.addEventListener('keydown', handleEsc);
@@ -784,6 +847,62 @@ export default function AdminShopDetail() {
                 </div>
             )}
 
+            {hasSettings && settings && isBillingOverrideModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsBillingOverrideModalOpen(false)}>
+                    <div className="modal-content modal-content-wide" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div className="modal-title">
+                                <Zap size={20} color="#1e293b" />
+                                Configure Billing Override
+                            </div>
+                            <button className="modal-close" onClick={() => setIsBillingOverrideModalOpen(false)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
+                                Override the app's effective plan for internal testing or dev stores. Shopify billing sync will still keep the real plan separately.
+                            </p>
+                            <Form method="post">
+                                <input type="hidden" name="intent" value="save_billing_override" />
+                                <div className="billing-input-group">
+                                    <label>Override status</label>
+                                    <select name="billingOverrideEnabled" className="billing-input" defaultValue={settings.billingOverrideEnabled ? "true" : "false"}>
+                                        <option value="true">Enabled</option>
+                                        <option value="false">Disabled</option>
+                                    </select>
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Effective plan</label>
+                                    <select name="billingOverridePlan" className="billing-input" defaultValue={settings.billingOverridePlan || UNLIMITED_PLAN}>
+                                        {BILLING_OVERRIDE_PLAN_OPTIONS.map((plan) => (
+                                            <option key={plan} value={plan}>{plan.toUpperCase()}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="billing-input-group">
+                                    <label>Reason</label>
+                                    <input
+                                        name="billingOverrideReason"
+                                        className="billing-input"
+                                        placeholder="dev store, QA, partner test..."
+                                        defaultValue={settings.billingOverrideReason || ""}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '28px' }}>
+                                    <button type="button" className="inline-toggle-btn" onClick={() => setIsBillingOverrideModalOpen(false)}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="primary-btn" style={{ width: 'auto', minWidth: '180px' }} disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <>Save Override <ChevronRight size={16} /></>}
+                                    </button>
+                                </div>
+                            </Form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {hasSettings && settings && isCustomPlanModalOpen && (
                 <div className="modal-overlay" onClick={() => setIsCustomPlanModalOpen(false)}>
                     <div className="modal-content modal-content-wide" onClick={e => e.stopPropagation()}>
@@ -940,6 +1059,31 @@ export default function AdminShopDetail() {
                                 <div className="info-item">
                                     <span className="label">Cookie TTL</span>
                                     <span className="value">{settings!.cookieDuration} Days</span>
+                                </div>
+                                <div className="custom-plan-summary">
+                                    <div className="custom-plan-summary-main">
+                                        <div className="custom-plan-title">
+                                            <span className="custom-plan-name">Billing Override</span>
+                                            <span className={`custom-plan-pill ${isBillingOverridden ? 'enabled' : 'disabled'}`}>
+                                                {isBillingOverridden ? 'ENABLED' : 'DISABLED'}
+                                            </span>
+                                        </div>
+                                        <div className="custom-plan-meta">
+                                            Shopify: {(shopifyPlan || FREE_PLAN).toUpperCase()} | Effective: {(currentPlan || FREE_PLAN).toUpperCase()}
+                                        </div>
+                                        {settings!.billingOverrideReason && (
+                                            <div className="custom-plan-note">
+                                                {settings!.billingOverrideReason}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="inline-toggle-btn enabled"
+                                        onClick={() => setIsBillingOverrideModalOpen(true)}
+                                    >
+                                        Configure
+                                    </button>
                                 </div>
                                 <div className="custom-plan-summary">
                                     <div className="custom-plan-summary-main">

@@ -8,6 +8,7 @@ import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage }
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server';
 import { cleanupOldLogs } from './cleanup.server';
+import { resolveEffectivePlan } from './effective-plan.server';
 
 const USAGE_JOB_LOCK_KEY = 'usage-cron:check-all-shops';
 const USAGE_JOB_LOCK_TTL_MS = 5 * 60 * 60 * 1000;
@@ -106,14 +107,14 @@ export async function checkAllShopsUsage() {
             const shop = settings.shop;
 
             try {
-                let currentPlan = settings.currentPlan || FREE_PLAN;
+                let shopifyPlan = settings.currentPlan || FREE_PLAN;
 
             // For paid shops: query Shopify API for the REAL active plan to avoid stale DB data
-            if (currentPlan !== FREE_PLAN) {
+            if (shopifyPlan !== FREE_PLAN) {
                 const actualPlan = await getShopActivePlan(shop);
-                if (actualPlan !== null && actualPlan !== currentPlan) {
-                    console.log(`[Cron] Plan sync for ${shop}: DB="${currentPlan}" -> Shopify="${actualPlan}"`);
-                    currentPlan = actualPlan;
+                if (actualPlan !== null && actualPlan !== shopifyPlan) {
+                    console.log(`[Cron] Plan sync for ${shop}: DB="${shopifyPlan}" -> Shopify="${actualPlan}"`);
+                    shopifyPlan = actualPlan;
                     // Sync corrected plan back to DB so proxy.config uses the right limit
                     try {
                         const planSyncData = actualPlan === FREE_PLAN
@@ -137,13 +138,18 @@ export async function checkAllShopsUsage() {
                         console.error(`[Cron] Failed to sync plan for ${shop}:`, err);
                     }
                 } else if (actualPlan !== null) {
-                    currentPlan = actualPlan; // Use Shopify's value even if same, to be safe
+                    shopifyPlan = actualPlan; // Use Shopify's value even if same, to be safe
                 }
                 // If actualPlan is null (API failed), fall back to DB value
             }
 
-            const planLimit = getPlanLimit(currentPlan, settings);
-            const hasPlanUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
+            const effectiveSettings = { ...settings, currentPlan: shopifyPlan };
+            const { effectivePlan: currentPlan } = resolveEffectivePlan({
+                settings: effectiveSettings,
+                shopifyPlan,
+            });
+            const planLimit = getPlanLimit(currentPlan, effectiveSettings);
+            const hasPlanUnlimitedUsage = hasUnlimitedUsage(currentPlan, effectiveSettings);
 
             // Auto-bill accumulated overage first so reward emails reflect the latest charged state.
             // Skip Free plan shops - they have no subscription, so billing API calls would be wasted.
@@ -151,7 +157,7 @@ export async function checkAllShopsUsage() {
                 await checkAndChargeOverageBackground(shop);
             }
 
-            const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
+            const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings: effectiveSettings });
 
             // Get current billing period usage
             const monthlyUsage = await prisma.monthlyUsage.findUnique({

@@ -3,8 +3,10 @@ import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { useMemo, useState } from "react";
 import { ExternalLink, Search, X } from "lucide-react";
+import { FREE_PLAN, hasUnlimitedUsage } from "../billing.config";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { resolveEffectivePlan } from "../utils/effective-plan.server";
 
 function getYearMonth(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -26,7 +28,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const currentCalendarKey = `calendar:${getYearMonth()}`;
   const usagePeriodKeys = Array.from(
-    new Set(shops.map((shop: any) => shop.billingPeriodKey || currentCalendarKey)),
+    new Set(shops.map((shop: any) => {
+      const { effectivePlan } = resolveEffectivePlan({
+        settings: shop,
+        shopifyPlan: shop.currentPlan,
+      });
+      return effectivePlan === FREE_PLAN || hasUnlimitedUsage(effectivePlan, shop)
+        ? currentCalendarKey
+        : shop.billingPeriodKey || currentCalendarKey;
+    })),
   );
   const usage =
     usagePeriodKeys.length > 0
@@ -42,12 +52,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const usageMap = new Map((usage as any[]).map((row: any) => [`${row.shop}:${row.billingPeriodKey}`, row]));
 
   return json({
-    shops: shops.map((shop: any) => ({
-      ...shop,
-      createdAt: shop.createdAt.toISOString(),
-      ruleCount: rulesMap.get(shop.shop) || 0,
-      latestUsage: usageMap.get(`${shop.shop}:${shop.billingPeriodKey || currentCalendarKey}`),
-    })),
+    shops: shops.map((shop: any) => {
+      const { effectivePlan, isBillingOverridden } = resolveEffectivePlan({
+        settings: shop,
+        shopifyPlan: shop.currentPlan,
+      });
+      const usagePeriodKey = effectivePlan === FREE_PLAN || hasUnlimitedUsage(effectivePlan, shop)
+        ? currentCalendarKey
+        : shop.billingPeriodKey || currentCalendarKey;
+
+      return {
+        ...shop,
+        currentPlan: effectivePlan,
+        shopifyPlan: shop.currentPlan,
+        isBillingOverridden,
+        createdAt: shop.createdAt.toISOString(),
+        ruleCount: rulesMap.get(shop.shop) || 0,
+        latestUsage: usageMap.get(`${shop.shop}:${usagePeriodKey}`),
+      };
+    }),
   });
 };
 
@@ -57,6 +80,7 @@ function planClass(plan?: string | null) {
   if (normalized === "plus") return "is-plus";
   if (normalized === "premium") return "is-premium";
   if (normalized === "custom") return "is-custom";
+  if (normalized === "unlimited") return "is-custom";
   return "is-free";
 }
 

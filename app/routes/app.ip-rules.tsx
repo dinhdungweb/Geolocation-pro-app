@@ -33,6 +33,7 @@ import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { isBillingTestMode } from "../utils/billing-mode.server";
+import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 
 interface IPRule {
     id: string;
@@ -67,8 +68,10 @@ function normalizeIPAddresses(value: unknown) {
         .filter(Boolean);
 }
 
-function isPaidBillingConfig(billingConfig: any) {
-    return billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+function isPaidBillingConfig(billingConfig: any, settings: any) {
+    const shopifyPlan = getShopifyPlanFromBillingCheck(billingConfig);
+    const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
+    return hasPaidPlanAccess(effectivePlan) || billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 }
 
 // Loader: Fetch all IP rules for the current shop
@@ -85,11 +88,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     // Check for active subscription (IP Rules is a Pro feature)
-    const billingConfig = await billing.check({
-        plans: ALL_PAID_PLANS as any,
-        isTest: isBillingTestMode(),
-    });
-    const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+    const [billingConfig, settings] = await Promise.all([
+        billing.check({
+            plans: ALL_PAID_PLANS as any,
+            isTest: isBillingTestMode(),
+        }),
+        prisma.settings.findUnique({ where: { shop } }),
+    ]);
+    const hasProPlan = isPaidBillingConfig(billingConfig, settings);
 
     const canCreateRule = hasProPlan;
     const conflictSummary = detectRuleConflicts(rules, "ip");
@@ -105,11 +111,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const intent = formData.get("intent") as string;
 
     try {
-        const billingConfig = await billing.check({
-            plans: ALL_PAID_PLANS as any,
-            isTest: isBillingTestMode(),
-        });
-        const hasProPlan = isPaidBillingConfig(billingConfig);
+        const [billingConfig, settings] = await Promise.all([
+            billing.check({
+                plans: ALL_PAID_PLANS as any,
+                isTest: isBillingTestMode(),
+            }),
+            prisma.settings.findUnique({ where: { shop } }),
+        ]);
+        const hasProPlan = isPaidBillingConfig(billingConfig, settings);
 
         if (intent === "create") {
             if (!hasProPlan) {

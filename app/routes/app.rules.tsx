@@ -35,6 +35,7 @@ import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { getShopifyMarkets } from "../utils/shopify-markets.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
+import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -102,8 +103,10 @@ function validateUrl(url: string) {
     return !dangerous.test(url.trim());
 }
 
-function isPaidBillingConfig(billingConfig: any) {
-    return billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+function isPaidBillingConfig(billingConfig: any, settings: any) {
+    const shopifyPlan = getShopifyPlanFromBillingCheck(billingConfig);
+    const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
+    return hasPaidPlanAccess(effectivePlan) || billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 }
 
 function isFreePlanFeatureRequest(ruleType: string, pageTargetingType: string, matchType = "country") {
@@ -137,11 +140,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     // Check for active subscription
-    const billingConfig = await billing.check({
-        plans: ALL_PAID_PLANS as any,
-        isTest: isBillingTestMode(),
-    });
-    const hasProPlan = billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
+    const [billingConfig, settings] = await Promise.all([
+        billing.check({
+            plans: ALL_PAID_PLANS as any,
+            isTest: isBillingTestMode(),
+        }),
+        prisma.settings.findUnique({ where: { shop } }),
+    ]);
+    const hasProPlan = isPaidBillingConfig(billingConfig, settings);
     const marketsResult = await getShopifyMarkets(admin);
     const marketCountriesByHandle = new Map(
         marketsResult.markets.map((market) => [market.handle, market.countryCodes] as const),
@@ -198,11 +204,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const intent = formData.get("intent") as string;
 
     try {
-        const billingConfig = await billing.check({
-            plans: ALL_PAID_PLANS as any,
-            isTest: isBillingTestMode(),
-        });
-        const hasProPlan = isPaidBillingConfig(billingConfig);
+        const [billingConfig, settings] = await Promise.all([
+            billing.check({
+                plans: ALL_PAID_PLANS as any,
+                isTest: isBillingTestMode(),
+            }),
+            prisma.settings.findUnique({ where: { shop } }),
+        ]);
+        const hasProPlan = isPaidBillingConfig(billingConfig, settings);
 
         if (intent === "create") {
             const name = formData.get("name") as string;
