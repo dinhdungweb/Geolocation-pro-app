@@ -82,21 +82,23 @@ export default function AdminLogin() {
   return (
     <div className="ed-login-screen">
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
         :root {
-          --ed-font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-          --ed-text: #545454;
-          --ed-text-strong: #222222;
+          --ed-font-primary: "Outfit", sans-serif;
+          --ed-color-text-primary: #3d3d47;
+          --ed-color-text-tertiary: #767676;
+          --ed-color-surface-base: #000000;
+          --ed-color-surface-muted: #f4f5f8;
+          --ed-color-surface-strong: #ffffff;
+          --ed-color-border-muted: #43b9b2;
+          --ed-radius-xl: 10px;
+          --ed-shadow: rgba(0, 0, 0, 0.1) 0px 36px 35px 0px;
+
           --ed-text-inverse: var(--ed-color-surface-strong);
-          --ed-surface-base: var(--ed-color-surface-base);
-          --ed-surface-muted: #82b440;
           --ed-page: var(--ed-color-surface-muted);
           --ed-panel: var(--ed-color-surface-strong);
-          --ed-border: #dfe5dc;
-          --ed-danger: #b42318;
           --ed-danger-soft: #fff1f0;
-          --ed-focus: rgba(130, 180, 64, 0.35);
-          --ed-radius: 4px;
-          --ed-shadow: rgb(111, 154, 55) 0px 2px 0px 0px;
         }
 
         *,
@@ -133,7 +135,7 @@ export default function AdminLogin() {
           justify-content: space-between;
           gap: 40px;
           padding: 40px;
-          background: var(--ed-color-surface-strong);
+          background: #0a9f98;
           color: var(--ed-text-inverse);
         }
 
