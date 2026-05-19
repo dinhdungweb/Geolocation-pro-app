@@ -108,6 +108,7 @@ export async function checkAllShopsUsage() {
 
             try {
                 let shopifyPlan = settings.currentPlan || FREE_PLAN;
+                const hasBillingOverride = Boolean(settings.billingOverrideEnabled && settings.billingOverridePlan);
 
             // For paid shops: query Shopify API for the REAL active plan to avoid stale DB data
             if (shopifyPlan !== FREE_PLAN) {
@@ -120,7 +121,7 @@ export async function checkAllShopsUsage() {
                         const planSyncData = actualPlan === FREE_PLAN
                             ? {
                                 currentPlan: actualPlan,
-                                blockVpn: false,
+                                blockVpn: hasBillingOverride ? settings.blockVpn : false,
                                 billingPlanName: null,
                                 billingPeriodKey: null,
                                 billingPeriodStart: null,

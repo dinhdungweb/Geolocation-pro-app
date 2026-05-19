@@ -348,11 +348,12 @@ export default function AdminShopDetail() {
 
     // Close modal after successful submission
     useEffect(() => {
-        if (actionData?.success && (isModalOpen || isCustomPlanModalOpen)) {
+        if (actionData?.success && (isModalOpen || isCustomPlanModalOpen || isBillingOverrideModalOpen)) {
             setIsModalOpen(false);
             setIsCustomPlanModalOpen(false);
+            setIsBillingOverrideModalOpen(false);
         }
-    }, [actionData, isModalOpen, isCustomPlanModalOpen]);
+    }, [actionData, isModalOpen, isCustomPlanModalOpen, isBillingOverrideModalOpen]);
 
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString("en-GB", {
