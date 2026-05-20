@@ -340,6 +340,38 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
     const startItem = (currentPage - 1) * itemsPerPage + 1;
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = [];
+        if (totalPages <= 5) {
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+            return pages;
+        }
+
+        pages.push(1);
+
+        const start = Math.max(2, currentPage - 1);
+        const end = Math.min(totalPages - 1, currentPage + 1);
+
+        if (start > 2) {
+            pages.push("...");
+        }
+
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+
+        if (end < totalPages - 1) {
+            pages.push("...");
+        }
+
+        pages.push(totalPages);
+        return pages;
+    };
+
+    const pages = getPageNumbers();
+
     return (
         <div className="ed-pagination">
             <div className="ed-pagination-info">
@@ -351,26 +383,37 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
                     disabled={currentPage === 1}
                     onClick={() => onPageChange(currentPage - 1)}
                     className="ed-pagination-btn"
+                    aria-label="Previous page"
                 >
-                    Previous
+                    «
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                        key={page}
-                        type="button"
-                        onClick={() => onPageChange(page)}
-                        className={`ed-pagination-btn ${currentPage === page ? "active" : ""}`}
-                    >
-                        {page}
-                    </button>
-                ))}
+                {pages.map((page, index) => {
+                    if (page === "...") {
+                        return (
+                            <span key={`ellipsis-${index}`} className="ed-pagination-ellipsis">
+                                ...
+                            </span>
+                        );
+                    }
+                    return (
+                        <button
+                            key={page}
+                            type="button"
+                            onClick={() => onPageChange(Number(page))}
+                            className={`ed-pagination-btn ${currentPage === page ? "active" : ""}`}
+                        >
+                            {page}
+                        </button>
+                    );
+                })}
                 <button
                     type="button"
                     disabled={currentPage === totalPages}
                     onClick={() => onPageChange(currentPage + 1)}
                     className="ed-pagination-btn"
+                    aria-label="Next page"
                 >
-                    Next
+                    »
                 </button>
             </div>
         </div>
@@ -825,43 +868,63 @@ export default function AdminShopDetail() {
                     color: var(--ed-color-text-primary);
                 }
 
-                .ed-pagination-buttons {
-                    display: flex;
+                 .ed-pagination-buttons {
+                    display: inline-flex;
                     align-items: center;
-                    gap: 6px;
+                    border: 1px solid #e9d5ff;
+                    border-radius: 8px;
+                    background: white;
+                    overflow: hidden;
+                    gap: 0;
                 }
 
-                .ed-pagination-btn {
-                    min-height: 32px;
-                    min-width: 32px;
-                    padding: 0 10px;
+                .ed-pagination-btn,
+                .ed-pagination-ellipsis {
+                    height: 34px;
+                    min-width: 34px;
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
-                    border: 1px solid var(--ed-color-surface-muted);
-                    border-radius: var(--ed-radius-lg);
-                    background: var(--ed-color-surface-strong);
-                    color: var(--ed-color-text-primary);
-                    font-size: var(--ed-font-size-xs);
-                    font-weight: 700;
+                    font-size: 13px;
+                    font-weight: 600;
+                    border: none;
+                    background: transparent;
+                    color: #9333ea;
+                    border-right: 1px solid #f3e8ff;
+                    border-radius: 0 !important;
+                    margin: 0;
+                    padding: 0 10px;
                     transition: all 0.15s ease;
+                    cursor: pointer;
+                    box-sizing: border-box;
+                    line-height: 1;
+                }
+
+                .ed-pagination-ellipsis {
+                    cursor: default;
+                    user-select: none;
+                    color: #c084fc;
+                }
+
+                .ed-pagination-buttons > button:last-child {
+                    border-right: none;
                 }
 
                 .ed-pagination-btn:hover:not(:disabled) {
-                    border-color: var(--ed-color-border-muted);
-                    color: var(--ed-color-accent-active);
-                    background: var(--ed-color-accent-soft);
+                    background: #f5f3ff;
+                    color: #7c3aed;
                 }
 
                 .ed-pagination-btn.active {
-                    border-color: var(--ed-color-border-muted);
-                    background: var(--ed-color-border-muted);
-                    color: var(--ed-color-surface-strong);
+                    background: #f3e8ff;
+                    color: #7c3aed;
+                    font-weight: 700;
                 }
 
                 .ed-pagination-btn:disabled {
-                    opacity: 0.4;
+                    opacity: 0.35;
                     cursor: not-allowed;
+                    background: #faf5ff;
                 }
 
                 /* Billing Forms */
@@ -1360,7 +1423,7 @@ export default function AdminShopDetail() {
                                             <td><strong>${Number(attempt.amount).toFixed(2)}</strong></td>
                                             <td>
                                                 {attempt.shopifyUsageRecordId ? (
-                                                    <span style={{ fontFamily: 'monospace' }} title={attempt.shopifyUsageRecordId}>
+                                                    <span style={{ fontWeight: 500 }} title={attempt.shopifyUsageRecordId}>
                                                         {attempt.shopifyUsageRecordId.replace("gid://shopify/AppUsageRecord/", "")}
                                                     </span>
                                                 ) : (
