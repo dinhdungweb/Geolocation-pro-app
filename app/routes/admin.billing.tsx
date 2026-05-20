@@ -595,17 +595,17 @@ export default function AdminBilling() {
                             : attempt.billingPeriodKey}
                         </span>
                       </td>
-                      <td className="ed-number">+{attempt.overageVisitors.toLocaleString()}</td>
+                      <td className="ed-number"><strong>+{attempt.overageVisitors.toLocaleString()}</strong></td>
                       <td className="ed-number">
                         <strong>${Number(attempt.amount).toFixed(2)}</strong>
                       </td>
                       <td>
                         {attempt.shopifyUsageRecordId ? (
-                          <span style={{ fontFamily: "monospace", fontSize: "11px" }} title={attempt.shopifyUsageRecordId}>
+                          <span style={{ fontFamily: "monospace" }} title={attempt.shopifyUsageRecordId}>
                             {attempt.shopifyUsageRecordId.replace("gid://shopify/AppUsageRecord/", "")}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--ed-color-text-tertiary)", fontSize: "11px" }}>-</span>
+                          <span style={{ color: "var(--ed-color-text-tertiary)" }}>-</span>
                         )}
                       </td>
                       <td>

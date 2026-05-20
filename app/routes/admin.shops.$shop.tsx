@@ -1356,15 +1356,15 @@ export default function AdminShopDetail() {
                                                         : attempt.billingPeriodKey}
                                                 </strong>
                                             </td>
-                                            <td>+{attempt.overageVisitors.toLocaleString()}</td>
+                                            <td><strong>+{attempt.overageVisitors.toLocaleString()}</strong></td>
                                             <td><strong>${Number(attempt.amount).toFixed(2)}</strong></td>
                                             <td>
                                                 {attempt.shopifyUsageRecordId ? (
-                                                    <span style={{ fontFamily: 'monospace', fontSize: '11px' }} title={attempt.shopifyUsageRecordId}>
+                                                    <span style={{ fontFamily: 'monospace' }} title={attempt.shopifyUsageRecordId}>
                                                         {attempt.shopifyUsageRecordId.replace("gid://shopify/AppUsageRecord/", "")}
                                                     </span>
                                                 ) : (
-                                                    <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
+                                                    <span style={{ color: '#94a3b8' }}>-</span>
                                                 )}
                                             </td>
                                             <td>
