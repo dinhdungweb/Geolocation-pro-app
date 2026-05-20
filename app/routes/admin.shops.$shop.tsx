@@ -1176,7 +1176,7 @@ export default function AdminShopDetail() {
             <div className="ed-shop-card ed-shop-table-card" style={{ marginBottom: '32px' }}>
                 <div className="ed-shop-card-head">
                     <DollarSign size={18} color="#82b440" />
-                    Overage Charge Attempts (Lịch sử Billing phát sinh)
+                    Overage Charge Attempts
                 </div>
                 <div className="table-container">
                     <table>
@@ -1204,20 +1204,28 @@ export default function AdminShopDetail() {
                                     return (
                                         <tr key={attempt.id}>
                                             <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(attempt.createdAt)}</td>
-                                            <td><strong>{attempt.billingPeriodKey}</strong></td>
+                                            <td>
+                                                <strong title={attempt.billingPeriodKey}>
+                                                    {attempt.billingPeriodKey && attempt.billingPeriodKey.includes(':') 
+                                                        ? attempt.billingPeriodKey.split(':').pop() 
+                                                        : attempt.billingPeriodKey}
+                                                </strong>
+                                            </td>
                                             <td>+{attempt.overageVisitors.toLocaleString()}</td>
                                             <td><strong>${Number(attempt.amount).toFixed(2)}</strong></td>
                                             <td>
                                                 {attempt.shopifyUsageRecordId ? (
-                                                    <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{attempt.shopifyUsageRecordId}</span>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '11px' }} title={attempt.shopifyUsageRecordId}>
+                                                        {attempt.shopifyUsageRecordId.replace("gid://shopify/AppUsageRecord/", "")}
+                                                    </span>
                                                 ) : (
                                                     <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
                                                 )}
                                             </td>
                                             <td>
                                                 <span className={`badge-v3`} style={{
-                                                    background: attempt.status === 'success' ? '#f2f6ee' : attempt.status === 'failed' ? '#fef2f2' : '#fff8e8',
-                                                    color: attempt.status === 'success' ? '#82b440' : attempt.status === 'failed' ? '#ef4444' : '#f59e0b',
+                                                    background: (attempt.status === 'success' || attempt.status === 'succeeded') ? '#f2f6ee' : attempt.status === 'failed' ? '#fef2f2' : '#fff8e8',
+                                                    color: (attempt.status === 'success' || attempt.status === 'succeeded') ? '#82b440' : attempt.status === 'failed' ? '#ef4444' : '#f59e0b',
                                                     fontWeight: 700
                                                 }}>
                                                     {attempt.status.toUpperCase()}

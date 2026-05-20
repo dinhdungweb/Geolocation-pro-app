@@ -468,7 +468,7 @@ export default function AdminBilling() {
 
       <div className="ed-period-label" style={{ marginTop: "24px", display: "flex", alignItems: "center", gap: "8px" }}>
         <DollarSign size={16} />
-        Recent Overage Charge Attempts (Lịch sử Billing phát sinh gần đây)
+        Recent Overage Charge Attempts
       </div>
 
       <div className="ed-billing-table-card" style={{ marginBottom: "32px" }}>
@@ -503,7 +503,7 @@ export default function AdminBilling() {
                   });
                   
                   const getAttemptStatusClass = (status: string) => {
-                    if (status === "success") return "ok";
+                    if (status === "success" || status === "succeeded") return "ok";
                     if (status === "failed") return "overcharged";
                     return "waiting";
                   };
@@ -518,7 +518,11 @@ export default function AdminBilling() {
                       </td>
                       <td>{createdAtLabel}</td>
                       <td>
-                        <span style={{ fontWeight: 600, color: "var(--ed-color-text-primary)" }}>{attempt.billingPeriodKey}</span>
+                        <span style={{ fontWeight: 600, color: "var(--ed-color-text-primary)" }} title={attempt.billingPeriodKey}>
+                          {attempt.billingPeriodKey && attempt.billingPeriodKey.includes(":") 
+                            ? attempt.billingPeriodKey.split(":").pop() 
+                            : attempt.billingPeriodKey}
+                        </span>
                       </td>
                       <td className="ed-number">+{attempt.overageVisitors.toLocaleString()}</td>
                       <td className="ed-number">
@@ -526,7 +530,9 @@ export default function AdminBilling() {
                       </td>
                       <td>
                         {attempt.shopifyUsageRecordId ? (
-                          <span style={{ fontFamily: "monospace", fontSize: "11px" }}>{attempt.shopifyUsageRecordId}</span>
+                          <span style={{ fontFamily: "monospace", fontSize: "11px" }} title={attempt.shopifyUsageRecordId}>
+                            {attempt.shopifyUsageRecordId.replace("gid://shopify/AppUsageRecord/", "")}
+                          </span>
                         ) : (
                           <span style={{ color: "var(--ed-color-text-tertiary)", fontSize: "11px" }}>-</span>
                         )}
