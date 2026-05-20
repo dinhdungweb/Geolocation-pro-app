@@ -221,7 +221,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         ? currentCalendarKey
         : settings.billingPeriodKey || currentCalendarKey;
 
-    const [rules, logs, recentUsage, currentPeriodUsage] = await Promise.all([
+    const [rules, logs, recentUsage, currentPeriodUsage, chargeAttempts] = await Promise.all([
         prisma.redirectRule.findMany({
             where: { shop },
             orderBy: { priority: "desc" },
