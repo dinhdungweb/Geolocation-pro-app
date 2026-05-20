@@ -33,7 +33,8 @@ import {
     Loader2,
     X,
     Settings2,
-    Gem
+    Gem,
+    DollarSign
 } from "lucide-react";
 
 function getYearMonth(date = new Date()) {
@@ -256,6 +257,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 },
             },
         }),
+        prisma.usageChargeAttempt.findMany({
+            where: { shop },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+        }),
     ]);
     const usageByKey = new Map<string, any>();
     (recentUsage as any[]).forEach((usage) => usageByKey.set(usage.billingPeriodKey, usage));
@@ -311,6 +317,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         rules: rules.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
         logs: logs.map((l: any) => ({ ...l, timestamp: l.timestamp.toISOString() })),
         monthlyUsage,
+        chargeAttempts: chargeAttempts.map((c: any) => ({
+            ...c,
+            createdAt: c.createdAt.toISOString(),
+            amount: c.amount.toString(),
+        })),
         stats: {
             totalVisitors,
             totalRedirected,
@@ -324,7 +335,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 
 export default function AdminShopDetail() {
-    const { shop, settings, hasSettings, rules, logs, monthlyUsage, stats, hasProPlan, currentPlan, shopifyPlan, isBillingOverridden } = useLoaderData<typeof loader>();
+    const { shop, settings, hasSettings, rules, logs, monthlyUsage, chargeAttempts, stats, hasProPlan, currentPlan, shopifyPlan, isBillingOverridden } = useLoaderData<typeof loader>();
     const actionData = useActionData<any>();
     const navigation = useNavigation();
     const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
@@ -1159,6 +1170,70 @@ export default function AdminShopDetail() {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div className="ed-shop-card ed-shop-table-card" style={{ marginBottom: '32px' }}>
+                <div className="ed-shop-card-head">
+                    <DollarSign size={18} color="#82b440" />
+                    Overage Charge Attempts (Lịch sử Billing phát sinh)
+                </div>
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Created At</th>
+                                <th>Billing Period</th>
+                                <th>Overage Visitors</th>
+                                <th>Amount</th>
+                                <th>Shopify Record ID</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {chargeAttempts.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6}>
+                                        <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>
+                                            No billing attempts recorded for this shop.
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                (chargeAttempts as any[]).map((attempt: any) => {
+                                    return (
+                                        <tr key={attempt.id}>
+                                            <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(attempt.createdAt)}</td>
+                                            <td><strong>{attempt.billingPeriodKey}</strong></td>
+                                            <td>+{attempt.overageVisitors.toLocaleString()}</td>
+                                            <td><strong>${Number(attempt.amount).toFixed(2)}</strong></td>
+                                            <td>
+                                                {attempt.shopifyUsageRecordId ? (
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{attempt.shopifyUsageRecordId}</span>
+                                                ) : (
+                                                    <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <span className={`badge-v3`} style={{
+                                                    background: attempt.status === 'success' ? '#f2f6ee' : attempt.status === 'failed' ? '#fef2f2' : '#fff8e8',
+                                                    color: attempt.status === 'success' ? '#82b440' : attempt.status === 'failed' ? '#ef4444' : '#f59e0b',
+                                                    fontWeight: 700
+                                                }}>
+                                                    {attempt.status.toUpperCase()}
+                                                </span>
+                                                {attempt.error && (
+                                                    <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '3px', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={attempt.error}>
+                                                        {attempt.error}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

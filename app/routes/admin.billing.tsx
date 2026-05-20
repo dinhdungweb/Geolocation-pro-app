@@ -79,7 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ]),
   );
 
-  const [currentUsage, prevUsage, legacyCalendarUsage] = await Promise.all([
+  const [currentUsage, prevUsage, legacyCalendarUsage, chargeAttempts] = await Promise.all([
     prisma.monthlyUsage.findMany({
       where: {
         billingPeriodKey: { in: currentPeriodKeys },
@@ -106,6 +106,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         shop: true,
         yearMonth: true,
       },
+    }),
+    prisma.usageChargeAttempt.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 20,
     }),
   ]);
 
@@ -224,6 +228,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       issueCount,
       totalShops: shops.length,
     },
+    chargeAttempts: chargeAttempts.map((c: any) => ({
+      ...c,
+      amount: c.amount.toString(),
+      createdAt: c.createdAt.toISOString(),
+    })),
   });
 };
 
@@ -241,7 +250,7 @@ function planClass(plan: string) {
 }
 
 export default function AdminBilling() {
-  const { shops, yearMonth, summary } = useLoaderData<typeof loader>();
+  const { shops, yearMonth, summary, chargeAttempts } = useLoaderData<typeof loader>();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
@@ -447,6 +456,90 @@ export default function AdminBilling() {
                       </td>
                       <td>
                         <span className={`ed-status ${shop.status}`}>{statusLabel[shop.status]}</span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="ed-period-label" style={{ marginTop: "24px", display: "flex", alignItems: "center", gap: "8px" }}>
+        <DollarSign size={16} />
+        Recent Overage Charge Attempts (Lịch sử Billing phát sinh gần đây)
+      </div>
+
+      <div className="ed-billing-table-card" style={{ marginBottom: "32px" }}>
+        <div className="ed-billing-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Shop</th>
+                <th>Created At</th>
+                <th>Billing Period</th>
+                <th>Overage Visitors</th>
+                <th>Amount</th>
+                <th>Shopify Record ID</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chargeAttempts.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>
+                    <div className="ed-billing-empty">No billing attempts recorded.</div>
+                  </td>
+                </tr>
+              ) : (
+                (chargeAttempts as any[]).map((attempt: any) => {
+                  const createdAtLabel = new Date(attempt.createdAt).toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  
+                  const getAttemptStatusClass = (status: string) => {
+                    if (status === "success") return "ok";
+                    if (status === "failed") return "overcharged";
+                    return "waiting";
+                  };
+
+                  return (
+                    <tr key={attempt.id}>
+                      <td>
+                        <Link to={`/admin/shops/${attempt.shop}`} className="ed-billing-shop-link">
+                          <strong>{attempt.shop.replace(".myshopify.com", "")}</strong>
+                          <small>.myshopify.com</small>
+                        </Link>
+                      </td>
+                      <td>{createdAtLabel}</td>
+                      <td>
+                        <span style={{ fontWeight: 600, color: "var(--ed-color-text-primary)" }}>{attempt.billingPeriodKey}</span>
+                      </td>
+                      <td className="ed-number">+{attempt.overageVisitors.toLocaleString()}</td>
+                      <td className="ed-number">
+                        <strong>${Number(attempt.amount).toFixed(2)}</strong>
+                      </td>
+                      <td>
+                        {attempt.shopifyUsageRecordId ? (
+                          <span style={{ fontFamily: "monospace", fontSize: "11px" }}>{attempt.shopifyUsageRecordId}</span>
+                        ) : (
+                          <span style={{ color: "var(--ed-color-text-tertiary)", fontSize: "11px" }}>-</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`ed-status ${getAttemptStatusClass(attempt.status)}`}>
+                          {attempt.status.toUpperCase()}
+                        </span>
+                        {attempt.error && (
+                          <div style={{ color: "#ef4444", fontSize: "10px", marginTop: "3px", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis" }} title={attempt.error}>
+                            {attempt.error}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
