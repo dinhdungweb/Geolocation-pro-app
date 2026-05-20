@@ -373,9 +373,9 @@ export default function AdminShops() {
         }
 
         .ed-plan-badge.is-premium {
-          border-color: #d8ddf5;
-          background: #f7f8ff;
-          color: #303f9f;
+          border-color: #d9e9cd;
+          background: #f2f8ee;
+          color: #82b440;
         }
 
         .ed-mode {
@@ -391,7 +391,7 @@ export default function AdminShops() {
           width: 8px;
           height: 8px;
           border-radius: 999px;
-          background: #303f9f;
+          background: #82b440;
         }
 
         .ed-mode-dot.is-auto {

@@ -907,7 +907,7 @@ export default function AdminBilling() {
         }
 
         .ed-review {
-          color: #5b3b9b !important;
+          color: #82b440 !important;
           font-weight: 700;
         }
 
@@ -982,9 +982,9 @@ export default function AdminBilling() {
         }
 
         .ed-status.charge_review {
-          border-color: #ddd4ef;
-          background: #f8f5ff;
-          color: #5b3b9b;
+          border-color: #d9e9cd;
+          background: #f2f8ee;
+          color: #82b440;
         }
 
         .ed-billing-empty {
@@ -1071,7 +1071,7 @@ export default function AdminBilling() {
         .ed-pagination-buttons {
           display: inline-flex;
           align-items: center;
-          border: 1px solid #e9d5ff;
+          border: 1px solid #d9e9cd;
           border-radius: 8px;
           background: white;
           overflow: hidden;
@@ -1089,8 +1089,8 @@ export default function AdminBilling() {
           font-weight: 600;
           border: none;
           background: transparent;
-          color: #9333ea;
-          border-right: 1px solid #f3e8ff;
+          color: #82b440;
+          border-right: 1px solid #d9e9cd;
           border-radius: 0 !important;
           margin: 0;
           padding: 0 10px;
@@ -1103,7 +1103,7 @@ export default function AdminBilling() {
         .ed-pagination-ellipsis {
           cursor: default;
           user-select: none;
-          color: #c084fc;
+          color: #a3cc7a;
         }
 
         .ed-pagination-buttons > button:last-child {
@@ -1111,20 +1111,20 @@ export default function AdminBilling() {
         }
 
         .ed-pagination-btn:hover:not(:disabled) {
-          background: #f5f3ff;
-          color: #7c3aed;
+          background: #f2f6ee;
+          color: #6f9a37;
         }
 
         .ed-pagination-btn.active {
-          background: #f3e8ff;
-          color: #7c3aed;
+          background: #f2f6ee;
+          color: #6f9a37;
           font-weight: 700;
         }
 
         .ed-pagination-btn:disabled {
           opacity: 0.35;
           cursor: not-allowed;
-          background: #faf5ff;
+          background: #fcfdfe;
         }
 
         @media (max-width: 1180px) {

@@ -871,7 +871,7 @@ export default function AdminShopDetail() {
                  .ed-pagination-buttons {
                     display: inline-flex;
                     align-items: center;
-                    border: 1px solid #e9d5ff;
+                    border: 1px solid #d9e9cd;
                     border-radius: 8px;
                     background: white;
                     overflow: hidden;
@@ -889,8 +889,8 @@ export default function AdminShopDetail() {
                     font-weight: 600;
                     border: none;
                     background: transparent;
-                    color: #9333ea;
-                    border-right: 1px solid #f3e8ff;
+                    color: #82b440;
+                    border-right: 1px solid #d9e9cd;
                     border-radius: 0 !important;
                     margin: 0;
                     padding: 0 10px;
@@ -903,7 +903,7 @@ export default function AdminShopDetail() {
                 .ed-pagination-ellipsis {
                     cursor: default;
                     user-select: none;
-                    color: #c084fc;
+                    color: #a3cc7a;
                 }
 
                 .ed-pagination-buttons > button:last-child {
@@ -911,20 +911,20 @@ export default function AdminShopDetail() {
                 }
 
                 .ed-pagination-btn:hover:not(:disabled) {
-                    background: #f5f3ff;
-                    color: #7c3aed;
+                    background: #f2f6ee;
+                    color: #6f9a37;
                 }
 
                 .ed-pagination-btn.active {
-                    background: #f3e8ff;
-                    color: #7c3aed;
+                    background: #f2f6ee;
+                    color: #6f9a37;
                     font-weight: 700;
                 }
 
                 .ed-pagination-btn:disabled {
                     opacity: 0.35;
                     cursor: not-allowed;
-                    background: #faf5ff;
+                    background: #fcfdfe;
                 }
 
                 /* Billing Forms */
