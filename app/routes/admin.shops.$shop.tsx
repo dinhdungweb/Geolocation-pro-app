@@ -505,15 +505,15 @@ export default function AdminShopDetail() {
         `${getUsagePeriodTitle(usage)} - ${usage.totalVisitors.toLocaleString()} views - charged ${usage.chargedVisitors.toLocaleString()}`;
 
     const modeColor = (mode: string) => {
-        if (mode === "popup") return "#82b440";
+        if (mode === "popup") return "#43b9b2";
         if (mode === "auto_redirect") return "#10b981";
         return "#64748b";
     };
 
     const actionColor = (action: string) => {
         const m: Record<string, string> = {
-            visit: "#64748b", redirected: "#82b440", blocked: "#ef4444",
-            auto_redirect: "#10b981", popup_show: "#82b440",
+            visit: "#64748b", redirected: "#43b9b2", blocked: "#ef4444",
+            auto_redirect: "#10b981", popup_show: "#43b9b2",
         };
         return m[action] ?? "#64748b";
     };
@@ -582,27 +582,25 @@ export default function AdminShopDetail() {
                 }
                 
                 .hero-content { display: flex; align-items: center; gap: 20px; }
-                .hero-icon { 
+                 .hero-icon { 
                     width: 58px; height: 58px; border-radius: 8px; 
                     background: #f1f5f9; display: flex; align-items: center; justify-content: center;
-                    color: #82b440; border: 1px solid #e2e8f0;
+                    color: #43b9b2; border: 1px solid #e2e8f0;
                 }
 
                 .shop-title-group h1 { font-size: 22px; font-weight: 800; color: #1e293b; margin: 0; letter-spacing: 0; }
                 .shop-title-group .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
                 .shop-link-hover { transition: color 0.2s; cursor: pointer; }
-                .shop-link-hover:hover { color: #82b440; text-decoration: underline; }
+                .shop-link-hover:hover { color: #43b9b2; text-decoration: underline; }
 
                 .ed-shop-plan-badge {
                     padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 800;
                     display: flex; align-items: center; gap: 8px;
                     ${(() => {
                         const plan = (currentPlan || 'FREE').toUpperCase();
-                        if (plan === 'ELITE') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
-                        if (plan === 'UNLIMITED') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
-                        if (plan === 'CUSTOM') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
-                        if (plan === 'PLUS') return 'background: #eef7e9; color: #37630f; border: 1px solid #b7df9e;';
-                        if (plan === 'PREMIUM') return 'background: #f2f6ee; color: #37630f; border: 1px solid #b7df9e;';
+                        if (plan === 'ELITE' || plan === 'UNLIMITED' || plan === 'CUSTOM' || plan === 'PLUS' || plan === 'PREMIUM') {
+                            return 'background: #e8fbfa; color: #0a9f98; border: 1px solid #b2e5e2;';
+                        }
                         return 'background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0;';
                     })()}
                 }
@@ -673,7 +671,7 @@ export default function AdminShopDetail() {
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
                 .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border: 1px solid transparent; transition: none; }
                 .month-row:hover { border-color: #e2e8f0; background: #f1f5f9; }
-                .month-name { font-weight: 800; font-size: 14px; color: #82b440; }
+                .month-name { font-weight: 800; font-size: 14px; color: #43b9b2; }
                 .month-stats { display: flex; gap: 16px; font-size: 12px; color: #64748b; font-weight: 600; }
 
                 @media (max-width: 768px) {
@@ -872,7 +870,7 @@ export default function AdminShopDetail() {
                  .ed-pagination-buttons {
                     display: inline-flex;
                     align-items: center;
-                    border: 1px solid #d9e9cd;
+                    border: 1px solid #b2e5e2;
                     border-radius: 8px;
                     background: white;
                     overflow: hidden;
@@ -890,8 +888,8 @@ export default function AdminShopDetail() {
                     font-weight: 600;
                     border: none;
                     background: transparent;
-                    color: #82b440;
-                    border-right: 1px solid #d9e9cd;
+                    color: #43b9b2;
+                    border-right: 1px solid #b2e5e2;
                     border-radius: 0 !important;
                     margin: 0;
                     padding: 0 10px;
@@ -904,7 +902,7 @@ export default function AdminShopDetail() {
                 .ed-pagination-ellipsis {
                     cursor: default;
                     user-select: none;
-                    color: #a3cc7a;
+                    color: #74cdc8;
                 }
 
                 .ed-pagination-buttons > button:last-child {
@@ -912,13 +910,13 @@ export default function AdminShopDetail() {
                 }
 
                 .ed-pagination-btn:hover:not(:disabled) {
-                    background: #f2f6ee;
-                    color: #6f9a37;
+                    background: #e8fbfa;
+                    color: #0a9f98;
                 }
 
                 .ed-pagination-btn.active {
-                    background: #f2f6ee;
-                    color: #6f9a37;
+                    background: #e8fbfa;
+                    color: #0a9f98;
                     font-weight: 700;
                 }
 
@@ -932,14 +930,14 @@ export default function AdminShopDetail() {
                 .billing-input-group { margin-bottom: 16px; }
                 .billing-input-group label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
                 .billing-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; transition: none; }
-                .billing-input:focus { border-color: #82b440; outline: none; box-shadow: 0 0 0 3px rgba(130, 180, 64, 0.1); }
+                .billing-input:focus { border-color: #43b9b2; outline: none; box-shadow: 0 0 0 3px rgba(67, 185, 178, 0.1); }
                 
                 .primary-btn { 
-                    width: 100%; padding: 12px; background: #82b440; color: white; border: none; border-radius: 8px;
+                    width: 100%; padding: 12px; background: #43b9b2; color: white; border: none; border-radius: 8px;
                     font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
                     transition: none;
                 }
-                .primary-btn:hover { background: #6f9a37; }
+                .primary-btn:hover { background: #0a9f98; }
                 .primary-btn:disabled { background: #94a3b8; cursor: not-allowed; }
                 .inline-action-form { margin: 0; }
                 .inline-toggle-btn {
@@ -947,7 +945,7 @@ export default function AdminShopDetail() {
                     background: white; color: #334155; font-size: 12px; font-weight: 700;
                     cursor: pointer; transition: all 0.2s;
                 }
-                .inline-toggle-btn:hover { border-color: #82b440; color: #6f9a37; }
+                .inline-toggle-btn:hover { border-color: #43b9b2; color: #0a9f98; }
                 .inline-toggle-btn.enabled { border-color: #10b98133; background: #ecfdf5; color: #059669; }
                 .inline-toggle-btn.disabled { border-color: #ef444433; background: #fef2f2; color: #ef4444; }
 

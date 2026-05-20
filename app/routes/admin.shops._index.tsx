@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
-import { useMemo, useState } from "react";
-import { ExternalLink, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink, Search, X } from "lucide-react";
 import { FREE_PLAN, hasUnlimitedUsage } from "../billing.config";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
@@ -84,11 +84,100 @@ function planClass(plan?: string | null) {
   return "is-free";
 }
 
+const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage }: any) => {
+  if (totalPages <= 1) return null;
+
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+      return pages;
+    }
+
+    pages.push(1);
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    if (start > 2) {
+      pages.push("...");
+    }
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (end < totalPages - 1) {
+      pages.push("...");
+    }
+
+    pages.push(totalPages);
+    return pages;
+  };
+
+  const pages = getPageNumbers();
+
+  return (
+    <div className="ed-pagination">
+      <div className="ed-pagination-info">
+        Showing <b>{startItem}</b> to <b>{endItem}</b> of <b>{totalItems}</b> entries
+      </div>
+      <div className="ed-pagination-buttons">
+        <button
+          type="button"
+          disabled={currentPage === 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          className="ed-pagination-btn"
+          aria-label="Previous page"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        {pages.map((page, index) => {
+          if (page === "...") {
+            return (
+              <span key={`ellipsis-${index}`} className="ed-pagination-ellipsis">
+                ...
+              </span>
+            );
+          }
+          return (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onPageChange(Number(page))}
+              className={`ed-pagination-btn ${currentPage === page ? "active" : ""}`}
+            >
+              {page}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          disabled={currentPage === totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          className="ed-pagination-btn"
+          aria-label="Next page"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function AdminShops() {
   const { shops } = useLoaderData<typeof loader>();
   const [searchQuery, setSearchQuery] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
   const [modeFilter, setModeFilter] = useState("all");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const uniquePlans = useMemo(() => {
     const plans = new Set(shops.map((shop: any) => shop.currentPlan?.toLowerCase()).filter(Boolean));
@@ -105,6 +194,16 @@ export default function AdminShops() {
       return matchesSearch && matchesPlan && matchesMode;
     });
   }, [shops, searchQuery, planFilter, modeFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, planFilter, modeFilter]);
+
+  const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
+  const paginatedShops = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredShops.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredShops, currentPage, itemsPerPage]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -159,9 +258,7 @@ export default function AdminShops() {
           )}
         </div>
 
-        <div className="ed-result-count">
-          Showing <strong>{filteredShops.length}</strong> / {shops.length} merchants
-        </div>
+
       </div>
 
       <div className="ed-table-card">
@@ -190,7 +287,7 @@ export default function AdminShops() {
                   </td>
                 </tr>
               ) : (
-                filteredShops.map((shop: any) => {
+                (paginatedShops as any[]).map((shop: any) => {
                   const mode = shop.mode || "popup";
                   const periodActions = shop.latestUsage?.redirected || 0;
 
@@ -232,6 +329,13 @@ export default function AdminShops() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filteredShops.length}
+          itemsPerPage={itemsPerPage}
+        />
       </div>
 
       <style>{`
@@ -242,7 +346,7 @@ export default function AdminShops() {
 
         .ed-shops-toolbar {
           display: grid;
-          grid-template-columns: minmax(280px, 1fr) auto auto;
+          grid-template-columns: minmax(280px, 1fr) auto;
           align-items: center;
           gap: 12px;
         }
@@ -366,16 +470,11 @@ export default function AdminShops() {
 
         .ed-plan-badge.is-plus,
         .ed-plan-badge.is-elite,
-        .ed-plan-badge.is-custom {
-          border-color: #d9e9cd;
-          background: #f2f8ee;
-          color: #10b981;
-        }
-
+        .ed-plan-badge.is-custom,
         .ed-plan-badge.is-premium {
-          border-color: #d9e9cd;
-          background: #f2f8ee;
-          color: #82b440;
+          border-color: #b2e5e2;
+          background: #e8fbfa;
+          color: #0a9f98;
         }
 
         .ed-mode {
@@ -391,7 +490,7 @@ export default function AdminShops() {
           width: 8px;
           height: 8px;
           border-radius: 999px;
-          background: #82b440;
+          background: #43b9b2;
         }
 
         .ed-mode-dot.is-auto {
@@ -487,6 +586,92 @@ export default function AdminShops() {
           .ed-filter-row:has(.ed-clear-button) {
             grid-template-columns: 1fr;
           }
+        }
+
+        .ed-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-top: 1px solid var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
+          font-size: var(--ed-font-size-sm);
+          color: var(--ed-color-text-tertiary);
+        }
+
+        @media (max-width: 640px) {
+          .ed-pagination {
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 12px 16px;
+          }
+          .ed-pagination-info {
+            margin-bottom: 4px;
+          }
+        }
+
+        .ed-pagination-info b {
+          color: var(--ed-color-text-primary);
+        }
+
+        .ed-pagination-buttons {
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid #b2e5e2;
+          border-radius: 8px;
+          background: white;
+          overflow: hidden;
+          gap: 0;
+        }
+
+        .ed-pagination-btn,
+        .ed-pagination-ellipsis {
+          height: 34px;
+          min-width: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 600;
+          border: none;
+          background: transparent;
+          color: #43b9b2;
+          border-right: 1px solid #b2e5e2;
+          border-radius: 0 !important;
+          margin: 0;
+          padding: 0 10px;
+          transition: all 0.15s ease;
+          cursor: pointer;
+          box-sizing: border-box;
+          line-height: 1;
+        }
+
+        .ed-pagination-btn:last-child {
+          border-right: none;
+        }
+
+        .ed-pagination-btn:hover:not(:disabled) {
+          background: #e8fbfa;
+          color: #0a9f98;
+        }
+
+        .ed-pagination-btn.active {
+          background: #e8fbfa;
+          color: #0a9f98;
+        }
+
+        .ed-pagination-btn:disabled {
+          color: var(--ed-color-text-disabled, #cbd5e1);
+          cursor: not-allowed;
+          background: #f8fafc;
+        }
+
+        .ed-pagination-ellipsis {
+          color: #74cdc8;
+          cursor: default;
         }
       `}</style>
     </section>

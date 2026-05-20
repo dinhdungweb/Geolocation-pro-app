@@ -479,9 +479,7 @@ export default function AdminBilling() {
           )}
         </div>
 
-        <div className="ed-billing-count">
-          {filtered.length} / {(shops as any[]).length} shops
-        </div>
+
       </div>
 
       <div className="ed-billing-table-card">
@@ -583,7 +581,7 @@ export default function AdminBilling() {
 
       <div className="ed-attempts-table-card" style={{ marginBottom: "32px", marginTop: "24px" }}>
         <div className="ed-attempts-table-card-head">
-          <DollarSign size={18} color="#82b440" />
+          <DollarSign size={18} color="#43b9b2" />
           Recent Overage Charge Attempts
         </div>
         <div className="ed-billing-table-scroll">
@@ -762,7 +760,7 @@ export default function AdminBilling() {
 
         .ed-billing-toolbar {
           display: grid;
-          grid-template-columns: minmax(280px, 1fr) auto auto;
+          grid-template-columns: minmax(280px, 1fr) auto;
           align-items: center;
           gap: 10px;
         }
@@ -857,7 +855,7 @@ export default function AdminBilling() {
 
         .ed-billing-shop-link strong {
           display: block;
-          color: #82b440 !important;
+          color: #43b9b2 !important;
           font-weight: 700;
           line-height: 18px;
           transition: color 0.15s ease;
@@ -865,7 +863,7 @@ export default function AdminBilling() {
 
         .ed-billing-shop-link:hover strong {
           text-decoration: underline;
-          color: #6f9a37 !important;
+          color: #0a9f98 !important;
         }
 
         .ed-billing-shop-link small {
@@ -907,7 +905,7 @@ export default function AdminBilling() {
         }
 
         .ed-review {
-          color: #82b440 !important;
+          color: #0a9f98 !important;
           font-weight: 700;
         }
 
@@ -982,9 +980,9 @@ export default function AdminBilling() {
         }
 
         .ed-status.charge_review {
-          border-color: #d9e9cd;
-          background: #f2f8ee;
-          color: #82b440;
+          border-color: #b2e5e2;
+          background: #e8fbfa;
+          color: #0a9f98;
         }
 
         .ed-billing-empty {
@@ -1071,7 +1069,7 @@ export default function AdminBilling() {
         .ed-pagination-buttons {
           display: inline-flex;
           align-items: center;
-          border: 1px solid #d9e9cd;
+          border: 1px solid #b2e5e2;
           border-radius: 8px;
           background: white;
           overflow: hidden;
@@ -1089,8 +1087,8 @@ export default function AdminBilling() {
           font-weight: 600;
           border: none;
           background: transparent;
-          color: #82b440;
-          border-right: 1px solid #d9e9cd;
+          color: #43b9b2;
+          border-right: 1px solid #b2e5e2;
           border-radius: 0 !important;
           margin: 0;
           padding: 0 10px;
@@ -1103,7 +1101,7 @@ export default function AdminBilling() {
         .ed-pagination-ellipsis {
           cursor: default;
           user-select: none;
-          color: #a3cc7a;
+          color: #74cdc8;
         }
 
         .ed-pagination-buttons > button:last-child {
@@ -1111,13 +1109,13 @@ export default function AdminBilling() {
         }
 
         .ed-pagination-btn:hover:not(:disabled) {
-          background: #f2f6ee;
-          color: #6f9a37;
+          background: #e8fbfa;
+          color: #0a9f98;
         }
 
         .ed-pagination-btn.active {
-          background: #f2f6ee;
-          color: #6f9a37;
+          background: #e8fbfa;
+          color: #0a9f98;
           font-weight: 700;
         }
 
