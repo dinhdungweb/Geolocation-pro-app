@@ -109,7 +109,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }),
     prisma.usageChargeAttempt.findMany({
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 100,
     }),
   ]);
 
@@ -299,10 +299,10 @@ export default function AdminBilling() {
   const [planFilter, setPlanFilter] = useState("all");
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
 
   const [attemptsPage, setAttemptsPage] = useState(1);
-  const attemptsPerPage = 10;
+  const attemptsPerPage = 20;
 
   const filtered = useMemo(() => {
     return (shops as any[]).filter((shop) => {
@@ -967,6 +967,7 @@ export default function AdminBilling() {
           width: 100%;
           border-collapse: separate;
           border-spacing: 0;
+          min-width: 960px;
         }
 
         .ed-attempts-table-card th:nth-child(4),
@@ -992,6 +993,20 @@ export default function AdminBilling() {
           background: var(--ed-color-surface-strong);
           font-size: var(--ed-font-size-sm);
           color: var(--ed-color-text-tertiary);
+        }
+
+        @media (max-width: 640px) {
+          .ed-pagination {
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 12px 16px;
+          }
+          .ed-pagination-info {
+            margin-bottom: 4px;
+          }
         }
 
         .ed-pagination-info b {

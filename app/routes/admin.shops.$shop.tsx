@@ -260,7 +260,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         prisma.usageChargeAttempt.findMany({
             where: { shop },
             orderBy: { createdAt: "desc" },
-            take: 10,
+            take: 100,
         }),
     ]);
     const usageByKey = new Map<string, any>();
@@ -388,10 +388,10 @@ export default function AdminShopDetail() {
     const [isBillingOverrideModalOpen, setIsBillingOverrideModalOpen] = useState(false);
 
     const [attemptsPage, setAttemptsPage] = useState(1);
-    const attemptsPerPage = 5;
+    const attemptsPerPage = 20;
 
     const [logsPage, setLogsPage] = useState(1);
-    const logsPerPage = 10;
+    const logsPerPage = 20;
 
     const totalAttemptsPages = Math.ceil(chargeAttempts.length / attemptsPerPage);
     const paginatedAttempts = useMemo(() => {
@@ -738,7 +738,7 @@ export default function AdminShopDetail() {
                         gap: 10px;
                     }
                     table {
-                        min-width: 720px;
+                        min-width: 960px;
                     }
                     .modal-content,
                     .modal-content-wide {
@@ -762,7 +762,7 @@ export default function AdminShopDetail() {
                         padding: 10px 0;
                     }
                     table {
-                        min-width: 660px;
+                        min-width: 960px;
                     }
                 }
                 @media (max-width: 360px) {
@@ -805,6 +805,20 @@ export default function AdminShopDetail() {
                     background: var(--ed-color-surface-strong);
                     font-size: var(--ed-font-size-sm);
                     color: var(--ed-color-text-tertiary);
+                }
+
+                @media (max-width: 640px) {
+                    .ed-pagination {
+                        flex-direction: column;
+                        gap: 12px;
+                        align-items: center;
+                        justify-content: center;
+                        text-align: center;
+                        padding: 12px 16px;
+                    }
+                    .ed-pagination-info {
+                        margin-bottom: 4px;
+                    }
                 }
 
                 .ed-pagination-info b {
