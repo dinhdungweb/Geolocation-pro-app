@@ -22,6 +22,7 @@ import {
 } from "../utils/effective-plan.server";
 import { 
     ArrowLeft, 
+    ChevronLeft,
     Eye, 
     Zap, 
     ShieldAlert, 
@@ -385,7 +386,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
                     className="ed-pagination-btn"
                     aria-label="Previous page"
                 >
-                    «
+                    <ChevronLeft size={16} />
                 </button>
                 {pages.map((page, index) => {
                     if (page === "...") {
@@ -413,7 +414,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
                     className="ed-pagination-btn"
                     aria-label="Next page"
                 >
-                    »
+                    <ChevronRight size={16} />
                 </button>
             </div>
         </div>

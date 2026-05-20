@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Clock, DollarSign, Search, Users, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock, DollarSign, Search, Users, X } from "lucide-react";
 import {
   FREE_PLAN,
   OVERAGE_RATE,
@@ -300,7 +300,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
           className="ed-pagination-btn"
           aria-label="Previous page"
         >
-          «
+          <ChevronLeft size={16} />
         </button>
         {pages.map((page, index) => {
           if (page === "...") {
@@ -328,7 +328,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
           className="ed-pagination-btn"
           aria-label="Next page"
         >
-          »
+          <ChevronRight size={16} />
         </button>
       </div>
     </div>
