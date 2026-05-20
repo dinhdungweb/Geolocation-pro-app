@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Clock, DollarSign, Search, Users, X } from "lucide-react";
 import {
@@ -403,8 +403,10 @@ export default function AdminBilling() {
                   return (
                     <tr key={shop.shop}>
                       <td>
-                        <strong>{shop.shop.replace(".myshopify.com", "")}</strong>
-                        <small>.myshopify.com</small>
+                        <Link to={`/admin/shops/${shop.shop}`} className="ed-billing-shop-link">
+                          <strong>{shop.shop.replace(".myshopify.com", "")}</strong>
+                          <small>.myshopify.com</small>
+                        </Link>
                       </td>
                       <td>
                         <span className={`ed-plan-badge ${planClass(shop.plan)}`}>{shop.plan}</span>
@@ -625,6 +627,22 @@ export default function AdminBilling() {
 
         .ed-billing-table-card table {
           min-width: 1180px;
+        }
+
+        .ed-billing-shop-link {
+          text-decoration: none;
+          color: inherit;
+          display: block;
+        }
+
+        .ed-billing-shop-link strong {
+          color: #82b440 !important;
+          transition: color 0.15s ease;
+        }
+
+        .ed-billing-shop-link:hover strong {
+          text-decoration: underline;
+          color: #6f9a37 !important;
         }
 
         .ed-billing-table-card td strong {
