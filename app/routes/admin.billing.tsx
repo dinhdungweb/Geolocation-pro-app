@@ -813,7 +813,10 @@ export default function AdminBilling() {
         }
 
         .ed-billing-shop-link strong {
+          display: block;
           color: #82b440 !important;
+          font-weight: 700;
+          line-height: 18px;
           transition: color 0.15s ease;
         }
 
@@ -822,14 +825,23 @@ export default function AdminBilling() {
           color: #6f9a37 !important;
         }
 
-        .ed-billing-table-card td strong {
+        .ed-billing-shop-link small {
+          display: block;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          line-height: 16px;
+        }
+
+        .ed-billing-table-card td strong,
+        .ed-attempts-table-card td strong {
           display: block;
           color: var(--ed-color-text-primary);
           font-weight: 700;
           line-height: 18px;
         }
 
-        .ed-billing-table-card td small {
+        .ed-billing-table-card td small,
+        .ed-attempts-table-card td small {
           display: block;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
