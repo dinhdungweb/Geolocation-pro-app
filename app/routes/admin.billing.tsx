@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock, DollarSign, Search, Users, X } from "lucide-react";
 import {
   FREE_PLAN,
@@ -249,11 +249,60 @@ function planClass(plan: string) {
   return `is-${(plan || FREE_PLAN).toLowerCase()}`;
 }
 
+const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage }: any) => {
+  if (totalPages <= 1) return null;
+
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  return (
+    <div className="ed-pagination">
+      <div className="ed-pagination-info">
+        Showing <b>{startItem}</b> to <b>{endItem}</b> of <b>{totalItems}</b> entries
+      </div>
+      <div className="ed-pagination-buttons">
+        <button
+          type="button"
+          disabled={currentPage === 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          className="ed-pagination-btn"
+        >
+          Previous
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          <button
+            key={page}
+            type="button"
+            onClick={() => onPageChange(page)}
+            className={`ed-pagination-btn ${currentPage === page ? "active" : ""}`}
+          >
+            {page}
+          </button>
+        ))}
+        <button
+          type="button"
+          disabled={currentPage === totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          className="ed-pagination-btn"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function AdminBilling() {
   const { shops, yearMonth, summary, chargeAttempts } = useLoaderData<typeof loader>();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const [attemptsPage, setAttemptsPage] = useState(1);
+  const attemptsPerPage = 10;
 
   const filtered = useMemo(() => {
     return (shops as any[]).filter((shop) => {
@@ -263,6 +312,22 @@ export default function AdminBilling() {
       return matchSearch && matchStatus && matchPlan;
     });
   }, [shops, searchQuery, statusFilter, planFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, planFilter]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedShops = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  const totalAttemptsPages = Math.ceil(chargeAttempts.length / attemptsPerPage);
+  const paginatedAttempts = useMemo(() => {
+    const startIndex = (attemptsPage - 1) * attemptsPerPage;
+    return (chargeAttempts as any[]).slice(startIndex, startIndex + attemptsPerPage);
+  }, [chargeAttempts, attemptsPage, attemptsPerPage]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -402,7 +467,7 @@ export default function AdminBilling() {
                   </td>
                 </tr>
               ) : (
-                (filtered as any[]).map((shop) => {
+                (paginatedShops as any[]).map((shop) => {
                   const isUnlimited = shop.unlimitedUsage || shop.limit >= Number.MAX_SAFE_INTEGER;
                   const usagePercent = isUnlimited
                     ? 100
@@ -464,14 +529,20 @@ export default function AdminBilling() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filtered.length}
+          itemsPerPage={itemsPerPage}
+        />
       </div>
 
-      <div className="ed-period-label" style={{ marginTop: "24px", display: "flex", alignItems: "center", gap: "8px" }}>
-        <DollarSign size={16} />
-        Recent Overage Charge Attempts
-      </div>
-
-      <div className="ed-billing-table-card" style={{ marginBottom: "32px" }}>
+      <div className="ed-attempts-table-card" style={{ marginBottom: "32px", marginTop: "24px" }}>
+        <div className="ed-attempts-table-card-head">
+          <DollarSign size={18} color="#82b440" />
+          Recent Overage Charge Attempts
+        </div>
         <div className="ed-billing-table-scroll">
           <table>
             <thead>
@@ -493,7 +564,7 @@ export default function AdminBilling() {
                   </td>
                 </tr>
               ) : (
-                (chargeAttempts as any[]).map((attempt: any) => {
+                (paginatedAttempts as any[]).map((attempt: any) => {
                   const createdAtLabel = new Date(attempt.createdAt).toLocaleString("en-GB", {
                     day: "2-digit",
                     month: "short",
@@ -554,6 +625,13 @@ export default function AdminBilling() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={attemptsPage}
+          totalPages={totalAttemptsPages}
+          onPageChange={setAttemptsPage}
+          totalItems={chargeAttempts.length}
+          itemsPerPage={attemptsPerPage}
+        />
       </div>
 
       <style>{`
@@ -858,6 +936,105 @@ export default function AdminBilling() {
           padding: 60px 20px;
           color: var(--ed-color-text-tertiary);
           text-align: center;
+        }
+
+        .ed-attempts-table-card {
+          overflow: hidden;
+          border: 1px solid #edf0f5;
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
+          box-shadow: var(--ed-shadow-2);
+          transition: border-color 0.15s ease;
+        }
+
+        .ed-attempts-table-card:hover {
+          border-color: #d9f3f1;
+        }
+
+        .ed-attempts-table-card-head {
+          padding: 16px 20px;
+          border-bottom: 1px solid #edf0f5;
+          background: #fcfdfe;
+          font-weight: 700;
+          font-size: 14px;
+          color: #1e293b;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ed-attempts-table-card table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+        }
+
+        .ed-attempts-table-card th:nth-child(4),
+        .ed-attempts-table-card th:nth-child(5),
+        .ed-attempts-table-card td:nth-child(4),
+        .ed-attempts-table-card td:nth-child(5) {
+          text-align: right !important;
+        }
+
+        .ed-attempts-table-card th:nth-child(6),
+        .ed-attempts-table-card th:nth-child(7),
+        .ed-attempts-table-card td:nth-child(6),
+        .ed-attempts-table-card td:nth-child(7) {
+          text-align: left !important;
+        }
+
+        .ed-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-top: 1px solid var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
+          font-size: var(--ed-font-size-sm);
+          color: var(--ed-color-text-tertiary);
+        }
+
+        .ed-pagination-info b {
+          color: var(--ed-color-text-primary);
+        }
+
+        .ed-pagination-buttons {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .ed-pagination-btn {
+          min-height: 32px;
+          min-width: 32px;
+          padding: 0 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-lg);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          transition: all 0.15s ease;
+        }
+
+        .ed-pagination-btn:hover:not(:disabled) {
+          border-color: var(--ed-color-border-muted);
+          color: var(--ed-color-accent-active);
+          background: var(--ed-color-accent-soft);
+        }
+
+        .ed-pagination-btn.active {
+          border-color: var(--ed-color-border-muted);
+          background: var(--ed-color-border-muted);
+          color: var(--ed-color-surface-strong);
+        }
+
+        .ed-pagination-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
 
         @media (max-width: 1180px) {

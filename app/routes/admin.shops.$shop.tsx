@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
 import {
@@ -334,6 +334,49 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 
+const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage }: any) => {
+    if (totalPages <= 1) return null;
+
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+    return (
+        <div className="ed-pagination">
+            <div className="ed-pagination-info">
+                Showing <b>{startItem}</b> to <b>{endItem}</b> of <b>{totalItems}</b> entries
+            </div>
+            <div className="ed-pagination-buttons">
+                <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => onPageChange(currentPage - 1)}
+                    className="ed-pagination-btn"
+                >
+                    Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                        key={page}
+                        type="button"
+                        onClick={() => onPageChange(page)}
+                        className={`ed-pagination-btn ${currentPage === page ? "active" : ""}`}
+                    >
+                        {page}
+                    </button>
+                ))}
+                <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => onPageChange(currentPage + 1)}
+                    className="ed-pagination-btn"
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    );
+};
+
 export default function AdminShopDetail() {
     const { shop, settings, hasSettings, rules, logs, monthlyUsage, chargeAttempts, stats, hasProPlan, currentPlan, shopifyPlan, isBillingOverridden } = useLoaderData<typeof loader>();
     const actionData = useActionData<any>();
@@ -343,6 +386,24 @@ export default function AdminShopDetail() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCustomPlanModalOpen, setIsCustomPlanModalOpen] = useState(false);
     const [isBillingOverrideModalOpen, setIsBillingOverrideModalOpen] = useState(false);
+
+    const [attemptsPage, setAttemptsPage] = useState(1);
+    const attemptsPerPage = 5;
+
+    const [logsPage, setLogsPage] = useState(1);
+    const logsPerPage = 10;
+
+    const totalAttemptsPages = Math.ceil(chargeAttempts.length / attemptsPerPage);
+    const paginatedAttempts = useMemo(() => {
+        const startIndex = (attemptsPage - 1) * attemptsPerPage;
+        return (chargeAttempts as any[]).slice(startIndex, startIndex + attemptsPerPage);
+    }, [chargeAttempts, attemptsPage, attemptsPerPage]);
+
+    const totalLogsPages = Math.ceil(logs.length / logsPerPage);
+    const paginatedLogs = useMemo(() => {
+        const startIndex = (logsPage - 1) * logsPerPage;
+        return (logs as any[]).slice(startIndex, startIndex + logsPerPage);
+    }, [logs, logsPage, logsPerPage]);
 
     // Close modal on escape key
     useEffect(() => {
@@ -718,6 +779,76 @@ export default function AdminShopDetail() {
                 }
                 td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
                 .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block; }
+
+                /* attempts table custom alignment */
+                .ed-shop-attempts-table-card th:nth-child(3),
+                .ed-shop-attempts-table-card th:nth-child(4),
+                .ed-shop-attempts-table-card td:nth-child(3),
+                .ed-shop-attempts-table-card td:nth-child(4) {
+                    text-align: right !important;
+                }
+
+                .ed-shop-attempts-table-card th:nth-child(5),
+                .ed-shop-attempts-table-card th:nth-child(6),
+                .ed-shop-attempts-table-card td:nth-child(5),
+                .ed-shop-attempts-table-card td:nth-child(6) {
+                    text-align: left !important;
+                }
+
+                /* Pagination UI */
+                .ed-pagination {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 16px 20px;
+                    border-top: 1px solid var(--ed-color-surface-muted);
+                    background: var(--ed-color-surface-strong);
+                    font-size: var(--ed-font-size-sm);
+                    color: var(--ed-color-text-tertiary);
+                }
+
+                .ed-pagination-info b {
+                    color: var(--ed-color-text-primary);
+                }
+
+                .ed-pagination-buttons {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+                .ed-pagination-btn {
+                    min-height: 32px;
+                    min-width: 32px;
+                    padding: 0 10px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid var(--ed-color-surface-muted);
+                    border-radius: var(--ed-radius-lg);
+                    background: var(--ed-color-surface-strong);
+                    color: var(--ed-color-text-primary);
+                    font-size: var(--ed-font-size-xs);
+                    font-weight: 700;
+                    transition: all 0.15s ease;
+                }
+
+                .ed-pagination-btn:hover:not(:disabled) {
+                    border-color: var(--ed-color-border-muted);
+                    color: var(--ed-color-accent-active);
+                    background: var(--ed-color-accent-soft);
+                }
+
+                .ed-pagination-btn.active {
+                    border-color: var(--ed-color-border-muted);
+                    background: var(--ed-color-border-muted);
+                    color: var(--ed-color-surface-strong);
+                }
+
+                .ed-pagination-btn:disabled {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                }
 
                 /* Billing Forms */
                 .billing-input-group { margin-bottom: 16px; }
@@ -1173,7 +1304,7 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="ed-shop-card ed-shop-table-card" style={{ marginBottom: '32px' }}>
+            <div className="ed-shop-card ed-shop-table-card ed-shop-attempts-table-card" style={{ marginBottom: '32px' }}>
                 <div className="ed-shop-card-head">
                     <DollarSign size={18} color="#82b440" />
                     Overage Charge Attempts
@@ -1200,7 +1331,7 @@ export default function AdminShopDetail() {
                                     </td>
                                 </tr>
                             ) : (
-                                (chargeAttempts as any[]).map((attempt: any) => {
+                                (paginatedAttempts as any[]).map((attempt: any) => {
                                     return (
                                         <tr key={attempt.id}>
                                             <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(attempt.createdAt)}</td>
@@ -1243,6 +1374,13 @@ export default function AdminShopDetail() {
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    currentPage={attemptsPage}
+                    totalPages={totalAttemptsPages}
+                    onPageChange={setAttemptsPage}
+                    totalItems={chargeAttempts.length}
+                    itemsPerPage={attemptsPerPage}
+                />
             </div>
 
             <div className="ed-shop-card ed-shop-table-card" style={{ marginBottom: '32px' }}>
@@ -1301,7 +1439,7 @@ export default function AdminShopDetail() {
                             </tr>
                         </thead>
                         <tbody>
-                            {logs.map((l: any) => (
+                            {paginatedLogs.map((l: any) => (
                                 <tr key={l.id}>
                                     <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(l.timestamp)}</td>
                                     <td>
@@ -1327,6 +1465,13 @@ export default function AdminShopDetail() {
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    currentPage={logsPage}
+                    totalPages={totalLogsPages}
+                    onPageChange={setLogsPage}
+                    totalItems={logs.length}
+                    itemsPerPage={logsPerPage}
+                />
             </div>
         </div>
     );
