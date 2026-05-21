@@ -20,6 +20,7 @@ import {
     normalizeBillingOverridePlan,
     resolveEffectivePlan,
 } from "../utils/effective-plan.server";
+import { getStateName } from "../utils/states";
 import { 
     ArrowLeft, 
     ChevronLeft,
@@ -1527,8 +1528,8 @@ export default function AdminShopDetail() {
                                         </div>
                                     </td>
                                     <td>
-                                        <span style={{ fontFamily: 'monospace', color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
-                                            {l.regionCode || '-'}
+                                        <span title={l.regionCode || ''} style={{ color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
+                                            {l.regionCode ? getStateName(l.regionCode) : '-'}
                                         </span>
                                     </td>
                                     <td>

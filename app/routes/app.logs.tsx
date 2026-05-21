@@ -16,6 +16,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { getStateName } from "../utils/states";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
@@ -129,7 +130,11 @@ export default function VisitorLogs() {
                         "Unknown"
                     )}
                 </IndexTable.Cell>
-                <IndexTable.Cell>{log.regionCode || "-"}</IndexTable.Cell>
+                <IndexTable.Cell>
+                    <span title={log.regionCode || ""}>
+                        {log.regionCode ? getStateName(log.regionCode) : "-"}
+                    </span>
+                </IndexTable.Cell>
                 <IndexTable.Cell>{getActionBadge(log.action)}</IndexTable.Cell>
                 <IndexTable.Cell>
                     {log.path ? (
