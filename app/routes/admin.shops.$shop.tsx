@@ -238,6 +238,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             take: 100,
             select: {
                 id: true, ipAddress: true, countryCode: true, action: true,
+                regionCode: true,
                 ruleName: true, targetUrl: true, timestamp: true,
                 userAgent: true, path: true,
             },
@@ -1508,6 +1509,7 @@ export default function AdminShopDetail() {
                             <tr>
                                 <th>Time</th>
                                 <th>Visitor IP</th>
+                                <th>Region</th>
                                 <th>Page Path</th>
                                 <th>User Agent</th>
                                 <th>Action</th>
@@ -1523,6 +1525,11 @@ export default function AdminShopDetail() {
                                             {l.countryCode && <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />}
                                             <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
                                         </div>
+                                    </td>
+                                    <td>
+                                        <span style={{ fontFamily: 'monospace', color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
+                                            {l.regionCode || '-'}
+                                        </span>
                                     </td>
                                     <td>
                                         <div style={{ fontSize: '11px', color: '#64748b', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.path || '/'}>
