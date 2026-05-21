@@ -101,23 +101,43 @@ function getUsageLineItem(subscription: any) {
 }
 
 async function getBillableUsageCounts(shop: string, billingPeriodKey: string) {
-  const events = await prisma.billableUsageEvent.findMany({
-    where: {
-      shop,
-      billingPeriodKey,
-    },
-    select: { action: true },
-  });
+  const [events, actionEvents] = await Promise.all([
+    prisma.billableUsageEvent.findMany({
+      where: {
+        shop,
+        billingPeriodKey,
+      },
+      select: { action: true, eventKey: true },
+    }),
+    prisma.billableUsageActionEvent.findMany({
+      where: {
+        shop,
+        billingPeriodKey,
+      },
+      select: { action: true, eventKey: true },
+    }),
+  ]);
+
+  const actionEventKeys = actionEvents.reduce<Set<string>>((items, event) => {
+    items.add(`${event.eventKey}:${event.action}`);
+    return items;
+  }, new Set<string>());
+  const actions = [
+    ...actionEvents.map((event) => event.action),
+    ...events
+      .filter((event) => !actionEventKeys.has(`${event.eventKey}:${event.action}`))
+      .map((event) => event.action),
+  ];
 
   return {
     totalVisitors: events.length,
-    redirected: events.filter((event) =>
-      ["redirected", "auto_redirected", "ip_redirected"].includes(event.action)
+    redirected: actions.filter((action) =>
+      ["redirected", "auto_redirected", "ip_redirected"].includes(action)
     ).length,
-    blocked: events.filter((event) =>
-      ["blocked", "ip_blocked", "vpn_blocked"].includes(event.action)
+    blocked: actions.filter((action) =>
+      ["blocked", "ip_blocked", "vpn_blocked"].includes(action)
     ).length,
-    popupShown: events.filter((event) => event.action === "popup_shown").length,
+    popupShown: actions.filter((action) => action === "popup_shown").length,
   };
 }
 

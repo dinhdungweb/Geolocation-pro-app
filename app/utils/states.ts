@@ -67,6 +67,45 @@ export function getStateName(code: string): string {
     return STATE_MAP[country]?.[normalizedCode] || code;
 }
 
+function normalizeRegionName(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/gi, " ")
+        .trim()
+        .toLowerCase();
+}
+
+/**
+ * Match a configured state code against the region returned by MaxMind.
+ *
+ * MaxMind and country-region-data do not always use the same subdivision code
+ * for a country. For example, country-region-data may expose Costa Rica as
+ * CR-1 while MaxMind returns CR-SJ. When codes differ, compare names for the
+ * same country so state/region rules still work.
+ */
+export function stateCodeMatchesRegion(
+    configuredCode: string,
+    visitorRegionCode: string,
+    visitorRegionName?: string | null,
+): boolean {
+    const configured = configuredCode.trim().toUpperCase();
+    const visitorCode = visitorRegionCode.trim().toUpperCase();
+    if (!configured || !visitorCode) return false;
+    if (configured === visitorCode) return true;
+
+    const [configuredCountry] = configured.split("-");
+    const [visitorCountry] = visitorCode.split("-");
+    if (!configuredCountry || configuredCountry !== visitorCountry) return false;
+
+    const configuredName = getStateName(configured);
+    const visitorName = visitorRegionName?.trim() || getStateName(visitorCode);
+    if (!configuredName || !visitorName) return false;
+    if (configuredName === configured && visitorName === visitorCode) return false;
+
+    return normalizeRegionName(configuredName) === normalizeRegionName(visitorName);
+}
+
 /**
  * Get the country code from a state code
  * @param stateCode - Full ISO 3166-2 code, e.g. "US-TX"

@@ -216,6 +216,21 @@ model BillableUsageEvent {
   @@index([shop, createdAt])
 }
 
+model BillableUsageActionEvent {
+  id          String   @id @default(uuid())
+  shop        String
+  yearMonth   String
+  billingPeriodKey String?
+  eventKey    String
+  action      String
+  createdAt   DateTime @default(now())
+
+  @@unique([eventKey, action])
+  @@index([shop, yearMonth])
+  @@index([shop, billingPeriodKey])
+  @@index([shop, createdAt])
+}
+
 model VisitorLog {
   id          String   @id @default(uuid())
   shop        String

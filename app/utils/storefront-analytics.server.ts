@@ -1,4 +1,5 @@
-import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
+import type { Prisma } from "@prisma/client";
 import prisma from "../db.server";
 import {
   isBillableAnalyticsEvent,
@@ -31,7 +32,7 @@ function actionFromType(type: string) {
 }
 
 function getUsageUpdateData(type: string) {
-  const updateData: any = { totalVisitors: { increment: 1 } };
+  const updateData: any = {};
 
   if (["redirected", "auto_redirected", "ip_redirected"].includes(type)) {
     updateData.redirected = { increment: 1 };
@@ -44,6 +45,118 @@ function getUsageUpdateData(type: string) {
   }
 
   return updateData;
+}
+
+function usageCreateData({
+  actionInserted,
+  billingPeriodKey,
+  mainInserted,
+  payload,
+  type,
+}: {
+  actionInserted: boolean;
+  billingPeriodKey: string;
+  mainInserted: boolean;
+  payload: AnalyticsTokenPayload;
+  type: string;
+}) {
+  return {
+    shop: payload.shop,
+    yearMonth: payload.yearMonth,
+    billingPeriodKey,
+    totalVisitors: mainInserted ? 1 : 0,
+    redirected:
+      actionInserted && ["redirected", "auto_redirected", "ip_redirected"].includes(type)
+        ? 1
+        : 0,
+    blocked:
+      actionInserted && ["blocked", "ip_blocked", "vpn_blocked"].includes(type)
+        ? 1
+        : 0,
+    popupShown: actionInserted && type === "popup_shown" ? 1 : 0,
+  };
+}
+
+async function insertBillableUsageEvent({
+  billingPeriodKey,
+  countryCode,
+  path,
+  payload,
+  tx,
+  type,
+}: {
+  billingPeriodKey: string;
+  countryCode: string | null;
+  path: string | null;
+  payload: AnalyticsTokenPayload;
+  tx: Prisma.TransactionClient;
+  type: string;
+}) {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    INSERT INTO "BillableUsageEvent" (
+      "id",
+      "shop",
+      "yearMonth",
+      "billingPeriodKey",
+      "eventKey",
+      "ruleId",
+      "action",
+      "countryCode",
+      "path",
+      "ipHash"
+    )
+    VALUES (
+      ${randomUUID()},
+      ${payload.shop},
+      ${payload.yearMonth},
+      ${billingPeriodKey},
+      ${payload.eventKey},
+      ${payload.ruleId},
+      ${type},
+      ${countryCode},
+      ${path},
+      ${payload.ipHash}
+    )
+    ON CONFLICT ("eventKey") DO NOTHING
+    RETURNING "id"
+  `;
+
+  return rows.length > 0;
+}
+
+async function insertBillableUsageActionEvent({
+  billingPeriodKey,
+  payload,
+  tx,
+  type,
+}: {
+  billingPeriodKey: string;
+  payload: AnalyticsTokenPayload;
+  tx: Prisma.TransactionClient;
+  type: string;
+}) {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    INSERT INTO "BillableUsageActionEvent" (
+      "id",
+      "shop",
+      "yearMonth",
+      "billingPeriodKey",
+      "eventKey",
+      "action"
+    )
+    VALUES (
+      ${randomUUID()},
+      ${payload.shop},
+      ${payload.yearMonth},
+      ${billingPeriodKey},
+      ${payload.eventKey},
+      ${type}
+    )
+    ON CONFLICT ("eventKey", "action") DO NOTHING
+    RETURNING "id"
+  `;
+
+  return rows.length > 0;
 }
 
 export async function recordBillableUsage({
@@ -59,64 +172,52 @@ export async function recordBillableUsage({
 }) {
   const billingPeriodKey = payload.billingPeriodKey || `calendar:${payload.yearMonth}`;
 
-  try {
-    return await prisma.$transaction(async (tx) => {
-      await tx.billableUsageEvent.create({
-        data: {
-          shop: payload.shop,
-          yearMonth: payload.yearMonth,
-          billingPeriodKey,
-          eventKey: payload.eventKey,
-          ruleId: payload.ruleId,
-          action: type,
-          countryCode,
-          path,
-          ipHash: payload.ipHash,
-        },
-      });
+  return prisma.$transaction(async (tx) => {
+    const mainInserted = await insertBillableUsageEvent({
+      billingPeriodKey,
+      countryCode,
+      path,
+      payload,
+      tx,
+      type,
+    });
+    const actionInserted = await insertBillableUsageActionEvent({
+      billingPeriodKey,
+      payload,
+      tx,
+      type,
+    });
 
-      const usageUpdateData = getUsageUpdateData(type);
+    const usageUpdateData = {
+      ...(mainInserted ? { totalVisitors: { increment: 1 } } : {}),
+      ...(actionInserted ? getUsageUpdateData(type) : {}),
+    };
+
+    if (Object.keys(usageUpdateData).length > 0) {
       await tx.monthlyUsage.upsert({
-      where: {
-        shop_billingPeriodKey: {
-          shop: payload.shop,
-          billingPeriodKey,
+        where: {
+          shop_billingPeriodKey: {
+            shop: payload.shop,
+            billingPeriodKey,
+          },
         },
-      },
-      update: usageUpdateData,
-      create: {
-        shop: payload.shop,
-        yearMonth: payload.yearMonth,
-        billingPeriodKey,
-        totalVisitors: 1,
-        redirected: ["redirected", "auto_redirected", "ip_redirected"].includes(type) ? 1 : 0,
-        blocked: ["blocked", "ip_blocked", "vpn_blocked"].includes(type) ? 1 : 0,
-        popupShown: type === "popup_shown" ? 1 : 0,
-      },
-    });
-
-      return {
-        inserted: true,
-        duplicateAction: null,
-      };
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      const existing = await prisma.billableUsageEvent.findUnique({
-        where: { eventKey: payload.eventKey },
-        select: { action: true },
+        update: usageUpdateData,
+        create: usageCreateData({
+          actionInserted,
+          billingPeriodKey,
+          mainInserted,
+          payload,
+          type,
+        }),
       });
-
-      return {
-        inserted: false,
-        duplicateAction: existing?.action || null,
-      };
     }
-    throw error;
-  }
+
+    return {
+      inserted: mainInserted,
+      actionInserted,
+      duplicateAction: mainInserted || actionInserted ? null : type,
+    };
+  });
 }
 
 export async function recordStorefrontAnalyticsDetails({

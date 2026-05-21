@@ -18,6 +18,7 @@ import {
   recordBillableUsage,
   recordStorefrontAnalyticsDetails,
 } from "../utils/storefront-analytics.server";
+import { stateCodeMatchesRegion } from "../utils/states";
 
 type ProxyRule = {
   id: string;
@@ -768,7 +769,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             (rule.stateCodes || "")
               .split(",")
               .map((code: string) => code.trim().toUpperCase())
-              .includes(regionCode.toUpperCase())
+              .some((code: string) => stateCodeMatchesRegion(code, regionCode, regionName))
           ) || null;
 
       if (selectedRule) {

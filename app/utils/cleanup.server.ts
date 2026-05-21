@@ -25,11 +25,14 @@ export async function cleanupOldLogs() {
         const billableCutoff = new Date();
         billableCutoff.setDate(billableCutoff.getDate() - BILLABLE_EVENT_RETENTION_DAYS);
 
-        const [logResult, billableResult] = await Promise.all([
+        const [logResult, billableResult, billableActionResult] = await Promise.all([
             prisma.visitorLog.deleteMany({
                 where: { timestamp: { lt: logCutoff } },
             }),
             prisma.billableUsageEvent.deleteMany({
+                where: { createdAt: { lt: billableCutoff } },
+            }),
+            prisma.billableUsageActionEvent.deleteMany({
                 where: { createdAt: { lt: billableCutoff } },
             }),
         ]);
@@ -41,6 +44,9 @@ export async function cleanupOldLogs() {
         }
         if (billableResult.count > 0) {
             console.log(`[Cleanup] Deleted ${billableResult.count} billable events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);
+        }
+        if (billableActionResult.count > 0) {
+            console.log(`[Cleanup] Deleted ${billableActionResult.count} billable action events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);
         }
     } catch (error) {
         console.error("[Cleanup] Failed to delete old records:", error);

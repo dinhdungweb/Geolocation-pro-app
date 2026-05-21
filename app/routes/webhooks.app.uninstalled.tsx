@@ -19,6 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     db.monthlyUsage.deleteMany({ where: { shop } }),
     db.usageChargeAttempt.deleteMany({ where: { shop } }),
     db.billableUsageEvent.deleteMany({ where: { shop } }),
+    db.billableUsageActionEvent.deleteMany({ where: { shop } }),
     db.visitorLog.deleteMany({ where: { shop } }),
     db.adminEmailLog.deleteMany({ where: { shop } }),
     db.automation.deleteMany({ where: { shop } }),

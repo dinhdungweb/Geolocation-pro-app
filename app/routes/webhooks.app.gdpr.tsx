@@ -42,6 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     prisma.monthlyUsage.deleteMany({ where: { shop } }),
                     prisma.usageChargeAttempt.deleteMany({ where: { shop } }),
                     prisma.billableUsageEvent.deleteMany({ where: { shop } }),
+                    prisma.billableUsageActionEvent.deleteMany({ where: { shop } }),
                     prisma.visitorLog.deleteMany({ where: { shop } }),
                     prisma.adminEmailLog.deleteMany({ where: { shop } }),
                     prisma.automation.deleteMany({ where: { shop } }),
