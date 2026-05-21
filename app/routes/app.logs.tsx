@@ -129,6 +129,7 @@ export default function VisitorLogs() {
                         "Unknown"
                     )}
                 </IndexTable.Cell>
+                <IndexTable.Cell>{log.regionCode || "-"}</IndexTable.Cell>
                 <IndexTable.Cell>{getActionBadge(log.action)}</IndexTable.Cell>
                 <IndexTable.Cell>
                     {log.path ? (
@@ -246,6 +247,7 @@ export default function VisitorLogs() {
                                                 { title: "Timestamp" },
                                                 { title: "IP Address" },
                                                 { title: "Country" },
+                                                { title: "Region" },
                                                 { title: "Action" },
                                                 { title: "Page Path" },
                                                 { title: "Details / Rule" },

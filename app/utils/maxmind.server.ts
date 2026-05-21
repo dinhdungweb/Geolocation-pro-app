@@ -22,11 +22,6 @@ async function initReader(): Promise<void> {
     // If it's missing, it will download (~5MB) — only happens on first deploy.
     await checkAndRunLiteUpdate().catch(err => console.error('[MaxMind] Update check failed:', err));
 
-    if (!fs.existsSync(DB_PATH)) {
-        console.error('[MaxMind] Database file not found:', DB_PATH);
-        return;
-    }
-
     try {
         // Try City DB first, fall back to legacy Country DB
         const dbFile = fs.existsSync(DB_PATH) ? DB_PATH : LEGACY_DB_PATH;

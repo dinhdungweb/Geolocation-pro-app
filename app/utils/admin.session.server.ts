@@ -1,5 +1,6 @@
 import { createCookieSessionStorage, redirect } from "@remix-run/node";
 import crypto from "crypto";
+import { isIP } from "node:net";
 
 const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || "__missing_admin_session_secret__";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "";
@@ -124,10 +125,63 @@ export async function validateCredentials(username: string, password: string): P
     return usernameMatches && passwordMatches;
 }
 
-export function getClientIP(request: Request): string {
+function normalizeIP(value: string | null | undefined) {
+    const raw = value?.trim();
+    if (!raw) return null;
+
+    const bracketedIPv6 = raw.match(/^\[([^\]]+)\](?::\d+)?$/);
+    const ipv4WithPort = raw.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$/);
+    const candidate = bracketedIPv6?.[1] || ipv4WithPort?.[1] || raw.replace(/^\[|\]$/g, "");
+
+    return isIP(candidate) ? candidate : null;
+}
+
+function isPrivateOrLocalIP(ip: string) {
+    if (
+        ip === "0.0.0.0" ||
+        ip === "127.0.0.1" ||
+        ip === "::1" ||
+        ip.toLowerCase().startsWith("fc") ||
+        ip.toLowerCase().startsWith("fd") ||
+        ip.toLowerCase().startsWith("fe80:")
+    ) {
+        return true;
+    }
+
+    const parts = ip.split(".").map((part) => Number.parseInt(part, 10));
+    if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+        return false;
+    }
+
+    const [a, b] = parts;
     return (
-        request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-        request.headers.get("x-real-ip") ||
+        a === 10 ||
+        a === 127 ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254)
+    );
+}
+
+function firstPublicForwardedIP(value: string | null) {
+    return value
+        ?.split(",")
+        .map(normalizeIP)
+        .find((ip): ip is string => Boolean(ip && !isPrivateOrLocalIP(ip)));
+}
+
+export function getClientIP(request: Request): string {
+    const singleHopIP = [
+        request.headers.get("cf-connecting-ip"),
+        request.headers.get("true-client-ip"),
+        request.headers.get("x-real-ip"),
+    ]
+        .map(normalizeIP)
+        .find((ip): ip is string => Boolean(ip && !isPrivateOrLocalIP(ip)));
+
+    return (
+        singleHopIP ||
+        firstPublicForwardedIP(request.headers.get("x-forwarded-for")) ||
         "unknown"
     );
 }

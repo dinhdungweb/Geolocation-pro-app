@@ -26,7 +26,6 @@ import {
     Divider,
     Banner,
     Tooltip,
-    Tag,
 } from "@shopify/polaris";
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
@@ -487,7 +486,6 @@ export default function RulesPage() {
     const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
     const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
     const [selectedStates, setSelectedStates] = useState<string[]>([]);
-    const [selectedStateCountry, setSelectedStateCountry] = useState<string>("US");
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
@@ -565,12 +563,6 @@ export default function RulesPage() {
             setSelectedCountries(editingRule.countryCodes.split(",").map(c => c.trim()).filter(Boolean));
             setSelectedMarkets((editingRule.marketHandles || "").split(",").map(c => c.trim()).filter(Boolean));
             setSelectedStates((editingRule.stateCodes || "").split(",").map(c => c.trim()).filter(Boolean));
-            const firstState = (editingRule.stateCodes || "").split(",").map(c => c.trim()).filter(Boolean)[0];
-            if (firstState) {
-                setSelectedStateCountry(firstState.split("-")[0]);
-            } else {
-                setSelectedStateCountry("US");
-            }
             setFormTargetUrl(editingRule.targetUrl);
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "redirect");
@@ -590,7 +582,6 @@ export default function RulesPage() {
             setSelectedCountries([]);
             setSelectedMarkets([]);
             setSelectedStates([]);
-            setSelectedStateCountry("US");
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("redirect");

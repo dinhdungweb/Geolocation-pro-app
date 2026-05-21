@@ -275,6 +275,22 @@ function isMarketMatch(rule: ProxyRule, marketHandle: string, marketId: string, 
     .some((code) => code === country);
 }
 
+function canRunCountryRule(rule: ProxyRule, hasPaidPlan: boolean) {
+  if (hasPaidPlan) return true;
+  return rule.ruleType !== "block" && (rule.pageTargetingType || "all") === "all";
+}
+
+function isCountryMatch(rule: ProxyRule, countryCode: string) {
+  const country = normalizeCountryCode(countryCode);
+  if (!country) return false;
+
+  return (rule.countryCodes || "")
+    .split(/[\n,]+/)
+    .map((code) => code.trim().toUpperCase())
+    .filter(Boolean)
+    .some((code) => code === "*" || code === country);
+}
+
 function getActionForRule(rule: ProxyRule): StorefrontAction {
   if (rule.ruleType === "block") return "block";
   return rule.redirectMode === "auto_redirect" ? "auto_redirect" : "popup";
@@ -768,15 +784,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const eligibleCountryRules = countryRules
         .filter((rule) => isRuleInSchedule(rule))
         .filter((rule) => isRuleOnPage(rule, currentPath))
-        .filter((rule) => hasPaidPlan || rule.ruleType !== "block");
+        .filter((rule) => canRunCountryRule(rule, hasPaidPlan));
 
       selectedRule =
-        eligibleCountryRules.find((rule) =>
-          rule.countryCodes
-            .split(",")
-            .map((code) => code.trim().toUpperCase())
-            .includes(countryCode.toUpperCase())
-        ) || null;
+        eligibleCountryRules.find((rule) => isCountryMatch(rule, countryCode)) || null;
 
       if (selectedRule) {
         source = "country";
@@ -824,6 +835,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             source,
             path: currentPath,
             countryCode,
+            regionCode,
             ipHash,
           })
         : null;
@@ -841,6 +853,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           return recordStorefrontAnalyticsDetails({
             countryCode,
             path: currentPath,
+            regionCode,
             request,
             ruleId: selectedRule.id,
             ruleName: selectedRule.name,

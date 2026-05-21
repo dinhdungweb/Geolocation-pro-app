@@ -131,6 +131,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const countryCode = tokenPayload?.countryCode || asSafeString(data.countryCode, 2).toUpperCase() || null;
+    const regionCode = tokenPayload?.regionCode || asSafeString(data.regionCode, 20).toUpperCase() || null;
     const ruleId = tokenPayload?.ruleId || asSafeString(data.ruleId, 100) || null;
     const ruleName =
       tokenPayload?.ruleId === "vpn-shield"
@@ -142,6 +143,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await recordStorefrontAnalyticsEvent({
       countryCode,
       path,
+      regionCode,
       request,
       ruleId,
       ruleName,

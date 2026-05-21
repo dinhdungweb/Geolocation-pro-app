@@ -12,6 +12,7 @@ export interface AnalyticsTokenPayload {
   source: RuleSource;
   path: string;
   countryCode: string;
+  regionCode?: string;
   ipHash: string;
   iat: number;
   eventKey: string;

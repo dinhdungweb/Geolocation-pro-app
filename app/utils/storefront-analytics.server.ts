@@ -9,6 +9,7 @@ import { getVisitorIP } from "./request-ip.server";
 type RecordStorefrontAnalyticsEventInput = {
   countryCode: string | null;
   path: string | null;
+  regionCode?: string | null;
   request: Request;
   ruleId: string | null;
   ruleName: string | null;
@@ -120,6 +121,7 @@ export async function recordBillableUsage({
 export async function recordStorefrontAnalyticsDetails({
   countryCode,
   path,
+  regionCode = null,
   request,
   ruleId,
   ruleName,
@@ -133,6 +135,7 @@ export async function recordStorefrontAnalyticsDetails({
         shop,
         ipAddress: getVisitorIP(request),
         countryCode,
+        regionCode,
         city: null,
         action: actionFromType(type),
         ruleName,
