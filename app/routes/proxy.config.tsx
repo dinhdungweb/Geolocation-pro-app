@@ -12,7 +12,7 @@ import {
 } from "../utils/analytics-token.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { resolveEffectivePlan } from "../utils/effective-plan.server";
-import { getCountryFromIP } from "../utils/maxmind.server";
+import { getGeoFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
 import {
   recordBillableUsage,
@@ -37,6 +37,7 @@ type ProxyRule = {
   timezone?: string | null;
   pageTargetingType: string;
   pagePaths?: string | null;
+  stateCodes?: string;
 };
 
 const corsHeaders = {
@@ -471,10 +472,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const ipHash = hashIP(visitorIP);
   let maxmindCountryCode = "";
   let countryCode = "";
+  let regionCode = "";
 
   try {
-    maxmindCountryCode = await getCountryFromIP(visitorIP);
-    countryCode = maxmindCountryCode;
+    const geoResult = await getGeoFromIP(visitorIP);
+    maxmindCountryCode = geoResult.countryCode;
+    countryCode = geoResult.countryCode;
+    regionCode = geoResult.regionCode;
   } catch (error: any) {
     console.error(`[Proxy] MaxMind lookup error:`, error.message);
   }
@@ -486,6 +490,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         countryCode,
         forwardedFor: request.headers.get("x-forwarded-for"),
         maxmindCountryCode,
+        regionCode,
         shopifyMarketHandle,
         shopifyMarketId,
         realIp: request.headers.get("x-real-ip"),
@@ -500,6 +505,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       countryCode,
       forwardedFor: request.headers.get("x-forwarded-for"),
       maxmindCountryCode,
+      regionCode,
       shopifyMarketHandle,
       shopifyMarketId,
       shopifyClientIp: request.headers.get("x-shopify-client-ip"),
@@ -694,6 +700,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       if (selectedRule) {
         source = "market";
+        action = getActionForRule(selectedRule);
+      }
+    }
+
+    if (!selectedRule && hasPaidPlan && regionCode) {
+      const stateRules = await prisma.redirectRule.findMany({
+        where: { shop, isActive: true, matchType: "state" },
+        orderBy: { priority: "desc" },
+        select: {
+          id: true,
+          name: true,
+          stateCodes: true,
+          targetUrl: true,
+          priority: true,
+          scheduleEnabled: true,
+          startTime: true,
+          endTime: true,
+          daysOfWeek: true,
+          timezone: true,
+          ruleType: true,
+          redirectMode: true,
+          pageTargetingType: true,
+          pagePaths: true,
+        },
+      });
+
+      selectedRule =
+        stateRules
+          .filter((rule) => isRuleInSchedule(rule))
+          .filter((rule) => isRuleOnPage(rule, currentPath))
+          .find((rule) =>
+            (rule.stateCodes || "")
+              .split(",")
+              .map((code: string) => code.trim().toUpperCase())
+              .includes(regionCode.toUpperCase())
+          ) || null;
+
+      if (selectedRule) {
+        source = "state";
         action = getActionForRule(selectedRule);
       }
     }

@@ -5,13 +5,13 @@ import { Readable } from 'stream';
 import { invalidateReader } from '../utils/maxmind.server';
 
 const DB_DIR = path.join(process.cwd(), 'data');
-const DB_FILENAME = 'GeoLite2-Country.mmdb';
+const DB_FILENAME = 'GeoLite2-City.mmdb';
 const DB_PATH = path.join(DB_DIR, DB_FILENAME);
 const LICENSE_KEY = process.env.MAXMIND_LICENSE_KEY;
 
 // URLs for MaxMind GeoLite2
 // Note: Requires a valid license key
-const DOWNLOAD_URL = `https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=${LICENSE_KEY}&suffix=tar.gz`;
+const DOWNLOAD_URL = `https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${LICENSE_KEY}&suffix=tar.gz`;
 
 export async function updateGeoIPDatabase() {
     if (!LICENSE_KEY) {

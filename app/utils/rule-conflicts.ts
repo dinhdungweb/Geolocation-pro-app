@@ -1,4 +1,4 @@
-export type ConflictMatchType = "country" | "ip" | "market";
+export type ConflictMatchType = "country" | "ip" | "market" | "state";
 
 export type ConflictSeverity = "warning" | "critical";
 
@@ -10,6 +10,7 @@ export interface ConflictRule {
   ipAddresses?: string | null;
   marketHandles?: string | null;
   marketCountryCodes?: string | null;
+  stateCodes?: string | null;
   isActive: boolean;
   priority: number;
   ruleType: string;
@@ -259,6 +260,22 @@ function marketOverlap(left: ConflictRule, right: ConflictRule) {
   };
 }
 
+function stateOverlap(left: ConflictRule, right: ConflictRule) {
+  const leftStates = splitList(left.stateCodes).map((code) => code.toUpperCase());
+  const rightStates = splitList(right.stateCodes).map((code) => code.toUpperCase());
+
+  if (leftStates.includes("*") || rightStates.includes("*")) {
+    return { overlaps: true, label: "all states" };
+  }
+
+  const rightSet = new Set(rightStates);
+  const shared = leftStates.filter((code) => rightSet.has(code));
+  return {
+    overlaps: shared.length > 0,
+    label: shared.length > 0 ? shared.slice(0, 4).join(", ") : "different states",
+  };
+}
+
 function addConflict(
   summary: RuleConflictSummary,
   conflict: Omit<RuleConflict, "id">,
@@ -286,6 +303,7 @@ export function detectRuleConflicts(
       const matchOverlap =
         matchType === "country" ? countryOverlap(left, right) :
         matchType === "market" ? marketOverlap(left, right) :
+        matchType === "state" ? stateOverlap(left, right) :
         ipOverlap(left, right);
       if (!matchOverlap.overlaps) continue;
 
@@ -315,6 +333,123 @@ export function detectRuleConflicts(
         severity: "critical",
         scope,
         message: `"${left.name}" has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
+      });
+      summary.total += 1;
+    }
+  }
+
+  return summary;
+}
+
+function countryStateOverlap(countryRule: ConflictRule, stateRule: ConflictRule) {
+  const countries = splitList(countryRule.countryCodes).map((code) => code.toUpperCase());
+  const states = splitList(stateRule.stateCodes).map((code) => code.toUpperCase());
+
+  if (countries.includes("*")) {
+    return { overlaps: true, label: "all countries vs states" };
+  }
+
+  const matchingStates = states.filter((stateCode) => {
+    const countryOfState = stateCode.split("-")[0];
+    return countries.includes(countryOfState);
+  });
+
+  return {
+    overlaps: matchingStates.length > 0,
+    label: matchingStates.length > 0 ? matchingStates.slice(0, 4).join(", ") : "different countries/states",
+  };
+}
+
+function marketStateOverlap(marketRule: ConflictRule, stateRule: ConflictRule) {
+  const marketCountries = splitList(marketRule.marketCountryCodes).map((code) => code.toUpperCase());
+  const states = splitList(stateRule.stateCodes).map((code) => code.toUpperCase());
+
+  const matchingStates = states.filter((stateCode) => {
+    const countryOfState = stateCode.split("-")[0];
+    return marketCountries.includes(countryOfState);
+  });
+
+  return {
+    overlaps: matchingStates.length > 0,
+    label: matchingStates.length > 0 ? matchingStates.slice(0, 4).join(", ") : "different markets/states",
+  };
+}
+
+export function detectCrossRuleConflicts(
+  rules: ConflictRule[],
+): RuleConflictSummary {
+  const summary: RuleConflictSummary = { total: 0, byRuleId: {} };
+  const activeCountryRules = rules.filter((rule) => rule.isActive && rule.matchType === "country");
+  const activeStateRules = rules.filter((rule) => rule.isActive && rule.matchType === "state");
+  const activeMarketRules = rules.filter((rule) => rule.isActive && rule.matchType === "market");
+
+  // 1. Check Country vs State
+  for (const countryRule of activeCountryRules) {
+    for (const stateRule of activeStateRules) {
+      if (countryRule.priority !== stateRule.priority) continue;
+
+      const matchOverlap = countryStateOverlap(countryRule, stateRule);
+      if (!matchOverlap.overlaps) continue;
+
+      const pageOverlap = pageTargetingOverlaps(countryRule, stateRule);
+      if (!pageOverlap.overlaps) continue;
+
+      const scheduleOverlap = schedulesOverlap(countryRule, stateRule);
+      if (!scheduleOverlap.overlaps) continue;
+
+      const scope = buildScope(matchOverlap.label, pageOverlap.label, scheduleOverlap.label);
+
+      addConflict(summary, {
+        ruleId: countryRule.id,
+        otherRuleId: stateRule.id,
+        otherRuleName: stateRule.name,
+        severity: "critical",
+        scope,
+        message: `"${stateRule.name}" (State Rule) has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
+      });
+      addConflict(summary, {
+        ruleId: stateRule.id,
+        otherRuleId: countryRule.id,
+        otherRuleName: countryRule.name,
+        severity: "critical",
+        scope,
+        message: `"${countryRule.name}" (Country Rule) has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
+      });
+      summary.total += 1;
+    }
+  }
+
+  // 2. Check Market vs State
+  for (const marketRule of activeMarketRules) {
+    for (const stateRule of activeStateRules) {
+      if (marketRule.priority !== stateRule.priority) continue;
+
+      const matchOverlap = marketStateOverlap(marketRule, stateRule);
+      if (!matchOverlap.overlaps) continue;
+
+      const pageOverlap = pageTargetingOverlaps(marketRule, stateRule);
+      if (!pageOverlap.overlaps) continue;
+
+      const scheduleOverlap = schedulesOverlap(marketRule, stateRule);
+      if (!scheduleOverlap.overlaps) continue;
+
+      const scope = buildScope(matchOverlap.label, pageOverlap.label, scheduleOverlap.label);
+
+      addConflict(summary, {
+        ruleId: marketRule.id,
+        otherRuleId: stateRule.id,
+        otherRuleName: stateRule.name,
+        severity: "critical",
+        scope,
+        message: `"${stateRule.name}" (State Rule) has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
+      });
+      addConflict(summary, {
+        ruleId: stateRule.id,
+        otherRuleId: marketRule.id,
+        otherRuleName: marketRule.name,
+        severity: "critical",
+        scope,
+        message: `"${marketRule.name}" (Market Rule) has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
       });
       summary.total += 1;
     }

@@ -47,6 +47,7 @@ model RedirectRule {
   marketHandles     String   @default("")
   marketCountryCodes String  @default("")
   matchType         String   @default("country")
+  stateCodes        String   @default("")
   redirectMode      String   @default("popup")
   pagePaths         String?
   pageTargetingType String   @default("all")
@@ -220,6 +221,7 @@ model VisitorLog {
   shop        String
   ipAddress   String
   countryCode String?
+  regionCode  String?
   city        String?
   action      String
   ruleName    String?

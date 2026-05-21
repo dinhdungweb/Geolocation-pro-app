@@ -5,35 +5,24 @@ name = "Geo: Redirect & Country Block"
 application_url = "https://geopro.bluepeaks.top"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-
 [webhooks]
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/scopes_update"
+  uri = "/webhooks/app/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
   [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/uninstalled"
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
 
   [[webhooks.subscriptions]]
   topics = [ "app_subscriptions/update" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/subscriptions/update"
+  uri = "/webhooks/app/subscriptions/update"
 
   [[webhooks.subscriptions]]
-  compliance_topics = [ "customers/data_request" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/gdpr"
-
-  [[webhooks.subscriptions]]
-  compliance_topics = [ "customers/redact" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/gdpr"
-
-  [[webhooks.subscriptions]]
-  compliance_topics = [ "shop/redact" ]
-  uri = "https://geopro.bluepeaks.top/webhooks/app/gdpr"
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -45,9 +34,10 @@ redirect_urls = [
   "https://geopro.bluepeaks.top/auth/shopify/callback"
 ]
 
-# App Proxy - Provides stable URL for storefront extension API calls
 [app_proxy]
 url = "https://geopro.bluepeaks.top/proxy"
 subpath = "geolocation"
 prefix = "apps"
 
+[build]
+automatically_update_urls_on_dev = true

@@ -1,13 +1,14 @@
 import maxmind from 'maxmind';
-import type { CountryResponse, Reader } from 'maxmind';
+import type { CityResponse, Reader } from 'maxmind';
 import path from 'path';
 import fs from 'fs';
 import { checkAndRunLiteUpdate } from '../services/geoip-updater.server';
 
-let reader: Reader<CountryResponse> | null = null;
+let reader: Reader<CityResponse> | null = null;
 let initPromise: Promise<void> | null = null;
 
-const DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-Country.mmdb');
+const DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-City.mmdb');
+const LEGACY_DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-Country.mmdb');
 
 /**
  * Initialize MaxMind GeoLite2-Country database reader.
@@ -27,8 +28,14 @@ async function initReader(): Promise<void> {
     }
 
     try {
-        reader = await maxmind.open<CountryResponse>(DB_PATH);
-        console.log('[MaxMind] Database loaded successfully');
+        // Try City DB first, fall back to legacy Country DB
+        const dbFile = fs.existsSync(DB_PATH) ? DB_PATH : LEGACY_DB_PATH;
+        if (!fs.existsSync(dbFile)) {
+            console.error('[MaxMind] No database file found at', DB_PATH, 'or', LEGACY_DB_PATH);
+            return;
+        }
+        reader = await maxmind.open<CityResponse>(dbFile);
+        console.log('[MaxMind] Database loaded successfully:', path.basename(dbFile));
     } catch (error) {
         console.error('[MaxMind] Failed to load database:', error);
     }
@@ -82,4 +89,44 @@ export async function getCountryFromIP(ip: string): Promise<string> {
     }
 
     return '';
+}
+
+/**
+ * Get full geo info from IP address using MaxMind GeoLite2-City
+ * @param ip - IP address to lookup
+ * @returns Object with countryCode, regionCode (ISO 3166-2), and city
+ */
+export async function getGeoFromIP(ip: string): Promise<{
+    countryCode: string;
+    regionCode: string;
+    city: string;
+}> {
+    // Initialize reader if not done yet
+    if (!reader) {
+        if (!initPromise) {
+            initPromise = initReader();
+        }
+        await initPromise;
+    }
+
+    const empty = { countryCode: '', regionCode: '', city: '' };
+    if (!reader) return empty;
+
+    try {
+        const result = reader.get(ip);
+        if (!result) return empty;
+
+        const countryCode = result.country?.iso_code || '';
+        const subdivisionCode = result.subdivisions?.[0]?.iso_code || '';
+        const regionCode = countryCode && subdivisionCode
+            ? `${countryCode}-${subdivisionCode}`
+            : '';
+        const city = result.city?.names?.en || '';
+
+        return { countryCode, regionCode, city };
+    } catch (error) {
+        console.error('[MaxMind] Geo lookup error for IP', ip, ':', error);
+    }
+
+    return empty;
 }
