@@ -8,6 +8,7 @@ import {
   verifyAnalyticsToken,
   type AnalyticsTokenPayload,
 } from "../utils/analytics-token.server";
+import { getGeoFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
 import { recordStorefrontAnalyticsEvent } from "../utils/storefront-analytics.server";
 
@@ -130,8 +131,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
     }
 
-    const countryCode = tokenPayload?.countryCode || asSafeString(data.countryCode, 2).toUpperCase() || null;
-    const regionCode = tokenPayload?.regionCode || asSafeString(data.regionCode, 20).toUpperCase() || null;
+    const hasRegionCodeField = Object.prototype.hasOwnProperty.call(data, "regionCode");
+    let countryCode = tokenPayload?.countryCode || asSafeString(data.countryCode, 2).toUpperCase() || null;
+    let regionCode = tokenPayload?.regionCode || asSafeString(data.regionCode, 20).toUpperCase() || null;
+    if (type === "visit" && !regionCode && !hasRegionCodeField) {
+      const geo = await getGeoFromIP(visitorIP);
+      countryCode = countryCode || geo.countryCode || null;
+      regionCode = geo.regionCode || null;
+    }
+
     const ruleId = tokenPayload?.ruleId || asSafeString(data.ruleId, 100) || null;
     const ruleName =
       tokenPayload?.ruleId === "vpn-shield"

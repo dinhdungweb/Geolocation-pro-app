@@ -429,6 +429,7 @@ function buildActionResponse({
   limitExceeded = false,
   planLimit,
   popup,
+  regionCode,
   rule,
   usage,
 }: {
@@ -443,6 +444,7 @@ function buildActionResponse({
   limitExceeded?: boolean;
   planLimit: number;
   popup: any;
+  regionCode?: string;
   rule: ReturnType<typeof buildRulePayload> | null;
   usage: number;
 }) {
@@ -459,6 +461,7 @@ function buildActionResponse({
     limitExceeded,
     planLimit,
     popup,
+    regionCode,
     rule,
     usage,
   };
@@ -559,6 +562,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           eventToken: null,
           planLimit,
           popup,
+          regionCode,
           rule: null,
           usage: currentUsage,
         }),
@@ -580,6 +584,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           limitExceeded: true,
           planLimit,
           popup,
+          regionCode,
           rule: null,
           usage: currentUsage,
         }),
@@ -600,6 +605,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           eventToken: null,
           planLimit,
           popup,
+          regionCode,
           rule: null,
           usage: currentUsage,
         }),
@@ -626,6 +632,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           eventToken: null,
           planLimit,
           popup,
+          regionCode,
           rule: null,
           usage: currentUsage,
         }),
@@ -817,6 +824,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           eventToken: null,
           planLimit,
           popup,
+          regionCode,
           rule: null,
           usage: currentUsage,
         }),
@@ -880,6 +888,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         eventToken,
         planLimit,
         popup,
+        regionCode,
         rule: rulePayload,
         usage: currentUsage,
       }),

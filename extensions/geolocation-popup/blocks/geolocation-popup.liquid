@@ -78,6 +78,11 @@
         sessionStorage.setItem(name, value);
       } catch {}
     },
+    remove(name) {
+      try {
+        sessionStorage.removeItem(name);
+      } catch {}
+    },
     has(name) {
       return this.get(name) !== null;
     }
@@ -105,10 +110,12 @@
     try {
       if (window.Shopify && window.Shopify.designMode) return;
 
+      const isVisit = type === 'visit';
+      let visitKey = null;
       if (type === 'visit') {
-        const visitKey = `geo_visit_tracked:${GEOLOCATION_CONFIG.shop}:${window.location.pathname}`;
+        visitKey = `geo_visit_tracked:${GEOLOCATION_CONFIG.shop}:${window.location.pathname}`;
         if (SessionManager.has(visitKey)) return;
-        SessionManager.set(visitKey, 'true');
+        SessionManager.set(visitKey, 'pending');
       }
 
       const rule = config.rule || {};
@@ -116,6 +123,7 @@
         type,
         path: window.location.pathname,
         countryCode: getCountryCode(config),
+        regionCode: typeof config.regionCode === 'string' ? config.regionCode : undefined,
         eventToken: config.eventToken || undefined,
         ruleId: rule.ruleId || undefined,
         ruleName: rule.name || undefined,
@@ -123,7 +131,7 @@
         ...extra
       };
 
-      if (navigator.sendBeacon) {
+      if (!isVisit && navigator.sendBeacon) {
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
         if (navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob)) return;
       }
@@ -133,7 +141,13 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         keepalive: true
-      }).catch((error) => log('Analytics error:', error));
+      }).then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (visitKey) SessionManager.set(visitKey, 'true');
+      }).catch((error) => {
+        if (visitKey) SessionManager.remove(visitKey);
+        log('Analytics error:', error);
+      });
     } catch (error) {
       log('Analytics failed:', error);
     }
