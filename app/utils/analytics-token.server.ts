@@ -13,6 +13,7 @@ export interface AnalyticsTokenPayload {
   path: string;
   countryCode: string;
   regionCode?: string;
+  regionName?: string;
   ipHash: string;
   iat: number;
   eventKey: string;

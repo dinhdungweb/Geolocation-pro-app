@@ -16,7 +16,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { getStateName } from "../utils/states";
+import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
@@ -46,11 +46,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         logs = logs.slice(0, Math.max(0, maxLogs - skip));
     }
 
+    const logsWithRegionNames = await Promise.all(logs.map(async (log) => ({
+        ...log,
+        regionName: await resolveVisitorLogRegionName(log),
+    })));
+
     return json({
-        logs: logs.map((log) => ({
-            ...log,
-            regionName: log.regionCode ? getStateName(log.regionCode) : null,
-        })),
+        logs: logsWithRegionNames,
         page,
         totalPages: Math.ceil(totalLogs / limit),
         totalLogs,

@@ -89,11 +89,12 @@ export async function getCountryFromIP(ip: string): Promise<string> {
 /**
  * Get full geo info from IP address using MaxMind GeoLite2-City
  * @param ip - IP address to lookup
- * @returns Object with countryCode, regionCode (ISO 3166-2), and city
+ * @returns Object with countryCode, regionCode (ISO 3166-2), regionName, and city
  */
 export async function getGeoFromIP(ip: string): Promise<{
     countryCode: string;
     regionCode: string;
+    regionName: string;
     city: string;
 }> {
     // Initialize reader if not done yet
@@ -104,7 +105,7 @@ export async function getGeoFromIP(ip: string): Promise<{
         await initPromise;
     }
 
-    const empty = { countryCode: '', regionCode: '', city: '' };
+    const empty = { countryCode: '', regionCode: '', regionName: '', city: '' };
     if (!reader) return empty;
 
     try {
@@ -112,13 +113,15 @@ export async function getGeoFromIP(ip: string): Promise<{
         if (!result) return empty;
 
         const countryCode = result.country?.iso_code || '';
-        const subdivisionCode = result.subdivisions?.[0]?.iso_code || '';
+        const subdivision = result.subdivisions?.[0];
+        const subdivisionCode = subdivision?.iso_code || '';
+        const regionName = subdivision?.names?.en || '';
         const regionCode = countryCode && subdivisionCode
             ? `${countryCode}-${subdivisionCode}`
             : '';
         const city = result.city?.names?.en || '';
 
-        return { countryCode, regionCode, city };
+        return { countryCode, regionCode, regionName, city };
     } catch (error) {
         console.error('[MaxMind] Geo lookup error for IP', ip, ':', error);
     }

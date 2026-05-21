@@ -134,10 +134,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const hasRegionCodeField = Object.prototype.hasOwnProperty.call(data, "regionCode");
     let countryCode = tokenPayload?.countryCode || asSafeString(data.countryCode, 2).toUpperCase() || null;
     let regionCode = tokenPayload?.regionCode || asSafeString(data.regionCode, 20).toUpperCase() || null;
-    if (type === "visit" && !regionCode && !hasRegionCodeField) {
+    let regionName = tokenPayload?.regionName || asSafeString(data.regionName, 120) || null;
+    if (type === "visit" && (!regionCode || !regionName) && (!hasRegionCodeField || !regionName)) {
       const geo = await getGeoFromIP(visitorIP);
       countryCode = countryCode || geo.countryCode || null;
-      regionCode = geo.regionCode || null;
+      regionCode = regionCode || geo.regionCode || null;
+      regionName = regionName || geo.regionName || null;
     }
 
     const ruleId = tokenPayload?.ruleId || asSafeString(data.ruleId, 100) || null;
@@ -152,6 +154,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       countryCode,
       path,
       regionCode,
+      regionName,
       request,
       ruleId,
       ruleName,

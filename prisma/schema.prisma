@@ -222,6 +222,7 @@ model VisitorLog {
   ipAddress   String
   countryCode String?
   regionCode  String?
+  regionName  String?
   city        String?
   action      String
   ruleName    String?

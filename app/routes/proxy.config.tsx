@@ -430,6 +430,7 @@ function buildActionResponse({
   planLimit,
   popup,
   regionCode,
+  regionName,
   rule,
   usage,
 }: {
@@ -445,6 +446,7 @@ function buildActionResponse({
   planLimit: number;
   popup: any;
   regionCode?: string;
+  regionName?: string;
   rule: ReturnType<typeof buildRulePayload> | null;
   usage: number;
 }) {
@@ -462,6 +464,7 @@ function buildActionResponse({
     planLimit,
     popup,
     regionCode,
+    regionName,
     rule,
     usage,
   };
@@ -492,12 +495,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let maxmindCountryCode = "";
   let countryCode = "";
   let regionCode = "";
+  let regionName = "";
 
   try {
     const geoResult = await getGeoFromIP(visitorIP);
     maxmindCountryCode = geoResult.countryCode;
     countryCode = geoResult.countryCode;
     regionCode = geoResult.regionCode;
+    regionName = geoResult.regionName;
   } catch (error: any) {
     console.error(`[Proxy] MaxMind lookup error:`, error.message);
   }
@@ -510,6 +515,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         forwardedFor: request.headers.get("x-forwarded-for"),
         maxmindCountryCode,
         regionCode,
+        regionName,
         shopifyMarketHandle,
         shopifyMarketId,
         realIp: request.headers.get("x-real-ip"),
@@ -525,6 +531,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       forwardedFor: request.headers.get("x-forwarded-for"),
       maxmindCountryCode,
       regionCode,
+      regionName,
       shopifyMarketHandle,
       shopifyMarketId,
       shopifyClientIp: request.headers.get("x-shopify-client-ip"),
@@ -563,6 +570,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           planLimit,
           popup,
           regionCode,
+          regionName,
           rule: null,
           usage: currentUsage,
         }),
@@ -585,6 +593,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           planLimit,
           popup,
           regionCode,
+          regionName,
           rule: null,
           usage: currentUsage,
         }),
@@ -606,6 +615,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           planLimit,
           popup,
           regionCode,
+          regionName,
           rule: null,
           usage: currentUsage,
         }),
@@ -633,6 +643,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           planLimit,
           popup,
           regionCode,
+          regionName,
           rule: null,
           usage: currentUsage,
         }),
@@ -825,6 +836,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           planLimit,
           popup,
           regionCode,
+          regionName,
           rule: null,
           usage: currentUsage,
         }),
@@ -844,6 +856,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             path: currentPath,
             countryCode,
             regionCode,
+            regionName,
             ipHash,
           })
         : null;
@@ -862,6 +875,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             countryCode,
             path: currentPath,
             regionCode,
+            regionName,
             request,
             ruleId: selectedRule.id,
             ruleName: selectedRule.name,
@@ -889,6 +903,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         planLimit,
         popup,
         regionCode,
+        regionName,
         rule: rulePayload,
         usage: currentUsage,
       }),

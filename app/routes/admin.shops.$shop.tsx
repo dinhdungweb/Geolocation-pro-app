@@ -20,7 +20,7 @@ import {
     normalizeBillingOverridePlan,
     resolveEffectivePlan,
 } from "../utils/effective-plan.server";
-import { getStateName } from "../utils/states";
+import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
 import { 
     ArrowLeft, 
     ChevronLeft,
@@ -239,7 +239,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             take: 100,
             select: {
                 id: true, ipAddress: true, countryCode: true, action: true,
-                regionCode: true,
+                regionCode: true, regionName: true,
                 ruleName: true, targetUrl: true, timestamp: true,
                 userAgent: true, path: true,
             },
@@ -318,11 +318,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             updatedAt: settings.updatedAt.toISOString(),
         } : null,
         rules: rules.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
-        logs: logs.map((l: any) => ({
+        logs: await Promise.all(logs.map(async (l: any) => ({
             ...l,
-            regionName: l.regionCode ? getStateName(l.regionCode) : null,
+            regionName: await resolveVisitorLogRegionName(l),
             timestamp: l.timestamp.toISOString(),
-        })),
+        }))),
         monthlyUsage,
         chargeAttempts: chargeAttempts.map((c: any) => ({
             ...c,

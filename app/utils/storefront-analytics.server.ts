@@ -10,6 +10,7 @@ type RecordStorefrontAnalyticsEventInput = {
   countryCode: string | null;
   path: string | null;
   regionCode?: string | null;
+  regionName?: string | null;
   request: Request;
   ruleId: string | null;
   ruleName: string | null;
@@ -122,6 +123,7 @@ export async function recordStorefrontAnalyticsDetails({
   countryCode,
   path,
   regionCode = null,
+  regionName = null,
   request,
   ruleId,
   ruleName,
@@ -136,6 +138,7 @@ export async function recordStorefrontAnalyticsDetails({
         ipAddress: getVisitorIP(request),
         countryCode,
         regionCode,
+        regionName,
         city: null,
         action: actionFromType(type),
         ruleName,

@@ -124,6 +124,7 @@
         path: window.location.pathname,
         countryCode: getCountryCode(config),
         regionCode: typeof config.regionCode === 'string' ? config.regionCode : undefined,
+        regionName: typeof config.regionName === 'string' ? config.regionName : undefined,
         eventToken: config.eventToken || undefined,
         ruleId: rule.ruleId || undefined,
         ruleName: rule.name || undefined,
