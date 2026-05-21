@@ -47,7 +47,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     return json({
-        logs,
+        logs: logs.map((log) => ({
+            ...log,
+            regionName: log.regionCode ? getStateName(log.regionCode) : null,
+        })),
         page,
         totalPages: Math.ceil(totalLogs / limit),
         totalLogs,
@@ -132,7 +135,7 @@ export default function VisitorLogs() {
                 </IndexTable.Cell>
                 <IndexTable.Cell>
                     <span title={log.regionCode || ""}>
-                        {log.regionCode ? getStateName(log.regionCode) : "-"}
+                        {log.regionName || "-"}
                     </span>
                 </IndexTable.Cell>
                 <IndexTable.Cell>{getActionBadge(log.action)}</IndexTable.Cell>

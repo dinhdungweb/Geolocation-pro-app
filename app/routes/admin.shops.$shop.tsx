@@ -318,7 +318,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             updatedAt: settings.updatedAt.toISOString(),
         } : null,
         rules: rules.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
-        logs: logs.map((l: any) => ({ ...l, timestamp: l.timestamp.toISOString() })),
+        logs: logs.map((l: any) => ({
+            ...l,
+            regionName: l.regionCode ? getStateName(l.regionCode) : null,
+            timestamp: l.timestamp.toISOString(),
+        })),
         monthlyUsage,
         chargeAttempts: chargeAttempts.map((c: any) => ({
             ...c,
@@ -1529,7 +1533,7 @@ export default function AdminShopDetail() {
                                     </td>
                                     <td>
                                         <span title={l.regionCode || ''} style={{ color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
-                                            {l.regionCode ? getStateName(l.regionCode) : '-'}
+                                            {l.regionName || '-'}
                                         </span>
                                     </td>
                                     <td>
