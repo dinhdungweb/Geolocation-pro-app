@@ -8,7 +8,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-05-22-head-block-layer';
+  const SCRIPT_VERSION = '2026-05-22-clean-block-layer';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -450,7 +450,20 @@
       html.geo-blocked { overflow: hidden !important; height: 100% !important; overscroll-behavior: none !important; }
       html.geo-blocked body { display: none !important; position: fixed !important; width: 100% !important; overflow: hidden !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
       html.geo-blocked > *:not(head):not(body):not(#geo-block-root) { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; z-index: -1 !important; }
-      html.geo-blocked #geo-block-root { display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; z-index: 2147483647 !important; }
+      html.geo-blocked #geo-block-root {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 2147483647 !important;
+        isolation: isolate !important;
+        contain: layout style paint !important;
+      }
       html.geo-blocked #geo-block-root * { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
       html.geo-blocked dialog:not(#geo-block-dialog),
       html.geo-blocked #preventify---container,
@@ -568,28 +581,21 @@
     const supportUrl = safeUrl(blockedSettings.supportUrl);
     const supportText = escapeHtml(blockedSettings.supportText || 'Contact support');
     const logoMarkup = logoUrl
-      ? `<img src="${logoUrl}" alt="" style="max-width: 160px !important; max-height: 70px !important; object-fit: contain !important; display: block !important; margin: 0 auto 32px !important;">`
-      : `<div style="width: 80px !important; height: 80px !important; border-radius: 50% !important; background: ${accentColor}15 !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 auto 32px !important; border: 1px solid ${accentColor}30 !important;">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      ? `<img src="${logoUrl}" alt="" class="geo-block-logo">`
+      : `<div class="geo-block-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
          </div>`;
     const supportMarkup = supportUrl && supportText
-      ? `<a href="${supportUrl}" class="geo-btn-support" style="display:inline-block !important; margin-top:32px !important; background:${accentColor} !important; color:#ffffff !important; text-decoration:none !important; padding:14px 32px !important; border-radius:10px !important; font-size:16px !important; font-weight:600 !important; transition: all 0.25s ease !important; box-shadow: 0 4px 6px -1px ${accentColor}40 !important; font-family: inherit !important;">${supportText}</a>`
+      ? `<a href="${supportUrl}" class="geo-btn-support">${supportText}</a>`
       : '';
 
     installBlockDocumentStyle(bgColor);
 
     const root = document.createElement('div');
     root.id = 'geo-block-root';
-    root.style.cssText = `
-      all: initial !important; position: fixed !important; inset: 0 !important;
-      width: 100vw !important; height: 100vh !important; height: 100dvh !important;
-      display: block !important; visibility: visible !important; opacity: 1 !important;
-      pointer-events: auto !important; z-index: 2147483647 !important;
-      isolation: isolate !important; contain: layout style paint !important;
-    `;
 
     const useDialog = supportsModalDialog();
     const shadowRoot = root.attachShadow ? root.attachShadow({ mode: 'open' }) : null;
@@ -601,45 +607,142 @@
     if (useDialog) {
       overlay.addEventListener('cancel', (event) => event.preventDefault());
     }
-    overlay.style.cssText = `
-      all: initial !important; position: fixed !important; inset: 0 !important;
-      width: 100vw !important; height: 100vh !important; height: 100dvh !important;
-      max-width: none !important; max-height: none !important;
-      margin: 0 !important; padding: 0 !important; border: 0 !important;
-      background: ${bgColor} !important;
-      color: ${textColor} !important; z-index: 2147483647 !important;
-      display: flex !important; align-items: center !important; justify-content: center !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      box-sizing: border-box !important; overflow: hidden !important;
-      visibility: visible !important;
-    `;
+    overlay.style.setProperty('--geo-block-bg', bgColor);
+    overlay.style.setProperty('--geo-block-text', textColor);
+    overlay.style.setProperty('--geo-block-accent', accentColor);
 
     const layerStyles = document.createElement('style');
     layerStyles.textContent = `
+      #geo-block-dialog,
+      #geo-block-layer {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: var(--geo-block-bg) !important;
+        color: var(--geo-block-text) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        visibility: visible !important;
+      }
       #geo-block-dialog::backdrop {
-        background: ${bgColor} !important;
+        background: var(--geo-block-bg) !important;
         opacity: 1 !important;
       }
-      #geo-block-screen, #geo-block-screen * {
+      #geo-block-screen {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        background: var(--geo-block-bg) !important;
+        color: var(--geo-block-text) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 24px !important;
+        visibility: visible !important;
+      }
+      #geo-block-screen,
+      #geo-block-screen * {
         box-sizing: border-box !important;
+      }
+      .geo-block-card {
+        text-align: center !important;
+        max-width: 520px !important;
+        width: 100% !important;
+        animation: geo-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      }
+      .geo-block-media {
+        margin-bottom: 20px !important;
+      }
+      .geo-block-logo {
+        max-width: 160px !important;
+        max-height: 70px !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto 32px !important;
+      }
+      .geo-block-icon {
+        width: 80px !important;
+        height: 80px !important;
+        border-radius: 50% !important;
+        color: var(--geo-block-accent) !important;
+        background: rgba(37, 99, 235, 0.08) !important;
+        background: color-mix(in srgb, var(--geo-block-accent) 8%, transparent) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 auto 32px !important;
+        border: 1px solid rgba(37, 99, 235, 0.18) !important;
+        border-color: color-mix(in srgb, var(--geo-block-accent) 18%, transparent) !important;
+      }
+      .geo-block-icon svg {
+        display: block !important;
+      }
+      .geo-block-title {
+        font-size: 42px !important;
+        font-weight: 600 !important;
+        margin: 0 0 16px !important;
+        color: var(--geo-block-text) !important;
+        letter-spacing: 0 !important;
+        line-height: 1.1 !important;
+      }
+      .geo-block-message {
+        font-size: 19px !important;
+        line-height: 1.5 !important;
+        color: var(--geo-block-text) !important;
+        opacity: 0.8 !important;
+        margin: 0 !important;
+        font-weight: 450 !important;
+      }
+      .geo-btn-support {
+        display: inline-block !important;
+        margin-top: 32px !important;
+        background: var(--geo-block-accent) !important;
+        color: #ffffff !important;
+        text-decoration: none !important;
+        padding: 14px 32px !important;
+        border-radius: 10px !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15) !important;
+        font-family: inherit !important;
       }
       .geo-btn-support:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
         opacity: 0.9 !important;
       }
+      @keyframes geo-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
     `;
 
     overlay.innerHTML = `
-      <div id="geo-block-screen" style="position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; height: 100dvh !important; background: ${bgColor} !important; color: ${textColor} !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; padding: 24px !important; visibility: visible !important;">
-      <div style="text-align: center !important; max-width: 520px !important; width: 100% !important; animation: geo-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;">
-        <div style="margin-bottom: 20px !important;">
-          ${logoMarkup}
+      <div id="geo-block-screen">
+        <div class="geo-block-card">
+          <div class="geo-block-media">
+            ${logoMarkup}
+          </div>
+          <h1 class="geo-block-title">${title}</h1>
+          <p class="geo-block-message">${message}</p>
+          ${supportMarkup}
         </div>
-        <h1 style="font-size: 42px !important; font-weight: 600 !important; margin: 0 0 16px !important; color: ${textColor} !important; letter-spacing: -0.04em !important; line-height: 1.1 !important;">${title}</h1>
-        <p style="font-size: 19px !important; line-height: 1.5 !important; color: ${textColor} !important; opacity: 0.8 !important; margin: 0 !important; font-weight: 450 !important;">${message}</p>
-        ${supportMarkup}
-      </div>
       </div>
     `;
 
