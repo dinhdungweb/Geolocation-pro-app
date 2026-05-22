@@ -10,7 +10,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-05-18-server-side-action-tracking';
+  const SCRIPT_VERSION = '2026-05-22-block-top-layer';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -294,6 +294,89 @@
     }
   };
 
+  let blockLayerObserver = null;
+  let blockLayerPromoteQueued = false;
+  let blockLayerNeedsDialogReopen = false;
+
+  const supportsModalDialog = () => {
+    return typeof HTMLDialogElement !== 'undefined' && typeof HTMLDialogElement.prototype.showModal === 'function';
+  };
+
+  const openBlockDialog = (layer, forceReopen) => {
+    if (layer.tagName !== 'DIALOG' || typeof layer.showModal !== 'function') return false;
+
+    try {
+      if (forceReopen && layer.open) layer.close();
+      if (!layer.open) layer.showModal();
+      return true;
+    } catch (error) {
+      log('Could not open block dialog as modal:', error);
+      return false;
+    }
+  };
+
+  const promoteBlockLayer = (layer, forceReopenDialog) => {
+    if (!document.body || !layer || !layer.isConnected) return;
+
+    if (layer.parentNode !== document.body || document.body.lastElementChild !== layer) {
+      document.body.appendChild(layer);
+    }
+
+    layer.style.setProperty('z-index', '2147483647', 'important');
+
+    if (layer.tagName === 'DIALOG') openBlockDialog(layer, forceReopenDialog);
+  };
+
+  const scheduleBlockLayerPromote = (layer, forceReopenDialog) => {
+    blockLayerNeedsDialogReopen = blockLayerNeedsDialogReopen || forceReopenDialog;
+    if (blockLayerPromoteQueued) return;
+    blockLayerPromoteQueued = true;
+
+    requestAnimationFrame(() => {
+      const shouldReopenDialog = blockLayerNeedsDialogReopen;
+      blockLayerPromoteQueued = false;
+      blockLayerNeedsDialogReopen = false;
+      promoteBlockLayer(layer, shouldReopenDialog);
+    });
+  };
+
+  const startBlockLayerGuard = (layer) => {
+    if (!window.MutationObserver || blockLayerObserver) return;
+
+    blockLayerObserver = new MutationObserver((mutations) => {
+      let forceReopenDialog = false;
+      let shouldPromote = false;
+
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (target === layer) continue;
+          if (target.tagName === 'DIALOG' && target.open) forceReopenDialog = true;
+          shouldPromote = true;
+          continue;
+        }
+
+        if (mutation.type === 'childList') {
+          shouldPromote = true;
+          Array.prototype.forEach.call(mutation.addedNodes, (node) => {
+            if (node.nodeType !== 1) return;
+            if (node.tagName === 'DIALOG' && node.open) forceReopenDialog = true;
+            if (node.querySelector && node.querySelector('dialog[open]')) forceReopenDialog = true;
+          });
+        }
+      }
+
+      if (shouldPromote) scheduleBlockLayerPromote(layer, forceReopenDialog);
+    });
+
+    blockLayerObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['open']
+    });
+  };
+
   const showBlockScreen = (config) => {
     const blockedSettings = config.blocked || {};
     const isVpn = config.rule && config.rule.source === 'vpn';
@@ -317,18 +400,29 @@
       ? `<a href="${supportUrl}" class="geo-btn-support" style="display:inline-block !important; margin-top:32px !important; background:${accentColor} !important; color:#ffffff !important; text-decoration:none !important; padding:14px 32px !important; border-radius:10px !important; font-size:16px !important; font-weight:600 !important; transition: all 0.25s ease !important; box-shadow: 0 4px 6px -1px ${accentColor}40 !important; font-family: inherit !important;">${supportText}</a>`
       : '';
 
-    const overlay = document.createElement('div');
-    overlay.id = 'geo-block-screen';
+    const useDialog = supportsModalDialog();
+    const overlay = document.createElement(useDialog ? 'dialog' : 'div');
+    overlay.id = useDialog ? 'geo-block-dialog' : 'geo-block-layer';
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('role', 'dialog');
+    if (useDialog) {
+      overlay.addEventListener('cancel', (event) => event.preventDefault());
+    }
     overlay.style.cssText = `
       position: fixed !important; inset: 0 !important;
+      width: 100vw !important; height: 100vh !important; height: 100dvh !important;
+      max-width: none !important; max-height: none !important;
+      margin: 0 !important; padding: 0 !important; border: 0 !important;
       background: ${bgColor} !important;
       color: ${textColor} !important; z-index: 2147483647 !important;
       display: flex !important; align-items: center !important; justify-content: center !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      padding: 24px !important; visibility: visible !important;
+      box-sizing: border-box !important; overflow: hidden !important;
+      visibility: visible !important;
     `;
 
     overlay.innerHTML = `
+      <div id="geo-block-screen" style="position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; height: 100dvh !important; background: ${bgColor} !important; color: ${textColor} !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; padding: 24px !important; visibility: visible !important;">
       <div style="text-align: center !important; max-width: 520px !important; width: 100% !important; animation: geo-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;">
         <div style="margin-bottom: 20px !important;">
           ${logoMarkup}
@@ -337,11 +431,16 @@
         <p style="font-size: 19px !important; line-height: 1.5 !important; color: ${textColor} !important; opacity: 0.8 !important; margin: 0 !important; font-weight: 450 !important;">${message}</p>
         ${supportMarkup}
       </div>
+      </div>
       <style id="geo-block-overrides">
-        html.geo-blocked, html.geo-blocked body { overflow: hidden !important; height: 100% !important; }
+        html.geo-blocked, html.geo-blocked body { overflow: hidden !important; height: 100% !important; overscroll-behavior: none !important; }
         html.geo-blocked body { position: fixed !important; width: 100% !important; }
-        html.geo-blocked body > *:not(#geolocation-app-container):not(#geo-block-screen) {
+        html.geo-blocked body > *:not(#geolocation-app-container):not(#geo-block-screen):not(#geo-block-dialog):not(#geo-block-layer) {
           display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;
+        }
+        #geo-block-dialog::backdrop {
+          background: ${bgColor} !important;
+          opacity: 1 !important;
         }
         .geo-btn-support:hover {
           transform: translateY(-2px) !important;
@@ -353,6 +452,9 @@
 
     document.documentElement.classList.add('geo-blocked');
     document.body.appendChild(overlay);
+    if (useDialog) openBlockDialog(overlay, false);
+    promoteBlockLayer(overlay, false);
+    startBlockLayerGuard(overlay);
   };
 
   const init = async () => {
