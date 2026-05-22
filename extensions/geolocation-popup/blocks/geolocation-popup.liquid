@@ -8,7 +8,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-05-22-clean-block-layer';
+  const SCRIPT_VERSION = '2026-05-22-stable-block-layer';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -420,6 +420,13 @@
     return document.getElementById('geo-block-dialog');
   };
 
+  const getBlockOverlay = (layer) => {
+    const dialog = getBlockDialog(layer);
+    if (dialog) return dialog;
+    if (layer && layer.shadowRoot) return layer.shadowRoot.getElementById('geo-block-layer');
+    return layer && layer.querySelector ? layer.querySelector('#geo-block-layer') : null;
+  };
+
   const promoteBlockLayer = (layer, forceReopenDialog) => {
     if (!document.documentElement || !layer) return;
 
@@ -428,7 +435,7 @@
       (document.head || document.documentElement).appendChild(blockDocumentStyle);
     }
 
-    if (layer.parentNode !== document.documentElement || document.documentElement.lastElementChild !== layer) {
+    if (layer.parentNode !== document.documentElement) {
       document.documentElement.appendChild(layer);
     }
 
@@ -481,15 +488,16 @@
   };
 
   const installBlockTakeoverHooks = (layer) => {
-    if (blockTakeoverHooksInstalled) return;
+    if (blockTakeoverHooksInstalled || window.__geoBlockTakeoverHooksInstalled) return;
     blockTakeoverHooksInstalled = true;
+    window.__geoBlockTakeoverHooksInstalled = true;
 
     if (typeof HTMLDialogElement !== 'undefined' && HTMLDialogElement.prototype.showModal) {
       const originalShowModal = HTMLDialogElement.prototype.showModal;
       HTMLDialogElement.prototype.showModal = function() {
         if (isBlockLayerElement(this, layer)) return originalShowModal.apply(this, arguments);
         hideCompetingElement(this, layer);
-        scheduleBlockLayerPromote(layer, true);
+        scheduleBlockLayerPromote(layer, false);
         return undefined;
       };
     }
@@ -499,7 +507,7 @@
       Element.prototype.showPopover = function() {
         if (isBlockLayerElement(this, layer)) return originalShowPopover.apply(this, arguments);
         hideCompetingElement(this, layer);
-        scheduleBlockLayerPromote(layer, true);
+        scheduleBlockLayerPromote(layer, false);
         return undefined;
       };
     }
@@ -534,14 +542,12 @@
     blockLayerObserver = new MutationObserver((mutations) => {
       if (blockLayerNeutralizing) return;
 
-      let forceReopenDialog = false;
       let shouldPromote = false;
 
       for (const mutation of mutations) {
         if (mutation.type === 'attributes') {
           const target = mutation.target;
           if (target === layer || isBlockLayerElement(target, layer)) continue;
-          if (target.tagName === 'DIALOG' && target.open) forceReopenDialog = true;
           if (target === document.documentElement || target === document.body || target.parentNode === document.body || target.tagName === 'DIALOG' || target.hasAttribute('popover')) {
             shouldPromote = true;
           }
@@ -552,13 +558,14 @@
           shouldPromote = true;
           Array.prototype.forEach.call(mutation.addedNodes, (node) => {
             if (node.nodeType !== 1) return;
-            if (node.tagName === 'DIALOG' && node.open) forceReopenDialog = true;
-            if (node.querySelector && node.querySelector('dialog[open]')) forceReopenDialog = true;
+            if (node.tagName === 'DIALOG' || node.hasAttribute('popover') || (node.querySelector && node.querySelector('dialog, [popover]'))) {
+              shouldPromote = true;
+            }
           });
         }
       }
 
-      if (shouldPromote) scheduleBlockLayerPromote(layer, forceReopenDialog);
+      if (shouldPromote) scheduleBlockLayerPromote(layer, false);
     });
 
     blockLayerObserver.observe(document.documentElement, {
@@ -594,8 +601,24 @@
 
     installBlockDocumentStyle(bgColor);
 
+    const existingRoot = document.getElementById('geo-block-root') || window.__geoBlockRoot;
+    if (existingRoot) {
+      const existingOverlay = getBlockOverlay(existingRoot);
+      if (existingOverlay) {
+        existingOverlay.style.setProperty('--geo-block-bg', bgColor);
+        existingOverlay.style.setProperty('--geo-block-text', textColor);
+        existingOverlay.style.setProperty('--geo-block-accent', accentColor);
+      }
+      window.__geoBlockRoot = existingRoot;
+      installBlockTakeoverHooks(existingRoot);
+      promoteBlockLayer(existingRoot, false);
+      startBlockLayerGuard(existingRoot);
+      return;
+    }
+
     const root = document.createElement('div');
     root.id = 'geo-block-root';
+    window.__geoBlockRoot = root;
 
     const useDialog = supportsModalDialog();
     const shadowRoot = root.attachShadow ? root.attachShadow({ mode: 'open' }) : null;
@@ -663,7 +686,6 @@
         text-align: center !important;
         max-width: 520px !important;
         width: 100% !important;
-        animation: geo-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
       }
       .geo-block-media {
         margin-bottom: 20px !important;
@@ -726,10 +748,6 @@
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
         opacity: 0.9 !important;
-      }
-      @keyframes geo-fade-in {
-        from { opacity: 0; }
-        to { opacity: 1; }
       }
     `;
 
