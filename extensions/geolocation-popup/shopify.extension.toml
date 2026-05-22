@@ -10,4 +10,4 @@ handle = "geolocation-popup"
 
 [[extensions.targeting]]
 module = "./blocks/geolocation-popup.liquid"
-target = "body"
+target = "head"
