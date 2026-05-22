@@ -10,7 +10,7 @@
 (function() {
   'use strict';
 
-  const SCRIPT_VERSION = '2026-05-22-block-top-layer';
+  const SCRIPT_VERSION = '2026-05-22-block-takeover-layer';
 
   const GEOLOCATION_CONFIG = {
     shop: '{{ shop.permanent_domain }}',
@@ -297,6 +297,7 @@
   let blockLayerObserver = null;
   let blockLayerPromoteQueued = false;
   let blockLayerNeedsDialogReopen = false;
+  let blockLayerNeutralizing = false;
 
   const supportsModalDialog = () => {
     return typeof HTMLDialogElement !== 'undefined' && typeof HTMLDialogElement.prototype.showModal === 'function';
@@ -315,6 +316,72 @@
     }
   };
 
+  const isBlockLayerElement = (element, layer) => {
+    if (!element || element.nodeType !== 1) return false;
+    if (element === layer || element === document.body || element === document.documentElement || element === document.head) return true;
+    if (element.id === 'geo-block-dialog' || element.id === 'geo-block-layer' || element.id === 'geo-block-screen' || element.id === 'geolocation-app-container') return true;
+    return Boolean(element.closest && element.closest('#geo-block-dialog, #geo-block-layer, #geo-block-screen, #geolocation-app-container'));
+  };
+
+  const setImportantStyle = (element, property, value) => {
+    if (element.style.getPropertyValue(property) === value && element.style.getPropertyPriority(property) === 'important') return;
+    element.style.setProperty(property, value, 'important');
+  };
+
+  const hideCompetingElement = (element, layer) => {
+    if (!element || element.nodeType !== 1 || !element.style || isBlockLayerElement(element, layer)) return;
+    if (/^(SCRIPT|STYLE|LINK|META|TEMPLATE|NOSCRIPT)$/i.test(element.tagName)) return;
+
+    if (element.getAttribute('aria-hidden') !== 'true') element.setAttribute('aria-hidden', 'true');
+    setImportantStyle(element, 'display', 'none');
+    setImportantStyle(element, 'visibility', 'hidden');
+    setImportantStyle(element, 'opacity', '0');
+    setImportantStyle(element, 'pointer-events', 'none');
+    setImportantStyle(element, 'z-index', '-1');
+  };
+
+  const getOpenPopovers = () => {
+    try {
+      return Array.prototype.slice.call(document.querySelectorAll(':popover-open'));
+    } catch {
+      return [];
+    }
+  };
+
+  const neutralizeCompetingLayers = (layer) => {
+    if (blockLayerNeutralizing || !document.body) return;
+
+    blockLayerNeutralizing = true;
+    try {
+      if (document.fullscreenElement && !isBlockLayerElement(document.fullscreenElement, layer) && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+
+      Array.prototype.forEach.call(document.querySelectorAll('dialog[open]'), (dialog) => {
+        if (isBlockLayerElement(dialog, layer)) return;
+        try {
+          if (typeof dialog.close === 'function') dialog.close();
+        } catch {}
+        dialog.removeAttribute('open');
+        hideCompetingElement(dialog, layer);
+      });
+
+      getOpenPopovers().forEach((popover) => {
+        if (isBlockLayerElement(popover, layer)) return;
+        try {
+          if (typeof popover.hidePopover === 'function') popover.hidePopover();
+        } catch {}
+        hideCompetingElement(popover, layer);
+      });
+
+      Array.prototype.forEach.call(document.body.children, (child) => {
+        hideCompetingElement(child, layer);
+      });
+    } finally {
+      blockLayerNeutralizing = false;
+    }
+  };
+
   const promoteBlockLayer = (layer, forceReopenDialog) => {
     if (!document.body || !layer || !layer.isConnected) return;
 
@@ -325,6 +392,7 @@
     layer.style.setProperty('z-index', '2147483647', 'important');
 
     if (layer.tagName === 'DIALOG') openBlockDialog(layer, forceReopenDialog);
+    neutralizeCompetingLayers(layer);
   };
 
   const scheduleBlockLayerPromote = (layer, forceReopenDialog) => {
@@ -344,15 +412,19 @@
     if (!window.MutationObserver || blockLayerObserver) return;
 
     blockLayerObserver = new MutationObserver((mutations) => {
+      if (blockLayerNeutralizing) return;
+
       let forceReopenDialog = false;
       let shouldPromote = false;
 
       for (const mutation of mutations) {
         if (mutation.type === 'attributes') {
           const target = mutation.target;
-          if (target === layer) continue;
+          if (target === layer || isBlockLayerElement(target, layer)) continue;
           if (target.tagName === 'DIALOG' && target.open) forceReopenDialog = true;
-          shouldPromote = true;
+          if (target.parentNode === document.body || target.tagName === 'DIALOG' || target.hasAttribute('popover')) {
+            shouldPromote = true;
+          }
           continue;
         }
 
@@ -373,7 +445,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['open']
+      attributeFilter: ['open', 'style', 'class', 'popover']
     });
   };
 
