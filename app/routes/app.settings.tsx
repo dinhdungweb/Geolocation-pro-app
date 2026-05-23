@@ -769,8 +769,9 @@ export default function SettingsPage() {
                         margin-bottom: 18px;
                     }
                     .settings-blocked-preview-default-image {
-                        width: 156px;
-                        height: 156px;
+                        width: 180px;
+                        max-width: 60%;
+                        height: auto;
                         object-fit: contain;
                         display: block;
                         margin: 0 auto 20px;
