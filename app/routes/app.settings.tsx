@@ -458,14 +458,14 @@ export default function SettingsPage() {
                             background: blockedPreviewBgColor,
                         }}
                     >
-                        <div style={{ textAlign: 'center', maxWidth: '420px', width: '100%' }}>
+                        <div style={{ textAlign: 'center', maxWidth: '520px', width: '100%' }}>
                             {blockedLogoUrl ? (
                                 <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" style={{ marginBottom: '16px' }} />
                             ) : (
-                                <img src="/access-denied.webp" alt="" className="settings-blocked-preview-default-image" />
+                                <img src="/access-denied-2.webp" alt="" className="settings-blocked-preview-default-image" />
                             )}
-                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '32px', fontWeight: '600', marginBottom: '12px', letterSpacing: '-0.03em' }}>{blockedTitle}</h3>
-                            <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '16px', lineHeight: '1.4' }}>{blockedMessage}</p>
+                            <h3 style={{ color: blockedPreviewTextColor, fontSize: '36px', fontWeight: '600', marginBottom: '12px', letterSpacing: 0, lineHeight: 1.1 }}>{blockedTitle}</h3>
+                            <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '18px', lineHeight: '1.45' }}>{blockedMessage}</p>
                             {blockedSupportUrl && blockedSupportText ? (
                                 <button
                                     type="button"
@@ -769,11 +769,11 @@ export default function SettingsPage() {
                         margin-bottom: 18px;
                     }
                     .settings-blocked-preview-default-image {
-                        width: 96px;
-                        height: 96px;
+                        width: 156px;
+                        height: 156px;
                         object-fit: contain;
                         display: block;
-                        margin: 0 auto 18px;
+                        margin: 0 auto 20px;
                     }
                     .settings-blocked-preview-card h3 {
                         margin: 0 0 12px;

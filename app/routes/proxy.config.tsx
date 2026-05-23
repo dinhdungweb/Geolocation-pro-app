@@ -327,7 +327,7 @@ function buildBlocked(settings: any, appOrigin: string) {
     title: settings.blockedTitle,
     message: settings.blockedMessage,
     logoUrl: settings.blockedLogoUrl,
-    defaultImageUrl: new URL("/access-denied.webp", appOrigin).toString(),
+    defaultImageUrl: new URL("/access-denied-2.webp", appOrigin).toString(),
     bgColor: settings.blockedBgColor,
     textColor: settings.blockedTextColor,
     accentColor: settings.blockedAccentColor,
