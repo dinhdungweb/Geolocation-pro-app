@@ -462,15 +462,7 @@ export default function SettingsPage() {
                             {blockedLogoUrl ? (
                                 <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" style={{ marginBottom: '16px' }} />
                             ) : (
-                                <div
-                                    className="settings-blocked-preview-shield"
-                                    style={{ background: `${blockedPreviewAccentColor}15`, borderColor: `${blockedPreviewAccentColor}30`, color: blockedPreviewAccentColor, marginBottom: '16px' }}
-                                >
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                                    </svg>
-                                </div>
+                                <img src="/access-denied.webp" alt="" className="settings-blocked-preview-default-image" />
                             )}
                             <h3 style={{ color: blockedPreviewTextColor, fontSize: '32px', fontWeight: '600', marginBottom: '12px', letterSpacing: '-0.03em' }}>{blockedTitle}</h3>
                             <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '16px', lineHeight: '1.4' }}>{blockedMessage}</p>
@@ -776,15 +768,12 @@ export default function SettingsPage() {
                         object-fit: contain;
                         margin-bottom: 18px;
                     }
-                    .settings-blocked-preview-shield {
-                        width: 64px;
-                        height: 64px;
-                        margin: 0 auto 24px;
-                        border: 1px solid currentColor;
-                        border-radius: 999px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
+                    .settings-blocked-preview-default-image {
+                        width: 96px;
+                        height: 96px;
+                        object-fit: contain;
+                        display: block;
+                        margin: 0 auto 18px;
                     }
                     .settings-blocked-preview-card h3 {
                         margin: 0 0 12px;

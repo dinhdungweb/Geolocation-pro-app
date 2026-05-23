@@ -322,11 +322,12 @@ function buildPopup(settings: any) {
   };
 }
 
-function buildBlocked(settings: any) {
+function buildBlocked(settings: any, appOrigin: string) {
   return {
     title: settings.blockedTitle,
     message: settings.blockedMessage,
     logoUrl: settings.blockedLogoUrl,
+    defaultImageUrl: new URL("/access-denied.webp", appOrigin).toString(),
     bgColor: settings.blockedBgColor,
     textColor: settings.blockedTextColor,
     accentColor: settings.blockedAccentColor,
@@ -555,7 +556,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
     const currentUsage = monthlyUsage?.totalVisitors || 0;
     const popup = buildPopup(settings);
-    const blocked = buildBlocked(settings);
+    const appOrigin = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
+    const blocked = buildBlocked(settings, appOrigin);
 
     if (!settings.isEnabled || settings.mode === "disabled") {
       return json(

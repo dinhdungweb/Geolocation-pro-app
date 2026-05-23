@@ -585,16 +585,14 @@
     const textColor = safeColor(blockedSettings.textColor, '#0f172a');
     const accentColor = safeColor(blockedSettings.accentColor, '#2563eb');
     const logoUrl = safeUrl(blockedSettings.logoUrl);
+    const defaultImageUrl = safeUrl(blockedSettings.defaultImageUrl);
     const supportUrl = safeUrl(blockedSettings.supportUrl);
     const supportText = escapeHtml(blockedSettings.supportText || 'Contact support');
     const logoMarkup = logoUrl
       ? `<img src="${logoUrl}" alt="" class="geo-block-logo">`
-      : `<div class="geo-block-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-         </div>`;
+      : defaultImageUrl
+        ? `<img src="${defaultImageUrl}" alt="" class="geo-block-default-image">`
+        : '';
     const supportMarkup = supportUrl && supportText
       ? `<a href="${supportUrl}" class="geo-btn-support">${supportText}</a>`
       : '';
@@ -697,22 +695,12 @@
         display: block !important;
         margin: 0 auto 32px !important;
       }
-      .geo-block-icon {
-        width: 80px !important;
-        height: 80px !important;
-        border-radius: 50% !important;
-        color: var(--geo-block-accent) !important;
-        background: rgba(37, 99, 235, 0.08) !important;
-        background: color-mix(in srgb, var(--geo-block-accent) 8%, transparent) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        margin: 0 auto 32px !important;
-        border: 1px solid rgba(37, 99, 235, 0.18) !important;
-        border-color: color-mix(in srgb, var(--geo-block-accent) 18%, transparent) !important;
-      }
-      .geo-block-icon svg {
+      .geo-block-default-image {
+        width: 112px !important;
+        height: 112px !important;
+        object-fit: contain !important;
         display: block !important;
+        margin: 0 auto 32px !important;
       }
       .geo-block-title {
         font-size: 42px !important;
