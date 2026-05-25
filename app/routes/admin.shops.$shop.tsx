@@ -21,6 +21,7 @@ import {
     resolveEffectivePlan,
 } from "../utils/effective-plan.server";
 import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
+import { getStateName } from "../utils/states";
 import { 
     ArrowLeft, 
     ChevronLeft,
@@ -230,6 +231,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             select: {
                 id: true, name: true, matchType: true, ruleType: true,
                 isActive: true, priority: true, countryCodes: true, ipAddresses: true,
+                stateCodes: true, marketHandles: true,
                 scheduleEnabled: true, createdAt: true,
             },
         }),
@@ -538,6 +540,22 @@ export default function AdminShopDetail() {
     const formatRuleMatch = (rule: any) => {
         if (rule.matchType === "ip") {
             return formatListPreview(rule.ipAddresses, "Invalid: no IPs selected");
+        }
+
+        if (rule.matchType === "state") {
+            const states = (rule.stateCodes || "")
+                .split(/[\n,]+/)
+                .map((code: string) => code.trim())
+                .filter(Boolean)
+                .map((code: string) => `${getStateName(code)} (${code})`);
+
+            if (states.length === 0) return "Invalid: no states selected";
+            if (states.length <= 3) return states.join(", ");
+            return `${states.slice(0, 3).join(", ")} ... +${states.length - 3} more`;
+        }
+
+        if (rule.matchType === "market") {
+            return formatListPreview(rule.marketHandles, "Invalid: no markets selected");
         }
 
         if (rule.countryCodes === "*") return "All Countries (*)";
