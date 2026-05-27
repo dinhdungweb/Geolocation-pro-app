@@ -4,7 +4,7 @@ export default function PrivacyPolicy() {
             <h1 style={{ fontSize: "28px", marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>Privacy Policy</h1>
 
             <p style={{ marginBottom: "20px", color: "#666" }}>
-                Last updated: April 24, 2026
+                Last updated: May 27, 2026
             </p>
 
             <div style={{ marginBottom: "30px" }}>
@@ -45,7 +45,7 @@ export default function PrivacyPolicy() {
             <section style={{ marginBottom: "30px" }}>
                 <h2 style={{ fontSize: "20px", marginBottom: "15px", fontWeight: "600" }}>4. Third-Party Processors</h2>
                 <p>
-                    Geolocation lookups are performed using the MaxMind GeoLite2 database. If the merchant enables anti-fraud protection and configures a VPN/proxy checking provider, visitor IP addresses may be sent to that configured provider for fraud and security checks.
+                    Geolocation lookups are primarily performed using local IP geolocation data. When region-level data is unavailable, visitor IP addresses may be processed by a third-party IP geolocation provider to improve location accuracy. If the merchant enables anti-fraud protection and configures a VPN/proxy checking provider, visitor IP addresses may also be sent to that configured provider for fraud and security checks.
                 </p>
             </section>
 

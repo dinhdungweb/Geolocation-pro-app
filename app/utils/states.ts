@@ -67,6 +67,32 @@ export function getStateName(code: string): string {
     return STATE_MAP[country]?.[normalizedCode] || code;
 }
 
+/**
+ * Get the ISO 3166-2 state/region code from a country code and region name.
+ * Useful for API providers that return "New York" instead of "US-NY".
+ */
+export function getStateCodeByName(countryCode: string, regionName: string): string | null {
+    const normalizedCountryCode = countryCode.trim().toUpperCase();
+    const normalizedRegionName = regionName.trim();
+    if (!normalizedCountryCode || !normalizedRegionName) return null;
+
+    const countryStates = STATE_MAP[normalizedCountryCode];
+    if (!countryStates) return null;
+
+    const directCode = normalizedRegionName.toUpperCase();
+    const fullDirectCode = directCode.startsWith(`${normalizedCountryCode}-`)
+        ? directCode
+        : `${normalizedCountryCode}-${directCode}`;
+    if (countryStates[fullDirectCode]) return fullDirectCode;
+
+    const normalizedName = normalizeRegionName(normalizedRegionName);
+    const match = Object.entries(countryStates).find(
+        ([, stateName]) => normalizeRegionName(stateName) === normalizedName,
+    );
+
+    return match?.[0] || null;
+}
+
 function normalizeRegionName(value: string): string {
     return value
         .normalize("NFD")
