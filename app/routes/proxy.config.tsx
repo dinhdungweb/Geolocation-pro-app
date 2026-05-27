@@ -510,22 +510,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   if (!countryCode) countryCode = shopifyCountryCode;
-  const debug = debugRequested
-    ? {
-        cfConnectingIp: request.headers.get("cf-connecting-ip"),
-        countryCode,
-        forwardedFor: request.headers.get("x-forwarded-for"),
-        maxmindCountryCode,
-        regionCode,
-        regionName,
-        shopifyMarketHandle,
-        shopifyMarketId,
-        realIp: request.headers.get("x-real-ip"),
-        shopifyClientIp: request.headers.get("x-shopify-client-ip"),
-        shopifyCountryCode,
-        visitorIP,
-      }
-    : undefined;
+  const buildDebug = () =>
+    debugRequested
+      ? {
+          cfConnectingIp: request.headers.get("cf-connecting-ip"),
+          countryCode,
+          forwardedFor: request.headers.get("x-forwarded-for"),
+          maxmindCountryCode,
+          regionCode,
+          regionName,
+          shopifyMarketHandle,
+          shopifyMarketId,
+          realIp: request.headers.get("x-real-ip"),
+          shopifyClientIp: request.headers.get("x-shopify-client-ip"),
+          shopifyCountryCode,
+          visitorIP,
+        }
+      : undefined;
+  let debug = buildDebug();
 
   if (process.env.GEO_DEBUG_IP === "true") {
     console.log("[Proxy IP Debug]", debug ?? {
@@ -741,7 +743,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
-    if (!selectedRule && hasPaidPlan && regionCode) {
+    if (!selectedRule && hasPaidPlan) {
       const stateRules = await prisma.redirectRule.findMany({
         where: { shop, isActive: true, matchType: "state" },
         orderBy: { priority: "desc" },
@@ -763,16 +765,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         },
       });
 
-      selectedRule =
-        stateRules
-          .filter((rule) => isRuleInSchedule(rule))
-          .filter((rule) => isRuleOnPage(rule, currentPath))
-          .find((rule) =>
+      const eligibleStateRules = stateRules
+        .filter((rule) => isRuleInSchedule(rule))
+        .filter((rule) => isRuleOnPage(rule, currentPath))
+        .filter((rule) =>
+          (rule.stateCodes || "")
+            .split(",")
+            .some((code: string) => Boolean(code.trim()))
+        );
+
+      const stateRuleCountryCodes = new Set(
+        eligibleStateRules.flatMap((rule) =>
+          (rule.stateCodes || "")
+            .split(",")
+            .map((code: string) => code.trim().toUpperCase().split("-")[0])
+            .filter(Boolean)
+        )
+      );
+
+      if (
+        eligibleStateRules.length > 0 &&
+        !regionCode &&
+        (!countryCode || stateRuleCountryCodes.has(countryCode))
+      ) {
+        const fallbackGeo = await getGeoFromIP(visitorIP, { useFreeFallback: true });
+        if (!countryCode) countryCode = fallbackGeo.countryCode;
+        if (!regionCode) regionCode = fallbackGeo.regionCode;
+        if (!regionName) regionName = fallbackGeo.regionName;
+        debug = buildDebug();
+      }
+
+      if (regionCode) {
+        selectedRule =
+          eligibleStateRules.find((rule) =>
             (rule.stateCodes || "")
               .split(",")
               .map((code: string) => code.trim().toUpperCase())
               .some((code: string) => stateCodeMatchesRegion(code, regionCode, regionName))
           ) || null;
+      }
 
       if (selectedRule) {
         source = "state";

@@ -23,6 +23,10 @@ type GeoLookupResult = {
     city: string;
 };
 
+type GeoLookupOptions = {
+    useFreeFallback?: boolean;
+};
+
 type FallbackCacheEntry = {
     expiresAt: number;
     geo: GeoLookupResult;
@@ -221,7 +225,7 @@ export async function getCountryFromIP(ip: string): Promise<string> {
  * @param ip - IP address to lookup
  * @returns Object with countryCode, regionCode (ISO 3166-2), regionName, and city
  */
-export async function getGeoFromIP(ip: string): Promise<{
+export async function getGeoFromIP(ip: string, options: GeoLookupOptions = {}): Promise<{
     countryCode: string;
     regionCode: string;
     regionName: string;
@@ -236,7 +240,7 @@ export async function getGeoFromIP(ip: string): Promise<{
     }
 
     if (!reader) {
-        return isPublicLookupCandidate(ip)
+        return options.useFreeFallback && isPublicLookupCandidate(ip)
             ? await getFreeFallbackGeoFromIP(ip)
             : emptyGeo;
     }
@@ -244,7 +248,7 @@ export async function getGeoFromIP(ip: string): Promise<{
     try {
         const result = reader.get(ip);
         if (!result) {
-            return isPublicLookupCandidate(ip)
+            return options.useFreeFallback && isPublicLookupCandidate(ip)
                 ? await getFreeFallbackGeoFromIP(ip)
                 : emptyGeo;
         }
@@ -259,7 +263,7 @@ export async function getGeoFromIP(ip: string): Promise<{
         const city = result.city?.names?.en || '';
 
         const localGeo = { countryCode, regionCode, regionName, city };
-        if (!isPublicLookupCandidate(ip) || !shouldUseFreeFallback(localGeo)) {
+        if (!options.useFreeFallback || !isPublicLookupCandidate(ip) || !shouldUseFreeFallback(localGeo)) {
             return localGeo;
         }
 
