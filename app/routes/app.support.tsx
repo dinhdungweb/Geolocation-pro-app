@@ -170,11 +170,11 @@ export default function Support() {
                                 <BlockStack gap="200">
                                     <div className="support-resource-link">
                                         <Button
-                                            url="/app/setup"
+                                            url="/app"
                                             icon={ChevronRightIcon}
                                             variant="plain"
                                         >
-                                            Setup Guide
+                                            Home
                                         </Button>
                                     </div>
                                     <div className="support-resource-link">

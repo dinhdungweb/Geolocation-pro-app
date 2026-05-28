@@ -34,6 +34,7 @@ import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 
 interface IPRule {
     id: string;
@@ -88,19 +89,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     // Check for active subscription (IP Rules is a Pro feature)
-    const [billingConfig, settings] = await Promise.all([
+    const [billingConfig, settings, appEmbedStatus] = await Promise.all([
         billing.check({
             plans: ALL_PAID_PLANS as any,
             isTest: isBillingTestMode(),
         }),
         prisma.settings.findUnique({ where: { shop } }),
+        getThemeAppEmbedStatus({
+            shop,
+            accessToken: session.accessToken,
+            scopeString: session.scope,
+        }),
     ]);
     const hasProPlan = isPaidBillingConfig(billingConfig, settings);
 
     const canCreateRule = hasProPlan;
     const conflictSummary = detectRuleConflicts(rules, "ip");
 
-    return json({ rules, shop, hasProPlan, canCreateRule, conflictSummary });
+    return json({
+        rules,
+        shop,
+        hasProPlan,
+        canCreateRule,
+        conflictSummary,
+        appEmbedStatus,
+        themeEditorUrl: getThemeEditorUrl(shop),
+    });
 };
 
 // Action: Handle CRUD operations
@@ -284,7 +298,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function IPRulesPage() {
-    const { rules, hasProPlan, conflictSummary } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const [modalOpen, setModalOpen] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -649,6 +663,22 @@ export default function IPRulesPage() {
                 </InlineStack>
             </div>
             <BlockStack gap="500">
+                {appEmbedStatus.state !== "enabled" && (
+                    <Banner
+                        tone="warning"
+                        title={appEmbedStatus.state === "missing_scope" ? "App embed status needs permission" : "Enable app embed before testing IP rules"}
+                    >
+                        <BlockStack gap="200">
+                            <p>{appEmbedStatus.helpText}</p>
+                            <p>IP rules can be saved here, but they only run on your storefront after the Shopify theme app embed is enabled.</p>
+                            <InlineStack gap="200">
+                                <Button url={themeEditorUrl} target="_blank">
+                                    Enable app embed
+                                </Button>
+                            </InlineStack>
+                        </BlockStack>
+                    </Banner>
+                )}
                 {!hasProPlan && rules.length > 0 && (
                     <Banner
                         title="Pro Feature"

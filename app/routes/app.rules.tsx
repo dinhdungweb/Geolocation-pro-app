@@ -36,6 +36,7 @@ import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-con
 import { getShopifyMarkets } from "../utils/shopify-markets.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 
 import { COUNTRY_MAP } from "../utils/countries";
 import { STATE_MAP, STATE_COUNTRY_LABELS, COUNTRIES_WITH_STATES, getStateName, getStatesForCountry } from "../utils/states";
@@ -142,12 +143,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     // Check for active subscription
-    const [billingConfig, settings] = await Promise.all([
+    const [billingConfig, settings, appEmbedStatus] = await Promise.all([
         billing.check({
             plans: ALL_PAID_PLANS as any,
             isTest: isBillingTestMode(),
         }),
         prisma.settings.findUnique({ where: { shop } }),
+        getThemeAppEmbedStatus({
+            shop,
+            accessToken: session.accessToken,
+            scopeString: session.scope,
+        }),
     ]);
     const hasProPlan = isPaidBillingConfig(billingConfig, settings);
     const marketsResult = await getShopifyMarkets(admin);
@@ -197,6 +203,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         conflictSummary,
         markets: marketsResult.markets,
         marketsError: marketsResult.error,
+        appEmbedStatus,
+        themeEditorUrl: getThemeEditorUrl(shop),
     });
 };
 
@@ -441,7 +449,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 const REVIEW_PROMPTED_KEY = "geo_review_prompted";
 
 export default function RulesPage() {
-    const { rules, hasProPlan, conflictSummary, markets, marketsError } = useLoaderData<typeof loader>();
+    const { rules, hasProPlan, conflictSummary, markets, marketsError, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
@@ -1067,6 +1075,22 @@ export default function RulesPage() {
                 </InlineStack>
             </div>
             <BlockStack gap="500">
+                {appEmbedStatus.state !== "enabled" && (
+                    <Banner
+                        tone="warning"
+                        title={appEmbedStatus.state === "missing_scope" ? "App embed status needs permission" : "Enable app embed before testing rules"}
+                    >
+                        <BlockStack gap="200">
+                            <p>{appEmbedStatus.helpText}</p>
+                            <p>Rules can be saved here, but they only run on your storefront after the Shopify theme app embed is enabled.</p>
+                            <InlineStack gap="200">
+                                <Button url={themeEditorUrl} target="_blank">
+                                    Enable app embed
+                                </Button>
+                            </InlineStack>
+                        </BlockStack>
+                    </Banner>
+                )}
                 {conflictTotal > 0 && (
                     <Banner tone="warning" title={`${conflictTotal} potential rule conflict${conflictTotal === 1 ? "" : "s"} found`}>
                         <BlockStack gap="200">
