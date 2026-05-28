@@ -76,7 +76,7 @@ Nội dung (thay đổi thông tin thật):
 DATABASE_URL="postgresql://myuser:mypassword@localhost:5432/geolocation_app?schema=public"
 SHOPIFY_API_KEY=your_api_key
 SHOPIFY_API_SECRET=your_api_secret
-SCOPES=read_markets
+SCOPES=read_markets,read_themes
 SHOPIFY_BILLING_TEST=false
 HOST=https://app.yourdomain.com
 SHOPIFY_APP_URL=https://app.yourdomain.com
