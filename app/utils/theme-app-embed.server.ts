@@ -32,14 +32,7 @@ export async function getThemeAppEmbedStatus({
   accessToken: string;
   scopeString: string | null | undefined;
 }): Promise<AppEmbedStatus> {
-  if (!hasSessionScope(scopeString, "read_themes")) {
-    return {
-      state: "missing_scope",
-      label: "Permission needed",
-      helpText: "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
-      themeName: null,
-    };
-  }
+  const sessionHasThemeScope = hasSessionScope(scopeString, "read_themes");
 
   const headers = {
     "X-Shopify-Access-Token": accessToken,
@@ -56,7 +49,9 @@ export async function getThemeAppEmbedStatus({
       return {
         state: "missing_scope",
         label: "Permission needed",
-        helpText: "Shopify did not allow theme access. Reapprove the app permissions, then reload this page.",
+        helpText: sessionHasThemeScope
+          ? "Shopify did not allow theme access. Reapprove the app permissions, then reload this page."
+          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
         themeName: null,
       };
     }
@@ -88,7 +83,9 @@ export async function getThemeAppEmbedStatus({
       return {
         state: "missing_scope",
         label: "Permission needed",
-        helpText: "Shopify did not allow theme asset access. Reapprove the app permissions, then reload this page.",
+        helpText: sessionHasThemeScope
+          ? "Shopify did not allow theme asset access. Reapprove the app permissions, then reload this page."
+          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
         themeName: mainTheme.name || null,
       };
     }

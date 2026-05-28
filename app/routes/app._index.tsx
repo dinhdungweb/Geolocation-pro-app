@@ -144,14 +144,7 @@ async function getThemeAppEmbedStatus({
   accessToken: string;
   scopeString: string | null | undefined;
 }): Promise<AppEmbedStatus> {
-  if (!hasSessionScope(scopeString, "read_themes")) {
-    return {
-      state: "missing_scope",
-      label: "Permission needed",
-      helpText: "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
-      themeName: null,
-    };
-  }
+  const sessionHasThemeScope = hasSessionScope(scopeString, "read_themes");
 
   const headers = {
     "X-Shopify-Access-Token": accessToken,
@@ -168,7 +161,9 @@ async function getThemeAppEmbedStatus({
       return {
         state: "missing_scope",
         label: "Permission needed",
-        helpText: "Shopify did not allow theme access. Reapprove the app permissions, then reload this page.",
+        helpText: sessionHasThemeScope
+          ? "Shopify did not allow theme access. Reapprove the app permissions, then reload this page."
+          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
         themeName: null,
       };
     }
@@ -200,7 +195,9 @@ async function getThemeAppEmbedStatus({
       return {
         state: "missing_scope",
         label: "Permission needed",
-        helpText: "Shopify did not allow theme asset access. Reapprove the app permissions, then reload this page.",
+        helpText: sessionHasThemeScope
+          ? "Shopify did not allow theme asset access. Reapprove the app permissions, then reload this page."
+          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
         themeName: mainTheme.name || null,
       };
     }
@@ -471,7 +468,7 @@ export default function Index() {
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
-  const hasRevalidatedPermissionStatus = useRef(false);
+  const hasScheduledPermissionRefresh = useRef(false);
 
   useEffect(() => {
     try {
@@ -483,34 +480,45 @@ export default function Index() {
 
   useEffect(() => {
     if (appEmbedStatus.state !== "missing_scope") {
-      hasRevalidatedPermissionStatus.current = false;
+      hasScheduledPermissionRefresh.current = false;
       return;
     }
 
-    const revalidateWhenIdle = () => {
-      if (
-        !hasRevalidatedPermissionStatus.current &&
-        document.visibilityState === "visible" &&
-        revalidator.state === "idle"
-      ) {
-        hasRevalidatedPermissionStatus.current = true;
-        revalidator.revalidate();
+    const refreshDelays = [0, 1000, 2500, 5000, 9000, 13000];
+    const refreshTimers: number[] = [];
+
+    const schedulePermissionRefresh = () => {
+      if (hasScheduledPermissionRefresh.current) return;
+      hasScheduledPermissionRefresh.current = true;
+
+      for (const delay of refreshDelays) {
+        const timer = window.setTimeout(() => {
+          if (document.visibilityState === "visible") {
+            revalidator.revalidate();
+          }
+        }, delay);
+        refreshTimers.push(timer);
       }
     };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        revalidateWhenIdle();
+        schedulePermissionRefresh();
       }
     };
 
-    window.addEventListener("focus", revalidateWhenIdle);
-    window.addEventListener("pageshow", revalidateWhenIdle);
+    window.addEventListener("focus", schedulePermissionRefresh);
+    window.addEventListener("pageshow", schedulePermissionRefresh);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    schedulePermissionRefresh();
 
     return () => {
-      window.removeEventListener("focus", revalidateWhenIdle);
-      window.removeEventListener("pageshow", revalidateWhenIdle);
+      window.removeEventListener("focus", schedulePermissionRefresh);
+      window.removeEventListener("pageshow", schedulePermissionRefresh);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      for (const timer of refreshTimers) {
+        window.clearTimeout(timer);
+      }
     };
   }, [appEmbedStatus.state, revalidator]);
 
