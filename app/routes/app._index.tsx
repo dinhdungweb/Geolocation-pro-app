@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useRevalidator } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -467,6 +467,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
@@ -478,6 +479,36 @@ export default function Index() {
       setSetupConfirmed(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (appEmbedStatus.state !== "missing_scope") return;
+
+    const revalidateWhenIdle = () => {
+      if (document.visibilityState === "visible" && revalidator.state === "idle") {
+        revalidator.revalidate();
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        revalidateWhenIdle();
+      }
+    };
+
+    window.addEventListener("focus", revalidateWhenIdle);
+    window.addEventListener("pageshow", revalidateWhenIdle);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const initialTimer = window.setTimeout(revalidateWhenIdle, 1000);
+    const refreshTimer = window.setInterval(revalidateWhenIdle, 4000);
+
+    return () => {
+      window.removeEventListener("focus", revalidateWhenIdle);
+      window.removeEventListener("pageshow", revalidateWhenIdle);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearTimeout(initialTimer);
+      window.clearInterval(refreshTimer);
+    };
+  }, [appEmbedStatus.state, revalidator]);
 
   // Calculate usage percentage
   const isUnlimitedPlan = isUnlimitedUsage;
