@@ -585,28 +585,6 @@ export default function Index() {
   const totalBlockedActions = blocksData.reduce((sum: number, item: any) => sum + Number(item.blocked || 0), 0);
   const totalPopupSeen = popupsData.reduce((sum: number, item: any) => sum + Number(item.seen || 0), 0);
   const totalAutoRedirected = autoRedirectsData.reduce((sum: number, item: any) => sum + Number(item.autoRedirected || 0), 0);
-  const metricCards = [
-    {
-      label: "Billable visitors",
-      value: currentUsage.toLocaleString(),
-      detail: isUnlimitedPlan ? "Unlimited usage" : `${usagePercent}% of ${planLimit.toLocaleString()}`,
-    },
-    {
-      label: "Active rules",
-      value: stats.activeRules.toLocaleString(),
-      detail: `${stats.totalRules.toLocaleString()} total rules`,
-    },
-    {
-      label: "Redirected",
-      value: stats.totalRedirected,
-      detail: "Last 30 days",
-    },
-    {
-      label: "Blocked",
-      value: stats.totalBlocked,
-      detail: "Last 30 days",
-    },
-  ];
 
   return (
     <Page>
@@ -626,7 +604,7 @@ export default function Index() {
           }
           .dashboard-overview-grid {
             display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+            grid-template-columns: minmax(0, 1fr);
             gap: 16px;
             align-items: stretch;
           }
@@ -648,27 +626,6 @@ export default function Index() {
             gap: 8px;
             margin-top: 12px;
             margin-bottom: auto;
-          }
-          .dashboard-metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-            height: 100%;
-          }
-          .dashboard-metric-card {
-            padding: 14px 16px;
-            min-height: 104px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            gap: 10px;
-          }
-          .dashboard-metric-value {
-            font-size: 24px;
-            line-height: 1.1;
-            font-weight: 700;
-            color: var(--p-color-text, #303030);
-            letter-spacing: 0;
           }
           .dashboard-content-grid {
             display: grid;
@@ -829,7 +786,6 @@ export default function Index() {
               align-items: flex-start;
             }
             .dashboard-overview-grid,
-            .dashboard-metrics-grid,
             .dashboard-content-grid {
               grid-template-columns: 1fr;
             }
@@ -1037,23 +993,6 @@ export default function Index() {
               </div>
             </Card>
 
-            <div className="dashboard-metrics-grid">
-              {metricCards.map((metric) => (
-                <Card key={metric.label} padding="0">
-                  <div className="dashboard-metric-card">
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {metric.label}
-                    </Text>
-                    <div>
-                      <div className="dashboard-metric-value">{metric.value}</div>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {metric.detail}
-                      </Text>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
           </div>
 
           <div className="dashboard-content-grid">
