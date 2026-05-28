@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
@@ -832,6 +832,15 @@ export default function RulesPage() {
     const selectedTargetCount = formMatchType === "market" ? selectedMarkets.length : (formMatchType === "state" ? selectedStates.length : selectedCountries.length);
     const isPaidOnlyRule = (rule: any) =>
         rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
+    const handleLockedFeatureClick = useCallback(() => {
+        setShowUpgradeModal(true);
+    }, []);
+    const handleLockedFeatureKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setShowUpgradeModal(true);
+        }
+    }, []);
 
     const rowMarkup = rules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
@@ -1188,40 +1197,80 @@ export default function RulesPage() {
                         />
 
                         <BlockStack gap="300">
-                            <ChoiceList
-                                title="Target visitors by"
-                                choices={[
-                                    { label: "Country", value: "country" },
-                                    {
-                                        label: (
-                                            <InlineStack gap="200">
-                                                <span>State/Region</span>
-                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
-                                            </InlineStack>
-                                        ),
-                                        value: "state",
-                                        disabled: !hasProPlan,
-                                    },
-                                    {
-                                        label: (
-                                            <InlineStack gap="200">
-                                                <span>Shopify Market</span>
-                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
-                                            </InlineStack>
-                                        ),
-                                        value: "market",
-                                        disabled: !hasProPlan,
-                                    },
-                                ]}
-                                selected={[formMatchType]}
-                                onChange={(value) => {
-                                    if ((value[0] === "market" || value[0] === "state") && !hasProPlan) {
-                                        setShowUpgradeModal(true);
-                                        return;
-                                    }
-                                    setFormMatchType(value[0]);
-                                }}
-                            />
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodyMd">Target visitors by</Text>
+                                <RadioButton
+                                    label="Country"
+                                    checked={formMatchType === "country"}
+                                    id="matchTypeCountry"
+                                    name="matchType"
+                                    onChange={() => setFormMatchType("country")}
+                                />
+                                {hasProPlan ? (
+                                    <RadioButton
+                                        label="State/Region"
+                                        checked={formMatchType === "state"}
+                                        id="matchTypeState"
+                                        name="matchType"
+                                        onChange={() => setFormMatchType("state")}
+                                    />
+                                ) : (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleLockedFeatureClick}
+                                        onKeyDown={handleLockedFeatureKeyDown}
+                                        style={{ cursor: "pointer", width: "fit-content" }}
+                                    >
+                                        <div style={{ pointerEvents: "none" }}>
+                                            <RadioButton
+                                                label={(
+                                                    <InlineStack gap="200">
+                                                        <span>State/Region</span>
+                                                        <Badge tone="warning">Pro</Badge>
+                                                    </InlineStack>
+                                                )}
+                                                checked={false}
+                                                id="matchTypeState"
+                                                name="matchType"
+                                                disabled
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                {hasProPlan ? (
+                                    <RadioButton
+                                        label="Shopify Market"
+                                        checked={formMatchType === "market"}
+                                        id="matchTypeMarket"
+                                        name="matchType"
+                                        onChange={() => setFormMatchType("market")}
+                                    />
+                                ) : (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleLockedFeatureClick}
+                                        onKeyDown={handleLockedFeatureKeyDown}
+                                        style={{ cursor: "pointer", width: "fit-content" }}
+                                    >
+                                        <div style={{ pointerEvents: "none" }}>
+                                            <RadioButton
+                                                label={(
+                                                    <InlineStack gap="200">
+                                                        <span>Shopify Market</span>
+                                                        <Badge tone="warning">Pro</Badge>
+                                                    </InlineStack>
+                                                )}
+                                                checked={false}
+                                                id="matchTypeMarket"
+                                                name="matchType"
+                                                disabled
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </BlockStack>
 
                             {formMatchType === "country" && (
                                 <BlockStack gap="300">
@@ -1641,40 +1690,80 @@ export default function RulesPage() {
                         <Divider />
                         <BlockStack gap="200">
                             <Text as="h3" variant="headingSm">Page Targeting</Text>
-                            <ChoiceList
-                                title="Apply to"
-                                choices={[
-                                    { label: "All Pages", value: "all" },
-                                    {
-                                        label: (
-                                            <InlineStack gap="200">
-                                                <span>Specific Pages</span>
-                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
-                                            </InlineStack>
-                                        ),
-                                        value: "include",
-                                        disabled: !hasProPlan
-                                    },
-                                    {
-                                        label: (
-                                            <InlineStack gap="200">
-                                                <span>Exclude Pages</span>
-                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
-                                            </InlineStack>
-                                        ),
-                                        value: "exclude",
-                                        disabled: !hasProPlan
-                                    },
-                                ]}
-                                selected={pageTargetingType}
-                                onChange={(val) => {
-                                    if (!hasProPlan && val[0] !== "all") {
-                                        setShowUpgradeModal(true);
-                                    } else {
-                                        setPageTargetingType(val);
-                                    }
-                                }}
-                            />
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodyMd">Apply to</Text>
+                                <RadioButton
+                                    label="All Pages"
+                                    checked={pageTargetingType[0] === "all"}
+                                    id="pageTargetingAll"
+                                    name="pageTargetingType"
+                                    onChange={() => setPageTargetingType(["all"])}
+                                />
+                                {hasProPlan ? (
+                                    <RadioButton
+                                        label="Specific Pages"
+                                        checked={pageTargetingType[0] === "include"}
+                                        id="pageTargetingInclude"
+                                        name="pageTargetingType"
+                                        onChange={() => setPageTargetingType(["include"])}
+                                    />
+                                ) : (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleLockedFeatureClick}
+                                        onKeyDown={handleLockedFeatureKeyDown}
+                                        style={{ cursor: "pointer", width: "fit-content" }}
+                                    >
+                                        <div style={{ pointerEvents: "none" }}>
+                                            <RadioButton
+                                                label={(
+                                                    <InlineStack gap="200">
+                                                        <span>Specific Pages</span>
+                                                        <Badge tone="warning">Pro</Badge>
+                                                    </InlineStack>
+                                                )}
+                                                checked={false}
+                                                id="pageTargetingInclude"
+                                                name="pageTargetingType"
+                                                disabled
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                {hasProPlan ? (
+                                    <RadioButton
+                                        label="Exclude Pages"
+                                        checked={pageTargetingType[0] === "exclude"}
+                                        id="pageTargetingExclude"
+                                        name="pageTargetingType"
+                                        onChange={() => setPageTargetingType(["exclude"])}
+                                    />
+                                ) : (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleLockedFeatureClick}
+                                        onKeyDown={handleLockedFeatureKeyDown}
+                                        style={{ cursor: "pointer", width: "fit-content" }}
+                                    >
+                                        <div style={{ pointerEvents: "none" }}>
+                                            <RadioButton
+                                                label={(
+                                                    <InlineStack gap="200">
+                                                        <span>Exclude Pages</span>
+                                                        <Badge tone="warning">Pro</Badge>
+                                                    </InlineStack>
+                                                )}
+                                                checked={false}
+                                                id="pageTargetingExclude"
+                                                name="pageTargetingType"
+                                                disabled
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </BlockStack>
 
                             {pageTargetingType[0] !== "all" && (
                                 <TextField
@@ -1769,6 +1858,7 @@ export default function RulesPage() {
                 open={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}
                 title="Upgrade to Pro"
+                size="small"
                 primaryAction={{
                     content: "View Plans",
                     url: "/app/pricing",
