@@ -469,14 +469,16 @@ export default function Index() {
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
   const hasScheduledPermissionRefresh = useRef(false);
+  const setupConfirmedKey = `${SETUP_CONFIRMED_KEY}:${shop}`;
 
   useEffect(() => {
     try {
-      setSetupConfirmed(localStorage.getItem(SETUP_CONFIRMED_KEY) === "true");
+      localStorage.removeItem(SETUP_CONFIRMED_KEY);
+      setSetupConfirmed(localStorage.getItem(setupConfirmedKey) === "true");
     } catch {
       setSetupConfirmed(false);
     }
-  }, []);
+  }, [setupConfirmedKey]);
 
   useEffect(() => {
     if (appEmbedStatus.state !== "missing_scope") {
@@ -571,7 +573,8 @@ export default function Index() {
   const handleConfirmSetup = useCallback(async () => {
     setSetupConfirmed(true);
     try {
-      localStorage.setItem(SETUP_CONFIRMED_KEY, "true");
+      localStorage.removeItem(SETUP_CONFIRMED_KEY);
+      localStorage.setItem(setupConfirmedKey, "true");
     } catch {}
 
     try {
@@ -585,7 +588,7 @@ export default function Index() {
     }
 
     window.open(REVIEW_URL, "_blank");
-  }, [shopify]);
+  }, [shopify, setupConfirmedKey]);
 
   const setupSteps: Array<{
     id: "embed" | "rule" | "logs" | "confirm";
