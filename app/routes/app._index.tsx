@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useRevalidator } from "@remix-run/react";
@@ -471,6 +471,7 @@ export default function Index() {
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
+  const hasRevalidatedPermissionStatus = useRef(false);
 
   useEffect(() => {
     try {
@@ -481,10 +482,18 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    if (appEmbedStatus.state !== "missing_scope") return;
+    if (appEmbedStatus.state !== "missing_scope") {
+      hasRevalidatedPermissionStatus.current = false;
+      return;
+    }
 
     const revalidateWhenIdle = () => {
-      if (document.visibilityState === "visible" && revalidator.state === "idle") {
+      if (
+        !hasRevalidatedPermissionStatus.current &&
+        document.visibilityState === "visible" &&
+        revalidator.state === "idle"
+      ) {
+        hasRevalidatedPermissionStatus.current = true;
         revalidator.revalidate();
       }
     };
@@ -498,15 +507,10 @@ export default function Index() {
     window.addEventListener("pageshow", revalidateWhenIdle);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    const initialTimer = window.setTimeout(revalidateWhenIdle, 1000);
-    const refreshTimer = window.setInterval(revalidateWhenIdle, 4000);
-
     return () => {
       window.removeEventListener("focus", revalidateWhenIdle);
       window.removeEventListener("pageshow", revalidateWhenIdle);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.clearTimeout(initialTimer);
-      window.clearInterval(refreshTimer);
     };
   }, [appEmbedStatus.state, revalidator]);
 
