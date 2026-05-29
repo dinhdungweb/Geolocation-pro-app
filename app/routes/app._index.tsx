@@ -674,29 +674,60 @@ export default function Index() {
             margin-bottom: auto;
           }
           .dashboard-content-grid {
+            --dashboard-traffic-panel-height: 432px;
             display: grid;
             grid-template-columns: minmax(0, 2fr) minmax(280px, 0.9fr);
+            grid-template-rows: var(--dashboard-traffic-panel-height);
             gap: 16px;
-            align-items: start;
+            align-items: stretch;
+          }
+          .dashboard-card-frame {
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+          }
+          .dashboard-card-frame > .Polaris-ShadowBevel,
+          .dashboard-card-frame > .Polaris-ShadowBevel > .Polaris-Box {
+            height: 100%;
+            min-height: 0;
           }
           .dashboard-side-stack {
             display: grid;
             gap: 16px;
+            grid-template-rows: repeat(2, minmax(0, 1fr));
+            height: 100%;
+            min-height: 0;
           }
           .dashboard-panel {
             min-height: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
           }
           .dashboard-panel-header {
             padding: 16px;
             border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
           }
           .dashboard-table-scroll {
-            overflow: auto;
+            overflow-x: auto;
+            overflow-y: auto;
             max-height: 360px;
+            min-height: 0;
           }
           .dashboard-table-scroll-short {
-            overflow: auto;
+            overflow-x: auto;
+            overflow-y: auto;
             max-height: 190px;
+            min-height: 0;
+          }
+          .dashboard-table-scroll-short.is-empty {
+            overflow-y: hidden;
+          }
+          .dashboard-content-grid .dashboard-table-scroll,
+          .dashboard-content-grid .dashboard-table-scroll-short {
+            flex: 1;
+            max-height: none;
           }
           .dashboard-table {
             width: 100%;
@@ -834,6 +865,24 @@ export default function Index() {
             .dashboard-overview-grid,
             .dashboard-content-grid {
               grid-template-columns: 1fr;
+              grid-template-rows: none;
+            }
+            .dashboard-card-frame,
+            .dashboard-card-frame > .Polaris-ShadowBevel,
+            .dashboard-card-frame > .Polaris-ShadowBevel > .Polaris-Box,
+            .dashboard-side-stack {
+              height: auto;
+            }
+            .dashboard-side-stack {
+              grid-template-rows: none;
+            }
+            .dashboard-content-grid .dashboard-table-scroll {
+              flex: none;
+              max-height: 360px;
+            }
+            .dashboard-content-grid .dashboard-table-scroll-short {
+              flex: none;
+              max-height: 220px;
             }
             .dashboard-usage-header,
             .dashboard-panel-header {
@@ -1042,107 +1091,55 @@ export default function Index() {
           </div>
 
           <div className="dashboard-content-grid">
-            <Card padding="0">
-              <div className="dashboard-panel">
-                <div className="dashboard-panel-header">
-                  <BlockStack gap="100">
-                    <Text as="h3" variant="headingMd">Traffic Overview</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">Visits and actions by country in the last 30 days.</Text>
-                  </BlockStack>
-                  <Badge>{visitsData.length} countries</Badge>
-                </div>
-                <div className="dashboard-table-scroll">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th>Country</th>
-                        <th className="text-right">Visits</th>
-                        <th className="text-right">Popup</th>
-                        <th className="text-right">Redirected</th>
-                        <th className="text-right">Blocked</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visitsData.length > 0 ? (
-                        visitsData.map((item: any) => (
-                          <tr key={item.id}>
-                            <td>
-                              <div className="dashboard-entity-cell">
-                                <img
-                                  src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
-                                  srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
-                                  width="24"
-                                  height="16"
-                                  alt={item.country}
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                                <span>{item.country}</span>
-                              </div>
-                            </td>
-                            <td className="text-right"><span className="dashboard-count">{item.visitors}</span></td>
-                            <td className="text-right"><span className="dashboard-count">{item.popup}</span></td>
-                            <td className="text-right"><span className="dashboard-count">{item.redirected}</span></td>
-                            <td className="text-right"><span className="dashboard-count">{item.blocked}</span></td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5}>
-                            <div className="dashboard-empty">No traffic data yet</div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </Card>
-
-            <div className="dashboard-side-stack">
+            <div className="dashboard-card-frame">
               <Card padding="0">
                 <div className="dashboard-panel">
                   <div className="dashboard-panel-header">
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingMd">Blocked Traffic</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">Visitors blocked by rule or country.</Text>
+                      <Text as="h3" variant="headingMd">Traffic Overview</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">Visits and actions by country in the last 30 days.</Text>
                     </BlockStack>
-                    <Badge tone={totalBlockedActions > 0 ? "critical" : undefined}>{totalBlockedActions}</Badge>
+                    <Badge>{visitsData.length} countries</Badge>
                   </div>
-                  <div className="dashboard-table-scroll-short">
+                  <div className="dashboard-table-scroll">
                     <table className="dashboard-table">
                       <thead>
                         <tr>
-                          <th>Block</th>
-                          <th className="text-right">Count</th>
+                          <th>Country</th>
+                          <th className="text-right">Visits</th>
+                          <th className="text-right">Popup</th>
+                          <th className="text-right">Redirected</th>
+                          <th className="text-right">Blocked</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {blocksData.length > 0 ? (
-                          blocksData.map((item: any) => (
+                        {visitsData.length > 0 ? (
+                          visitsData.map((item: any) => (
                             <tr key={item.id}>
                               <td>
                                 <div className="dashboard-entity-cell">
-                                  {String(item.id).length === 2 && (
-                                    <img
-                                      src={`https://flagcdn.com/w40/${String(item.id).toLowerCase()}.png`}
-                                      width="24"
-                                      height="16"
-                                      alt={item.block}
-                                      loading="lazy"
-                                      decoding="async"
-                                    />
-                                  )}
-                                  <span>{item.block}</span>
+                                  <img
+                                    src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
+                                    srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
+                                    width="24"
+                                    height="16"
+                                    alt={item.country}
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                  <span>{item.country}</span>
                                 </div>
                               </td>
+                              <td className="text-right"><span className="dashboard-count">{item.visitors}</span></td>
+                              <td className="text-right"><span className="dashboard-count">{item.popup}</span></td>
+                              <td className="text-right"><span className="dashboard-count">{item.redirected}</span></td>
                               <td className="text-right"><span className="dashboard-count">{item.blocked}</span></td>
                             </tr>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={2}>
-                              <div className="dashboard-empty">No blocks found</div>
+                            <td colSpan={5}>
+                              <div className="dashboard-empty">No traffic data yet</div>
                             </td>
                           </tr>
                         )}
@@ -1151,48 +1148,106 @@ export default function Index() {
                   </div>
                 </div>
               </Card>
+            </div>
 
-              <Card padding="0">
-                <div className="dashboard-panel">
-                  <div className="dashboard-panel-header">
-                    <BlockStack gap="100">
-                      <Text as="h3" variant="headingMd">Instant Redirects</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">Auto-redirects in the last 30 days.</Text>
-                    </BlockStack>
-                    <Badge tone={totalAutoRedirected > 0 ? "success" : undefined}>{totalAutoRedirected}</Badge>
-                  </div>
-                  <div className="dashboard-table-scroll-short">
-                    <table className="dashboard-table">
-                      <thead>
-                        <tr>
-                          <th>Rule</th>
-                          <th className="text-right">Redirected</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {autoRedirectsData.length > 0 ? (
-                          autoRedirectsData.map((item: any) => (
-                            <tr key={item.id}>
-                              <td>
-                                <div className="dashboard-entity-cell">
-                                  <span>{item.rule}</span>
-                                </div>
-                              </td>
-                              <td className="text-right"><span className="dashboard-count">{item.autoRedirected}</span></td>
-                            </tr>
-                          ))
-                        ) : (
+            <div className="dashboard-side-stack">
+              <div className="dashboard-card-frame">
+                <Card padding="0">
+                  <div className="dashboard-panel">
+                    <div className="dashboard-panel-header">
+                      <BlockStack gap="100">
+                        <Text as="h3" variant="headingMd">Blocked Traffic</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">Visitors blocked by rule or country.</Text>
+                      </BlockStack>
+                      <Badge tone={totalBlockedActions > 0 ? "critical" : undefined}>{totalBlockedActions}</Badge>
+                    </div>
+                    <div className={`dashboard-table-scroll-short${blocksData.length > 0 ? "" : " is-empty"}`}>
+                      <table className="dashboard-table">
+                        <thead>
                           <tr>
-                            <td colSpan={2}>
-                              <div className="dashboard-empty">No auto-redirect data</div>
-                            </td>
+                            <th>Block</th>
+                            <th className="text-right">Count</th>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {blocksData.length > 0 ? (
+                            blocksData.map((item: any) => (
+                              <tr key={item.id}>
+                                <td>
+                                  <div className="dashboard-entity-cell">
+                                    {String(item.id).length === 2 && (
+                                      <img
+                                        src={`https://flagcdn.com/w40/${String(item.id).toLowerCase()}.png`}
+                                        width="24"
+                                        height="16"
+                                        alt={item.block}
+                                        loading="lazy"
+                                        decoding="async"
+                                      />
+                                    )}
+                                    <span>{item.block}</span>
+                                  </div>
+                                </td>
+                                <td className="text-right"><span className="dashboard-count">{item.blocked}</span></td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={2}>
+                                <div className="dashboard-empty">No blocks found</div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              </div>
+
+              <div className="dashboard-card-frame">
+                <Card padding="0">
+                  <div className="dashboard-panel">
+                    <div className="dashboard-panel-header">
+                      <BlockStack gap="100">
+                        <Text as="h3" variant="headingMd">Instant Redirects</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">Auto-redirects in the last 30 days.</Text>
+                      </BlockStack>
+                      <Badge tone={totalAutoRedirected > 0 ? "success" : undefined}>{totalAutoRedirected}</Badge>
+                    </div>
+                    <div className={`dashboard-table-scroll-short${autoRedirectsData.length > 0 ? "" : " is-empty"}`}>
+                      <table className="dashboard-table">
+                        <thead>
+                          <tr>
+                            <th>Rule</th>
+                            <th className="text-right">Redirected</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {autoRedirectsData.length > 0 ? (
+                            autoRedirectsData.map((item: any) => (
+                              <tr key={item.id}>
+                                <td>
+                                  <div className="dashboard-entity-cell">
+                                    <span>{item.rule}</span>
+                                  </div>
+                                </td>
+                                <td className="text-right"><span className="dashboard-count">{item.autoRedirected}</span></td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={2}>
+                                <div className="dashboard-empty">No auto-redirect data</div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </Card>
+              </div>
             </div>
           </div>
 
