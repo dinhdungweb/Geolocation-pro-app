@@ -18,6 +18,10 @@ import {
   recordBillableUsage,
   recordStorefrontAnalyticsDetails,
 } from "../utils/storefront-analytics.server";
+import {
+  getStorefrontConfigCache,
+  setStorefrontConfigCache,
+} from "../utils/storefront-config-cache.server";
 import { stateCodeMatchesRegion } from "../utils/states";
 
 type ProxyRule = {
@@ -27,6 +31,7 @@ type ProxyRule = {
   ipAddresses?: string;
   marketHandles?: string;
   marketCountryCodes?: string;
+  matchType: string;
   targetUrl: string;
   priority: number;
   ruleType: string;
@@ -39,6 +44,16 @@ type ProxyRule = {
   pageTargetingType: string;
   pagePaths?: string | null;
   stateCodes?: string;
+};
+
+type StorefrontRuntimeConfig = {
+  activeRules: ProxyRule[];
+  currentPlan: string;
+  currentUsage: number;
+  hasPaidPlan: boolean;
+  planLimit: number;
+  settings: any;
+  usagePeriod: Awaited<ReturnType<typeof getUsagePeriodForShop>>;
 };
 
 const corsHeaders = {
@@ -472,6 +487,73 @@ function buildActionResponse({
   };
 }
 
+async function getOrCreateSettings(shop: string) {
+  const existing = await prisma.settings.findUnique({ where: { shop } });
+  if (existing) return existing;
+
+  try {
+    return await prisma.settings.create({ data: { shop } });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      const raced = await prisma.settings.findUnique({ where: { shop } });
+      if (raced) return raced;
+    }
+    throw error;
+  }
+}
+
+async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRuntimeConfig> {
+  const cached = getStorefrontConfigCache<StorefrontRuntimeConfig>(shop);
+  if (cached) return cached;
+
+  const settings = await getOrCreateSettings(shop);
+  const { effectivePlan: currentPlan } = resolveEffectivePlan({ settings });
+  const hasPaidPlan = currentPlan !== FREE_PLAN;
+  const planLimit = getPlanLimit(currentPlan, settings);
+  const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
+
+  const [monthlyUsage, activeRules] = await Promise.all([
+    prisma.monthlyUsage.findUnique({
+      where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
+    }),
+    prisma.redirectRule.findMany({
+      where: { shop, isActive: true },
+      orderBy: { priority: "desc" },
+      select: {
+        id: true,
+        name: true,
+        countryCodes: true,
+        ipAddresses: true,
+        marketHandles: true,
+        marketCountryCodes: true,
+        matchType: true,
+        targetUrl: true,
+        priority: true,
+        ruleType: true,
+        redirectMode: true,
+        scheduleEnabled: true,
+        startTime: true,
+        endTime: true,
+        daysOfWeek: true,
+        timezone: true,
+        pageTargetingType: true,
+        pagePaths: true,
+        stateCodes: true,
+      },
+    }),
+  ]);
+
+  return setStorefrontConfigCache(shop, {
+    activeRules,
+    currentPlan,
+    currentUsage: monthlyUsage?.totalVisitors || 0,
+    hasPaidPlan,
+    planLimit,
+    settings,
+    usagePeriod,
+  });
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
@@ -545,18 +627,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const settings =
-      (await prisma.settings.findUnique({ where: { shop } })) ??
-      (await prisma.settings.create({ data: { shop } }));
-
-    const { effectivePlan: currentPlan } = resolveEffectivePlan({ settings });
-    const hasPaidPlan = currentPlan !== FREE_PLAN;
-    const planLimit = getPlanLimit(currentPlan, settings);
-    const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
-    const monthlyUsage = await prisma.monthlyUsage.findUnique({
-      where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
-    });
-    const currentUsage = monthlyUsage?.totalVisitors || 0;
+    const {
+      activeRules,
+      currentPlan,
+      currentUsage,
+      hasPaidPlan,
+      planLimit,
+      settings,
+      usagePeriod,
+    } = await loadStorefrontRuntimeConfig(shop);
     const popup = buildPopup(settings);
     const appOrigin = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
     const blocked = buildBlocked(settings, appOrigin);
@@ -630,9 +709,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const isIPExcluded = settings.excludedIPs
       .split(",")
-      .map((ip) => ip.trim())
+      .map((ip: string) => ip.trim())
       .filter(Boolean)
-      .some((excludedIP) => isIPMatch(visitorIP, excludedIP));
+      .some((excludedIP: string) => isIPMatch(visitorIP, excludedIP));
 
     if (isIPExcluded) {
       return json(
@@ -666,6 +745,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       selectedRule = {
         id: "vpn-shield",
         name: "Anti-Fraud Shield",
+        matchType: "vpn",
         targetUrl: "",
         priority: Number.MAX_SAFE_INTEGER,
         ruleType: "block",
@@ -675,27 +755,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (!selectedRule && hasPaidPlan) {
-      const ipRules = await prisma.redirectRule.findMany({
-        where: { shop, isActive: true, matchType: "ip" },
-        orderBy: { priority: "desc" },
-        select: {
-          id: true,
-          name: true,
-          ipAddresses: true,
-          targetUrl: true,
-          priority: true,
-          ruleType: true,
-          redirectMode: true,
-          pageTargetingType: true,
-          pagePaths: true,
-        },
-      });
+      const ipRules = activeRules.filter((rule) => rule.matchType === "ip");
 
       selectedRule =
         ipRules
           .filter((rule) => isRuleOnPage(rule, currentPath))
           .find((rule) =>
-            rule.ipAddresses
+            (rule.ipAddresses || "")
               .split(",")
               .map((ip) => ip.trim())
               .filter(Boolean)
@@ -709,27 +775,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (!selectedRule && hasPaidPlan && (shopifyMarketHandle || shopifyMarketId)) {
-      const marketRules = await prisma.redirectRule.findMany({
-        where: { shop, isActive: true, matchType: "market" },
-        orderBy: { priority: "desc" },
-        select: {
-          id: true,
-          name: true,
-          marketHandles: true,
-          marketCountryCodes: true,
-          targetUrl: true,
-          priority: true,
-          scheduleEnabled: true,
-          startTime: true,
-          endTime: true,
-          daysOfWeek: true,
-          timezone: true,
-          ruleType: true,
-          redirectMode: true,
-          pageTargetingType: true,
-          pagePaths: true,
-        },
-      });
+      const marketRules = activeRules.filter((rule) => rule.matchType === "market");
 
       selectedRule =
         marketRules
@@ -744,26 +790,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (!selectedRule && hasPaidPlan) {
-      const stateRules = await prisma.redirectRule.findMany({
-        where: { shop, isActive: true, matchType: "state" },
-        orderBy: { priority: "desc" },
-        select: {
-          id: true,
-          name: true,
-          stateCodes: true,
-          targetUrl: true,
-          priority: true,
-          scheduleEnabled: true,
-          startTime: true,
-          endTime: true,
-          daysOfWeek: true,
-          timezone: true,
-          ruleType: true,
-          redirectMode: true,
-          pageTargetingType: true,
-          pagePaths: true,
-        },
-      });
+      const stateRules = activeRules.filter((rule) => rule.matchType === "state");
 
       const eligibleStateRules = stateRules
         .filter((rule) => isRuleInSchedule(rule))
@@ -812,26 +839,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (!selectedRule && countryCode) {
-      const countryRules = await prisma.redirectRule.findMany({
-        where: { shop, isActive: true, matchType: "country" },
-        orderBy: { priority: "desc" },
-        select: {
-          id: true,
-          name: true,
-          countryCodes: true,
-          targetUrl: true,
-          priority: true,
-          scheduleEnabled: true,
-          startTime: true,
-          endTime: true,
-          daysOfWeek: true,
-          timezone: true,
-          ruleType: true,
-          redirectMode: true,
-          pageTargetingType: true,
-          pagePaths: true,
-        },
-      });
+      const countryRules = activeRules.filter((rule) => rule.matchType === "country");
 
       const eligibleCountryRules = countryRules
         .filter((rule) => isRuleInSchedule(rule))

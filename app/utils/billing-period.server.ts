@@ -101,43 +101,51 @@ function getUsageLineItem(subscription: any) {
 }
 
 async function getBillableUsageCounts(shop: string, billingPeriodKey: string) {
-  const [events, actionEvents] = await Promise.all([
-    prisma.billableUsageEvent.findMany({
+  const [totalVisitors, actionRows] = await Promise.all([
+    prisma.billableUsageEvent.count({
       where: {
         shop,
         billingPeriodKey,
       },
-      select: { action: true, eventKey: true },
     }),
-    prisma.billableUsageActionEvent.findMany({
-      where: {
-        shop,
-        billingPeriodKey,
-      },
-      select: { action: true, eventKey: true },
-    }),
+    prisma.$queryRaw<Array<{ action: string; count: number }>>`
+      WITH action_counts AS (
+        SELECT "action", COUNT(*)::integer AS "count"
+        FROM "BillableUsageActionEvent"
+        WHERE "shop" = ${shop}
+          AND "billingPeriodKey" = ${billingPeriodKey}
+        GROUP BY "action"
+
+        UNION ALL
+
+        SELECT e."action", COUNT(*)::integer AS "count"
+        FROM "BillableUsageEvent" e
+        WHERE e."shop" = ${shop}
+          AND e."billingPeriodKey" = ${billingPeriodKey}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "BillableUsageActionEvent" a
+            WHERE a."eventKey" = e."eventKey"
+              AND a."action" = e."action"
+          )
+        GROUP BY e."action"
+      )
+      SELECT "action", SUM("count")::integer AS "count"
+      FROM action_counts
+      GROUP BY "action"
+    `,
   ]);
 
-  const actionEventKeys = actionEvents.reduce<Set<string>>((items, event) => {
-    items.add(`${event.eventKey}:${event.action}`);
-    return items;
-  }, new Set<string>());
-  const actions = [
-    ...actionEvents.map((event) => event.action),
-    ...events
-      .filter((event) => !actionEventKeys.has(`${event.eventKey}:${event.action}`))
-      .map((event) => event.action),
-  ];
+  const countActions = (actions: string[]) =>
+    actionRows
+      .filter((row) => actions.includes(row.action))
+      .reduce((total, row) => total + Number(row.count || 0), 0);
 
   return {
-    totalVisitors: events.length,
-    redirected: actions.filter((action) =>
-      ["redirected", "auto_redirected", "ip_redirected"].includes(action)
-    ).length,
-    blocked: actions.filter((action) =>
-      ["blocked", "ip_blocked", "vpn_blocked"].includes(action)
-    ).length,
-    popupShown: actions.filter((action) => action === "popup_shown").length,
+    totalVisitors,
+    redirected: countActions(["redirected", "auto_redirected", "ip_redirected"]),
+    blocked: countActions(["blocked", "ip_blocked", "vpn_blocked"]),
+    popupShown: countActions(["popup_shown"]),
   };
 }
 

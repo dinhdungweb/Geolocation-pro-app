@@ -24,6 +24,7 @@ import prisma from "../db.server";
 import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 interface Settings {
     id: string;
@@ -257,6 +258,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             },
         });
 
+        invalidateStorefrontConfigCache(shop);
         return json({ success: true, message: "Settings saved successfully" });
     } catch (error) {
         console.error("Settings save error:", error);

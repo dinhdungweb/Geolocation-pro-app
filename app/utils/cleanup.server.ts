@@ -3,10 +3,64 @@ import prisma from "../db.server";
 // Retention periods
 const LOG_RETENTION_DAYS = 30;
 const BILLABLE_EVENT_RETENTION_DAYS = 62; // Must exceed max billing period (~30d) + buffer
+const DELETE_BATCH_SIZE = 5_000;
+const MAX_BATCHES_PER_RUN = 20;
 
 // In-memory tracker to avoid running cleanup too frequently
 // Only runs once per server process per day, even if startup and schedule overlap.
 let lastCleanupDate = "";
+
+async function deleteVisitorLogBatch(cutoff: Date) {
+    return prisma.$executeRaw`
+        DELETE FROM "VisitorLog"
+        WHERE "id" IN (
+            SELECT "id"
+            FROM "VisitorLog"
+            WHERE "timestamp" < ${cutoff}
+            ORDER BY "timestamp" ASC
+            LIMIT ${DELETE_BATCH_SIZE}
+        )
+    `;
+}
+
+async function deleteBillableUsageEventBatch(cutoff: Date) {
+    return prisma.$executeRaw`
+        DELETE FROM "BillableUsageEvent"
+        WHERE "id" IN (
+            SELECT "id"
+            FROM "BillableUsageEvent"
+            WHERE "createdAt" < ${cutoff}
+            ORDER BY "createdAt" ASC
+            LIMIT ${DELETE_BATCH_SIZE}
+        )
+    `;
+}
+
+async function deleteBillableUsageActionEventBatch(cutoff: Date) {
+    return prisma.$executeRaw`
+        DELETE FROM "BillableUsageActionEvent"
+        WHERE "id" IN (
+            SELECT "id"
+            FROM "BillableUsageActionEvent"
+            WHERE "createdAt" < ${cutoff}
+            ORDER BY "createdAt" ASC
+            LIMIT ${DELETE_BATCH_SIZE}
+        )
+    `;
+}
+
+async function deleteInBatches(deleteBatch: () => Promise<number>) {
+    let total = 0;
+
+    for (let index = 0; index < MAX_BATCHES_PER_RUN; index++) {
+        const deleted = await deleteBatch();
+        total += deleted;
+
+        if (deleted < DELETE_BATCH_SIZE) break;
+    }
+
+    return total;
+}
 
 /**
  * Deletes old VisitorLogs and BillableUsageEvents.
@@ -25,28 +79,22 @@ export async function cleanupOldLogs() {
         const billableCutoff = new Date();
         billableCutoff.setDate(billableCutoff.getDate() - BILLABLE_EVENT_RETENTION_DAYS);
 
-        const [logResult, billableResult, billableActionResult] = await Promise.all([
-            prisma.visitorLog.deleteMany({
-                where: { timestamp: { lt: logCutoff } },
-            }),
-            prisma.billableUsageEvent.deleteMany({
-                where: { createdAt: { lt: billableCutoff } },
-            }),
-            prisma.billableUsageActionEvent.deleteMany({
-                where: { createdAt: { lt: billableCutoff } },
-            }),
+        const [deletedLogs, deletedBillableEvents, deletedBillableActionEvents] = await Promise.all([
+            deleteInBatches(() => deleteVisitorLogBatch(logCutoff)),
+            deleteInBatches(() => deleteBillableUsageEventBatch(billableCutoff)),
+            deleteInBatches(() => deleteBillableUsageActionEventBatch(billableCutoff)),
         ]);
 
         lastCleanupDate = today;
 
-        if (logResult.count > 0) {
-            console.log(`[Cleanup] Deleted ${logResult.count} visitor logs older than ${LOG_RETENTION_DAYS} days`);
+        if (deletedLogs > 0) {
+            console.log(`[Cleanup] Deleted ${deletedLogs} visitor logs older than ${LOG_RETENTION_DAYS} days`);
         }
-        if (billableResult.count > 0) {
-            console.log(`[Cleanup] Deleted ${billableResult.count} billable events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);
+        if (deletedBillableEvents > 0) {
+            console.log(`[Cleanup] Deleted ${deletedBillableEvents} billable events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);
         }
-        if (billableActionResult.count > 0) {
-            console.log(`[Cleanup] Deleted ${billableActionResult.count} billable action events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);
+        if (deletedBillableActionEvents > 0) {
+            console.log(`[Cleanup] Deleted ${deletedBillableActionEvents} billable action events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);
         }
     } catch (error) {
         console.error("[Cleanup] Failed to delete old records:", error);

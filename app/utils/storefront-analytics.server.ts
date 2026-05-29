@@ -7,19 +7,81 @@ import {
 } from "./analytics-token.server";
 import { getVisitorIP } from "./request-ip.server";
 
-type RecordStorefrontAnalyticsEventInput = {
+export type RecordStorefrontAnalyticsEventInput = {
   countryCode: string | null;
+  ipAddress?: string | null;
   path: string | null;
   regionCode?: string | null;
   regionName?: string | null;
-  request: Request;
+  request?: Request;
   ruleId: string | null;
   ruleName: string | null;
   shop: string;
   targetUrl: string | null;
   tokenPayload?: AnalyticsTokenPayload | null;
   type: string;
+  userAgent?: string | null;
 };
+
+const ANALYTICS_QUEUE_MAX_SIZE = Number.parseInt(process.env.ANALYTICS_QUEUE_MAX_SIZE || "5000", 10);
+const ANALYTICS_QUEUE_CONCURRENCY = Number.parseInt(process.env.ANALYTICS_QUEUE_CONCURRENCY || "4", 10);
+const analyticsQueue: RecordStorefrontAnalyticsEventInput[] = [];
+let analyticsQueueActive = 0;
+
+function getInputIP(input: RecordStorefrontAnalyticsEventInput) {
+  if (input.ipAddress) return input.ipAddress;
+  return input.request ? getVisitorIP(input.request) : "unknown";
+}
+
+function getInputUserAgent(input: RecordStorefrontAnalyticsEventInput) {
+  if (input.userAgent) return input.userAgent;
+  return input.request?.headers.get("user-agent") || "Unknown";
+}
+
+function snapshotAnalyticsInput(input: RecordStorefrontAnalyticsEventInput): RecordStorefrontAnalyticsEventInput {
+  return {
+    ...input,
+    ipAddress: getInputIP(input),
+    request: undefined,
+    userAgent: getInputUserAgent(input),
+  };
+}
+
+function pumpAnalyticsQueue() {
+  const concurrency =
+    Number.isFinite(ANALYTICS_QUEUE_CONCURRENCY) && ANALYTICS_QUEUE_CONCURRENCY > 0
+      ? ANALYTICS_QUEUE_CONCURRENCY
+      : 4;
+
+  while (analyticsQueueActive < concurrency && analyticsQueue.length > 0) {
+    const input = analyticsQueue.shift()!;
+    analyticsQueueActive++;
+
+    recordStorefrontAnalyticsEvent(input)
+      .catch((error) => {
+        console.error("[Analytics Queue] Failed to process analytics event:", error);
+      })
+      .finally(() => {
+        analyticsQueueActive--;
+        pumpAnalyticsQueue();
+      });
+  }
+}
+
+export function enqueueStorefrontAnalyticsEvent(input: RecordStorefrontAnalyticsEventInput) {
+  const maxSize = Number.isFinite(ANALYTICS_QUEUE_MAX_SIZE) && ANALYTICS_QUEUE_MAX_SIZE > 0
+    ? ANALYTICS_QUEUE_MAX_SIZE
+    : 5_000;
+
+  if (analyticsQueue.length >= maxSize) {
+    console.warn("[Analytics Queue] Dropped analytics event because the queue is full.");
+    return false;
+  }
+
+  analyticsQueue.push(snapshotAnalyticsInput(input));
+  queueMicrotask(pumpAnalyticsQueue);
+  return true;
+}
 
 function actionFromType(type: string) {
   if (type === "redirected") return "clicked_redirect";
@@ -222,6 +284,7 @@ export async function recordBillableUsage({
 
 export async function recordStorefrontAnalyticsDetails({
   countryCode,
+  ipAddress,
   path,
   regionCode = null,
   regionName = null,
@@ -231,12 +294,13 @@ export async function recordStorefrontAnalyticsDetails({
   shop,
   targetUrl,
   type,
+  userAgent,
 }: RecordStorefrontAnalyticsEventInput) {
   try {
     await prisma.visitorLog.create({
       data: {
         shop,
-        ipAddress: getVisitorIP(request),
+        ipAddress: getInputIP({ request, ipAddress, countryCode, path, ruleId, ruleName, shop, targetUrl, type }),
         countryCode,
         regionCode,
         regionName,
@@ -244,7 +308,7 @@ export async function recordStorefrontAnalyticsDetails({
         action: actionFromType(type),
         ruleName,
         targetUrl,
-        userAgent: request.headers.get("user-agent") || "Unknown",
+        userAgent: getInputUserAgent({ request, userAgent, countryCode, path, ruleId, ruleName, shop, targetUrl, type }),
         path,
       },
     });

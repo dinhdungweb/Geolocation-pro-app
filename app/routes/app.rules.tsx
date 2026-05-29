@@ -37,6 +37,7 @@ import { getShopifyMarkets } from "../utils/shopify-markets.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 import { COUNTRY_MAP } from "../utils/countries";
 import { STATE_MAP, STATE_COUNTRY_LABELS, COUNTRIES_WITH_STATES, getStateName, getStatesForCountry } from "../utils/states";
@@ -284,6 +285,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pagePaths,
                 },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "Rule created successfully" });
         }
 
@@ -345,6 +347,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pagePaths,
                 },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "Rule updated successfully" });
         }
 
@@ -366,6 +369,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 where: { id, shop },
                 data: { isActive: !isActive },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "Rule toggled successfully" });
         }
 
@@ -374,6 +378,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             await prisma.redirectRule.deleteMany({
                 where: { id: { in: ids }, shop },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "Rule(s) deleted successfully" });
         }
 
@@ -437,6 +442,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 created++;
             }
 
+            if (created > 0) invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: `Successfully imported ${created} rule(s)` });
         }
 

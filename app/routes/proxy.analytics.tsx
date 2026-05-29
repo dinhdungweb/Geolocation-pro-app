@@ -10,7 +10,10 @@ import {
 } from "../utils/analytics-token.server";
 import { getGeoFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
-import { recordStorefrontAnalyticsEvent } from "../utils/storefront-analytics.server";
+import {
+  enqueueStorefrontAnalyticsEvent,
+  recordStorefrontAnalyticsEvent,
+} from "../utils/storefront-analytics.server";
 
 const MAX_BODY_BYTES = 8 * 1024;
 const VALID_TYPES = [
@@ -150,8 +153,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const path = tokenPayload?.path || asSafeString(data.path, 500) || null;
     const targetUrl = asSafeString(data.targetUrl, 1000) || null;
 
-    await recordStorefrontAnalyticsEvent({
+    const analyticsInput = {
       countryCode,
+      ipAddress: visitorIP,
       path,
       regionCode,
       regionName,
@@ -162,7 +166,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       targetUrl,
       tokenPayload,
       type,
-    });
+      userAgent: request.headers.get("user-agent") || "Unknown",
+    };
+
+    if (type === "visit") {
+      const queued = enqueueStorefrontAnalyticsEvent(analyticsInput);
+      return json({ success: true, queued }, { headers: corsHeaders });
+    }
+
+    await recordStorefrontAnalyticsEvent(analyticsInput);
 
     return json({ success: true }, { headers: corsHeaders });
   } catch (error) {

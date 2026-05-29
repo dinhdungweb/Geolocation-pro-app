@@ -35,6 +35,7 @@ import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 interface IPRule {
     id: string;
@@ -171,6 +172,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pagePaths,
                 },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "IP Rule created successfully" });
         }
 
@@ -208,6 +210,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pagePaths,
                 },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "IP Rule updated successfully" });
         }
 
@@ -223,6 +226,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 where: { id, shop },
                 data: { isActive: !isActive },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "IP Rule toggled successfully" });
         }
 
@@ -231,6 +235,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             await prisma.redirectRule.deleteMany({
                 where: { id: { in: ids }, shop },
             });
+            invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: "IP Rule(s) deleted successfully" });
         }
 
@@ -288,6 +293,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             const skippedMessage = skipped > 0 ? ` Skipped ${skipped} invalid IP rule(s).` : "";
+            if (created > 0) invalidateStorefrontConfigCache(shop);
             return json({ success: true, message: `Imported ${created} IP rule(s).${skippedMessage}` });
         }
 

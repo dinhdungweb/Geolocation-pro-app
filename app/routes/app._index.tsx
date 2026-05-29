@@ -33,6 +33,7 @@ import { COUNTRY_MAP } from "../utils/countries";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 // Helper to get country name (simplified version of the one in app.rules.tsx)
 //Ideally this should be shared, but for now we put it here or rely on code.
@@ -383,6 +384,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     where: { shop },
     update: settingsSyncData,
     create: { shop, currentPlan: shopifyPlan },
+  }).then(() => {
+    invalidateStorefrontConfigCache(shop);
   }).catch((error) => {
     console.error("[Settings] Failed to sync currentPlan:", error);
   });

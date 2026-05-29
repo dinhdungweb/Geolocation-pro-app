@@ -36,6 +36,7 @@ import { loadCrisp } from "../utils/crisp";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { chargeOverageUsageRecord } from "../utils/billing.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
     const requestUrl = new URL(request.url);
@@ -324,6 +325,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     },
                     create: { shop, currentPlan: FREE_PLAN },
                 });
+                invalidateStorefrontConfigCache(shop);
             } catch (err) {
                 console.error("[Settings] Failed to sync currentPlan:", err);
             }
@@ -370,6 +372,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     update: syncData,
                     create: { shop, currentPlan: selectedPlan },
                 });
+                invalidateStorefrontConfigCache(shop);
             } catch (err) {
                 console.error("[Settings] Failed to sync confirmed currentPlan:", err);
             }
