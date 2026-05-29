@@ -349,48 +349,38 @@ const emptyFilterOptions: VisitorLogFilterOptions = {
     countries: [],
 };
 
-const filterOptionsCache = new Map<string, { expiresAt: number; value: VisitorLogFilterOptions }>();
-const FILTER_OPTIONS_CACHE_TTL_MS = 60_000;
+const visitorLogActionOptions = [
+    "visit",
+    "popup_shown",
+    "clicked_redirect",
+    "auto_redirect",
+    "ip_redirect",
+    "blocked",
+    "ip_block",
+    "vpn_block",
+    "declined",
+    "dismissed",
+];
 
-async function getVisitorLogFilterOptions(shop: string): Promise<VisitorLogFilterOptions> {
-    const now = Date.now();
-    const cached = filterOptionsCache.get(shop);
+const RECENT_LOG_LIMIT = 250;
 
-    if (cached && cached.expiresAt > now) {
-        return cached.value;
-    }
+function getVisitorLogFilterOptionsFromRecentLogs(
+    recentLogs: Array<{ action: string; countryCode: string | null }>
+): VisitorLogFilterOptions {
+    const recentActions = new Set(recentLogs.map((log) => log.action).filter(Boolean));
+    const knownActions = visitorLogActionOptions.filter((action) => recentActions.has(action));
+    const unknownActions = Array.from(recentActions)
+        .filter((action) => !visitorLogActionOptions.includes(action))
+        .sort();
 
-    const [actionRows, countryRows] = await Promise.all([
-        prisma.visitorLog.findMany({
-            where: { shop },
-            distinct: ["action"],
-            select: { action: true },
-            orderBy: { action: "asc" },
-        }),
-        prisma.visitorLog.findMany({
-            where: {
-                shop,
-                countryCode: { not: null },
-            },
-            distinct: ["countryCode"],
-            select: { countryCode: true },
-            orderBy: { countryCode: "asc" },
-        }),
-    ]);
-
-    const value = {
-        actions: actionRows.map((row) => row.action).filter(Boolean),
-        countries: countryRows
-            .map((row) => row.countryCode)
-            .filter((countryCode): countryCode is string => Boolean(countryCode)),
+    return {
+        actions: [...knownActions, ...unknownActions],
+        countries: Array.from(new Set(
+            recentLogs
+                .map((log) => log.countryCode)
+                .filter((countryCode): countryCode is string => Boolean(countryCode))
+        )).sort(),
     };
-
-    filterOptionsCache.set(shop, {
-        expiresAt: now + FILTER_OPTIONS_CACHE_TTL_MS,
-        value,
-    });
-
-    return value;
 }
 
 function VisitorLogsTableSkeleton() {
@@ -434,8 +424,33 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
     const limit = 20;
     const skip = (page - 1) * limit;
 
-    const maxLogs = 250;
-    const where: any = { shop };
+    const recentLogs = await prisma.visitorLog.findMany({
+        where: { shop },
+        orderBy: { timestamp: "desc" },
+        take: RECENT_LOG_LIMIT,
+        select: {
+            id: true,
+            action: true,
+            countryCode: true,
+        },
+    });
+    const recentLogIds = recentLogs.map((log) => log.id);
+    const filterOptions = getVisitorLogFilterOptionsFromRecentLogs(recentLogs);
+
+    if (recentLogIds.length === 0 || skip >= RECENT_LOG_LIMIT) {
+        return {
+            logs: [],
+            page,
+            totalPages: 1,
+            totalLogs: 0,
+            filterOptions,
+        };
+    }
+
+    const where: any = {
+        shop,
+        id: { in: recentLogIds },
+    };
 
     if (filters.query) {
         where.OR = [
@@ -467,7 +482,7 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
         };
     }
 
-    const remainingLogSlots = Math.max(0, maxLogs - skip);
+    const remainingLogSlots = Math.max(0, RECENT_LOG_LIMIT - skip);
     const logTake = remainingLogSlots > 0 ? Math.min(limit + 1, remainingLogSlots + 1) : 0;
     const logsPromise = logTake > 0
         ? prisma.visitorLog.findMany({
@@ -491,14 +506,11 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
         })
         : Promise.resolve([]);
 
-    const [logRows, filterOptions] = await Promise.all([
-        logsPromise,
-        getVisitorLogFilterOptions(shop),
-    ]);
+    const logRows = await logsPromise;
 
-    const hasNextPage = logRows.length > limit && skip + limit < maxLogs;
+    const hasNextPage = logRows.length > limit && skip + limit < RECENT_LOG_LIMIT;
     const logs = logRows.slice(0, limit);
-    const totalLogs = Math.min(skip + logs.length + (hasNextPage ? 1 : 0), maxLogs);
+    const totalLogs = Math.min(skip + logs.length + (hasNextPage ? 1 : 0), RECENT_LOG_LIMIT);
     const totalPages = Math.max(1, page + (hasNextPage ? 1 : 0));
 
     const logsWithRegionNames = await Promise.all(logs.map(async (log) => ({
