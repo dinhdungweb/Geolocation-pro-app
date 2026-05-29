@@ -1,3 +1,5 @@
+import { normalizePagePathPattern, splitPagePathPatterns } from "./page-targeting";
+
 export type ConflictMatchType = "country" | "ip" | "market" | "state";
 
 export type ConflictSeverity = "warning" | "critical";
@@ -48,15 +50,9 @@ function splitList(value: string | null | undefined) {
     .filter(Boolean);
 }
 
-function normalizePath(path: string) {
-  const trimmed = path.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-}
-
 function pathPatternsOverlap(left: string, right: string) {
-  const a = normalizePath(left);
-  const b = normalizePath(right);
+  const a = normalizePagePathPattern(left);
+  const b = normalizePagePathPattern(right);
   if (!a || !b) return false;
 
   const aWildcard = a.endsWith("*");
@@ -80,8 +76,8 @@ function pageTargetingOverlaps(left: ConflictRule, right: ConflictRule) {
     return { overlaps: true, label: "all pages" };
   }
 
-  const leftPaths = splitList(left.pagePaths);
-  const rightPaths = splitList(right.pagePaths);
+  const leftPaths = splitPagePathPatterns(left.pagePaths);
+  const rightPaths = splitPagePathPatterns(right.pagePaths);
 
   if (leftType === "include" && leftPaths.length === 0) {
     return { overlaps: false, label: "no included pages" };

@@ -38,6 +38,7 @@ import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { normalizePagePathPatterns } from "../utils/page-targeting";
 
 import { COUNTRY_MAP } from "../utils/countries";
 import { STATE_MAP, STATE_COUNTRY_LABELS, COUNTRIES_WITH_STATES, getStateName, getStatesForCountry } from "../utils/states";
@@ -247,7 +248,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
-            const pagePaths = formData.get("pagePaths") as string || "";
+            const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
             if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType, matchType)) {
                 return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
@@ -310,7 +311,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const startTime = formData.get("startTime") as string;
             const endTime = formData.get("endTime") as string;
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
-            const pagePaths = formData.get("pagePaths") as string || "";
+            const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
             if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType, matchType)) {
                 return json({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
@@ -1779,7 +1780,7 @@ export default function RulesPage() {
                                     onChange={setPagePaths}
                                     multiline={3}
                                     placeholder="/products/*, /collections/summer-sale, /pages/about-us"
-                                    helpText="Enter one path per line or separated by commas. Use * for wildcards."
+                                    helpText="Enter one path or full URL per line, or separate with commas. Full URLs are saved as paths. Use * for wildcards."
                                     autoComplete="off"
                                 />
                             )}

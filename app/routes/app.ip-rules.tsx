@@ -36,6 +36,7 @@ import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { normalizePagePathPatterns } from "../utils/page-targeting";
 
 interface IPRule {
     id: string;
@@ -154,7 +155,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
-            const pagePaths = formData.get("pagePaths") as string || "";
+            const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
             await prisma.redirectRule.create({
                 data: {
@@ -195,7 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
-            const pagePaths = formData.get("pagePaths") as string || "";
+            const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
             await prisma.redirectRule.update({
                 where: { id, shop },
@@ -843,7 +844,7 @@ export default function IPRulesPage() {
                                     onChange={setPagePaths}
                                     multiline={3}
                                     placeholder="/products/*, /collections/summer-sale, /pages/about-us"
-                                    helpText="Enter one path per line or separated by commas. Use * for wildcards."
+                                    helpText="Enter one path or full URL per line, or separate with commas. Full URLs are saved as paths. Use * for wildcards."
                                     autoComplete="off"
                                 />
                             )}

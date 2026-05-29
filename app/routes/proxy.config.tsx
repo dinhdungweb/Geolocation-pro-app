@@ -23,6 +23,7 @@ import {
   getStorefrontConfigCache,
   setStorefrontConfigCache,
 } from "../utils/storefront-config-cache.server";
+import { normalizePagePathPattern, splitPagePathPatterns } from "../utils/page-targeting";
 import { stateCodeMatchesRegion } from "../utils/states";
 
 type ProxyRule = {
@@ -254,18 +255,16 @@ function isRuleOnPage(rule: ProxyRule, path: string) {
   const type = rule.pageTargetingType || "all";
   if (type === "all") return true;
 
-  const paths = (rule.pagePaths || "")
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const currentPath = normalizePagePathPattern(path);
+  const paths = splitPagePathPatterns(rule.pagePaths);
 
   if (paths.length === 0) return type === "exclude";
 
   const isMatch = paths.some((configuredPath) => {
     if (configuredPath.endsWith("*")) {
-      return path.startsWith(configuredPath.slice(0, -1));
+      return currentPath.startsWith(configuredPath.slice(0, -1));
     }
-    return path === configuredPath;
+    return currentPath === configuredPath;
   });
 
   return type === "include" ? isMatch : !isMatch;
