@@ -116,6 +116,27 @@
     return (config.countryCode || GEOLOCATION_CONFIG.visitorCountry || '').toUpperCase();
   };
 
+  const getCountryFlag = (countryCode) => {
+    const code = (countryCode || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) return '';
+
+    return String.fromCodePoint(
+      code.charCodeAt(0) - 65 + 0x1F1E6,
+      code.charCodeAt(1) - 65 + 0x1F1E6
+    );
+  };
+
+  const getCountryLabelHtml = (countryCode) => {
+    const code = (countryCode || '').toUpperCase();
+    if (!code) return 'your region';
+
+    const flag = getCountryFlag(code);
+    const escapedCode = escapeHtml(code);
+    if (!flag) return escapedCode;
+
+    return `<span class="geo-country-label"><span class="geo-country-flag" aria-hidden="true">${flag}</span><span>${escapedCode}</span></span>`;
+  };
+
   const trackEvent = (type, config, extra = {}) => {
     try {
       if (window.Shopify && window.Shopify.designMode) return;
@@ -214,9 +235,10 @@
     } catch {}
 
     const title = escapeHtml(popup.title || 'Redirect Available');
-    const message = escapeHtml((popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
-      .replace('{country}', getCountryCode(config) || 'your region')
-      .replace('{target}', targetName || 'the recommended store'));
+    const countryCode = getCountryCode(config);
+    const message = escapeHtml(popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
+      .replaceAll('{country}', getCountryLabelHtml(countryCode))
+      .replaceAll('{target}', escapeHtml(targetName || 'the recommended store'));
     const confirmBtn = escapeHtml(popup.confirmBtn || 'Go now');
     const cancelBtn = escapeHtml(popup.cancelBtn || 'Stay here');
     const bgColor = safeColor(popup.bgColor, '#ffffff');
@@ -282,6 +304,8 @@
         @keyframes geo-fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes geo-slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes geo-slide-down { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .geo-country-label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; vertical-align: baseline; }
+        .geo-country-flag { display: inline-flex; align-items: center; font-size: 1.1em; line-height: 1; }
       </style>
     `;
     container.style.display = 'block';
