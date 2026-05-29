@@ -394,22 +394,31 @@ const emptyFilterOptions: VisitorLogFilterOptions = {
     countries: [],
 };
 
-const visitorLogActionOptions = [
-    "visit",
-    "popup_shown",
-    "redirected",
-    "clicked_redirect",
-    "auto_redirect",
-    "auto_redirected",
-    "ip_redirect",
-    "ip_redirected",
-    "blocked",
-    "ip_block",
-    "vpn_block",
-    "clicked_no",
-    "declined",
-    "dismissed",
+const visitorLogActionFilterOptions = [
+    { value: "visit", label: "Visit", actions: ["visit"] },
+    { value: "popup_shown", label: "Popup Shown", actions: ["popup_shown"] },
+    { value: "redirected", label: "Redirected", actions: ["redirected", "clicked_redirect"] },
+    { value: "auto_redirect", label: "Auto Redirect", actions: ["auto_redirect", "auto_redirected"] },
+    { value: "ip_redirect", label: "IP Redirect", actions: ["ip_redirect", "ip_redirected"] },
+    { value: "blocked", label: "Blocked", actions: ["blocked", "ip_block"] },
+    { value: "vpn_block", label: "VPN Block", actions: ["vpn_block"] },
+    { value: "declined", label: "Declined", actions: ["declined", "clicked_no"] },
+    { value: "dismissed", label: "Dismissed", actions: ["dismissed"] },
 ];
+
+function getActionFilterGroup(action: string) {
+    return visitorLogActionFilterOptions.find((option) =>
+        option.value === action || option.actions.includes(action)
+    );
+}
+
+function getActionFilterValue(action: string) {
+    return getActionFilterGroup(action)?.value || action;
+}
+
+function getActionFilterActions(action: string) {
+    return getActionFilterGroup(action)?.actions || [action];
+}
 
 async function getVisitorLogFilterOptions(
     shop: string,
@@ -433,7 +442,7 @@ async function getVisitorLogFilterOptions(
     });
 
     return {
-        actions: visitorLogActionOptions,
+        actions: visitorLogActionFilterOptions.map((option) => option.value),
         countries: countryRows
             .map((row) => row.countryCode)
                 .filter((countryCode): countryCode is string => Boolean(countryCode))
@@ -504,7 +513,8 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
     }
 
     if (filters.action) {
-        where.action = filters.action;
+        const actionValues = getActionFilterActions(filters.action);
+        where.action = actionValues.length > 1 ? { in: actionValues } : actionValues[0];
     }
 
     if (filters.country) {
@@ -804,18 +814,23 @@ export default function VisitorLogs() {
     };
 
     const renderFilterControls = (filterOptions: VisitorLogFilterOptions) => {
-        const availableActions = filters.action && !filterOptions.actions.includes(filters.action)
-            ? [...filterOptions.actions, filters.action]
+        const selectedActionValue = filters.action ? getActionFilterValue(filters.action) : "all";
+        const availableActions = selectedActionValue !== "all" && !filterOptions.actions.includes(selectedActionValue)
+            ? [...filterOptions.actions, selectedActionValue]
             : filterOptions.actions;
         const availableCountries = filters.country && !filterOptions.countries.includes(filters.country)
             ? [...filterOptions.countries, filters.country].sort()
             : filterOptions.countries;
         const actionOptions = [
             { label: "All actions", value: "all" },
-            ...availableActions.map((action) => ({
-                label: formatActionLabel(action),
-                value: action,
-            })),
+            ...availableActions.map((action) => {
+                const actionGroup = getActionFilterGroup(action);
+
+                return {
+                    label: actionGroup?.label || formatActionLabel(action),
+                    value: action,
+                };
+            }),
         ];
 
         const countryOptions = [
@@ -965,7 +980,7 @@ export default function VisitorLogs() {
                             label="Action"
                             labelHidden
                             options={actionOptions}
-                            value={filters.action || "all"}
+                            value={selectedActionValue}
                             onChange={(value) => updateSearchParam("action", value)}
                         />
                     </div>
@@ -1467,7 +1482,7 @@ export default function VisitorLogs() {
                                     <BlockStack gap="100">
                                         <Text as="h1" variant="headingLg">Visitor Logs</Text>
                                         <Text as="p" variant="bodyMd" tone="subdued">
-                                            Detailed logs of all visitor interactions
+                                            Recent visitor activity, redirects, blocks, and popup events.
                                         </Text>
                                     </BlockStack>
                                 </div>
