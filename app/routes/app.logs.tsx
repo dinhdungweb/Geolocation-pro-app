@@ -110,6 +110,11 @@ const datePresetOptions: Array<{ label: string; value: DateRangePreset }> = [
     { label: "Custom", value: "custom" },
 ];
 
+const DATE_SCOPE_PARAM = "dateScope";
+const DATE_SCOPE_ALL = "all";
+const DEFAULT_LOG_WINDOW_DAYS = 30;
+const LOGS_PAGE_SIZE = 50;
+
 function startOfDay(date: Date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -118,6 +123,13 @@ function addDays(date: Date, days: number) {
     const nextDate = startOfDay(date);
     nextDate.setDate(nextDate.getDate() + days);
     return nextDate;
+}
+
+function getDefaultLogDateRange(today: Date): DateRangeValue {
+    return {
+        start: addDays(today, -(DEFAULT_LOG_WINDOW_DAYS - 1)),
+        end: today,
+    };
 }
 
 function startOfMonth(date: Date) {
@@ -249,6 +261,38 @@ function formatDateRangeLabel(from: string, to: string, today: Date) {
     return `${formatDisplayDate(start)} - ${formatDisplayDate(end)}`;
 }
 
+function getEffectiveLogDateParams(
+    filters: { from: string; to: string; dateScope: string },
+    today: Date
+) {
+    if (filters.dateScope === DATE_SCOPE_ALL) {
+        return {
+            from: "",
+            to: "",
+            isAllDates: true,
+        };
+    }
+
+    if (filters.from || filters.to) {
+        const start = filters.from || filters.to;
+        const end = filters.to || filters.from;
+
+        return {
+            from: start,
+            to: end,
+            isAllDates: false,
+        };
+    }
+
+    const defaultRange = getDefaultLogDateRange(today);
+
+    return {
+        from: formatDateParam(defaultRange.start),
+        to: formatDateParam(defaultRange.end),
+        isAllDates: false,
+    };
+}
+
 function formatMajorVersion(label: string, version?: string) {
     const majorVersion = version?.split(".")[0];
     return majorVersion ? `${label} ${majorVersion}` : label;
@@ -334,6 +378,7 @@ type VisitorLogFilters = {
     country: string;
     from: string;
     to: string;
+    dateScope: string;
 };
 
 type VisitorLogsData = {
@@ -352,34 +397,47 @@ const emptyFilterOptions: VisitorLogFilterOptions = {
 const visitorLogActionOptions = [
     "visit",
     "popup_shown",
+    "redirected",
     "clicked_redirect",
     "auto_redirect",
+    "auto_redirected",
     "ip_redirect",
+    "ip_redirected",
     "blocked",
     "ip_block",
     "vpn_block",
+    "clicked_no",
     "declined",
     "dismissed",
 ];
 
-const RECENT_LOG_LIMIT = 250;
+async function getVisitorLogFilterOptions(
+    shop: string,
+    fromDate: Date | null,
+    toDate: Date | null
+): Promise<VisitorLogFilterOptions> {
+    const where: any = { shop };
 
-function getVisitorLogFilterOptionsFromRecentLogs(
-    recentLogs: Array<{ action: string; countryCode: string | null }>
-): VisitorLogFilterOptions {
-    const recentActions = new Set(recentLogs.map((log) => log.action).filter(Boolean));
-    const knownActions = visitorLogActionOptions.filter((action) => recentActions.has(action));
-    const unknownActions = Array.from(recentActions)
-        .filter((action) => !visitorLogActionOptions.includes(action))
-        .sort();
+    if (fromDate || toDate) {
+        where.date = {
+            ...(fromDate ? { gte: fromDate } : {}),
+            ...(toDate ? { lte: toDate } : {}),
+        };
+    }
+
+    const countryRows = await prisma.analyticsCountry.findMany({
+        where,
+        distinct: ["countryCode"],
+        select: { countryCode: true },
+        orderBy: { countryCode: "asc" },
+    });
 
     return {
-        actions: [...knownActions, ...unknownActions],
-        countries: Array.from(new Set(
-            recentLogs
-                .map((log) => log.countryCode)
+        actions: visitorLogActionOptions,
+        countries: countryRows
+            .map((row) => row.countryCode)
                 .filter((countryCode): countryCode is string => Boolean(countryCode))
-        )).sort(),
+            .sort(),
     };
 }
 
@@ -419,37 +477,15 @@ function VisitorLogsTableSkeleton() {
 }
 
 async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, page: number): Promise<VisitorLogsData> {
-    const fromDate = parseDateFilter(filters.from);
-    const toDate = parseDateFilter(filters.to, true);
-    const limit = 20;
+    const today = startOfDay(new Date());
+    const effectiveDateParams = getEffectiveLogDateParams(filters, today);
+    const fromDate = effectiveDateParams.isAllDates ? null : parseDateFilter(effectiveDateParams.from);
+    const toDate = effectiveDateParams.isAllDates ? null : parseDateFilter(effectiveDateParams.to, true);
+    const limit = LOGS_PAGE_SIZE;
     const skip = (page - 1) * limit;
-
-    const recentLogs = await prisma.visitorLog.findMany({
-        where: { shop },
-        orderBy: { timestamp: "desc" },
-        take: RECENT_LOG_LIMIT,
-        select: {
-            id: true,
-            action: true,
-            countryCode: true,
-        },
-    });
-    const recentLogIds = recentLogs.map((log) => log.id);
-    const filterOptions = getVisitorLogFilterOptionsFromRecentLogs(recentLogs);
-
-    if (recentLogIds.length === 0 || skip >= RECENT_LOG_LIMIT) {
-        return {
-            logs: [],
-            page,
-            totalPages: 1,
-            totalLogs: 0,
-            filterOptions,
-        };
-    }
 
     const where: any = {
         shop,
-        id: { in: recentLogIds },
     };
 
     if (filters.query) {
@@ -482,14 +518,12 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
         };
     }
 
-    const remainingLogSlots = Math.max(0, RECENT_LOG_LIMIT - skip);
-    const logTake = remainingLogSlots > 0 ? Math.min(limit + 1, remainingLogSlots + 1) : 0;
-    const logsPromise = logTake > 0
-        ? prisma.visitorLog.findMany({
+    const [logRows, filterOptions] = await Promise.all([
+        prisma.visitorLog.findMany({
             where,
             orderBy: { timestamp: "desc" },
             skip,
-            take: logTake,
+            take: limit + 1,
             select: {
                 id: true,
                 shop: true,
@@ -503,14 +537,13 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
                 timestamp: true,
                 path: true,
             },
-        })
-        : Promise.resolve([]);
+        }),
+        getVisitorLogFilterOptions(shop, fromDate, toDate),
+    ]);
 
-    const logRows = await logsPromise;
-
-    const hasNextPage = logRows.length > limit && skip + limit < RECENT_LOG_LIMIT;
+    const hasNextPage = logRows.length > limit;
     const logs = logRows.slice(0, limit);
-    const totalLogs = Math.min(skip + logs.length + (hasNextPage ? 1 : 0), RECENT_LOG_LIMIT);
+    const totalLogs = skip + logs.length + (hasNextPage ? 1 : 0);
     const totalPages = Math.max(1, page + (hasNextPage ? 1 : 0));
 
     const logsWithRegionNames = await Promise.all(logs.map(async (log) => ({
@@ -537,6 +570,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         country: (url.searchParams.get("country") || "").trim().toUpperCase(),
         from: url.searchParams.get("from") || "",
         to: url.searchParams.get("to") || "",
+        dateScope: url.searchParams.get(DATE_SCOPE_PARAM) || "",
     };
 
     return defer({
@@ -551,10 +585,24 @@ export default function VisitorLogs() {
     const [searchParams, setSearchParams] = useSearchParams();
     const searchParamsString = searchParams.toString();
     const today = startOfDay(new Date());
-    const currentDateRange = getDefaultDateRange(filters.from, filters.to, today);
-    const currentDatePreset = getMatchingDatePreset(filters.from, filters.to, today);
-    const hasFilters = Boolean(filters.query || filters.action || filters.country || filters.from || filters.to);
-    const dateRangeLabel = formatDateRangeLabel(filters.from, filters.to, today);
+    const effectiveDateParams = getEffectiveLogDateParams(filters, today);
+    const currentDateRange = effectiveDateParams.isAllDates
+        ? getDefaultLogDateRange(today)
+        : getDefaultDateRange(effectiveDateParams.from, effectiveDateParams.to, today);
+    const currentDatePreset = effectiveDateParams.isAllDates
+        ? "all"
+        : getMatchingDatePreset(effectiveDateParams.from, effectiveDateParams.to, today);
+    const hasFilters = Boolean(
+        filters.query ||
+        filters.action ||
+        filters.country ||
+        filters.from ||
+        filters.to ||
+        filters.dateScope === DATE_SCOPE_ALL
+    );
+    const dateRangeLabel = effectiveDateParams.isAllDates
+        ? "All dates"
+        : formatDateRangeLabel(effectiveDateParams.from, effectiveDateParams.to, today);
     const [queryDraft, setQueryDraft] = useState(filters.query);
     const [datePopoverActive, setDatePopoverActive] = useState(false);
     const [draftDatePreset, setDraftDatePreset] = useState<DateRangePreset>(currentDatePreset);
@@ -608,9 +656,16 @@ export default function VisitorLogs() {
     };
 
     const resetDraftDateSelection = () => {
-        const nextDateRange = getDefaultDateRange(filters.from, filters.to, today);
+        const nextDateParams = getEffectiveLogDateParams(filters, today);
+        const nextDateRange = nextDateParams.isAllDates
+            ? getDefaultLogDateRange(today)
+            : getDefaultDateRange(nextDateParams.from, nextDateParams.to, today);
 
-        setDraftDatePreset(getMatchingDatePreset(filters.from, filters.to, today));
+        setDraftDatePreset(
+            nextDateParams.isAllDates
+                ? "all"
+                : getMatchingDatePreset(nextDateParams.from, nextDateParams.to, today)
+        );
         setDraftDateRange(nextDateRange);
         setDatePickerMonth(nextDateRange.start.getMonth());
         setDatePickerYear(nextDateRange.start.getFullYear());
@@ -666,8 +721,10 @@ export default function VisitorLogs() {
         if (draftDatePreset === "all") {
             nextParams.delete("from");
             nextParams.delete("to");
+            nextParams.set(DATE_SCOPE_PARAM, DATE_SCOPE_ALL);
         } else {
             const nextRange = normalizeDateRange(draftDateRange);
+            nextParams.delete(DATE_SCOPE_PARAM);
             nextParams.set("from", formatDateParam(nextRange.start));
             nextParams.set("to", formatDateParam(nextRange.end));
         }
@@ -678,7 +735,7 @@ export default function VisitorLogs() {
 
     const clearFilters = () => {
         const nextParams = new URLSearchParams(searchParams);
-        ["q", "action", "country", "from", "to", "page"].forEach((key) => nextParams.delete(key));
+        ["q", "action", "country", "from", "to", DATE_SCOPE_PARAM, "page"].forEach((key) => nextParams.delete(key));
         setSearchParams(nextParams);
     };
 
@@ -747,9 +804,15 @@ export default function VisitorLogs() {
     };
 
     const renderFilterControls = (filterOptions: VisitorLogFilterOptions) => {
+        const availableActions = filters.action && !filterOptions.actions.includes(filters.action)
+            ? [...filterOptions.actions, filters.action]
+            : filterOptions.actions;
+        const availableCountries = filters.country && !filterOptions.countries.includes(filters.country)
+            ? [...filterOptions.countries, filters.country].sort()
+            : filterOptions.countries;
         const actionOptions = [
             { label: "All actions", value: "all" },
-            ...filterOptions.actions.map((action) => ({
+            ...availableActions.map((action) => ({
                 label: formatActionLabel(action),
                 value: action,
             })),
@@ -757,7 +820,7 @@ export default function VisitorLogs() {
 
         const countryOptions = [
             { label: "All countries", value: "all" },
-            ...filterOptions.countries.map((countryCode) => ({
+            ...availableCountries.map((countryCode) => ({
                 label: countryCode,
                 value: countryCode,
             })),
