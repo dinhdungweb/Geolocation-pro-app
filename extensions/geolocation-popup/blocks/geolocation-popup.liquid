@@ -125,6 +125,7 @@
       if (type === 'visit') {
         visitKey = `geo_visit_tracked:${GEOLOCATION_CONFIG.shop}:${window.location.pathname}`;
         if (SessionManager.has(visitKey)) return;
+        if (!config.visitToken) return;
         SessionManager.set(visitKey, 'pending');
       }
 
@@ -135,7 +136,7 @@
         countryCode: getCountryCode(config),
         regionCode: typeof config.regionCode === 'string' ? config.regionCode : undefined,
         regionName: typeof config.regionName === 'string' ? config.regionName : undefined,
-        eventToken: config.eventToken || undefined,
+        eventToken: isVisit ? config.visitToken : (config.eventToken || undefined),
         ruleId: rule.ruleId || undefined,
         ruleName: rule.name || undefined,
         targetUrl: rule.targetUrl || undefined,

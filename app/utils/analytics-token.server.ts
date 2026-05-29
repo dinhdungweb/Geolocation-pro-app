@@ -113,6 +113,10 @@ export function analyticsEventAllowedForToken(
   eventType: string,
   payload: AnalyticsTokenPayload
 ) {
+  if (payload.action === "none") {
+    return payload.ruleId === "visit" && eventType === "visit";
+  }
+
   if (payload.action === "popup") {
     return ["popup_shown", "redirected", "clicked_no", "dismissed"].includes(eventType);
   }

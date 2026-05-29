@@ -450,6 +450,7 @@ function buildActionResponse({
   regionName,
   rule,
   usage,
+  visitToken,
 }: {
   action: StorefrontAction;
   analyticsEvent: string | null;
@@ -466,6 +467,7 @@ function buildActionResponse({
   regionName?: string;
   rule: ReturnType<typeof buildRulePayload> | null;
   usage: number;
+  visitToken?: string | null;
 }) {
   return {
     enabled: !limitExceeded && action !== "none",
@@ -484,6 +486,7 @@ function buildActionResponse({
     regionName,
     rule,
     usage,
+    visitToken,
   };
 }
 
@@ -639,6 +642,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const popup = buildPopup(settings);
     const appOrigin = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
     const blocked = buildBlocked(settings, appOrigin);
+    const visitAnalytics = createAnalyticsEvent({
+      shop,
+      yearMonth: usagePeriod.yearMonth,
+      billingPeriodKey: usagePeriod.key,
+      ruleId: "visit",
+      action: "none",
+      source: "country",
+      path: currentPath,
+      countryCode,
+      regionCode,
+      regionName,
+      ipHash,
+    });
+    const visitToken = visitAnalytics.token;
 
     if (!settings.isEnabled || settings.mode === "disabled") {
       return json(
@@ -657,6 +674,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           regionName,
           rule: null,
           usage: currentUsage,
+          visitToken,
         }),
         { headers: corsHeaders }
       );
@@ -680,6 +698,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           regionName,
           rule: null,
           usage: currentUsage,
+          visitToken,
         }),
         { headers: corsHeaders }
       );
@@ -702,6 +721,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           regionName,
           rule: null,
           usage: currentUsage,
+          visitToken,
         }),
         { headers: corsHeaders }
       );
@@ -730,6 +750,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           regionName,
           rule: null,
           usage: currentUsage,
+          visitToken,
         }),
         { headers: corsHeaders }
       );
@@ -881,6 +902,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           regionName,
           rule: null,
           usage: currentUsage,
+          visitToken,
         }),
         { headers: corsHeaders }
       );
@@ -948,6 +970,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         regionName,
         rule: rulePayload,
         usage: currentUsage,
+        visitToken,
       }),
       { headers: corsHeaders }
     );

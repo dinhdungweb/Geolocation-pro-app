@@ -104,34 +104,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const settings = await prisma.settings.findUnique({
       where: { shop },
-      select: { id: true },
+      select: { id: true, isEnabled: true, mode: true },
     });
     if (!settings) {
       return json({ error: "Unauthorized: Invalid shop" }, { status: 401, headers: corsHeaders });
     }
+    if (!settings.isEnabled || settings.mode === "disabled") {
+      return json({ success: true, logged: false, reason: "disabled" }, { headers: corsHeaders });
+    }
 
     let tokenPayload: AnalyticsTokenPayload | null = null;
-    if (type !== "visit") {
-      const token = asSafeString(data.eventToken, 4096);
-      tokenPayload = token ? verifyAnalyticsToken(token) : null;
+    const token = asSafeString(data.eventToken, 4096);
+    tokenPayload = token ? verifyAnalyticsToken(token) : null;
 
-      if (!tokenPayload) {
-        return json({ error: "Missing or invalid analytics token" }, { status: 401, headers: corsHeaders });
-      }
-      if (tokenPayload.shop !== shop || tokenPayload.ipHash !== hashIP(visitorIP)) {
-        return json({ error: "Analytics token does not match request" }, { status: 401, headers: corsHeaders });
-      }
-      if (!analyticsEventAllowedForToken(type, tokenPayload)) {
-        return json({ error: "Analytics event is not allowed for this token" }, { status: 400, headers: corsHeaders });
-      }
-      const bodyPath = asSafeString(data.path, 500);
-      const bodyRuleId = asSafeString(data.ruleId, 100);
-      if (bodyPath && bodyPath !== tokenPayload.path) {
-        return json({ error: "Analytics token path mismatch" }, { status: 401, headers: corsHeaders });
-      }
-      if (bodyRuleId && bodyRuleId !== tokenPayload.ruleId) {
-        return json({ error: "Analytics token rule mismatch" }, { status: 401, headers: corsHeaders });
-      }
+    if (!tokenPayload) {
+      return json({ error: "Missing or invalid analytics token" }, { status: 401, headers: corsHeaders });
+    }
+    if (tokenPayload.shop !== shop || tokenPayload.ipHash !== hashIP(visitorIP)) {
+      return json({ error: "Analytics token does not match request" }, { status: 401, headers: corsHeaders });
+    }
+    if (!analyticsEventAllowedForToken(type, tokenPayload)) {
+      return json({ error: "Analytics event is not allowed for this token" }, { status: 400, headers: corsHeaders });
+    }
+    const bodyPath = asSafeString(data.path, 500);
+    const bodyRuleId = asSafeString(data.ruleId, 100);
+    if (bodyPath && bodyPath !== tokenPayload.path) {
+      return json({ error: "Analytics token path mismatch" }, { status: 401, headers: corsHeaders });
+    }
+    if (bodyRuleId && bodyRuleId !== tokenPayload.ruleId) {
+      return json({ error: "Analytics token rule mismatch" }, { status: 401, headers: corsHeaders });
     }
 
     const hasRegionCodeField = Object.prototype.hasOwnProperty.call(data, "regionCode");
