@@ -240,7 +240,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
-            const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
+            const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
             const daysOfWeek = formData.get("daysOfWeek") as string;
             const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
@@ -504,7 +504,7 @@ export default function RulesPage() {
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
-    const [formRedirectMode, setFormRedirectMode] = useState("popup");
+    const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
     // Scheduling State
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [startTime, setStartTime] = useState("09:00");
@@ -600,7 +600,7 @@ export default function RulesPage() {
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("redirect");
-            setFormRedirectMode("popup");
+            setFormRedirectMode("auto_redirect");
             setScheduleEnabled(false);
             setStartTime("09:00");
             setEndTime("17:00");
@@ -1616,12 +1616,12 @@ export default function RulesPage() {
                                 <Select
                                     label="Redirect Method"
                                     options={[
-                                        { label: "Popup (Recommended)", value: "popup" },
                                         { label: "Auto Redirect", value: "auto_redirect" },
+                                        { label: "Popup", value: "popup" },
                                     ]}
                                     value={formRedirectMode}
                                     onChange={setFormRedirectMode}
-                                    helpText="Auto Redirect may affect SEO. Popup is safer for search engines."
+                                    helpText="Choose how matching visitors are redirected."
                                 />
                             </BlockStack>
                         )}

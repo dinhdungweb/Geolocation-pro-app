@@ -116,25 +116,22 @@
     return (config.countryCode || GEOLOCATION_CONFIG.visitorCountry || '').toUpperCase();
   };
 
-  const getCountryFlag = (countryCode) => {
+  const getCountryFlagUrl = (countryCode) => {
     const code = (countryCode || '').toUpperCase();
     if (!/^[A-Z]{2}$/.test(code)) return '';
 
-    return String.fromCodePoint(
-      code.charCodeAt(0) - 65 + 0x1F1E6,
-      code.charCodeAt(1) - 65 + 0x1F1E6
-    );
+    return `https://flagcdn.com/${code.toLowerCase()}.svg`;
   };
 
   const getCountryLabelHtml = (countryCode) => {
     const code = (countryCode || '').toUpperCase();
     if (!code) return 'your region';
 
-    const flag = getCountryFlag(code);
+    const flagUrl = getCountryFlagUrl(code);
     const escapedCode = escapeHtml(code);
-    if (!flag) return escapedCode;
+    if (!flagUrl) return escapedCode;
 
-    return `<span class="geo-country-label"><span class="geo-country-flag" aria-hidden="true">${flag}</span><span>${escapedCode}</span></span>`;
+    return `<span class="geo-country-label"><img class="geo-country-flag" src="${flagUrl}" alt="" loading="lazy" onerror="this.style.display='none'"><span>${escapedCode}</span></span>`;
   };
 
   const trackEvent = (type, config, extra = {}) => {
@@ -238,7 +235,7 @@
     const countryCode = getCountryCode(config);
     const message = escapeHtml(popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
       .replaceAll('{country}', getCountryLabelHtml(countryCode))
-      .replaceAll('{target}', escapeHtml(targetName || 'the recommended store'));
+      .replaceAll('{target}', escapeHtml(targetName || 'this store'));
     const confirmBtn = escapeHtml(popup.confirmBtn || 'Go now');
     const cancelBtn = escapeHtml(popup.cancelBtn || 'Stay here');
     const bgColor = safeColor(popup.bgColor, '#ffffff');
@@ -261,30 +258,37 @@
       contentStyle = 'display: flex !important; align-items: center !important; gap: 15px !important; flex: 1 !important;';
     } else {
       overlayStyle = `
-        position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.5) !important;
+        position: fixed !important; inset: 0 !important; background: rgba(17, 24, 39, 0.46) !important;
         z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-        animation: geo-fade-in 0.3s ease !important;
+        padding: 20px !important; animation: geo-fade-in 0.16s ease !important;
       `;
       contentStyle = `
-        background: ${bgColor} !important; color: ${textColor} !important;
-        padding: 24px !important; border-radius: 12px !important; max-width: 400px !important; width: 90% !important;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
-        text-align: center !important; animation: geo-slide-up 0.3s ease !important; position: relative !important;
+        --geo-popup-bg: ${bgColor}; --geo-popup-text: ${textColor}; --geo-popup-accent: ${btnColor};
       `;
     }
 
-    const buttonsHtml = `
-      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-        <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
-        <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
-      </div>
-    `;
+    const buttonsHtml = template === 'modal'
+      ? `
+        <div class="geo-popup-actions">
+          <button id="geo-confirm-btn" class="geo-popup-btn geo-popup-btn-primary">${confirmBtn}</button>
+          <button id="geo-cancel-btn" class="geo-popup-btn geo-popup-btn-secondary">${cancelBtn}</button>
+        </div>
+      `
+      : `
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
+          <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
+        </div>
+      `;
 
     const contentHtml = template === 'modal'
       ? `
-        <div id="geo-popup-modal" style="${contentStyle}">
-          <h3 style="margin: 0 0 12px; font-size: 18px; font-weight: 600;">${title}</h3>
-          <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: 0.9;">${message}</p>
+        <div id="geo-popup-modal" class="geo-popup-card" style="${contentStyle}" role="dialog" aria-modal="true" aria-labelledby="geo-popup-title">
+          <button id="geo-close-btn" class="geo-popup-close" type="button" aria-label="Close">&times;</button>
+          <div class="geo-popup-copy">
+            <h3 id="geo-popup-title" class="geo-popup-title">${title}</h3>
+            <p class="geo-popup-message">${message}</p>
+          </div>
           ${buttonsHtml}
         </div>
       `
@@ -302,10 +306,116 @@
       </div>
       <style>
         @keyframes geo-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes geo-scale-in { from { transform: scale(0.98); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes geo-slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes geo-slide-down { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .geo-country-label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; vertical-align: baseline; }
-        .geo-country-flag { display: inline-flex; align-items: center; font-size: 1.1em; line-height: 1; }
+        .geo-country-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 6px;
+          border: 1px solid #e3e5e8;
+          border-radius: 0;
+          background: #f7f8f9;
+          color: #202223;
+          font-size: 13px;
+          font-weight: 600;
+          line-height: 1.2;
+          white-space: nowrap;
+          vertical-align: 0;
+        }
+        .geo-country-flag { display: inline-block; width: 16px; height: 11px; object-fit: cover; border-radius: 0; box-shadow: none; }
+        .geo-popup-card,
+        .geo-popup-card * { box-sizing: border-box !important; }
+        .geo-popup-card {
+          width: min(390px, 100%) !important;
+          background: var(--geo-popup-bg) !important;
+          color: var(--geo-popup-text) !important;
+          border: 1px solid #e3e5e8 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          padding: 24px !important;
+          position: relative !important;
+          text-align: left !important;
+          animation: geo-scale-in 0.16s ease !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        }
+        .geo-popup-close {
+          position: absolute !important;
+          top: 12px !important;
+          right: 12px !important;
+          width: 28px !important;
+          height: 28px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+          color: var(--geo-popup-text) !important;
+          font-size: 21px !important;
+          line-height: 1 !important;
+          cursor: pointer !important;
+          opacity: 0.55 !important;
+        }
+        .geo-popup-close:hover { opacity: 0.9 !important; background: #f6f6f7 !important; }
+        .geo-popup-copy { padding-right: 28px !important; }
+        .geo-popup-title {
+          margin: 0 !important;
+          color: var(--geo-popup-text) !important;
+          font-size: 18px !important;
+          font-weight: 700 !important;
+          letter-spacing: 0 !important;
+          line-height: 1.3 !important;
+        }
+        .geo-popup-message {
+          margin: 12px 0 0 !important;
+          color: var(--geo-popup-text) !important;
+          font-size: 14px !important;
+          line-height: 1.5 !important;
+          opacity: 0.74 !important;
+        }
+        .geo-popup-actions {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          gap: 8px !important;
+          margin-top: 18px !important;
+          flex-wrap: wrap !important;
+        }
+        .geo-popup-btn {
+          min-height: 38px !important;
+          padding: 0 16px !important;
+          border-radius: 0 !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          line-height: 1 !important;
+          cursor: pointer !important;
+          font-family: inherit !important;
+          transition: background 0.14s ease, border-color 0.14s ease, opacity 0.14s ease !important;
+        }
+        .geo-popup-btn:hover { opacity: 0.9 !important; }
+        .geo-popup-btn-primary {
+          order: 1 !important;
+          background: var(--geo-popup-accent) !important;
+          color: #ffffff !important;
+          border: 1px solid var(--geo-popup-accent) !important;
+          box-shadow: none !important;
+        }
+        .geo-popup-btn-secondary {
+          order: 2 !important;
+          background: transparent !important;
+          color: var(--geo-popup-text) !important;
+          border: 1px solid #d7dade !important;
+        }
+        @media (max-width: 480px) {
+          .geo-popup-card { padding: 22px !important; border-radius: 0 !important; }
+          .geo-popup-copy { padding-right: 28px !important; }
+          .geo-popup-title { font-size: 18px !important; line-height: 1.3 !important; }
+          .geo-popup-message { font-size: 14px !important; line-height: 1.5 !important; }
+          .geo-popup-actions { flex-direction: column !important; align-items: stretch !important; }
+          .geo-popup-btn { width: 100% !important; }
+        }
       </style>
     `;
     container.style.display = 'block';
@@ -323,6 +433,11 @@
     });
 
     if (template === 'modal') {
+      document.getElementById('geo-close-btn').addEventListener('click', () => {
+        trackEvent('dismissed', config);
+        container.style.display = 'none';
+      });
+
       document.getElementById('geo-popup-overlay').addEventListener('click', (event) => {
         if (event.target.id === 'geo-popup-overlay') {
           trackEvent('dismissed', config);

@@ -152,7 +152,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
-            const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
+            const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = formData.get("pagePaths") as string || "";
 
@@ -320,7 +320,7 @@ export default function IPRulesPage() {
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("block");
-    const [formRedirectMode, setFormRedirectMode] = useState("popup");
+    const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
     const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
     const [pagePaths, setPagePaths] = useState("");
 
@@ -350,6 +350,7 @@ export default function IPRulesPage() {
             setFormTargetUrl(editingRule.targetUrl);
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "block");
+            setFormRedirectMode(editingRule.redirectMode || "auto_redirect");
             setPageTargetingType([editingRule.pageTargetingType || "all"]);
             setPagePaths(editingRule.pagePaths || "");
         } else {
@@ -358,7 +359,7 @@ export default function IPRulesPage() {
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("block");
-            setFormRedirectMode("popup");
+            setFormRedirectMode("auto_redirect");
             setPageTargetingType(["all"]);
             setPagePaths("");
         }
@@ -802,12 +803,12 @@ export default function IPRulesPage() {
                                 <Select
                                     label="Redirect Method"
                                     options={[
-                                        { label: "Popup (Recommended)", value: "popup" },
                                         { label: "Auto Redirect", value: "auto_redirect" },
+                                        { label: "Popup", value: "popup" },
                                     ]}
                                     value={formRedirectMode}
                                     onChange={setFormRedirectMode}
-                                    helpText="Auto Redirect may affect SEO. Popup is safer for search engines."
+                                    helpText="Choose how matching visitors are redirected."
                                 />
                             </BlockStack>
                         )}
