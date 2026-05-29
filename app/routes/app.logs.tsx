@@ -1119,13 +1119,14 @@ export default function VisitorLogs() {
                     }
                     .visitor-log-header {
                         display: flex;
-                        align-items: flex-start;
+                        align-items: flex-end;
                         justify-content: space-between;
                         gap: 20px;
                     }
                     .visitor-log-header-copy {
                         flex: 1 1 260px;
                         min-width: 220px;
+                        max-width: 520px;
                     }
                     .visitor-log-header .visitor-log-filter-area {
                         flex: 0 1 auto;
@@ -1434,6 +1435,7 @@ export default function VisitorLogs() {
                             padding-bottom: 88px;
                         }
                         .visitor-log-header {
+                            align-items: stretch;
                             flex-direction: column;
                             gap: 12px;
                         }
