@@ -925,6 +925,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           })
         : null;
     const eventToken = analytics?.token || null;
+    const responseEventToken = eventToken || visitToken;
 
     if (selectedRule && source && analyticsEvent && analytics?.payload) {
       void recordBillableUsage({
@@ -963,7 +964,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         currentPath,
         currentPlan,
         debug,
-        eventToken,
+        eventToken: responseEventToken,
         planLimit,
         popup,
         regionCode,

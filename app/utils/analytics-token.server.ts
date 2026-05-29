@@ -113,6 +113,10 @@ export function analyticsEventAllowedForToken(
   eventType: string,
   payload: AnalyticsTokenPayload
 ) {
+  if (eventType === "visit") {
+    return true;
+  }
+
   if (payload.action === "none") {
     return payload.ruleId === "visit" && eventType === "visit";
   }
