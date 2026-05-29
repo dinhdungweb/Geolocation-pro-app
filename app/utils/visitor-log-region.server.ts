@@ -7,7 +7,15 @@ type VisitorLogRegionInput = {
   regionName?: string | null;
 };
 
-export async function resolveVisitorLogRegionName(log: VisitorLogRegionInput) {
+type VisitorLogRegionOptions = {
+  useGeoLookupFallback?: boolean;
+};
+
+export async function resolveVisitorLogRegionName(
+  log: VisitorLogRegionInput,
+  options: VisitorLogRegionOptions = {},
+) {
+  const { useGeoLookupFallback = true } = options;
   const storedRegionName = log.regionName?.trim();
   if (storedRegionName) return storedRegionName;
 
@@ -17,7 +25,7 @@ export async function resolveVisitorLogRegionName(log: VisitorLogRegionInput) {
   const mappedName = getStateName(regionCode);
   if (mappedName !== regionCode) return mappedName;
 
-  if (!log.ipAddress) return regionCode;
+  if (!useGeoLookupFallback || !log.ipAddress) return regionCode;
 
   const geo = await getGeoFromIP(log.ipAddress);
   if (

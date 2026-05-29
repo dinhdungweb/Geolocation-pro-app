@@ -71,6 +71,80 @@ function sortUsageRows(rows: any[], currentBillingPeriodKey: string | null | und
 
 const BILLING_OVERRIDE_PLAN_OPTIONS = [PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMITED_PLAN, CUSTOM_PLAN];
 
+function formatMajorVersion(label: string, version?: string) {
+    const majorVersion = version?.split(".")[0];
+    return majorVersion ? `${label} ${majorVersion}` : label;
+}
+
+function parseVisitorUserAgent(userAgentValue?: string | null) {
+    const userAgent = userAgentValue || "";
+
+    if (!userAgent) {
+        return {
+            browser: "Unknown",
+            device: "Unknown",
+            os: "Unknown",
+            visitorType: "Unknown",
+        };
+    }
+
+    const isBot =
+        /\b(bot|crawler|spider|crawling|googlebot|bingbot|duckduckbot|baiduspider|yandexbot|slurp|facebookexternalhit|telegrambot|curl|wget|python-requests)\b/i.test(userAgent);
+
+    const os =
+        userAgent.match(/(?:iPhone|iPad|iPod).*OS\s([\d_]+)/)
+            ? `iOS ${userAgent.match(/(?:iPhone|iPad|iPod).*OS\s([\d_]+)/)?.[1].replace(/_/g, ".")}`
+            : userAgent.match(/Android\s([\d.]+)/)
+                ? `Android ${userAgent.match(/Android\s([\d.]+)/)?.[1]}`
+                : userAgent.match(/Mac OS X\s([\d_]+)/)
+                    ? `macOS ${userAgent.match(/Mac OS X\s([\d_]+)/)?.[1].replace(/_/g, ".")}`
+                    : /CrOS/i.test(userAgent)
+                        ? "ChromeOS"
+                        : /Windows NT 10\.0/i.test(userAgent)
+                            ? "Windows 10/11"
+                            : /Windows NT 6\.3/i.test(userAgent)
+                                ? "Windows 8.1"
+                                : /Windows NT 6\.2/i.test(userAgent)
+                                    ? "Windows 8"
+                                    : /Windows NT 6\.1/i.test(userAgent)
+                                        ? "Windows 7"
+                                        : /Windows/i.test(userAgent)
+                                            ? "Windows"
+                                            : /Linux/i.test(userAgent)
+                                                ? "Linux"
+                                                : "Unknown";
+
+    const browser =
+        userAgent.match(/EdgA?\/([\d.]+)/)
+            ? formatMajorVersion("Edge", userAgent.match(/EdgA?\/([\d.]+)/)?.[1])
+            : userAgent.match(/OPR\/([\d.]+)/)
+                ? formatMajorVersion("Opera", userAgent.match(/OPR\/([\d.]+)/)?.[1])
+                : userAgent.match(/SamsungBrowser\/([\d.]+)/)
+                    ? formatMajorVersion("Samsung Internet", userAgent.match(/SamsungBrowser\/([\d.]+)/)?.[1])
+                    : userAgent.match(/(?:Chrome|CriOS)\/([\d.]+)/)
+                        ? formatMajorVersion("Chrome", userAgent.match(/(?:Chrome|CriOS)\/([\d.]+)/)?.[1])
+                        : userAgent.match(/(?:Firefox|FxiOS)\/([\d.]+)/)
+                            ? formatMajorVersion("Firefox", userAgent.match(/(?:Firefox|FxiOS)\/([\d.]+)/)?.[1])
+                            : userAgent.match(/Version\/([\d.]+).*Safari\//)
+                                ? formatMajorVersion("Safari", userAgent.match(/Version\/([\d.]+).*Safari\//)?.[1])
+                                : /Trident|MSIE/i.test(userAgent)
+                                    ? "Internet Explorer"
+                                    : "Unknown";
+
+    const device =
+        isBot
+            ? "Bot"
+            : /iPad|Tablet|PlayBook|Silk/i.test(userAgent) || (/Android/i.test(userAgent) && !/Mobile/i.test(userAgent))
+                ? "Tablet"
+                : /Mobi|iPhone|iPod|Android|IEMobile|Windows Phone/i.test(userAgent)
+                    ? "Mobile"
+                    : /Windows NT|Macintosh|X11|Linux/i.test(userAgent)
+                        ? "Desktop"
+                        : "Unknown";
+
+    return { browser, device, os, visitorType: isBot ? "Bot" : "User" };
+}
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     await requireAdminAuth(request);
     const shop = decodeURIComponent(params.shop ?? "");
@@ -845,6 +919,38 @@ export default function AdminShopDetail() {
                 }
                 td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
                 .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block; }
+                .ed-shop-logs-table-card table {
+                    min-width: 1120px;
+                }
+                .admin-log-user-agent-detail {
+                    max-width: 120px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    color: #64748b;
+                    font-size: 11px;
+                    line-height: 1.4;
+                }
+                .admin-log-visitor-badge {
+                    padding: 5px 10px;
+                    border-radius: 8px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    display: inline-block;
+                    white-space: nowrap;
+                }
+                .admin-log-visitor-badge-user {
+                    background: #ecfdf5;
+                    color: #059669;
+                }
+                .admin-log-visitor-badge-bot {
+                    background: #fff7ed;
+                    color: #c2410c;
+                }
+                .admin-log-visitor-badge-unknown {
+                    background: #f1f5f9;
+                    color: #64748b;
+                }
 
                 /* attempts table custom alignment */
                 .ed-shop-attempts-table-card th:nth-child(3),
@@ -1521,7 +1627,7 @@ export default function AdminShopDetail() {
                 </div>
             </div>
 
-            <div className="ed-shop-card ed-shop-table-card">
+            <div className="ed-shop-card ed-shop-table-card ed-shop-logs-table-card">
                 <div className="ed-shop-card-head">
                     <Globe size={18} color="#82b440" />
                     Live Interaction Logs
@@ -1534,40 +1640,72 @@ export default function AdminShopDetail() {
                                 <th>Visitor IP</th>
                                 <th>Region</th>
                                 <th>Page Path</th>
-                                <th>User Agent</th>
+                                <th>Visitor</th>
+                                <th>Device</th>
+                                <th>OS</th>
+                                <th>Browser</th>
                                 <th>Action</th>
                                 <th>Rule</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {paginatedLogs.map((l: any) => (
-                                <tr key={l.id}>
-                                    <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(l.timestamp)}</td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            {l.countryCode && <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />}
-                                            <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span title={l.regionCode || ''} style={{ color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
-                                            {l.regionName || '-'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontSize: '11px', color: '#64748b', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.path || '/'}>
-                                            {l.path || '/'}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontSize: '11px', color: '#64748b', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.userAgent || 'Unknown'}>
-                                            {l.userAgent || '-'}
-                                        </div>
-                                    </td>
-                                    <td><span className="badge-v3" style={{ background: `${actionColor(l.action)}15`, color: actionColor(l.action) }}>{l.action.toUpperCase()}</span></td>
-                                    <td style={{ color: 'var(--text-muted)' }}>{l.ruleName || '-'}</td>
-                                </tr>
-                            ))}
+                            {paginatedLogs.map((l: any) => {
+                                const userAgentDetails = parseVisitorUserAgent(l.userAgent);
+                                const userAgentTitle = l.userAgent || "Unknown";
+                                const visitorBadgeClass =
+                                    userAgentDetails.visitorType === "Bot"
+                                        ? "admin-log-visitor-badge-bot"
+                                        : userAgentDetails.visitorType === "User"
+                                            ? "admin-log-visitor-badge-user"
+                                            : "admin-log-visitor-badge-unknown";
+
+                                return (
+                                    <tr key={l.id}>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(l.timestamp)}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {l.countryCode && <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />}
+                                                <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span title={l.regionCode || ''} style={{ color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
+                                                {l.regionName || '-'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ fontSize: '11px', color: '#64748b', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.path || '/'}>
+                                                {l.path || '/'}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span
+                                                className={`admin-log-visitor-badge ${visitorBadgeClass}`}
+                                                title={userAgentTitle}
+                                            >
+                                                {userAgentDetails.visitorType}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div className="admin-log-user-agent-detail" title={userAgentTitle}>
+                                                {userAgentDetails.device}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="admin-log-user-agent-detail" title={userAgentTitle}>
+                                                {userAgentDetails.os}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="admin-log-user-agent-detail" title={userAgentTitle}>
+                                                {userAgentDetails.browser}
+                                            </div>
+                                        </td>
+                                        <td><span className="badge-v3" style={{ background: `${actionColor(l.action)}15`, color: actionColor(l.action) }}>{l.action.toUpperCase()}</span></td>
+                                        <td style={{ color: 'var(--text-muted)' }}>{l.ruleName || '-'}</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

@@ -1,7 +1,7 @@
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Page,
     Layout,
@@ -305,6 +305,55 @@ function parseVisitorUserAgent(userAgentValue?: string | null) {
     return { browser, device, os, visitorType: isBot ? "Bot" : "User" };
 }
 
+type VisitorLogFilterOptions = {
+    actions: string[];
+    countries: string[];
+};
+
+const filterOptionsCache = new Map<string, { expiresAt: number; value: VisitorLogFilterOptions }>();
+const FILTER_OPTIONS_CACHE_TTL_MS = 60_000;
+
+async function getVisitorLogFilterOptions(shop: string): Promise<VisitorLogFilterOptions> {
+    const now = Date.now();
+    const cached = filterOptionsCache.get(shop);
+
+    if (cached && cached.expiresAt > now) {
+        return cached.value;
+    }
+
+    const [actionRows, countryRows] = await Promise.all([
+        prisma.visitorLog.findMany({
+            where: { shop },
+            distinct: ["action"],
+            select: { action: true },
+            orderBy: { action: "asc" },
+        }),
+        prisma.visitorLog.findMany({
+            where: {
+                shop,
+                countryCode: { not: null },
+            },
+            distinct: ["countryCode"],
+            select: { countryCode: true },
+            orderBy: { countryCode: "asc" },
+        }),
+    ]);
+
+    const value = {
+        actions: actionRows.map((row) => row.action).filter(Boolean),
+        countries: countryRows
+            .map((row) => row.countryCode)
+            .filter((countryCode): countryCode is string => Boolean(countryCode)),
+    };
+
+    filterOptionsCache.set(shop, {
+        expiresAt: now + FILTER_OPTIONS_CACHE_TTL_MS,
+        value,
+    });
+
+    return value;
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
     const url = new URL(request.url);
@@ -352,68 +401,65 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         };
     }
 
-    let [logs, dbCount, actionRows, countryRows] = await Promise.all([
-        prisma.visitorLog.findMany({
+    const remainingLogSlots = Math.max(0, maxLogs - skip);
+    const logTake = remainingLogSlots > 0 ? Math.min(limit + 1, remainingLogSlots + 1) : 0;
+    const logsPromise = logTake > 0
+        ? prisma.visitorLog.findMany({
             where,
             orderBy: { timestamp: "desc" },
             skip,
-            take: limit,
-        }),
-        prisma.visitorLog.count({
-            where,
-        }),
-        prisma.visitorLog.findMany({
-            where: { shop: session.shop },
-            distinct: ["action"],
-            select: { action: true },
-            orderBy: { action: "asc" },
-        }),
-        prisma.visitorLog.findMany({
-            where: {
-                shop: session.shop,
-                countryCode: { not: null },
+            take: logTake,
+            select: {
+                id: true,
+                shop: true,
+                ipAddress: true,
+                countryCode: true,
+                regionCode: true,
+                regionName: true,
+                action: true,
+                ruleName: true,
+                userAgent: true,
+                timestamp: true,
+                path: true,
             },
-            distinct: ["countryCode"],
-            select: { countryCode: true },
-            orderBy: { countryCode: "asc" },
-        }),
+        })
+        : Promise.resolve([]);
+
+    const [logRows, filterOptions] = await Promise.all([
+        logsPromise,
+        getVisitorLogFilterOptions(session.shop),
     ]);
 
-    const totalLogs = Math.min(dbCount, maxLogs);
-
-    // Enforce the hard limit of 250 items displayed
-    if (skip + logs.length > maxLogs) {
-        logs = logs.slice(0, Math.max(0, maxLogs - skip));
-    }
+    const hasNextPage = logRows.length > limit && skip + limit < maxLogs;
+    const logs = logRows.slice(0, limit);
+    const totalLogs = Math.min(skip + logs.length + (hasNextPage ? 1 : 0), maxLogs);
+    const totalPages = Math.max(1, page + (hasNextPage ? 1 : 0));
 
     const logsWithRegionNames = await Promise.all(logs.map(async (log) => ({
         ...log,
-        regionName: await resolveVisitorLogRegionName(log),
+        regionName: await resolveVisitorLogRegionName(log, { useGeoLookupFallback: false }),
     })));
 
     return json({
         logs: logsWithRegionNames,
         page,
-        totalPages: Math.ceil(totalLogs / limit),
+        totalPages,
         totalLogs,
         filters: { query, action, country, from, to },
-        filterOptions: {
-            actions: actionRows.map((row) => row.action).filter(Boolean),
-            countries: countryRows
-                .map((row) => row.countryCode)
-                .filter((countryCode): countryCode is string => Boolean(countryCode)),
-        },
+        filterOptions,
     });
 };
 
 export default function VisitorLogs() {
     const { logs, page, totalPages, filters, filterOptions } = useLoaderData<typeof loader>();
     const [searchParams, setSearchParams] = useSearchParams();
+    const searchParamsString = searchParams.toString();
     const today = startOfDay(new Date());
     const currentDateRange = getDefaultDateRange(filters.from, filters.to, today);
     const currentDatePreset = getMatchingDatePreset(filters.from, filters.to, today);
     const hasFilters = Boolean(filters.query || filters.action || filters.country || filters.from || filters.to);
     const dateRangeLabel = formatDateRangeLabel(filters.from, filters.to, today);
+    const [queryDraft, setQueryDraft] = useState(filters.query);
     const [datePopoverActive, setDatePopoverActive] = useState(false);
     const [draftDatePreset, setDraftDatePreset] = useState<DateRangePreset>(currentDatePreset);
     const [draftDateRange, setDraftDateRange] = useState<DateRangeValue>(currentDateRange);
@@ -424,6 +470,29 @@ export default function VisitorLogs() {
             <Icon source={CalendarIcon} tone="subdued" />
         </span>
     );
+
+    useEffect(() => {
+        setQueryDraft(filters.query);
+    }, [filters.query]);
+
+    useEffect(() => {
+        if (queryDraft === filters.query) return;
+
+        const handle = window.setTimeout(() => {
+            const nextParams = new URLSearchParams(searchParamsString);
+            nextParams.delete("page");
+
+            if (queryDraft) {
+                nextParams.set("q", queryDraft);
+            } else {
+                nextParams.delete("q");
+            }
+
+            setSearchParams(nextParams);
+        }, 350);
+
+        return () => window.clearTimeout(handle);
+    }, [filters.query, queryDraft, searchParamsString, setSearchParams]);
 
     const updateSearchParam = (key: string, value: string) => {
         const nextParams = new URLSearchParams(searchParams);
@@ -967,9 +1036,9 @@ export default function VisitorLogs() {
                                                 placeholder="Search IP, rule, path..."
                                                 size="slim"
                                                 type="search"
-                                                value={filters.query}
-                                                onChange={(value) => updateSearchParam("q", value)}
-                                                onClearButtonClick={() => updateSearchParam("q", "")}
+                                                value={queryDraft}
+                                                onChange={setQueryDraft}
+                                                onClearButtonClick={() => setQueryDraft("")}
                                             />
                                         </div>
                                         <Popover

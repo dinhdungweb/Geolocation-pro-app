@@ -247,6 +247,8 @@ model VisitorLog {
   path        String?
 
   @@index([shop, timestamp])
+  @@index([shop, action, timestamp])
+  @@index([shop, countryCode, timestamp])
 }
 
 model AdminEmailLog {
