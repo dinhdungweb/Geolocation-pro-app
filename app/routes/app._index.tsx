@@ -285,17 +285,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [
     rulesCount,
     activeRulesCount,
-    visitorLogCount,
+    latestVisitorLog,
     settings,
     billingConfig,
     countryStats,
+    blockStats,
     ruleStats,
     shopIdentity,
     appEmbedStatus,
   ] = await Promise.all([
     prisma.redirectRule.count({ where: { shop } }),
     prisma.redirectRule.count({ where: { shop, isActive: true } }),
-    prisma.visitorLog.count({ where: { shop } }),
+    prisma.visitorLog.findFirst({
+      where: { shop },
+      orderBy: { timestamp: "desc" },
+      select: { id: true },
+    }),
     prisma.settings.upsert({
       where: { shop },
       update: {},
@@ -316,7 +321,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         popupShown: true,
         redirected: true,
         blocked: true,
-      }
+      },
+      orderBy: {
+        _sum: {
+          visitors: "desc",
+        },
+      },
+    }),
+    prisma.analyticsCountry.groupBy({
+      by: ['countryCode'],
+      where: {
+        shop,
+        date: { gte: thirtyDaysAgo },
+        blocked: { gt: 0 },
+      },
+      _sum: {
+        blocked: true,
+      },
+      orderBy: {
+        _sum: {
+          blocked: "desc",
+        },
+      },
     }),
     prisma.analyticsRule.groupBy({
       by: ['ruleName', 'ruleId'],
@@ -390,7 +416,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("[Settings] Failed to sync currentPlan:", error);
   });
 
-  // Aggregate total redirected and blocked for banner
+  const hasVisitorLogs = Boolean(latestVisitorLog);
+  const totalCountries = Array.isArray(countryStats) ? countryStats.length : 0;
   const totalRedirected = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.redirected || 0), 0) : 0;
   const totalBlocked = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.blocked || 0), 0) : 0;
 
@@ -403,11 +430,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     popup: stat._sum.popupShown || 0,
     redirected: (stat._sum.redirected || 0).toLocaleString(),
     blocked: stat._sum.blocked || 0,
-  })).sort((a: VisitsDataItem, b: VisitsDataItem) => {
-    const valA = parseInt(a.visitors.replace(/,/g, ''));
-    const valB = parseInt(b.visitors.replace(/,/g, ''));
-    return valB - valA;
-  }) : [];
+  })) : [];
 
   // Process Popups Data (for Banners and Popups table)
   const popupsData = Array.isArray(ruleStats) ? ruleStats.map((stat: any) => ({
@@ -427,11 +450,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   })).filter((item: any) => item.autoRedirected > 0) : [];
 
   // Process Blocks Data
-  const blocksData = Array.isArray(countryStats) ? countryStats.map((stat: any) => ({
+  const blocksData = Array.isArray(blockStats) ? blockStats.map((stat: any) => ({
     id: stat.countryCode,
     block: COUNTRY_MAP[stat.countryCode] || stat.countryCode,
     blocked: stat._sum.blocked || 0
-  })).filter((item: any) => item.blocked > 0) : [];
+  })) : [];
 
   return json({
     shop,
@@ -450,11 +473,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     stats: {
       totalRules: rulesCount,
       activeRules: activeRulesCount,
-      visitorLogs: visitorLogCount,
+      hasVisitorLogs,
+      visitorLogs: hasVisitorLogs ? 1 : 0,
       mode: settings?.mode || "disabled",
       totalRedirected: totalRedirected.toLocaleString(),
       totalBlocked: totalBlocked.toLocaleString(),
     },
+    totalCountries,
     shopIdentity,
     appEmbedStatus,
     visitsData,
@@ -467,7 +492,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 export default function Index() {
-  const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData } = useLoaderData<typeof loader>();
+  const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData, totalCountries } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
@@ -618,9 +643,9 @@ export default function Index() {
     {
       id: "logs",
       title: "Check visitor logs",
-      completed: stats.visitorLogs > 0,
-      status: stats.visitorLogs > 0 ? `${stats.visitorLogs} found` : "No logs yet",
-      statusTone: stats.visitorLogs > 0 ? "success" : "attention",
+      completed: stats.hasVisitorLogs,
+      status: stats.hasVisitorLogs ? "Available" : "No logs yet",
+      statusTone: stats.hasVisitorLogs ? "success" : "attention",
     },
     {
       id: "confirm",
@@ -1137,7 +1162,7 @@ export default function Index() {
                       <Text as="h3" variant="headingMd">Traffic Overview</Text>
                       <Text as="p" variant="bodySm" tone="subdued">Visits and actions by country in the last 30 days.</Text>
                     </BlockStack>
-                    <Badge>{`${visitsData.length} countries`}</Badge>
+                    <Badge>{`${totalCountries} countries`}</Badge>
                   </div>
                   <div className="dashboard-table-scroll">
                     <table className="dashboard-table">
