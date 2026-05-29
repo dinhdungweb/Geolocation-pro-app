@@ -254,6 +254,25 @@ model VisitorLog {
   @@index([timestamp])
 }
 
+model StorefrontAnalyticsEventQueue {
+  id            String   @id @default(uuid())
+  shop          String
+  type          String
+  payload       Json
+  status        String   @default("pending")
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  lockedAt      DateTime?
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, lockedAt])
+  @@index([shop, createdAt])
+  @@index([createdAt])
+}
+
 model AdminEmailLog {
   id        String   @id @default(uuid())
   shop      String

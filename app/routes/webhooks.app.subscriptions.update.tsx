@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { fetchShopifyUsagePeriod, syncUsagePeriodForShop } from "../utils/billing-period.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { payload, topic, shop } = await authenticate.webhook(request);
@@ -61,6 +62,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         }
 
+        invalidateStorefrontConfigCache(shop);
         console.log(`[Subscription Update] Successfully synced plan for ${shop}`);
     } catch (error) {
         console.error(`[Subscription Update] Failed to sync plan for ${shop}:`, error);

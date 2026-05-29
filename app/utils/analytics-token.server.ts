@@ -19,7 +19,11 @@ export interface AnalyticsTokenPayload {
   eventKey: string;
 }
 
-const TOKEN_TTL_MS = 10 * 60 * 1000;
+const TOKEN_TTL_MS = Number.parseInt(process.env.ANALYTICS_TOKEN_TTL_MS || `${30 * 60 * 1000}`, 10);
+
+function tokenTtlMs() {
+  return Number.isFinite(TOKEN_TTL_MS) && TOKEN_TTL_MS > 0 ? TOKEN_TTL_MS : 30 * 60 * 1000;
+}
 
 function getSecret() {
   const secret = process.env.SHOPIFY_API_SECRET;
@@ -99,7 +103,7 @@ export function verifyAnalyticsToken(token: string): AnalyticsTokenPayload | nul
 
   try {
     const payload = JSON.parse(base64UrlDecode(encodedPayload)) as AnalyticsTokenPayload;
-    if (!payload.iat || Date.now() - payload.iat > TOKEN_TTL_MS) return null;
+    if (!payload.iat || Date.now() - payload.iat > tokenTtlMs()) return null;
     if (!payload.shop || !payload.yearMonth || !payload.eventKey || !payload.ipHash) {
       return null;
     }

@@ -13,6 +13,7 @@ import { getVisitorIP } from "../utils/request-ip.server";
 import {
   enqueueStorefrontAnalyticsEvent,
   recordStorefrontAnalyticsEvent,
+  startStorefrontAnalyticsQueueWorker,
 } from "../utils/storefront-analytics.server";
 
 const MAX_BODY_BYTES = 8 * 1024;
@@ -73,6 +74,8 @@ async function readJsonBody(request: Request) {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  startStorefrontAnalyticsQueueWorker();
+
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -171,7 +174,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
 
     if (type === "visit") {
-      const queued = enqueueStorefrontAnalyticsEvent(analyticsInput);
+      const queued = await enqueueStorefrontAnalyticsEvent(analyticsInput);
       return json({ success: true, queued }, { headers: corsHeaders });
     }
 

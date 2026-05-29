@@ -23,10 +23,12 @@ export type RecordStorefrontAnalyticsEventInput = {
   userAgent?: string | null;
 };
 
-const ANALYTICS_QUEUE_MAX_SIZE = Number.parseInt(process.env.ANALYTICS_QUEUE_MAX_SIZE || "5000", 10);
-const ANALYTICS_QUEUE_CONCURRENCY = Number.parseInt(process.env.ANALYTICS_QUEUE_CONCURRENCY || "4", 10);
-const analyticsQueue: RecordStorefrontAnalyticsEventInput[] = [];
-let analyticsQueueActive = 0;
+const ANALYTICS_QUEUE_BATCH_SIZE = Number.parseInt(process.env.ANALYTICS_QUEUE_BATCH_SIZE || "100", 10);
+const ANALYTICS_QUEUE_INTERVAL_MS = Number.parseInt(process.env.ANALYTICS_QUEUE_INTERVAL_MS || "2500", 10);
+const ANALYTICS_QUEUE_MAX_ATTEMPTS = Number.parseInt(process.env.ANALYTICS_QUEUE_MAX_ATTEMPTS || "5", 10);
+const ANALYTICS_QUEUE_STALE_LOCK_MS = Number.parseInt(process.env.ANALYTICS_QUEUE_STALE_LOCK_MS || "120000", 10);
+let analyticsQueueWorkerStarted = false;
+let analyticsQueuePumpActive = false;
 
 function getInputIP(input: RecordStorefrontAnalyticsEventInput) {
   if (input.ipAddress) return input.ipAddress;
@@ -47,40 +49,184 @@ function snapshotAnalyticsInput(input: RecordStorefrontAnalyticsEventInput): Rec
   };
 }
 
-function pumpAnalyticsQueue() {
-  const concurrency =
-    Number.isFinite(ANALYTICS_QUEUE_CONCURRENCY) && ANALYTICS_QUEUE_CONCURRENCY > 0
-      ? ANALYTICS_QUEUE_CONCURRENCY
-      : 4;
+function toJsonPayload(input: RecordStorefrontAnalyticsEventInput) {
+  return JSON.parse(JSON.stringify(snapshotAnalyticsInput(input))) as Prisma.InputJsonObject;
+}
 
-  while (analyticsQueueActive < concurrency && analyticsQueue.length > 0) {
-    const input = analyticsQueue.shift()!;
-    analyticsQueueActive++;
+function fromJsonPayload(value: Prisma.JsonValue): RecordStorefrontAnalyticsEventInput | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, unknown>;
+  if (typeof payload.shop !== "string" || typeof payload.type !== "string") return null;
 
-    recordStorefrontAnalyticsEvent(input)
-      .catch((error) => {
-        console.error("[Analytics Queue] Failed to process analytics event:", error);
-      })
-      .finally(() => {
-        analyticsQueueActive--;
-        pumpAnalyticsQueue();
-      });
+  return {
+    countryCode: typeof payload.countryCode === "string" ? payload.countryCode : null,
+    ipAddress: typeof payload.ipAddress === "string" ? payload.ipAddress : null,
+    path: typeof payload.path === "string" ? payload.path : null,
+    regionCode: typeof payload.regionCode === "string" ? payload.regionCode : null,
+    regionName: typeof payload.regionName === "string" ? payload.regionName : null,
+    ruleId: typeof payload.ruleId === "string" ? payload.ruleId : null,
+    ruleName: typeof payload.ruleName === "string" ? payload.ruleName : null,
+    shop: payload.shop,
+    targetUrl: typeof payload.targetUrl === "string" ? payload.targetUrl : null,
+    tokenPayload:
+      payload.tokenPayload && typeof payload.tokenPayload === "object" && !Array.isArray(payload.tokenPayload)
+        ? (payload.tokenPayload as unknown as AnalyticsTokenPayload)
+        : null,
+    type: payload.type,
+    userAgent: typeof payload.userAgent === "string" ? payload.userAgent : null,
+  };
+}
+
+function queueBatchSize() {
+  return Number.isFinite(ANALYTICS_QUEUE_BATCH_SIZE) && ANALYTICS_QUEUE_BATCH_SIZE > 0
+    ? Math.min(ANALYTICS_QUEUE_BATCH_SIZE, 500)
+    : 100;
+}
+
+function queueMaxAttempts() {
+  return Number.isFinite(ANALYTICS_QUEUE_MAX_ATTEMPTS) && ANALYTICS_QUEUE_MAX_ATTEMPTS > 0
+    ? ANALYTICS_QUEUE_MAX_ATTEMPTS
+    : 5;
+}
+
+function queueStaleLockMs() {
+  return Number.isFinite(ANALYTICS_QUEUE_STALE_LOCK_MS) && ANALYTICS_QUEUE_STALE_LOCK_MS > 0
+    ? ANALYTICS_QUEUE_STALE_LOCK_MS
+    : 120_000;
+}
+
+function queueNextAttemptAt(attempts: number) {
+  const backoffMs = Math.min(5 * 60 * 1000, 5_000 * Math.max(1, attempts));
+  return new Date(Date.now() + backoffMs);
+}
+
+type QueuedAnalyticsRow = {
+  id: string;
+  attempts: number;
+  payload: Prisma.JsonValue;
+};
+
+export async function enqueueStorefrontAnalyticsEvent(input: RecordStorefrontAnalyticsEventInput) {
+  const payload = toJsonPayload(input);
+
+  await prisma.storefrontAnalyticsEventQueue.create({
+    data: {
+      shop: input.shop,
+      type: input.type,
+      payload,
+    },
+  });
+
+  queueMicrotask(() => {
+    void processQueuedStorefrontAnalyticsEvents();
+  });
+
+  return true;
+}
+
+export async function processQueuedStorefrontAnalyticsEvents() {
+  if (analyticsQueuePumpActive) return { processed: 0, skipped: true };
+  analyticsQueuePumpActive = true;
+
+  try {
+    const staleBefore = new Date(Date.now() - queueStaleLockMs());
+    const now = new Date();
+    const rows = await prisma.$transaction(async (tx) => {
+      const selected = await tx.$queryRaw<QueuedAnalyticsRow[]>`
+        SELECT "id", "attempts", "payload"
+        FROM "StorefrontAnalyticsEventQueue"
+        WHERE (
+          "status" = 'pending'
+          AND "nextAttemptAt" <= ${now}
+        ) OR (
+          "status" = 'processing'
+          AND "lockedAt" < ${staleBefore}
+        )
+        ORDER BY "createdAt" ASC
+        LIMIT ${queueBatchSize()}
+        FOR UPDATE SKIP LOCKED
+      `;
+
+      if (selected.length > 0) {
+        await tx.storefrontAnalyticsEventQueue.updateMany({
+          where: { id: { in: selected.map((row) => row.id) } },
+          data: {
+            lockedAt: now,
+            status: "processing",
+          },
+        });
+      }
+
+      return selected;
+    });
+
+    let processed = 0;
+
+    for (const row of rows) {
+      const input = fromJsonPayload(row.payload);
+      if (!input) {
+        await prisma.storefrontAnalyticsEventQueue.update({
+          where: { id: row.id },
+          data: {
+            attempts: { increment: 1 },
+            lastError: "Invalid analytics payload",
+            lockedAt: null,
+            status: "failed",
+          },
+        });
+        continue;
+      }
+
+      try {
+        await recordStorefrontAnalyticsDetails(input, { retryableLogErrors: true });
+        await prisma.storefrontAnalyticsEventQueue.delete({ where: { id: row.id } });
+        processed++;
+      } catch (error) {
+        const attempts = row.attempts + 1;
+        const failed = attempts >= queueMaxAttempts();
+        await prisma.storefrontAnalyticsEventQueue.update({
+          where: { id: row.id },
+          data: {
+            attempts,
+            lastError: String(error instanceof Error ? error.message : error).slice(0, 1000),
+            lockedAt: null,
+            nextAttemptAt: failed ? new Date() : queueNextAttemptAt(attempts),
+            status: failed ? "failed" : "pending",
+          },
+        });
+      }
+    }
+
+    return { processed, skipped: false };
+  } finally {
+    analyticsQueuePumpActive = false;
   }
 }
 
-export function enqueueStorefrontAnalyticsEvent(input: RecordStorefrontAnalyticsEventInput) {
-  const maxSize = Number.isFinite(ANALYTICS_QUEUE_MAX_SIZE) && ANALYTICS_QUEUE_MAX_SIZE > 0
-    ? ANALYTICS_QUEUE_MAX_SIZE
-    : 5_000;
-
-  if (analyticsQueue.length >= maxSize) {
-    console.warn("[Analytics Queue] Dropped analytics event because the queue is full.");
-    return false;
+export function startStorefrontAnalyticsQueueWorker() {
+  if (
+    analyticsQueueWorkerStarted ||
+    process.env.NODE_ENV === "test" ||
+    process.env.DISABLE_ANALYTICS_QUEUE_WORKER === "true"
+  ) {
+    return;
   }
 
-  analyticsQueue.push(snapshotAnalyticsInput(input));
-  queueMicrotask(pumpAnalyticsQueue);
-  return true;
+  analyticsQueueWorkerStarted = true;
+  const intervalMs =
+    Number.isFinite(ANALYTICS_QUEUE_INTERVAL_MS) && ANALYTICS_QUEUE_INTERVAL_MS > 0
+      ? ANALYTICS_QUEUE_INTERVAL_MS
+      : 2_500;
+
+  setInterval(() => {
+    processQueuedStorefrontAnalyticsEvents().catch((error) => {
+      console.error("[Analytics Queue] Failed to process queued events:", error);
+    });
+  }, intervalMs).unref?.();
+
+  queueMicrotask(() => {
+    void processQueuedStorefrontAnalyticsEvents();
+  });
 }
 
 function actionFromType(type: string) {
@@ -282,20 +428,23 @@ export async function recordBillableUsage({
   });
 }
 
-export async function recordStorefrontAnalyticsDetails({
-  countryCode,
-  ipAddress,
-  path,
-  regionCode = null,
-  regionName = null,
-  request,
-  ruleId,
-  ruleName,
-  shop,
-  targetUrl,
-  type,
-  userAgent,
-}: RecordStorefrontAnalyticsEventInput) {
+export async function recordStorefrontAnalyticsDetails(
+  {
+    countryCode,
+    ipAddress,
+    path,
+    regionCode = null,
+    regionName = null,
+    request,
+    ruleId,
+    ruleName,
+    shop,
+    targetUrl,
+    type,
+    userAgent,
+  }: RecordStorefrontAnalyticsEventInput,
+  options: { retryableLogErrors?: boolean } = {},
+) {
   try {
     await prisma.visitorLog.create({
       data: {
@@ -314,6 +463,7 @@ export async function recordStorefrontAnalyticsDetails({
     });
   } catch (logError) {
     console.error("[Analytics] Error saving visitor log:", logError);
+    if (options.retryableLogErrors) throw logError;
   }
 
   const today = new Date();

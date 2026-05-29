@@ -15,8 +15,9 @@ import { resolveEffectivePlan } from "../utils/effective-plan.server";
 import { getGeoFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
 import {
+  enqueueStorefrontAnalyticsEvent,
   recordBillableUsage,
-  recordStorefrontAnalyticsDetails,
+  startStorefrontAnalyticsQueueWorker,
 } from "../utils/storefront-analytics.server";
 import {
   getStorefrontConfigCache,
@@ -558,6 +559,8 @@ async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRunt
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  startStorefrontAnalyticsQueueWorker();
+
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const currentPath = url.searchParams.get("path") || "/";
@@ -928,15 +931,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const responseEventToken = eventToken || visitToken;
 
     if (selectedRule && source && analyticsEvent && analytics?.payload) {
-      void recordBillableUsage({
-        countryCode,
-        path: currentPath,
-        type: analyticsEvent,
-        payload: analytics.payload,
-      })
-        .then((billableResult) => {
-          if (!billableResult.inserted) return null;
-          return recordStorefrontAnalyticsDetails({
+      try {
+        const billableResult = await recordBillableUsage({
+          countryCode,
+          path: currentPath,
+          type: analyticsEvent,
+          payload: analytics.payload,
+        });
+
+        if (billableResult.inserted) {
+          await enqueueStorefrontAnalyticsEvent({
             countryCode,
             path: currentPath,
             regionCode,
@@ -949,10 +953,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             tokenPayload: analytics.payload,
             type: analyticsEvent,
           });
-        })
-        .catch((error) => {
-          console.error("[Proxy] Failed to record async server-side action:", error);
-        });
+        }
+      } catch (error) {
+        console.error("[Proxy] Failed to record server-side action:", error);
+      }
     }
 
     return json(
