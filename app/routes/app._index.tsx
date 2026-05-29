@@ -276,6 +276,7 @@ function formatUsagePeriodEnd(value: string | null) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
+  const accessToken = session.accessToken || "";
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -332,11 +333,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }),
     getShopIdentity({
       shop,
-      accessToken: session.accessToken,
+      accessToken,
     }),
     getThemeAppEmbedStatus({
       shop,
-      accessToken: session.accessToken,
+      accessToken,
       scopeString: session.scope,
     }),
   ]);
@@ -721,6 +722,40 @@ export default function Index() {
             max-height: 190px;
             min-height: 0;
           }
+          .dashboard-table-scroll,
+          .dashboard-table-scroll-short {
+            --dashboard-scrollbar-thumb: rgba(138, 138, 138, 0.42);
+            --dashboard-scrollbar-thumb-hover: rgba(97, 97, 97, 0.72);
+            --dashboard-scrollbar-track: transparent;
+            scrollbar-color: var(--dashboard-scrollbar-thumb) var(--dashboard-scrollbar-track);
+            scrollbar-width: thin;
+          }
+          .dashboard-table-scroll::-webkit-scrollbar,
+          .dashboard-table-scroll-short::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          .dashboard-table-scroll::-webkit-scrollbar-track,
+          .dashboard-table-scroll-short::-webkit-scrollbar-track {
+            background: var(--dashboard-scrollbar-track);
+          }
+          .dashboard-table-scroll::-webkit-scrollbar-thumb,
+          .dashboard-table-scroll-short::-webkit-scrollbar-thumb {
+            background-color: var(--dashboard-scrollbar-thumb);
+            border: 2px solid transparent;
+            border-radius: 999px;
+            background-clip: padding-box;
+          }
+          .dashboard-table-scroll:hover::-webkit-scrollbar-thumb,
+          .dashboard-table-scroll-short:hover::-webkit-scrollbar-thumb {
+            background-color: var(--dashboard-scrollbar-thumb-hover);
+          }
+          .dashboard-table-scroll::-webkit-scrollbar-button,
+          .dashboard-table-scroll-short::-webkit-scrollbar-button {
+            width: 0;
+            height: 0;
+            display: none;
+          }
           .dashboard-table-scroll-short.is-empty {
             overflow-y: hidden;
           }
@@ -929,12 +964,12 @@ export default function Index() {
                     Get started with the app in just a few simple steps.
                   </Text>
                   <div>
-                    <Badge>{completedSetupSteps} / {setupSteps.length} completed</Badge>
+                    <Badge>{`${completedSetupSteps} / ${setupSteps.length} completed`}</Badge>
                   </div>
                 </BlockStack>
                 {appEmbedStatus.themeName && (
                   <Badge tone={appEmbedStatus.state === "enabled" ? "success" : "attention"}>
-                    Theme: {appEmbedStatus.themeName}
+                    {`Theme: ${appEmbedStatus.themeName}`}
                   </Badge>
                 )}
               </div>
@@ -1099,7 +1134,7 @@ export default function Index() {
                       <Text as="h3" variant="headingMd">Traffic Overview</Text>
                       <Text as="p" variant="bodySm" tone="subdued">Visits and actions by country in the last 30 days.</Text>
                     </BlockStack>
-                    <Badge>{visitsData.length} countries</Badge>
+                    <Badge>{`${visitsData.length} countries`}</Badge>
                   </div>
                   <div className="dashboard-table-scroll">
                     <table className="dashboard-table">
@@ -1159,7 +1194,7 @@ export default function Index() {
                         <Text as="h3" variant="headingMd">Blocked Traffic</Text>
                         <Text as="p" variant="bodySm" tone="subdued">Visitors blocked by rule or country.</Text>
                       </BlockStack>
-                      <Badge tone={totalBlockedActions > 0 ? "critical" : undefined}>{totalBlockedActions}</Badge>
+                      <Badge tone={totalBlockedActions > 0 ? "critical" : undefined}>{totalBlockedActions.toLocaleString()}</Badge>
                     </div>
                     <div className={`dashboard-table-scroll-short${blocksData.length > 0 ? "" : " is-empty"}`}>
                       <table className="dashboard-table">
@@ -1213,7 +1248,7 @@ export default function Index() {
                         <Text as="h3" variant="headingMd">Instant Redirects</Text>
                         <Text as="p" variant="bodySm" tone="subdued">Auto-redirects in the last 30 days.</Text>
                       </BlockStack>
-                      <Badge tone={totalAutoRedirected > 0 ? "success" : undefined}>{totalAutoRedirected}</Badge>
+                      <Badge tone={totalAutoRedirected > 0 ? "success" : undefined}>{totalAutoRedirected.toLocaleString()}</Badge>
                     </div>
                     <div className={`dashboard-table-scroll-short${autoRedirectsData.length > 0 ? "" : " is-empty"}`}>
                       <table className="dashboard-table">
@@ -1258,7 +1293,7 @@ export default function Index() {
                   <Text as="h3" variant="headingMd">Banners and Popups</Text>
                   <Text as="p" variant="bodySm" tone="subdued">Popup interactions in the last 30 days.</Text>
                 </BlockStack>
-                <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>{totalPopupSeen} seen</Badge>
+                <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>{`${totalPopupSeen.toLocaleString()} seen`}</Badge>
               </div>
               <div className="dashboard-table-scroll">
                 <table className="dashboard-table">

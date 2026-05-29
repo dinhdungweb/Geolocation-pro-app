@@ -11,8 +11,9 @@ import {
 } from "@shopify/polaris";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
+import { Link, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { ArrowLeftIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import {
@@ -650,15 +651,40 @@ export default function PricingPage() {
     });
 
     return (
-        <Page
-            fullWidth
-            title="Pricing plans"
-            subtitle="Choose the monthly visitor limit and controls that match your store traffic."
-            backAction={{ url: "/app" }}
-        >
+        <Page fullWidth>
             <TitleBar title="Pricing" />
             <style>
                 {`
+                    .pricing-page-content {
+                        width: min(100%, 1320px);
+                        margin: 0 auto;
+                    }
+                    .pricing-page-header {
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 10px;
+                    }
+                    .pricing-page-back-link {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 6px;
+                        color: var(--p-color-text, #202223);
+                        text-decoration: none;
+                    }
+                    .pricing-page-back-link:hover {
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
+                    }
+                    .pricing-page-back-link svg {
+                        display: block;
+                        width: 20px;
+                        height: 20px;
+                    }
+                    .pricing-page-title {
+                        min-width: 0;
+                    }
                     .pricing-cards-grid {
                         display: grid;
                         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -784,6 +810,9 @@ export default function PricingPage() {
                         }
                     }
                     @media (max-width: 47.9975em) {
+                        .pricing-page-content {
+                            width: 100%;
+                        }
                         .pricing-cards-grid {
                             grid-template-columns: 1fr;
                         }
@@ -793,93 +822,109 @@ export default function PricingPage() {
                     }
                 `}
             </style>
-            <BlockStack gap="500">
-                {!canUseCustomPlan && (
-                    <Card>
-                        <div className="pricing-custom-plan-card">
-                            <Box padding="400">
-                                <InlineStack align="space-between" blockAlign="center" gap="400">
-                                    <BlockStack gap="150">
+            <div className="pricing-page-content">
+                <BlockStack gap="500">
+                    <div className="pricing-page-header">
+                        <Link to="/app" className="pricing-page-back-link" aria-label="Back to dashboard">
+                            <ArrowLeftIcon aria-hidden="true" focusable="false" />
+                        </Link>
+                        <div className="pricing-page-title">
+                            <BlockStack gap="100">
+                                <Text as="h1" variant="headingLg">Pricing plans</Text>
+                                <Text as="p" variant="bodyMd" tone="subdued">
+                                    Choose the monthly visitor limit and controls that match your store traffic.
+                                </Text>
+                            </BlockStack>
+                        </div>
+                    </div>
+
+                    {!canUseCustomPlan && (
+                        <Card>
+                            <div className="pricing-custom-plan-card">
+                                <Box padding="400">
+                                    <InlineStack align="space-between" blockAlign="center" gap="400">
+                                        <BlockStack gap="150">
+                                            <InlineStack gap="200" blockAlign="center">
+                                                <Text as="h2" variant="headingMd">Need a custom plan?</Text>
+                                                <Badge tone="info">Custom plan</Badge>
+                                            </InlineStack>
+                                            <Text as="p" tone="subdued">
+                                                High-volume stores can request private pricing, custom visitor limits and predictable monthly billing.
+                                            </Text>
+                                        </BlockStack>
                                         <InlineStack gap="200" blockAlign="center">
-                                            <Text as="h2" variant="headingMd">Need a custom plan?</Text>
-                                            <Badge tone="info">Custom plan</Badge>
+                                            <Button url="/app/support">Contact support</Button>
+                                            <Button variant="primary" onClick={openLiveChat}>Open live chat</Button>
                                         </InlineStack>
+                                    </InlineStack>
+                                </Box>
+                            </div>
+                        </Card>
+                    )}
+
+                    <div className={`pricing-cards-grid ${visiblePlans.length === 5 ? "pricing-cards-grid-5" : ""}`}>
+                        {visiblePlans.map((plan) => (
+                            <PlanCard
+                                key={plan.name}
+                                name={plan.name}
+                                displayName={plan.displayName}
+                                subtitle={plan.subtitle}
+                                price={plan.price}
+                                visitorLimit={plan.visitorLimit}
+                                visitorLimitLabel={plan.visitorLimitLabel}
+                                features={plan.features}
+                                isCurrentPlan={currentPlan === plan.name}
+                                isFree={plan.isFree}
+                                isRecommended={plan.isRecommended}
+                                hasTrial={plan.hasTrial}
+                                trialDays={plan.trialDays}
+                                noOverage={plan.noOverage}
+                                ribbon={plan.ribbon}
+                                ribbonTone={plan.ribbonTone}
+                                isLoading={submittingPlan === plan.name}
+                                isDisabled={Boolean(submittingPlan) && submittingPlan !== plan.name}
+                                onSelect={() => handleSelectPlan(plan.name)}
+                            />
+                        ))}
+                    </div>
+
+                    <Card>
+                        <BlockStack gap="400">
+                            <Text as="h2" variant="headingMd">Billing notes</Text>
+                            <div className="pricing-note-grid">
+                                <div className="pricing-note-item">
+                                    <BlockStack gap="100">
+                                        <Text as="p" fontWeight="semibold">{DEFAULT_TRIAL_DAYS}-day trial</Text>
+                                        <Text as="p" tone="subdued">Paid plans include a free trial before billing starts.</Text>
+                                    </BlockStack>
+                                </div>
+                                <div className="pricing-note-item">
+                                    <BlockStack gap="100">
+                                        <Text as="p" fontWeight="semibold">Cancel anytime</Text>
+                                        <Text as="p" tone="subdued">Upgrade or downgrade from this page when traffic changes.</Text>
+                                    </BlockStack>
+                                </div>
+                                <div className="pricing-note-item">
+                                    <BlockStack gap="100">
+                                        <Text as="p" fontWeight="semibold">Overage</Text>
                                         <Text as="p" tone="subdued">
-                                            High-volume stores can request private pricing, custom visitor limits and predictable monthly billing.
+                                            {canUseCustomPlan && customNoOverage
+                                                ? "Standard paid plans can charge extra visitors when limits are exceeded. Your custom plan has no overage charges."
+                                                : "Paid plans can charge extra visitors through Shopify billing when limits are exceeded."}
                                         </Text>
                                     </BlockStack>
-                                    <InlineStack gap="200" blockAlign="center">
-                                        <Button url="/app/support">Contact support</Button>
-                                        <Button variant="primary" onClick={openLiveChat}>Open live chat</Button>
-                                    </InlineStack>
-                                </InlineStack>
-                            </Box>
-                        </div>
+                                </div>
+                            </div>
+                            <Divider />
+                            <Text as="p" variant="bodySm" tone="subdued">
+                                Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor and capped at ${OVERAGE_MONTHLY_CAP_AMOUNT.toFixed(2)} per month for standard paid plans.
+                            </Text>
+                        </BlockStack>
                     </Card>
-                )}
 
-                <div className={`pricing-cards-grid ${visiblePlans.length === 5 ? "pricing-cards-grid-5" : ""}`}>
-                    {visiblePlans.map((plan) => (
-                        <PlanCard
-                            key={plan.name}
-                            name={plan.name}
-                            displayName={plan.displayName}
-                            subtitle={plan.subtitle}
-                            price={plan.price}
-                            visitorLimit={plan.visitorLimit}
-                            visitorLimitLabel={plan.visitorLimitLabel}
-                            features={plan.features}
-                            isCurrentPlan={currentPlan === plan.name}
-                            isFree={plan.isFree}
-                            isRecommended={plan.isRecommended}
-                            hasTrial={plan.hasTrial}
-                            trialDays={plan.trialDays}
-                            noOverage={plan.noOverage}
-                            ribbon={plan.ribbon}
-                            ribbonTone={plan.ribbonTone}
-                            isLoading={submittingPlan === plan.name}
-                            isDisabled={Boolean(submittingPlan) && submittingPlan !== plan.name}
-                            onSelect={() => handleSelectPlan(plan.name)}
-                        />
-                    ))}
-                </div>
-
-                <Card>
-                    <BlockStack gap="400">
-                        <Text as="h2" variant="headingMd">Billing notes</Text>
-                        <div className="pricing-note-grid">
-                            <div className="pricing-note-item">
-                                <BlockStack gap="100">
-                                    <Text as="p" fontWeight="semibold">{DEFAULT_TRIAL_DAYS}-day trial</Text>
-                                    <Text as="p" tone="subdued">Paid plans include a free trial before billing starts.</Text>
-                                </BlockStack>
-                            </div>
-                            <div className="pricing-note-item">
-                                <BlockStack gap="100">
-                                    <Text as="p" fontWeight="semibold">Cancel anytime</Text>
-                                    <Text as="p" tone="subdued">Upgrade or downgrade from this page when traffic changes.</Text>
-                                </BlockStack>
-                            </div>
-                            <div className="pricing-note-item">
-                                <BlockStack gap="100">
-                                    <Text as="p" fontWeight="semibold">Overage</Text>
-                                    <Text as="p" tone="subdued">
-                                        {canUseCustomPlan && customNoOverage
-                                            ? "Standard paid plans can charge extra visitors when limits are exceeded. Your custom plan has no overage charges."
-                                            : "Paid plans can charge extra visitors through Shopify billing when limits are exceeded."}
-                                    </Text>
-                                </BlockStack>
-                            </div>
-                        </div>
-                        <Divider />
-                        <Text as="p" variant="bodySm" tone="subdued">
-                            Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor and capped at ${OVERAGE_MONTHLY_CAP_AMOUNT.toFixed(2)} per month for standard paid plans.
-                        </Text>
-                    </BlockStack>
-                </Card>
-
-                <Box paddingBlockEnd="800" />
-            </BlockStack>
+                    <Box paddingBlockEnd="800" />
+                </BlockStack>
+            </div>
         </Page>
     );
 }

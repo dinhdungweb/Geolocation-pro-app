@@ -79,6 +79,7 @@ function isPaidBillingConfig(billingConfig: any, settings: any) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
+    const accessToken = session.accessToken || "";
 
     const rules = await prisma.redirectRule.findMany({
         where: {
@@ -97,7 +98,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         prisma.settings.findUnique({ where: { shop } }),
         getThemeAppEmbedStatus({
             shop,
-            accessToken: session.accessToken,
+            accessToken,
             scopeString: session.scope,
         }),
     ]);
