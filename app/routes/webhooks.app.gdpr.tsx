@@ -2,6 +2,8 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import { FREE_PLAN } from "../billing.config";
+import { enqueueShopCleanupJob } from "../utils/cleanup.server";
 
 /**
  * Mandatory GDPR Webhooks for Shopify Apps
@@ -30,32 +32,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             break;
 
         case "shop/redact":
-            // Shop data deletion request (48 hours after uninstall)
-            // Must delete ALL data associated with this shop
-            console.log(`[GDPR] Shop Redact Request received for ${shop}. Deleting all shop data...`);
-            try {
-                await Promise.all([
-                    prisma.settings.deleteMany({ where: { shop } }),
-                    prisma.redirectRule.deleteMany({ where: { shop } }),
-                    prisma.analyticsCountry.deleteMany({ where: { shop } }),
-                    prisma.analyticsRule.deleteMany({ where: { shop } }),
-                    prisma.monthlyUsage.deleteMany({ where: { shop } }),
-                    prisma.usageChargeAttempt.deleteMany({ where: { shop } }),
-                    prisma.billableUsageEvent.deleteMany({ where: { shop } }),
-                    prisma.billableUsageActionEvent.deleteMany({ where: { shop } }),
-                    prisma.visitorLog.deleteMany({ where: { shop } }),
-                    prisma.storefrontAnalyticsEventQueue.deleteMany({ where: { shop } }),
-                    prisma.adminEmailLog.deleteMany({ where: { shop } }),
-                    prisma.automation.deleteMany({ where: { shop } }),
-                    prisma.emailTemplate.deleteMany({ where: { shop } }),
-                    prisma.campaign.deleteMany({ where: { shop } }),
-                    prisma.emailBlacklist.deleteMany({ where: { shop } }),
-                    prisma.session.deleteMany({ where: { shop } }),
-                ]);
-                console.log(`[GDPR] All data deleted for ${shop}`);
-            } catch (error) {
-                console.error(`[GDPR] Failed to delete data for ${shop}:`, error);
-            }
+            console.log(`[GDPR] Shop Redact Request received for ${shop}. Queueing cleanup job...`);
+            await enqueueShopCleanupJob(shop, "shop_redact");
+            await Promise.allSettled([
+                prisma.session.deleteMany({ where: { shop } }),
+                prisma.settings.updateMany({
+                    where: { shop },
+                    data: {
+                        isEnabled: false,
+                        currentPlan: FREE_PLAN,
+                        blockVpn: false,
+                        billingPlanName: null,
+                        billingPeriodKey: null,
+                        billingPeriodStart: null,
+                        billingPeriodEnd: null,
+                        billingSubscriptionId: null,
+                        billingUsageLineItemId: null,
+                    },
+                }),
+            ]);
+            console.log(`[GDPR] Queued cleanup job for ${shop}`);
             break;
 
         default:

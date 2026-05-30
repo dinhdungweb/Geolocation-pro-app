@@ -1,38 +1,40 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { FREE_PLAN } from "../billing.config";
+import { enqueueShopCleanupJob } from "../utils/cleanup.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, topic } = await authenticate.webhook(request);
 
   console.log(`Received ${topic} webhook for ${shop}`);
 
-  // Webhook requests can trigger multiple times and may arrive after the session is gone.
-  // Always clean by shop so uninstall remains idempotent.
-  // Use allSettled so a single table-delete failure does not prevent the others.
+  await enqueueShopCleanupJob(shop, "app_uninstalled");
+
+  // Keep the webhook fast. Do only lightweight deactivation here; the heavy
+  // deletes run in the background cleanup job.
   const results = await Promise.allSettled([
     db.session.deleteMany({ where: { shop } }),
-    db.settings.deleteMany({ where: { shop } }),
-    db.redirectRule.deleteMany({ where: { shop } }),
-    db.analyticsCountry.deleteMany({ where: { shop } }),
-    db.analyticsRule.deleteMany({ where: { shop } }),
-    db.monthlyUsage.deleteMany({ where: { shop } }),
-    db.usageChargeAttempt.deleteMany({ where: { shop } }),
-    db.billableUsageEvent.deleteMany({ where: { shop } }),
-    db.billableUsageActionEvent.deleteMany({ where: { shop } }),
-    db.visitorLog.deleteMany({ where: { shop } }),
-    db.storefrontAnalyticsEventQueue.deleteMany({ where: { shop } }),
-    db.adminEmailLog.deleteMany({ where: { shop } }),
-    db.automation.deleteMany({ where: { shop } }),
-    db.emailTemplate.deleteMany({ where: { shop } }),
-    db.campaign.deleteMany({ where: { shop } }),
-    db.emailBlacklist.deleteMany({ where: { shop } }),
+    db.settings.updateMany({
+      where: { shop },
+      data: {
+        isEnabled: false,
+        currentPlan: FREE_PLAN,
+        blockVpn: false,
+        billingPlanName: null,
+        billingPeriodKey: null,
+        billingPeriodStart: null,
+        billingPeriodEnd: null,
+        billingSubscriptionId: null,
+        billingUsageLineItemId: null,
+      },
+    }),
   ]);
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length > 0) {
-    console.error(`[Uninstall] ${failures.length} delete(s) failed for ${shop}:`, failures);
+    console.error(`[Uninstall] ${failures.length} quick cleanup step(s) failed for ${shop}:`, failures);
   }
-  console.log(`[Uninstall] Cleaned up all data for ${shop}`);
+  console.log(`[Uninstall] Queued cleanup job for ${shop}`);
 
-  return new Response();
+  return new Response(null, { status: 200 });
 };

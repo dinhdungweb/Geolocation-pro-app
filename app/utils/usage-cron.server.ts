@@ -7,7 +7,7 @@ import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml }
 import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server';
-import { cleanupOldLogs } from './cleanup.server';
+import { cleanupOldLogs, processPendingShopCleanupJobs } from './cleanup.server';
 import { resolveEffectivePlan } from './effective-plan.server';
 
 const USAGE_JOB_LOCK_KEY = 'usage-cron:check-all-shops';
@@ -266,10 +266,17 @@ export function initUsageCron() {
         });
     });
 
+    cron.schedule('*/5 * * * *', () => {
+        processPendingShopCleanupJobs().catch(err => {
+            console.error('[Cron Error] Failed to process shop cleanup jobs:', err);
+        });
+    });
+
     globalAny.__usageCronStarted = true;
     console.log('[Cron] Usage monitoring scheduled (every 6 hours).');
     console.log('[Cron] GeoIP auto-update scheduled (daily at 3:00 AM).');
     console.log('[Cron] Cleanup scheduled (daily at 2:30 AM).');
+    console.log('[Cron] Shop cleanup scheduled (every 5 minutes).');
     
     // Run initial check after a short delay to avoid API spam during rolling deploys.
     setTimeout(() => {
@@ -283,4 +290,10 @@ export function initUsageCron() {
             console.error('[Cron Startup Error] Failed to clean old logs:', err);
         });
     }, 60_000);
+
+    setTimeout(() => {
+        processPendingShopCleanupJobs().catch(err => {
+            console.error('[Cron Startup Error] Failed to process shop cleanup jobs:', err);
+        });
+    }, 90_000);
 }

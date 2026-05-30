@@ -198,6 +198,23 @@ model JobLock {
   @@index([lockedUntil])
 }
 
+model ShopCleanupJob {
+  id          String    @id @default(uuid())
+  shop        String
+  reason      String
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  lockedAt    DateTime?
+  lastError   String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([shop, reason])
+  @@index([status, lockedAt, createdAt])
+  @@index([shop])
+}
+
 model BillableUsageEvent {
   id          String   @id @default(uuid())
   shop        String
