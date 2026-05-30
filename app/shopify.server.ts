@@ -97,6 +97,7 @@ const shopify = shopifyApp({
   },
   future: {
     unstable_newEmbeddedAuthStrategy: true,
+    expiringOfflineAccessTokens: true,
   },
   logger: {
     level: LogSeverity.Error,
@@ -151,11 +152,170 @@ const shopify = shopifyApp({
   },
 });
 
+type OfflineSessionForMigration = {
+  id: string;
+  shop: string;
+  isOnline: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  expires?: Date;
+};
+
+type OfflineTokenExchangeResponse = {
+  access_token: string;
+  expires_in: number;
+  refresh_token: string;
+  refresh_token_expires_in: number;
+  scope?: string;
+};
+
+async function hasExpiringOfflineSession(sessionId: string) {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: {
+      expires: true,
+      refreshToken: true,
+    },
+  });
+
+  return Boolean(session?.expires && session.refreshToken);
+}
+
+async function migrateOfflineSessionToExpiringIfNeeded(
+  session: OfflineSessionForMigration,
+) {
+  if (
+    session.isOnline ||
+    !session.accessToken ||
+    session.refreshToken ||
+    session.expires
+  ) {
+    return false;
+  }
+
+  const currentSession = await prisma.session.findUnique({
+    where: { id: session.id },
+    select: {
+      id: true,
+      shop: true,
+      isOnline: true,
+      accessToken: true,
+      refreshToken: true,
+      expires: true,
+    },
+  });
+
+  if (
+    !currentSession ||
+    currentSession.isOnline ||
+    !currentSession.accessToken ||
+    currentSession.refreshToken ||
+    currentSession.expires
+  ) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://${currentSession.shop}/admin/oauth/access_token`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          client_id: process.env.SHOPIFY_API_KEY,
+          client_secret: process.env.SHOPIFY_API_SECRET || "",
+          grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+          subject_token: currentSession.accessToken,
+          subject_token_type:
+            "urn:shopify:params:oauth:token-type:offline-access-token",
+          requested_token_type:
+            "urn:shopify:params:oauth:token-type:offline-access-token",
+          expiring: "1",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.text();
+      if (await hasExpiringOfflineSession(currentSession.id)) return true;
+
+      console.error(
+        `[OfflineTokenMigration] Failed for ${currentSession.shop}: ${response.status} ${body}`,
+      );
+      return false;
+    }
+
+    const token = (await response.json()) as OfflineTokenExchangeResponse;
+    const now = Date.now();
+
+    await prisma.session.update({
+      where: { id: currentSession.id },
+      data: {
+        accessToken: token.access_token,
+        scope: token.scope,
+        expires: new Date(now + token.expires_in * 1000),
+        refreshToken: token.refresh_token,
+        refreshTokenExpires: new Date(
+          now + token.refresh_token_expires_in * 1000,
+        ),
+      },
+    });
+
+    console.log(
+      `[OfflineTokenMigration] Migrated ${currentSession.shop} to expiring offline token`,
+    );
+    return true;
+  } catch (error) {
+    if (await hasExpiringOfflineSession(currentSession.id)) return true;
+
+    console.error(
+      `[OfflineTokenMigration] Error for ${currentSession.shop}:`,
+      error,
+    );
+    return false;
+  }
+}
+
+const baseAuthenticate = shopify.authenticate;
+const baseUnauthenticated = shopify.unauthenticated;
+
 export default shopify;
 export const apiVersion = "2026-04" as ApiVersion;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
-export const authenticate = shopify.authenticate;
-export const unauthenticated = shopify.unauthenticated;
+export const authenticate = {
+  ...baseAuthenticate,
+  admin: async (request: Request) => {
+    const context = await baseAuthenticate.admin(request);
+    const migrated = await migrateOfflineSessionToExpiringIfNeeded(
+      context.session,
+    );
+
+    if (!migrated) return context;
+
+    const refreshedContext = await baseUnauthenticated.admin(
+      context.session.shop,
+    );
+    return {
+      ...context,
+      admin: refreshedContext.admin,
+      session: refreshedContext.session,
+    };
+  },
+} as typeof shopify.authenticate;
+export const unauthenticated = {
+  ...baseUnauthenticated,
+  admin: async (shop: string) => {
+    const context = await baseUnauthenticated.admin(shop);
+    const migrated = await migrateOfflineSessionToExpiringIfNeeded(
+      context.session,
+    );
+
+    return migrated ? baseUnauthenticated.admin(shop) : context;
+  },
+} as typeof shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;
