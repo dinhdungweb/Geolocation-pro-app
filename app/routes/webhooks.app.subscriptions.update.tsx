@@ -24,6 +24,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         const existingSettings = await db.settings.findUnique({ where: { shop } });
+        if (!existingSettings && appSubscription?.status !== "ACTIVE") {
+            invalidateStorefrontConfigCache(shop);
+            console.log(`[Subscription Update] Ignored inactive subscription update for uninstalled or unknown shop ${shop}`);
+            return new Response();
+        }
+
         const hasBillingOverride = Boolean(existingSettings?.billingOverrideEnabled && existingSettings?.billingOverridePlan);
 
         await db.settings.upsert({

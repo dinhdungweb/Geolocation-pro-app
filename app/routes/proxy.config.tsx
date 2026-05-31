@@ -490,26 +490,13 @@ function buildActionResponse({
   };
 }
 
-async function getOrCreateSettings(shop: string) {
-  const existing = await prisma.settings.findUnique({ where: { shop } });
-  if (existing) return existing;
-
-  try {
-    return await prisma.settings.create({ data: { shop } });
-  } catch (error: any) {
-    if (error?.code === "P2002") {
-      const raced = await prisma.settings.findUnique({ where: { shop } });
-      if (raced) return raced;
-    }
-    throw error;
-  }
-}
-
-async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRuntimeConfig> {
+async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRuntimeConfig | null> {
   const cached = getStorefrontConfigCache<StorefrontRuntimeConfig>(shop);
   if (cached) return cached;
 
-  const settings = await getOrCreateSettings(shop);
+  const settings = await prisma.settings.findUnique({ where: { shop } });
+  if (!settings) return null;
+
   const { effectivePlan: currentPlan } = resolveEffectivePlan({ settings });
   const hasPaidPlan = currentPlan !== FREE_PLAN;
   const planLimit = getPlanLimit(currentPlan, settings);
@@ -632,6 +619,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
+    const runtimeConfig = await loadStorefrontRuntimeConfig(shop);
+    if (!runtimeConfig) {
+      return json(
+        buildActionResponse({
+          action: "none",
+          analyticsEvent: null,
+          blocked: null,
+          countryCode,
+          currentPath,
+          currentPlan: FREE_PLAN,
+          debug,
+          eventToken: null,
+          planLimit: getPlanLimit(FREE_PLAN),
+          popup: null,
+          regionCode,
+          regionName,
+          rule: null,
+          usage: 0,
+          visitToken: null,
+        }),
+        { headers: corsHeaders }
+      );
+    }
+
     const {
       activeRules,
       currentPlan,
@@ -640,7 +651,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       planLimit,
       settings,
       usagePeriod,
-    } = await loadStorefrontRuntimeConfig(shop);
+    } = runtimeConfig;
     const popup = buildPopup(settings);
     const appOrigin = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
     const blocked = buildBlocked(settings, appOrigin);
