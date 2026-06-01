@@ -9,11 +9,75 @@ const resend = process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_
     : null;
 
 const DEFAULT_SENDER = process.env.SENDER_EMAIL || 'send@geopro.bluepeaks.top';
+const SHOPIFY_API_VERSION = "2026-04";
 
 export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'limit_unlimited' | 'manual';
 
 function getEmailLogType(type: EmailType, dedupeKey?: string) {
     return dedupeKey ? `${type}:${dedupeKey}` : type;
+}
+
+async function fetchAndStoreShopEmail(shop: string, accessToken: string) {
+    const response = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": accessToken,
+        },
+        body: JSON.stringify({
+            query: `query { shop { email } }`,
+        }),
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Shopify email query failed: ${response.status} ${body}`);
+    }
+
+    const data = await response.json();
+    const email = data?.data?.shop?.email;
+    if (!email) return null;
+
+    await prisma.session.updateMany({
+        where: { shop },
+        data: { email },
+    });
+
+    return email as string;
+}
+
+async function resolveShopRecipientEmail(shop: string) {
+    const sessionWithEmail = await prisma.session.findFirst({
+        where: {
+            shop,
+            email: { not: null },
+        },
+        orderBy: { expires: 'desc' },
+        select: { email: true },
+    });
+
+    if (sessionWithEmail?.email) return sessionWithEmail.email;
+
+    const sessionWithToken = await prisma.session.findFirst({
+        where: { shop },
+        orderBy: { expires: 'desc' },
+        select: {
+            accessToken: true,
+        },
+    });
+
+    if (!sessionWithToken?.accessToken) return null;
+
+    try {
+        const email = await fetchAndStoreShopEmail(shop, sessionWithToken.accessToken);
+        if (email) {
+            console.log(`[Email Service] Recovered recipient email for ${shop}`);
+        }
+        return email;
+    } catch (error) {
+        console.error(`[Email Service] Failed to recover email for shop ${shop}:`, error);
+        return null;
+    }
 }
 
 export async function sendAdminEmail({ 
@@ -77,13 +141,7 @@ export async function sendAdminEmail({
         finalHtml = replaceEmailVariables(html, { shop });
     }
 
-    // Find shop email from Session
-    const session = await prisma.session.findFirst({
-        where: { shop },
-        orderBy: { expires: 'desc' }
-    });
-
-    const recipient = session?.email;
+    const recipient = await resolveShopRecipientEmail(shop);
     if (!recipient) {
         console.error(`[Email Service] No email found for shop ${shop}`);
         return { success: false, error: 'No recipient email' };
