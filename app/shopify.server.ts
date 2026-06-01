@@ -138,6 +138,22 @@ const shopify = shopifyApp({
       }
 
       // 2. Send welcome email if not already sent
+      const uninstallCleanup = await prisma.shopCleanupJob.findFirst({
+        where: {
+          shop,
+          reason: "app_uninstalled",
+          status: { in: ["pending", "running", "failed"] },
+        },
+        select: { status: true },
+      });
+
+      if (uninstallCleanup) {
+        console.log(
+          `[AfterAuth] Skipping welcome email for ${shop}; uninstall cleanup is ${uninstallCleanup.status}`,
+        );
+        return;
+      }
+
       const welcomed = await hasSentEmail(shop, 'welcome');
       if (!welcomed) {
         console.log(`[AfterAuth] Triggering welcome email to ${shop}`);

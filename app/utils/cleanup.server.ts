@@ -187,7 +187,7 @@ export async function enqueueShopCleanupJob(shop: string, reason: ShopCleanupRea
     });
 }
 
-async function cleanupShopData(shop: string) {
+async function cleanupShopData(shop: string, reason: ShopCleanupReason) {
     await prisma.session.deleteMany({ where: { shop } });
     await prisma.settings.deleteMany({ where: { shop } });
     await prisma.redirectRule.deleteMany({ where: { shop } });
@@ -201,7 +201,9 @@ async function cleanupShopData(shop: string) {
     const deletedVisitorLogs = await deleteInBatches(() => deleteShopVisitorLogBatch(shop));
     const deletedAnalyticsQueue = await deleteInBatches(() => deleteShopStorefrontAnalyticsQueueBatch(shop));
 
-    await prisma.adminEmailLog.deleteMany({ where: { shop } });
+    if (reason === "shop_redact") {
+        await prisma.adminEmailLog.deleteMany({ where: { shop } });
+    }
     await prisma.automation.deleteMany({ where: { shop } });
     await prisma.emailTemplate.deleteMany({ where: { shop } });
     await prisma.campaign.deleteMany({ where: { shop } });
@@ -249,7 +251,7 @@ export async function processPendingShopCleanupJobs() {
 
         try {
             console.log(`[ShopCleanup] Processing ${job.reason} cleanup for ${job.shop}`);
-            await cleanupShopData(job.shop);
+            await cleanupShopData(job.shop, job.reason as ShopCleanupReason);
             await prisma.shopCleanupJob.update({
                 where: { id: job.id },
                 data: {
