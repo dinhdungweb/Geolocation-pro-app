@@ -1209,14 +1209,14 @@ export default function Index() {
             <Card padding="0">
               <div className="dashboard-summary-card">
                 <Text as="p" variant="bodySm" tone="subdued">Redirected</Text>
-                <span className="dashboard-summary-value" style={{ color: 'var(--p-color-text-success, #1a7346)' }}>{stats.totalRedirected}</span>
+                <span className="dashboard-summary-value">{stats.totalRedirected}</span>
                 <Text as="p" variant="bodySm" tone="subdued">visitors redirected</Text>
               </div>
             </Card>
             <Card padding="0">
               <div className="dashboard-summary-card">
                 <Text as="p" variant="bodySm" tone="subdued">Blocked</Text>
-                <span className="dashboard-summary-value" style={{ color: 'var(--p-color-text-critical, #c4260a)' }}>{stats.totalBlocked}</span>
+                <span className="dashboard-summary-value">{stats.totalBlocked}</span>
                 <Text as="p" variant="bodySm" tone="subdued">visitors blocked</Text>
               </div>
             </Card>
