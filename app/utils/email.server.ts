@@ -74,8 +74,14 @@ async function resolveShopRecipientEmail(shop: string) {
             console.log(`[Email Service] Recovered recipient email for ${shop}`);
         }
         return email;
-    } catch (error) {
-        console.error(`[Email Service] Failed to recover email for shop ${shop}:`, error);
+    } catch (error: any) {
+        const errorStr = String(error?.message || error).toLowerCase();
+        const isUnauthorized = errorStr.includes("401") || errorStr.includes("unauthorized") || errorStr.includes("session");
+        if (isUnauthorized) {
+            console.warn(`[Email Service] Skipping email recovery for ${shop}: Access token is unauthorized/expired (potentially uninstalled).`);
+        } else {
+            console.error(`[Email Service] Failed to recover email for shop ${shop}:`, error);
+        }
         return null;
     }
 }
@@ -143,7 +149,7 @@ export async function sendAdminEmail({
 
     const recipient = await resolveShopRecipientEmail(shop);
     if (!recipient) {
-        console.error(`[Email Service] No email found for shop ${shop}`);
+        console.warn(`[Email Service] No email found for shop ${shop} (potentially uninstalled or unauthorized)`);
         return { success: false, error: 'No recipient email' };
     }
 
