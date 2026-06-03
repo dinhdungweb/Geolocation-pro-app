@@ -380,7 +380,7 @@ export async function recordBillableUsage({
 }) {
   const billingPeriodKey = payload.billingPeriodKey || `calendar:${payload.yearMonth}`;
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const mainInserted = await insertBillableUsageEvent({
       billingPeriodKey,
       countryCode,
