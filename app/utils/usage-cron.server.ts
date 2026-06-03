@@ -55,7 +55,7 @@ async function releaseJobLock(lock: { key: string; owner: string }) {
     });
 }
 
-async function hasSentUsageEmail(shop: string, type: 'limit_80' | 'limit_100' | 'limit_unlimited', usagePeriod: UsagePeriod) {
+export async function hasSentUsageEmail(shop: string, type: 'limit_80' | 'limit_100' | 'limit_unlimited', usagePeriod: UsagePeriod) {
     const directSent = await hasSentEmail(shop, type, usagePeriod.key);
     if (directSent) return true;
 
@@ -226,6 +226,88 @@ export async function checkAllShopsUsage() {
         console.log('[Cron] Usage check completed.');
     } finally {
         await releaseJobLock(lock);
+    }
+}
+
+/**
+ * Checks usage for a single shop and sends warning emails if needed.
+ * This is designed to be run in real-time when usage is recorded.
+ */
+export async function checkAndSendLimitEmailIfNeeded({
+    shop,
+    usagePeriod,
+    currentPlan,
+    planLimit,
+    settings,
+}: {
+    shop: string;
+    usagePeriod: UsagePeriod;
+    currentPlan: string;
+    planLimit: number;
+    settings: any;
+}) {
+    try {
+        const hasPlanUnlimitedUsage = hasUnlimitedUsage(currentPlan, settings);
+        if (hasPlanUnlimitedUsage) return;
+
+        // Fetch monthlyUsage to get totalVisitors and chargedVisitors in DB
+        const monthlyUsage = await prisma.monthlyUsage.findUnique({
+            where: {
+                shop_billingPeriodKey: {
+                    shop,
+                    billingPeriodKey: usagePeriod.key,
+                },
+            }
+        });
+
+        const currentUsage = monthlyUsage?.totalVisitors || 0;
+        const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
+        const hasMonthlyReward = hasMonthlyUnlimitedReward(currentPlan, chargedVisitors);
+
+        if (hasMonthlyReward) {
+            const sentUnlimited = await hasSentUsageEmail(shop, 'limit_unlimited', usagePeriod);
+            if (!sentUnlimited) {
+                console.log(`[Realtime Limit Check] Sending Unlimited Reward email to ${shop}`);
+                await sendAdminEmail({
+                    shop,
+                    type: 'limit_unlimited',
+                    subject: `CONGRATULATIONS: ${shop} granted UNLIMITED usage this month!`,
+                    html: getLimitUnlimitedEmailHtml(shop, currentUsage),
+                    dedupeKey: usagePeriod.key,
+                });
+            }
+            return;
+        }
+
+        const usagePercent = (currentUsage / planLimit) * 100;
+
+        if (usagePercent >= 100) {
+            const sent100 = await hasSentUsageEmail(shop, 'limit_100', usagePeriod);
+            if (!sent100) {
+                console.log(`[Realtime Limit Check] Sending 100% usage email to ${shop}`);
+                await sendAdminEmail({
+                    shop,
+                    type: 'limit_100',
+                    subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
+                    html: getLimit100EmailHtml(shop, currentUsage, planLimit),
+                    dedupeKey: usagePeriod.key,
+                });
+            }
+        } else if (usagePercent >= 80) {
+            const sent80 = await hasSentUsageEmail(shop, 'limit_80', usagePeriod);
+            if (!sent80) {
+                console.log(`[Realtime Limit Check] Sending 80% usage email to ${shop}`);
+                await sendAdminEmail({
+                    shop,
+                    type: 'limit_80',
+                    subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
+                    html: getLimit80EmailHtml(shop, currentUsage, planLimit),
+                    dedupeKey: usagePeriod.key,
+                });
+            }
+        }
+    } catch (error) {
+        console.error(`[Realtime Limit Check] Failed to check usage/send email for ${shop}:`, error);
     }
 }
 

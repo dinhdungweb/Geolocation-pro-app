@@ -426,6 +426,43 @@ export async function recordBillableUsage({
       duplicateAction: mainInserted || actionInserted ? null : type,
     };
   });
+
+  if (result.inserted) {
+    setTimeout(async () => {
+      try {
+        const { checkAndSendLimitEmailIfNeeded } = await import("./usage-cron.server");
+        const settings = await prisma.settings.findUnique({
+          where: { shop: payload.shop },
+        });
+        if (!settings) return;
+
+        const { resolveEffectivePlan } = await import("./effective-plan.server");
+        const { getPlanLimit } = await import("../billing.config");
+        const { getUsagePeriodForShop } = await import("./billing-period.server");
+
+        const shopifyPlan = settings.currentPlan || "free";
+        const { effectivePlan: currentPlan } = resolveEffectivePlan({
+          settings,
+          shopifyPlan,
+        });
+
+        const planLimit = getPlanLimit(currentPlan, settings);
+        const usagePeriod = await getUsagePeriodForShop({ shop: payload.shop, currentPlan, settings });
+
+        await checkAndSendLimitEmailIfNeeded({
+          shop: payload.shop,
+          usagePeriod,
+          currentPlan,
+          planLimit,
+          settings,
+        });
+      } catch (err) {
+        console.error("[Realtime Limit Check] Background check error:", err);
+      }
+    }, 0);
+  }
+
+  return result;
 }
 
 export async function recordStorefrontAnalyticsDetails(
