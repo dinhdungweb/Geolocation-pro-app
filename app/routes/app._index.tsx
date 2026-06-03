@@ -478,6 +478,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       mode: settings?.mode || "disabled",
       totalRedirected: totalRedirected.toLocaleString(),
       totalBlocked: totalBlocked.toLocaleString(),
+      isEnabled: settings?.isEnabled !== false,
     },
     totalCountries,
     shopIdentity,
@@ -660,6 +661,8 @@ export default function Index() {
   const totalBlockedActions = blocksData.reduce((sum: number, item: any) => sum + Number(item.blocked || 0), 0);
   const totalPopupSeen = popupsData.reduce((sum: number, item: any) => sum + Number(item.seen || 0), 0);
   const totalAutoRedirected = autoRedirectsData.reduce((sum: number, item: any) => sum + Number(item.autoRedirected || 0), 0);
+  const isAppActive = stats.isEnabled && stats.mode !== "disabled";
+  const remainingVisitors = isUnlimitedPlan ? null : Math.max(0, planLimit - currentUsage);
 
   return (
     <Page>
@@ -855,6 +858,23 @@ export default function Index() {
             text-align: center;
             color: var(--p-color-text-secondary, #616161);
           }
+          .dashboard-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+          }
+          .dashboard-summary-card {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+          }
+          .dashboard-summary-value {
+            font-size: 24px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+          }
           .setup-guide-card {
             padding: 16px;
           }
@@ -929,6 +949,9 @@ export default function Index() {
             .dashboard-content-grid {
               grid-template-columns: 1fr;
               grid-template-rows: none;
+            }
+            .dashboard-summary-grid {
+              grid-template-columns: repeat(2, 1fr);
             }
             .dashboard-card-frame,
             .dashboard-card-frame > .Polaris-ShadowBevel,
@@ -1115,9 +1138,14 @@ export default function Index() {
                     <Text as="h3" variant="headingSm">{usageHeading}</Text>
                     <Text as="p" variant="bodySm" tone="subdued">{usageScopeText}</Text>
                   </BlockStack>
-                  <Badge tone={isAtLimit ? "critical" : isNearLimit ? "warning" : "success"}>
-                    {formatPlanLabel(planDisplayName)}
-                  </Badge>
+                  <InlineStack gap="200">
+                    <Badge tone={isAtLimit ? "critical" : isNearLimit ? "warning" : "success"}>
+                      {formatPlanLabel(planDisplayName)}
+                    </Badge>
+                    <Badge tone={isAppActive ? "success" : "warning"}>
+                      {isAppActive ? "Active" : "Paused"}
+                    </Badge>
+                  </InlineStack>
                 </div>
                 <div className="dashboard-usage-progress">
                   <InlineStack align="space-between" blockAlign="center" gap="300">
@@ -1133,7 +1161,24 @@ export default function Index() {
                     tone={isAtLimit ? "critical" : undefined}
                     size="small"
                   />
+                  {remainingVisitors !== null && (
+                    <Text as="p" variant="bodySm" tone={isAtLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
+                      {isAtLimit
+                        ? currentPlan === FREE_PLAN
+                          ? "Limit reached — app paused for this period"
+                          : "Limit reached — overage charges may apply"
+                        : `${remainingVisitors.toLocaleString()} visitors remaining${currentPlan !== FREE_PLAN ? " before overage" : ""}`
+                      }
+                    </Text>
+                  )}
                 </div>
+                {!isAppActive && (
+                  <div style={{ marginTop: "12px" }}>
+                    <Banner tone="warning" action={{ content: "Go to Settings", url: "/app/settings" }}>
+                      The app is currently paused. Enable it in Settings so visitors can see redirects, popups, and blocks.
+                    </Banner>
+                  </div>
+                )}
                 {isAtLimit && (
                   <div style={{ marginTop: "12px" }}>
                     <Banner tone="critical" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
@@ -1151,6 +1196,37 @@ export default function Index() {
               </div>
             </Card>
 
+          </div>
+
+          <div className="dashboard-summary-grid">
+            <Card padding="0">
+              <div className="dashboard-summary-card">
+                <Text as="p" variant="bodySm" tone="subdued">Countries</Text>
+                <span className="dashboard-summary-value">{totalCountries}</span>
+                <Text as="p" variant="bodySm" tone="subdued">visited in last 30 days</Text>
+              </div>
+            </Card>
+            <Card padding="0">
+              <div className="dashboard-summary-card">
+                <Text as="p" variant="bodySm" tone="subdued">Redirected</Text>
+                <span className="dashboard-summary-value" style={{ color: 'var(--p-color-text-success, #1a7346)' }}>{stats.totalRedirected}</span>
+                <Text as="p" variant="bodySm" tone="subdued">visitors redirected</Text>
+              </div>
+            </Card>
+            <Card padding="0">
+              <div className="dashboard-summary-card">
+                <Text as="p" variant="bodySm" tone="subdued">Blocked</Text>
+                <span className="dashboard-summary-value" style={{ color: 'var(--p-color-text-critical, #c4260a)' }}>{stats.totalBlocked}</span>
+                <Text as="p" variant="bodySm" tone="subdued">visitors blocked</Text>
+              </div>
+            </Card>
+            <Card padding="0">
+              <div className="dashboard-summary-card">
+                <Text as="p" variant="bodySm" tone="subdued">Active Rules</Text>
+                <span className="dashboard-summary-value">{stats.activeRules}</span>
+                <Text as="p" variant="bodySm" tone="subdued">of {stats.totalRules} total</Text>
+              </div>
+            </Card>
           </div>
 
           <div className="dashboard-content-grid">
@@ -1332,6 +1408,7 @@ export default function Index() {
                       <th className="text-right">Clicked Yes</th>
                       <th className="text-right">Clicked No</th>
                       <th className="text-right">Dismissed</th>
+                      <th className="text-right">Rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1347,11 +1424,12 @@ export default function Index() {
                           <td className="text-right"><span className="dashboard-count">{item.clickedYes}</span></td>
                           <td className="text-right"><span className="dashboard-count">{item.clickedNo}</span></td>
                           <td className="text-right"><span className="dashboard-count">{item.dismissed}</span></td>
+                          <td className="text-right"><span className="dashboard-count" style={{ color: item.seen > 0 ? 'var(--p-color-text-success, #1a7346)' : undefined }}>{item.seen > 0 ? `${Math.round((item.clickedYes / item.seen) * 100)}%` : '—'}</span></td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5}>
+                        <td colSpan={6}>
                           <div className="dashboard-empty">No popup data</div>
                         </td>
                       </tr>

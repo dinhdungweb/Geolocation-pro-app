@@ -950,6 +950,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
 
         if (billableResult.inserted) {
+          runtimeConfig.currentUsage++;
           await enqueueStorefrontAnalyticsEvent({
             countryCode,
             path: currentPath,
