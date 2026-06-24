@@ -162,8 +162,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return json({ error: "Custom plan visitor limit is required for overage billing" }, { status: 400 });
             }
 
-            const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-            const returnUrl = new URL("/app/pricing", appUrl).toString();
+            const returnUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}/app/pricing`;
             const lineItems: any[] = [
                 {
                     plan: {
