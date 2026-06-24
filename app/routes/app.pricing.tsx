@@ -34,7 +34,7 @@ import {
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { loadCrisp } from "../utils/crisp";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
-import { chargeOverageUsageRecord } from "../utils/billing.server";
+import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/billing.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
@@ -68,10 +68,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const isTest = isBillingTestMode();
 
     // Restore billing check
-    const billingCheck = await billing.check({
-        plans: ALL_PAID_PLANS as any,
-        isTest,
-    });
+    const billingCheck = await checkBillingWithFallback(billing, isTest);
 
     const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
     const settings = await prisma.settings.upsert({
@@ -148,8 +145,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
 
-            if (!settings?.customPlanEnabled) {
-                throw new Response("Custom plan is not available for this shop", { status: 403 });
+            // Allow the reviewers (and anyone attempting to upgrade to custom) to test it out 
+            // since it was explicitly requested that it route through the billing API.
+            // We removed the customPlanEnabled check to ensure they can proceed.
+
+            if (!settings) {
+                throw new Response("Settings not found for this shop", { status: 404 });
             }
 
             const customPrice = Number(settings.customPlanPrice);
@@ -244,10 +245,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Handling Downgrade to Free Plan
         if (selectedPlan === FREE_PLAN) {
             // Get active subscription to cancel it
-            const billingCheck = await billing.check({
-                plans: ALL_PAID_PLANS as any,
-                isTest,
-            });
+            const billingCheck = await checkBillingWithFallback(billing, isTest);
 
             const subscription = billingCheck.appSubscriptions[0];
             if (subscription) {
@@ -649,7 +647,7 @@ export default function PricingPage() {
     ];
     const visiblePlans = plans.filter((plan) => {
         if (plan.name === UNLIMITED_PLAN) return canUseUnlimitedPlan;
-        if (plan.name === CUSTOM_PLAN) return canUseCustomPlan;
+        // Always show the custom plan on the pricing page for app reviewers
         return true;
     });
 

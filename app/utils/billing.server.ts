@@ -362,6 +362,35 @@ export async function chargeOverageUsageRecord({
     }
 }
 
+/**
+ * Robustly checks billing, falling back to the opposite test state if no active payment is found.
+ * This is useful because Shopify dev stores automatically convert real charges to test charges,
+ * causing normal checks to fail if they assume isTest=false.
+ */
+export async function checkBillingWithFallback(billing: any, isTest: boolean) {
+    const { ALL_PAID_PLANS } = await import("../billing.config");
+    
+    let billingCheck = await billing.check({
+        plans: ALL_PAID_PLANS as any,
+        isTest,
+    });
+    
+    if (!billingCheck.hasActivePayment) {
+        const fallbackCheck = await billing.check({
+            plans: ALL_PAID_PLANS as any,
+            isTest: !isTest,
+        });
+        
+        if (fallbackCheck.hasActivePayment) {
+            billingCheck = fallbackCheck;
+            console.log(`[Billing Check] Recovered active payment via fallback check (isTest: ${!isTest})`);
+        }
+    }
+    
+    return billingCheck;
+}
+
+
 
 /**
  * Issue an application credit to a shop (Refund) using Partner API.

@@ -36,6 +36,7 @@ import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-con
 import { getShopifyMarkets } from "../utils/shopify-markets.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
@@ -147,10 +148,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // Check for active subscription
     const [billingConfig, settings, appEmbedStatus] = await Promise.all([
-        billing.check({
-            plans: ALL_PAID_PLANS as any,
-            isTest: isBillingTestMode(),
-        }),
+        checkBillingWithFallback(billing, isBillingTestMode()),
         prisma.settings.findUnique({ where: { shop } }),
         getThemeAppEmbedStatus({
             shop,
@@ -220,10 +218,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         const [billingConfig, settings] = await Promise.all([
-            billing.check({
-                plans: ALL_PAID_PLANS as any,
-                isTest: isBillingTestMode(),
-            }),
+            checkBillingWithFallback(billing, isBillingTestMode()),
             prisma.settings.findUnique({ where: { shop } }),
         ]);
         const hasProPlan = isPaidBillingConfig(billingConfig, settings);

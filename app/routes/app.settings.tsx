@@ -24,6 +24,7 @@ import prisma from "../db.server";
 import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 interface Settings {
@@ -125,10 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
-    const billingCheck = await billing.check({
-        plans: ALL_PAID_PLANS as any,
-        isTest: isBillingTestMode(),
-    });
+    const billingCheck = await checkBillingWithFallback(billing, isBillingTestMode());
 
     const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
 
@@ -166,10 +164,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         const [billingCheck, settings] = await Promise.all([
-            billing.check({
-                plans: ALL_PAID_PLANS as any,
-                isTest: isBillingTestMode(),
-            }),
+            checkBillingWithFallback(billing, isBillingTestMode()),
             prisma.settings.findUnique({ where: { shop } }),
         ]);
         const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);

@@ -16,6 +16,7 @@ import {
   PLUS_PLAN,
   ELITE_PLAN,
   UNLIMITED_PLAN,
+  CUSTOM_PLAN,
   OVERAGE_MONTHLY_CAP_AMOUNT,
 } from "./billing.config";
 import { sendAdminEmail, hasSentEmail } from "./utils/email.server";
@@ -85,6 +86,16 @@ const shopify = shopifyApp({
       trialDays: DEFAULT_TRIAL_DAYS,
     },
     [UNLIMITED_PLAN]: {
+      lineItems: [
+        {
+          amount: 79.99,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+      trialDays: DEFAULT_TRIAL_DAYS,
+    },
+    [CUSTOM_PLAN]: {
       lineItems: [
         {
           amount: 79.99,

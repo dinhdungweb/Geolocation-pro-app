@@ -27,11 +27,11 @@ import {
   hasMonthlyUnlimitedReward,
   hasUnlimitedUsage,
 } from "../billing.config";
-// Overage charging is handled by the background usage cron.
 import prisma from "../db.server";
 import { COUNTRY_MAP } from "../utils/countries";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
+import { checkBillingWithFallback } from "../utils/billing.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
@@ -306,10 +306,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       update: {},
       create: { shop },
     }),
-    billing.check({
-      plans: ALL_PAID_PLANS as any,
-      isTest: isBillingTestMode(),
-    }),
+    checkBillingWithFallback(billing, isBillingTestMode()),
     prisma.analyticsCountry.groupBy({
       by: ['countryCode'],
       where: {
