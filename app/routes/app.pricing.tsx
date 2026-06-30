@@ -646,7 +646,7 @@ export default function PricingPage() {
     ];
     const visiblePlans = plans.filter((plan) => {
         if (plan.name === UNLIMITED_PLAN) return canUseUnlimitedPlan;
-        // Always show the custom plan on the pricing page for app reviewers
+        if (plan.name === CUSTOM_PLAN) return canUseCustomPlan;
         return true;
     });
 
@@ -838,7 +838,7 @@ export default function PricingPage() {
                         </div>
                     </div>
 
-                    {!canUseCustomPlan && (
+                    {/* {!canUseCustomPlan && (
                         <Card>
                             <div className="pricing-custom-plan-card">
                                 <Box padding="400">
@@ -860,7 +860,7 @@ export default function PricingPage() {
                                 </Box>
                             </div>
                         </Card>
-                    )}
+                    )} */}
 
                     <div className={`pricing-cards-grid ${visiblePlans.length === 5 ? "pricing-cards-grid-5" : ""}`}>
                         {visiblePlans.map((plan) => (
