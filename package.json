@@ -2,7 +2,7 @@
   "name": "geo-redirect-country-blocker",
   "private": true,
   "scripts": {
-    "build": "remix vite:build && vite build --config vite.worker.config.ts",
+    "build": "prisma generate && remix vite:build && vite build --config vite.worker.config.ts",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",

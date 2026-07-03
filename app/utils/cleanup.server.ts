@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../db.server";
 
 // Retention periods
@@ -166,25 +167,43 @@ function errorMessage(error: unknown) {
 }
 
 export async function enqueueShopCleanupJob(shop: string, reason: ShopCleanupReason) {
-    await prisma.shopCleanupJob.upsert({
-        where: {
-            shop_reason: {
+    try {
+        await prisma.shopCleanupJob.upsert({
+            where: {
+                shop_reason: {
+                    shop,
+                    reason,
+                },
+            },
+            update: {
+                status: "pending",
+                attempts: 0,
+                lockedAt: null,
+                lastError: null,
+                completedAt: null,
+            },
+            create: {
                 shop,
                 reason,
             },
-        },
-        update: {
-            status: "pending",
-            attempts: 0,
-            lockedAt: null,
-            lastError: null,
-            completedAt: null,
-        },
-        create: {
-            shop,
-            reason,
-        },
-    });
+        });
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            await prisma.shopCleanupJob.updateMany({
+                where: { shop, reason },
+                data: {
+                    status: "pending",
+                    attempts: 0,
+                    lockedAt: null,
+                    lastError: null,
+                    completedAt: null,
+                },
+            });
+            return;
+        }
+
+        throw error;
+    }
 }
 
 async function cleanupShopData(shop: string, reason: ShopCleanupReason) {
