@@ -18,7 +18,6 @@ import {
     InlineStack,
     EmptyState,
     Select,
-    useBreakpoints,
     RadioButton,
     Banner,
     Divider,
@@ -29,7 +28,6 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { isBillingTestMode } from "../utils/billing-mode.server";
@@ -304,7 +302,6 @@ export default function IPRulesPage() {
     const { rules, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const [modalOpen, setModalOpen] = useState(false);
-    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingRule, setEditingRule] = useState<IPRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
@@ -320,13 +317,7 @@ export default function IPRulesPage() {
     const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
     const [pagePaths, setPagePaths] = useState("");
 
-    const { smUp } = useBreakpoints();
-    const [mounted, setMounted] = useState(false);
     const hasNormalizedIPs = normalizeIPAddresses(formIPAddresses).length > 0;
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     const resourceName = {
         singular: "IP rule",
@@ -362,9 +353,7 @@ export default function IPRulesPage() {
     }, [editingRule, modalOpen]);
 
     const handleOpenModal = useCallback((rule?: IPRule) => {
-        // Check Pro plan before allowing create/edit
         if (!hasProPlan && !rule) {
-            setShowUpgradeModal(true);
             return;
         }
         setEditingRule(rule || null);
@@ -498,7 +487,7 @@ export default function IPRulesPage() {
             onClick={() => handleOpenModal(rule)}
         >
             <IndexTable.Cell>
-                <div style={{ minWidth: "140px" }}>
+                <div className="ip-rule-name-cell">
                     <InlineStack gap="100" blockAlign="center" wrap={false}>
                         <Text variant="bodyMd" fontWeight="bold" as="span">
                             {rule.name}
@@ -514,7 +503,7 @@ export default function IPRulesPage() {
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <div style={{ minWidth: "300px" }}>
+                <div className="ip-rule-addresses-cell">
                     <InlineStack gap="100" wrap={false}>
                         {rule.ipAddresses.split(/[\n,]+/).filter(Boolean).slice(0, 3).map((ip: string) => (
                             <Badge key={ip} tone="info">{ip.trim()}</Badge>
@@ -526,10 +515,10 @@ export default function IPRulesPage() {
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <div style={{ minWidth: "260px" }}>
+                <div className="ip-rule-action-cell">
                     <Text as="span" variant="bodyMd" truncate>
                         {rule.ruleType === "block" ? (
-                            <Badge tone="critical">Block</Badge>
+                            <Badge tone="attention">Block</Badge>
                         ) : (
                             <>
                                 <Badge tone="warning">Redirect</Badge>
@@ -545,11 +534,11 @@ export default function IPRulesPage() {
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <div style={{ minWidth: "80px" }}>
+                <div className="ip-rule-status-cell">
                     {rule.isActive && !hasProPlan ? (
                         <Badge tone="warning">Disabled (Free Plan)</Badge>
                     ) : (
-                        <Badge tone={rule.isActive ? "success" : "critical"}>
+                        <Badge tone={rule.isActive ? "success" : "warning"}>
                             {rule.isActive ? "Active" : "Inactive"}
                         </Badge>
                     )}
@@ -559,7 +548,7 @@ export default function IPRulesPage() {
             <IndexTable.Cell>
                 <div
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: "flex", justifyContent: "flex-end", minWidth: "124px" }}
+                    className="ip-rule-actions-cell"
                 >
                     <InlineStack gap="200" wrap={false}>
                         <Button size="slim" onClick={() => handleOpenModal(rule)}>
@@ -572,13 +561,8 @@ export default function IPRulesPage() {
                         ) : (
                             <Button
                                 size="slim"
-                                onClick={() => {
-                                    if (!hasProPlan) {
-                                        setShowUpgradeModal(true);
-                                    } else {
-                                        handleToggle(rule);
-                                    }
-                                }}
+                                onClick={() => handleToggle(rule)}
+                                disabled={!hasProPlan}
                             >
                                 Enable
                             </Button>
@@ -619,54 +603,111 @@ export default function IPRulesPage() {
         <Page fullWidth>
             <TitleBar title="IP Rules">
             </TitleBar>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-end',
-                gap: '16px',
-                flexWrap: 'wrap',
-                marginBottom: '16px',
-            }}>
-                <BlockStack gap="100">
-                    <Text as="h1" variant="headingLg">IP Rules</Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                        Block or redirect specific IP addresses and CIDR ranges before they reach your store.
-                    </Text>
-                </BlockStack>
-                <InlineStack gap="200" align="end">
-                    <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                        <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
-                            <Button
-                                icon={!hasProPlan ? LockIcon : ExportIcon}
-                                onClick={() => {
-                                    if (!hasProPlan) { setShowUpgradeModal(true); return; }
-                                    handleExportRules(true);
-                                }}
-                                disabled={rules.length === 0 && hasProPlan}
-                            >
-                                Export All
-                            </Button>
-                        </div>
-                    </Tooltip>
-                    <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                        <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
-                            <Button
-                                icon={!hasProPlan ? LockIcon : ImportIcon}
-                                onClick={() => {
-                                    if (!hasProPlan) { setShowUpgradeModal(true); return; }
-                                    setImportModalOpen(true);
-                                }}
-                            >
-                                Import
-                            </Button>
-                        </div>
-                    </Tooltip>
-                    <Button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
-                        Add IP Rule
-                    </Button>
-                </InlineStack>
-            </div>
-            <BlockStack gap="500">
+            <style>
+                {`
+                    .ip-rules-page {
+                        padding-bottom: var(--p-space-800, 32px);
+                    }
+                    .ip-rules-table-wrap {
+                        width: 100%;
+                        max-width: 100%;
+                        overflow-x: auto;
+                        overflow-y: hidden;
+                        -webkit-overflow-scrolling: touch;
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable-ScrollContainer {
+                        overflow: visible !important;
+                        max-height: none;
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable__ScrollBarContainer {
+                        display: none !important;
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable,
+                    .ip-rules-table-wrap .Polaris-IndexTable__Table {
+                        width: 100%;
+                        min-width: 1120px;
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable__TableHeading--first,
+                    .ip-rules-table-wrap .Polaris-IndexTable__TableHeading--second {
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable__TableCell--first,
+                    .ip-rules-table-wrap .Polaris-IndexTable__TableCell--first + .Polaris-IndexTable__TableCell {
+                        background: var(--p-color-bg-surface, #ffffff);
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable__TableHeading--first,
+                    .ip-rules-table-wrap .Polaris-IndexTable__TableCell--first {
+                        box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
+                    }
+                    .ip-rule-name-cell {
+                        min-width: 140px;
+                    }
+                    .ip-rule-addresses-cell {
+                        min-width: 300px;
+                    }
+                    .ip-rule-action-cell {
+                        min-width: 260px;
+                    }
+                    .ip-rule-status-cell {
+                        min-width: 80px;
+                    }
+                    .ip-rule-actions-cell {
+                        display: flex;
+                        justify-content: flex-end;
+                        min-width: 124px;
+                    }
+                    @media (max-width: 47.9975em) {
+                        .ip-rules-table-wrap .Polaris-IndexTable,
+                        .ip-rules-table-wrap .Polaris-IndexTable__Table {
+                            min-width: 1120px;
+                        }
+                    }
+                `}
+            </style>
+            <div className="ip-rules-page">
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                    marginBottom: '16px',
+                }}>
+                    <BlockStack gap="100">
+                        <Text as="h1" variant="headingLg">IP Rules</Text>
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                            Block or redirect specific IP addresses and CIDR ranges before they reach your store.
+                        </Text>
+                    </BlockStack>
+                    <InlineStack gap="200" align="end">
+                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
+                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                                <Button
+                                    icon={!hasProPlan ? LockIcon : ExportIcon}
+                                    onClick={() => handleExportRules(true)}
+                                    disabled={!hasProPlan || rules.length === 0}
+                                >
+                                    Export All
+                                </Button>
+                            </div>
+                        </Tooltip>
+                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
+                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                                <Button
+                                    icon={!hasProPlan ? LockIcon : ImportIcon}
+                                    onClick={() => setImportModalOpen(true)}
+                                    disabled={!hasProPlan}
+                                >
+                                    Import
+                                </Button>
+                            </div>
+                        </Tooltip>
+                        <Button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
+                            Add IP Rule
+                        </Button>
+                    </InlineStack>
+                </div>
+                <BlockStack gap="500">
                 {appEmbedStatus.state !== "enabled" && (
                     <Banner
                         tone="warning"
@@ -703,31 +744,34 @@ export default function IPRulesPage() {
                             {rules.length === 0 ? (
                                 emptyStateMarkup
                             ) : (
-                                <IndexTable
-                                    condensed={mounted ? !smUp : false}
-                                    resourceName={resourceName}
-                                    itemCount={rules.length}
-                                    selectedItemsCount={
-                                        allResourcesSelected ? "All" : selectedResources.length
-                                    }
-                                    onSelectionChange={handleSelectionChange}
-                                    headings={[
-                                        { title: "Name" },
-                                        { title: "IP Addresses" },
-                                        { title: "Action" },
-                                        { title: "Status" },
-                                        { title: "Priority" },
-                                        { title: "Actions", alignment: "end" },
-                                    ]}
-                                    promotedBulkActions={promotedBulkActions}
-                                >
-                                    {rowMarkup}
-                                </IndexTable>
+                                <div className="ip-rules-table-wrap">
+                                    <IndexTable
+                                        condensed={false}
+                                        resourceName={resourceName}
+                                        itemCount={rules.length}
+                                        selectedItemsCount={
+                                            allResourcesSelected ? "All" : selectedResources.length
+                                        }
+                                        onSelectionChange={handleSelectionChange}
+                                        headings={[
+                                            { title: "Name" },
+                                            { title: "IP Addresses" },
+                                            { title: "Action" },
+                                            { title: "Status" },
+                                            { title: "Priority" },
+                                            { title: "Actions", alignment: "end" },
+                                        ]}
+                                        promotedBulkActions={promotedBulkActions}
+                                    >
+                                        {rowMarkup}
+                                    </IndexTable>
+                                </div>
                             )}
                         </Card>
                     </Layout.Section>
                 </Layout>
-            </BlockStack>
+                </BlockStack>
+            </div>
 
             {/* Add/Edit Modal */}
             <Modal
@@ -920,28 +964,6 @@ export default function IPRulesPage() {
                 </Modal.Section>
             </Modal>
 
-            {/* Upgrade Modal */}
-            <Modal
-                open={showUpgradeModal}
-                onClose={() => setShowUpgradeModal(false)}
-                title="Upgrade to Pro"
-                primaryAction={{
-                    content: "View Plans",
-                    url: "/app/pricing",
-                }}
-                secondaryActions={[
-                    {
-                        content: "Cancel",
-                        onAction: () => setShowUpgradeModal(false),
-                    },
-                ]}
-            >
-                <Modal.Section>
-                    <Text as="p">
-                        IP Rules is a Pro feature. Upgrade now to block or redirect specific IP addresses and protect your store from unwanted traffic.
-                    </Text>
-                </Modal.Section>
-            </Modal>
         </Page>
     );
 }

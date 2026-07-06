@@ -5,15 +5,17 @@ import {
     Card,
     Text,
     BlockStack,
+    Banner,
     Divider,
     InlineStack,
     Badge,
 } from "@shopify/polaris";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { Link, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
+import { Link, useLoaderData, useNavigation, useSearchParams, useSubmit } from "@remix-run/react";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { ArrowLeftIcon } from "@shopify/polaris-icons";
+import { BillingError } from "@shopify/shopify-api";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import {
@@ -32,7 +34,6 @@ import {
     getPlanLimit,
 } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
-import { loadCrisp } from "../utils/crisp";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/billing.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
@@ -61,6 +62,34 @@ function redirectToBillingConfirmation(request: Request, shop: string, confirmat
     }
 
     throw redirect(confirmationUrl);
+}
+
+function getBillingErrorMessage(error: unknown) {
+    if (error instanceof BillingError) {
+        const firstError = Array.isArray(error.errorData) ? error.errorData[0] : null;
+        if (firstError?.message) return firstError.message;
+        return error.message || "Shopify could not create the billing confirmation.";
+    }
+
+    if (error instanceof Error) return error.message;
+
+    return "Shopify could not create the billing confirmation.";
+}
+
+function redirectToPricingWithBillingError(request: Request, message: string) {
+    const requestUrl = new URL(request.url);
+    const params = new URLSearchParams();
+    params.set("billingError", message);
+
+    const shop = requestUrl.searchParams.get("shop");
+    const host = requestUrl.searchParams.get("host");
+    const embedded = requestUrl.searchParams.get("embedded");
+
+    if (shop) params.set("shop", shop);
+    if (host) params.set("host", host);
+    if (embedded) params.set("embedded", embedded);
+
+    throw redirect(`/app/pricing?${params.toString()}`);
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -332,16 +361,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         // Handling Paid Plans
         if (ALL_PAID_PLANS.includes(selectedPlan) && selectedPlan !== CUSTOM_PLAN) {
-            await billing.require({
-                plans: [selectedPlan] as any,
-                isTest,
-                onFailure: async () => {
-                    return billing.request({
-                        plan: selectedPlan as any,
-                        isTest,
-                    });
-                },
-            });
+            try {
+                await billing.require({
+                    plans: [selectedPlan] as any,
+                    isTest,
+                    onFailure: async () => {
+                        return billing.request({
+                            plan: selectedPlan as any,
+                            isTest,
+                            returnUrl: `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}/app/pricing`,
+                        });
+                    },
+                });
+            } catch (error) {
+                if (error instanceof Response) {
+                    throw error;
+                }
+
+                console.error("[Billing] Failed to create billing confirmation:", {
+                    shop,
+                    selectedPlan,
+                    isTest,
+                    message: error instanceof Error ? error.message : String(error),
+                    errorData: error instanceof BillingError ? error.errorData : undefined,
+                });
+
+                redirectToPricingWithBillingError(request, getBillingErrorMessage(error));
+            }
 
             try {
                 const syncData = selectedPlan === UNLIMITED_PLAN
@@ -401,6 +447,7 @@ interface PlanCardProps {
 }
 
 function formatPlanName(name: string) {
+    if (name === PREMIUM_PLAN) return "Pro";
     return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
@@ -520,22 +567,16 @@ function PlanCard({
 }
 
 export default function PricingPage() {
-    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan, shop } = useLoaderData<typeof loader>();
+    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan } = useLoaderData<typeof loader>();
+    const [searchParams] = useSearchParams();
     const submit = useSubmit();
     const navigation = useNavigation();
     const submittingPlan = navigation.state !== "idle" ? navigation.formData?.get("plan")?.toString() : null;
+    const billingError = searchParams.get("billingError");
 
     const handleSelectPlan = (plan: string) => {
         // Pass both selected plan and current plan if needed
         submit({ plan, currentPlan }, { method: "POST" });
-    };
-
-    const openLiveChat = () => {
-        if (loadCrisp({ shop, open: true })) {
-            return;
-        }
-
-        window.location.href = "/app/support";
     };
 
     const customVisitorLimit = customPlan?.visitorLimit ?? null;
@@ -562,6 +603,7 @@ export default function PricingPage() {
         },
         {
             name: PREMIUM_PLAN,
+            displayName: "Pro",
             subtitle: "More controls",
             price: "4.99",
             visitorLimit: PLAN_LIMITS[PREMIUM_PLAN],
@@ -581,7 +623,7 @@ export default function PricingPage() {
             price: "7.99",
             visitorLimit: PLAN_LIMITS[PLUS_PLAN],
             features: [
-                "Everything in Premium",
+                "Everything in Pro",
                 "Higher monthly limit",
                 "Dedicated support",
                 "High traffic priority",
@@ -838,29 +880,11 @@ export default function PricingPage() {
                         </div>
                     </div>
 
-                    {/* {!canUseCustomPlan && (
-                        <Card>
-                            <div className="pricing-custom-plan-card">
-                                <Box padding="400">
-                                    <InlineStack align="space-between" blockAlign="center" gap="400">
-                                        <BlockStack gap="150">
-                                            <InlineStack gap="200" blockAlign="center">
-                                                <Text as="h2" variant="headingMd">Need a custom plan?</Text>
-                                                <Badge tone="info">Custom plan</Badge>
-                                            </InlineStack>
-                                            <Text as="p" tone="subdued">
-                                                High-volume stores can request private pricing, custom visitor limits and predictable monthly billing.
-                                            </Text>
-                                        </BlockStack>
-                                        <InlineStack gap="200" blockAlign="center">
-                                            <Button url="/app/support">Contact support</Button>
-                                            <Button variant="primary" onClick={openLiveChat}>Open live chat</Button>
-                                        </InlineStack>
-                                    </InlineStack>
-                                </Box>
-                            </div>
-                        </Card>
-                    )} */}
+                    {billingError && (
+                        <Banner tone="critical">
+                            <p>{billingError}</p>
+                        </Banner>
+                    )}
 
                     <div className={`pricing-cards-grid ${visiblePlans.length === 5 ? "pricing-cards-grid-5" : ""}`}>
                         {visiblePlans.map((plan) => (

@@ -1,14 +1,12 @@
-import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData } from "@remix-run/react";
+import { useActionData, useLoaderData } from "@remix-run/react";
 import {
   AppProvider as PolarisAppProvider,
+  BlockStack,
   Button,
   Card,
-  FormLayout,
   Page,
   Text,
-  TextField,
 } from "@shopify/polaris";
 import polarisTranslations from "@shopify/polaris/locales/en.json";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
@@ -18,6 +16,8 @@ import { login } from "../../shopify.server";
 import { loginErrorMessage } from "./error.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
+
+const APP_STORE_URL = "https://apps.shopify.com/geo-redirect-country-block";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const errors = loginErrorMessage(await login(request));
@@ -36,31 +36,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function Auth() {
   const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const [shop, setShop] = useState("");
   const { errors } = actionData || loaderData;
 
   return (
     <PolarisAppProvider i18n={loaderData.polarisTranslations}>
-      <Page>
+      <Page narrowWidth>
         <Card>
-          <Form method="post">
-            <FormLayout>
-              <Text variant="headingMd" as="h2">
-                Log in
+          <BlockStack gap="400">
+            <Text variant="headingMd" as="h2">
+              Open Geo Redirect from Shopify
+            </Text>
+            <Text as="p" tone="subdued">
+              For security, install and launch the app from the Shopify App Store or your Shopify admin Apps page.
+            </Text>
+            {errors.shop && (
+              <Text as="p" tone="critical">
+                {errors.shop}
               </Text>
-              <TextField
-                type="text"
-                name="shop"
-                label="Shop domain"
-                helpText="example.myshopify.com"
-                value={shop}
-                onChange={setShop}
-                autoComplete="on"
-                error={errors.shop}
-              />
-              <Button submit>Log in</Button>
-            </FormLayout>
-          </Form>
+            )}
+            <Button variant="primary" url={APP_STORE_URL}>
+              Open in Shopify App Store
+            </Button>
+          </BlockStack>
         </Card>
       </Page>
     </PolarisAppProvider>

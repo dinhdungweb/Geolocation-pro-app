@@ -18,7 +18,6 @@ import { CheckIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { apiVersion, authenticate } from "../shopify.server";
 import {
-  ALL_PAID_PLANS,
   FREE_PLAN,
   PREMIUM_PLAN,
   PLUS_PLAN,
@@ -52,7 +51,7 @@ interface VisitsDataItem {
 }
 
 const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: string }> = {
-  [FREE_PLAN]: { label: "Premium", actionContent: "Upgrade to Premium" },
+  [FREE_PLAN]: { label: "Pro", actionContent: "Upgrade to Pro" },
   [PREMIUM_PLAN]: { label: "Plus", actionContent: "Upgrade to Plus" },
   [PLUS_PLAN]: { label: "Elite", actionContent: "Upgrade to Elite" },
 };
@@ -60,6 +59,7 @@ const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: str
 const CUSTOM_PLAN_REQUEST_ACTION = { content: "Request custom plan", url: "/app/pricing" };
 const APP_EMBED_BLOCK_HANDLE = "geolocation-popup";
 const SETUP_CONFIRMED_KEY = "geo_dashboard_setup_confirmed";
+const SETUP_DISMISSED_KEY = "geo_dashboard_setup_dismissed";
 const REVIEW_URL = "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal";
 
 type AppEmbedStatusState = "enabled" | "disabled" | "missing_scope" | "unavailable";
@@ -258,6 +258,7 @@ async function getThemeAppEmbedStatus({
 
 function formatPlanLabel(planName: string) {
   if (!planName) return "current";
+  if (planName === PREMIUM_PLAN) return "Pro";
   return planName.charAt(0).toUpperCase() + planName.slice(1);
 }
 
@@ -494,18 +495,23 @@ export default function Index() {
   const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
+  const [setupDismissed, setSetupDismissed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
   const hasScheduledPermissionRefresh = useRef(false);
   const setupConfirmedKey = `${SETUP_CONFIRMED_KEY}:${shop}`;
+  const setupDismissedKey = `${SETUP_DISMISSED_KEY}:${shop}`;
 
   useEffect(() => {
     try {
       localStorage.removeItem(SETUP_CONFIRMED_KEY);
+      localStorage.removeItem(SETUP_DISMISSED_KEY);
       setSetupConfirmed(localStorage.getItem(setupConfirmedKey) === "true");
+      setSetupDismissed(localStorage.getItem(setupDismissedKey) === "true");
     } catch {
       setSetupConfirmed(false);
+      setSetupDismissed(false);
     }
-  }, [setupConfirmedKey]);
+  }, [setupConfirmedKey, setupDismissedKey]);
 
   useEffect(() => {
     if (appEmbedStatus.state !== "missing_scope") {
@@ -611,11 +617,27 @@ export default function Index() {
         return;
       }
     } catch {
-      // Fall back to the App Store review URL when App Bridge reviews are unavailable.
+      // Fall back to opening the App Store review URL when App Bridge reviews are unavailable.
     }
 
     window.open(REVIEW_URL, "_blank");
   }, [shopify, setupConfirmedKey]);
+
+  const handleDismissSetup = useCallback(() => {
+    setSetupDismissed(true);
+    try {
+      localStorage.removeItem(SETUP_DISMISSED_KEY);
+      localStorage.setItem(setupDismissedKey, "true");
+    } catch {}
+  }, [setupDismissedKey]);
+
+  const handleShowSetup = useCallback(() => {
+    setSetupDismissed(false);
+    try {
+      localStorage.removeItem(SETUP_DISMISSED_KEY);
+      localStorage.removeItem(setupDismissedKey);
+    } catch {}
+  }, [setupDismissedKey]);
 
   const setupSteps: Array<{
     id: "embed" | "rule" | "logs" | "confirm";
@@ -655,6 +677,7 @@ export default function Index() {
   ];
   const activeSetupStep = activeSetupStepId || setupSteps.find((step) => !step.completed)?.id || "confirm";
   const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
+  const isSetupComplete = completedSetupSteps === setupSteps.length;
   const totalBlockedActions = blocksData.reduce((sum: number, item: any) => sum + Number(item.blocked || 0), 0);
   const totalPopupSeen = popupsData.reduce((sum: number, item: any) => sum + Number(item.seen || 0), 0);
   const totalAutoRedirected = autoRedirectsData.reduce((sum: number, item: any) => sum + Number(item.autoRedirected || 0), 0);
@@ -672,6 +695,38 @@ export default function Index() {
             justify-content: space-between;
             gap: 16px;
             padding: 2px 4px 0;
+          }
+          .dashboard-page,
+          .dashboard-shell,
+          .dashboard-overview-grid,
+          .dashboard-summary-grid,
+          .dashboard-content-grid,
+          .dashboard-side-stack,
+          .dashboard-card-frame,
+          .dashboard-panel {
+            min-width: 0;
+            max-width: 100%;
+          }
+          .dashboard-page {
+            box-sizing: border-box;
+            width: 100%;
+          }
+          .dashboard-page > .Polaris-BlockStack,
+          .dashboard-page .Polaris-ShadowBevel {
+            --pc-shadow-bevel-border-radius-xs: var(--p-border-radius-200, 8px) !important;
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            border-radius: var(--p-border-radius-200, 8px);
+            overflow: hidden;
+          }
+          .dashboard-page .Polaris-ShadowBevel > .Polaris-Box {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            border-radius: inherit;
           }
           .dashboard-shell {
             display: grid;
@@ -695,6 +750,23 @@ export default function Index() {
             align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
+          }
+          .dashboard-usage-header > .Polaris-BlockStack,
+          .dashboard-panel-header > .Polaris-BlockStack {
+            min-width: 0;
+            flex: 1 1 auto;
+          }
+          .dashboard-header-badge,
+          .dashboard-header-badges {
+            display: flex;
+            flex: 0 0 auto;
+            justify-content: flex-end;
+            max-width: 48%;
+          }
+          .dashboard-header-badge .Polaris-Badge,
+          .dashboard-header-badges .Polaris-Badge {
+            width: fit-content;
+            max-width: 100%;
           }
           .dashboard-usage-progress {
             display: grid;
@@ -741,14 +813,22 @@ export default function Index() {
           .dashboard-table-scroll {
             overflow-x: auto;
             overflow-y: auto;
+            width: 100%;
+            max-width: 100%;
             max-height: 360px;
             min-height: 0;
+            min-width: 0;
+            contain: inline-size;
           }
           .dashboard-table-scroll-short {
             overflow-x: auto;
             overflow-y: auto;
+            width: 100%;
+            max-width: 100%;
             max-height: 190px;
             min-height: 0;
+            min-width: 0;
+            contain: inline-size;
           }
           .dashboard-table-scroll,
           .dashboard-table-scroll-short {
@@ -862,9 +942,29 @@ export default function Index() {
           }
           .dashboard-summary-card {
             padding: 16px;
+            height: 100%;
+            min-height: 94px;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             gap: 4px;
+          }
+          .dashboard-summary-grid > .Polaris-ShadowBevel,
+          .dashboard-summary-grid > .Polaris-ShadowBevel > .Polaris-Box {
+            height: 100%;
+          }
+          .dashboard-embed-card {
+            padding: 16px;
+            display: grid;
+            gap: 12px;
+          }
+          .dashboard-embed-header,
+          .setup-guide-header-actions {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
           }
           .dashboard-summary-value {
             font-size: 24px;
@@ -903,6 +1003,14 @@ export default function Index() {
             text-align: left;
             cursor: pointer;
           }
+          .setup-guide-step-header > .Polaris-Badge {
+            width: fit-content;
+            max-width: 100%;
+            justify-self: end;
+          }
+          .setup-guide-step-header > span:not(.setup-guide-step-marker):not(.Polaris-Badge) {
+            min-width: 0;
+          }
           .setup-guide-step-marker {
             width: 20px;
             height: 20px;
@@ -938,9 +1046,24 @@ export default function Index() {
             margin-top: 4px;
           }
           @media (max-width: 47.9975em) {
+            :where(html, body):has(.dashboard-page) {
+              overflow-x: hidden;
+            }
+            body:has(.dashboard-page) .Polaris-Page,
+            body:has(.dashboard-page) .Polaris-Page__Content {
+              box-sizing: border-box;
+              width: 100%;
+              min-width: 0;
+              max-width: 100%;
+            }
+            .dashboard-page {
+              width: 100%;
+              max-width: 100%;
+            }
             .dashboard-welcome {
               flex-direction: column;
               align-items: flex-start;
+              padding: 2px 0 0;
             }
             .dashboard-overview-grid,
             .dashboard-content-grid {
@@ -959,36 +1082,115 @@ export default function Index() {
             .dashboard-side-stack {
               grid-template-rows: none;
             }
+            .dashboard-panel {
+              height: auto;
+              overflow: visible;
+            }
             .dashboard-content-grid .dashboard-table-scroll {
               flex: none;
-              max-height: 360px;
+              max-height: none;
+              overflow-y: visible;
             }
             .dashboard-content-grid .dashboard-table-scroll-short {
               flex: none;
-              max-height: 220px;
+              max-height: none;
+              overflow-y: visible;
+            }
+            .dashboard-table-scroll-short.is-empty {
+              overflow-y: visible;
+            }
+            .dashboard-table {
+              min-width: 560px;
+            }
+            .dashboard-summary-card {
+              min-height: 104px;
             }
             .dashboard-usage-header,
             .dashboard-panel-header {
-              flex-direction: column;
-              align-items: stretch;
+              flex-direction: row;
+              align-items: flex-start;
+            }
+            .dashboard-header-badge,
+            .dashboard-header-badges {
+              margin-left: auto;
+              max-width: 46%;
+            }
+            .dashboard-header-badges .Polaris-InlineStack {
+              justify-content: flex-end;
+            }
+            .dashboard-table-scroll,
+            .dashboard-table-scroll-short {
+              overscroll-behavior-x: contain;
             }
             .setup-guide-header {
               flex-direction: column;
               align-items: stretch;
             }
-            .setup-guide-step-header {
-              grid-template-columns: 24px minmax(0, 1fr);
+            .dashboard-embed-header,
+            .setup-guide-header-actions {
+              justify-content: flex-start;
             }
-            .setup-guide-step-header > span:last-child {
-              grid-column: 2;
+            .setup-guide-step-header {
+              grid-template-columns: 24px minmax(0, 1fr) max-content;
+            }
+            .setup-guide-step-header > .Polaris-Badge {
+              grid-column: 3;
+              justify-self: end;
             }
             .setup-guide-step-body {
               padding-left: 46px;
             }
           }
+          @media (max-width: 30em) {
+            .dashboard-shell,
+            .dashboard-overview-grid,
+            .dashboard-summary-grid,
+            .dashboard-content-grid,
+            .dashboard-side-stack {
+              gap: var(--p-space-400, 16px);
+            }
+            .dashboard-summary-grid {
+              grid-template-columns: 1fr;
+            }
+            .dashboard-embed-card,
+            .setup-guide-card,
+            .dashboard-usage-card,
+            .dashboard-summary-card,
+            .dashboard-panel-header {
+              padding: var(--p-space-400, 16px);
+            }
+            .dashboard-usage-header,
+            .dashboard-panel-header,
+            .dashboard-embed-header {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) max-content;
+              align-items: start;
+            }
+            .dashboard-embed-header > .Polaris-InlineStack,
+            .dashboard-header-badge,
+            .dashboard-header-badges {
+              justify-self: end;
+              max-width: 44vw;
+            }
+            .dashboard-embed-header > .Polaris-InlineStack,
+            .dashboard-header-badges .Polaris-InlineStack {
+              flex-wrap: wrap;
+            }
+            .setup-guide-header-actions {
+              align-items: center;
+            }
+            .setup-guide-step-header {
+              gap: 8px;
+              padding: 10px 8px;
+            }
+            .setup-guide-step-body {
+              padding-right: 8px;
+              padding-left: 42px;
+            }
+          }
         `}
       </style>
-      <div style={{ paddingBottom: '32px' }}>
+      <div className="dashboard-page" style={{ paddingBottom: '32px' }}>
       <BlockStack gap="500">
 
         <div className="dashboard-welcome">
@@ -1003,9 +1205,43 @@ export default function Index() {
         </div>
 
         <Card padding="0">
-          <div className="setup-guide-card">
-            <BlockStack gap="400">
-              <div className="setup-guide-header">
+          <div className="dashboard-embed-card">
+            <div className="dashboard-embed-header">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Theme app embed</Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  {appEmbedStatus.helpText}
+                </Text>
+              </BlockStack>
+              <InlineStack gap="200" blockAlign="center">
+                <Badge tone={appEmbedStatus.state === "enabled" ? "success" : appEmbedStatus.state === "missing_scope" ? "warning" : "attention"}>
+                  {appEmbedStatus.label}
+                </Badge>
+                {appEmbedStatus.themeName && (
+                  <Badge>{`Theme: ${appEmbedStatus.themeName}`}</Badge>
+                )}
+                {setupDismissed && (
+                  <Button variant="plain" onClick={handleShowSetup}>
+                    Show setup guide
+                  </Button>
+                )}
+              </InlineStack>
+            </div>
+            {appEmbedStatus.state !== "enabled" && (
+              <InlineStack gap="200">
+                <Button onClick={handleOpenThemeEditor}>
+                  Enable app embed
+                </Button>
+              </InlineStack>
+            )}
+          </div>
+        </Card>
+
+        {!setupDismissed && (
+          <Card padding="0">
+            <div className="setup-guide-card">
+              <BlockStack gap="400">
+                <div className="setup-guide-header">
                 <BlockStack gap="100">
                   <Text as="h2" variant="headingMd">Setup guide</Text>
                   <Text as="p" variant="bodyMd">
@@ -1015,12 +1251,19 @@ export default function Index() {
                     <Badge>{`${completedSetupSteps} / ${setupSteps.length} completed`}</Badge>
                   </div>
                 </BlockStack>
-                {appEmbedStatus.themeName && (
-                  <Badge tone={appEmbedStatus.state === "enabled" ? "success" : "attention"}>
-                    {`Theme: ${appEmbedStatus.themeName}`}
-                  </Badge>
-                )}
-              </div>
+                  <div className="setup-guide-header-actions">
+                    {appEmbedStatus.themeName && (
+                      <Badge tone={appEmbedStatus.state === "enabled" ? "success" : "attention"}>
+                        {`Theme: ${appEmbedStatus.themeName}`}
+                      </Badge>
+                    )}
+                    {isSetupComplete && (
+                      <Button variant="plain" onClick={handleDismissSetup}>
+                        Dismiss
+                      </Button>
+                    )}
+                  </div>
+                </div>
 
               <div className="setup-guide-steps">
                 {setupSteps.map((step) => {
@@ -1122,9 +1365,10 @@ export default function Index() {
                   );
                 })}
               </div>
-            </BlockStack>
-          </div>
-        </Card>
+              </BlockStack>
+            </div>
+          </Card>
+        )}
 
         <div className="dashboard-shell">
           <div className="dashboard-overview-grid">
@@ -1135,14 +1379,16 @@ export default function Index() {
                     <Text as="h3" variant="headingSm">{usageHeading}</Text>
                     <Text as="p" variant="bodySm" tone="subdued">{usageScopeText}</Text>
                   </BlockStack>
-                  <InlineStack gap="200">
-                    <Badge tone={isAtLimit ? "critical" : isNearLimit ? "warning" : "success"}>
-                      {formatPlanLabel(planDisplayName)}
-                    </Badge>
-                    <Badge tone={isAppActive ? "success" : "warning"}>
-                      {isAppActive ? "Active" : "Paused"}
-                    </Badge>
-                  </InlineStack>
+                  <div className="dashboard-header-badges">
+                    <InlineStack gap="200">
+                      <Badge tone={isAtLimit ? "critical" : isNearLimit ? "warning" : "success"}>
+                        {formatPlanLabel(planDisplayName)}
+                      </Badge>
+                      <Badge tone={isAppActive ? "success" : "warning"}>
+                        {isAppActive ? "Active" : "Paused"}
+                      </Badge>
+                    </InlineStack>
+                  </div>
                 </div>
                 <div className="dashboard-usage-progress">
                   <InlineStack align="space-between" blockAlign="center" gap="300">
@@ -1235,7 +1481,9 @@ export default function Index() {
                       <Text as="h3" variant="headingMd">Traffic Overview</Text>
                       <Text as="p" variant="bodySm" tone="subdued">Visits and actions by country in the last 30 days.</Text>
                     </BlockStack>
-                    <Badge>{`${totalCountries} countries`}</Badge>
+                    <div className="dashboard-header-badge">
+                      <Badge>{`${totalCountries} countries`}</Badge>
+                    </div>
                   </div>
                   <div className="dashboard-table-scroll">
                     <table className="dashboard-table">
@@ -1295,7 +1543,9 @@ export default function Index() {
                         <Text as="h3" variant="headingMd">Blocked Traffic</Text>
                         <Text as="p" variant="bodySm" tone="subdued">Visitors blocked by rule or country.</Text>
                       </BlockStack>
-                      <Badge tone={totalBlockedActions > 0 ? "critical" : undefined}>{totalBlockedActions.toLocaleString()}</Badge>
+                      <div className="dashboard-header-badge">
+                        <Badge tone={totalBlockedActions > 0 ? "attention" : undefined}>{totalBlockedActions.toLocaleString()}</Badge>
+                      </div>
                     </div>
                     <div className={`dashboard-table-scroll-short${blocksData.length > 0 ? "" : " is-empty"}`}>
                       <table className="dashboard-table">
@@ -1349,7 +1599,9 @@ export default function Index() {
                         <Text as="h3" variant="headingMd">Instant Redirects</Text>
                         <Text as="p" variant="bodySm" tone="subdued">Auto-redirects in the last 30 days.</Text>
                       </BlockStack>
-                      <Badge tone={totalAutoRedirected > 0 ? "success" : undefined}>{totalAutoRedirected.toLocaleString()}</Badge>
+                      <div className="dashboard-header-badge">
+                        <Badge tone={totalAutoRedirected > 0 ? "success" : undefined}>{totalAutoRedirected.toLocaleString()}</Badge>
+                      </div>
                     </div>
                     <div className={`dashboard-table-scroll-short${autoRedirectsData.length > 0 ? "" : " is-empty"}`}>
                       <table className="dashboard-table">
@@ -1394,7 +1646,9 @@ export default function Index() {
                   <Text as="h3" variant="headingMd">Banners and Popups</Text>
                   <Text as="p" variant="bodySm" tone="subdued">Popup interactions in the last 30 days.</Text>
                 </BlockStack>
-                <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>{`${totalPopupSeen.toLocaleString()} seen`}</Badge>
+                <div className="dashboard-header-badge">
+                  <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>{`${totalPopupSeen.toLocaleString()} seen`}</Badge>
+                </div>
               </div>
               <div className="dashboard-table-scroll">
                 <table className="dashboard-table">

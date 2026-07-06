@@ -1,18 +1,13 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "@remix-run/react";
-import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
-import { loadCrisp, prepareCrisp } from "../utils/crisp";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
-
-const CRISP_BOOT_DELAY_MS = 1500;
-const CRISP_IDLE_TIMEOUT_MS = 1500;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -883,7 +878,7 @@ function getPendingShellForPath(pathname: string) {
 }
 
 export default function App() {
-  const { apiKey, shop } = useLoaderData<typeof loader>();
+  const { apiKey } = useLoaderData<typeof loader>();
   const location = useLocation();
   const navigation = useNavigation();
   const isNavigatingToAppRoute =
@@ -894,79 +889,40 @@ export default function App() {
     ? getPendingShellForPath(navigation.location.pathname)
     : null;
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    prepareCrisp(shop);
-
-    let delayTimer: number | undefined;
-    let idleCallbackId: number | undefined;
-    let hasRequestedLoad = false;
-
-    const intentEvents = ["pointerdown", "keydown", "touchstart"] as const;
-    const listenerOptions: AddEventListenerOptions = {
-      capture: true,
-      passive: true,
-      once: true,
-    };
-
-    const removeIntentListeners = () => {
-      for (const eventName of intentEvents) {
-        window.removeEventListener(eventName, handleUserIntent, listenerOptions);
-      }
-    };
-
-    const requestCrispLoad = () => {
-      if (hasRequestedLoad) return;
-      hasRequestedLoad = true;
-
-      if (delayTimer !== undefined) {
-        window.clearTimeout(delayTimer);
-      }
-
-      if (idleCallbackId !== undefined && "cancelIdleCallback" in window) {
-        window.cancelIdleCallback(idleCallbackId);
-      }
-
-      removeIntentListeners();
-      loadCrisp({ shop });
-    };
-
-    function handleUserIntent() {
-      requestCrispLoad();
-    }
-
-    const queueIdleLoad = () => {
-      if ("requestIdleCallback" in window) {
-        idleCallbackId = window.requestIdleCallback(requestCrispLoad, {
-          timeout: CRISP_IDLE_TIMEOUT_MS,
-        });
-      } else {
-        requestCrispLoad();
-      }
-    };
-
-    for (const eventName of intentEvents) {
-      window.addEventListener(eventName, handleUserIntent, listenerOptions);
-    }
-
-    delayTimer = window.setTimeout(queueIdleLoad, CRISP_BOOT_DELAY_MS);
-
-    return () => {
-      if (delayTimer !== undefined) {
-        window.clearTimeout(delayTimer);
-      }
-
-      if (idleCallbackId !== undefined && "cancelIdleCallback" in window) {
-        window.cancelIdleCallback(idleCallbackId);
-      }
-
-      removeIntentListeners();
-    };
-  }, [shop]);
-
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
+      <style>
+        {`
+          @media (max-width: 30em) {
+            .app-route-frame > .Polaris-Page {
+              box-sizing: border-box;
+              padding-left: var(--p-space-400, 16px) !important;
+              padding-right: var(--p-space-400, 16px) !important;
+            }
+            .app-route-frame > .Polaris-Page > .Polaris-Page__Content {
+              padding-left: 0 !important;
+              padding-right: 0 !important;
+            }
+            .app-route-frame > .Polaris-Page .Polaris-ShadowBevel {
+              --pc-shadow-bevel-border-radius-xs: var(--p-border-radius-200, 8px) !important;
+              border-radius: var(--p-border-radius-200, 8px) !important;
+              overflow: hidden;
+            }
+            .app-route-frame > .Polaris-Page .Polaris-ShadowBevel > .Polaris-Box {
+              border-radius: inherit !important;
+            }
+            .app-route-frame > .Polaris-Page .Polaris-Banner,
+            .app-route-frame > .Polaris-Page .Polaris-Banner--withinPage,
+            .app-route-frame > .Polaris-Page .Polaris-Banner--withinContentContainer {
+              border-radius: var(--p-border-radius-200, 8px) !important;
+              overflow: hidden;
+            }
+            .app-route-frame > .Polaris-Page .Polaris-Banner--withinPage::before {
+              border-radius: var(--p-border-radius-200, 8px) !important;
+            }
+          }
+        `}
+      </style>
       <NavMenu>
         <Link to="/app" rel="home">
           Home
@@ -978,7 +934,9 @@ export default function App() {
         <Link to="/app/pricing">Pricing</Link>
         <Link to="/app/support">Support</Link>
       </NavMenu>
-      {pendingShell || <Outlet />}
+      <div className="app-route-frame">
+        {pendingShell || <Outlet />}
+      </div>
     </AppProvider>
   );
 }

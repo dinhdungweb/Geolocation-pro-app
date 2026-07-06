@@ -19,7 +19,6 @@ import { TitleBar } from "@shopify/app-bridge-react";
 
 const supportEmail = "support@bluepeaks.top";
 const appStoreUrl = "https://apps.shopify.com/geo-redirect-country-block";
-const reviewUrl = "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal";
 
 const faqItems = [
     {
@@ -194,16 +193,6 @@ export default function Support() {
                                             variant="plain"
                                         >
                                             App Store Page
-                                        </Button>
-                                    </div>
-                                    <div className="support-resource-link">
-                                        <Button
-                                            url={reviewUrl}
-                                            target="_blank"
-                                            icon={ExternalIcon}
-                                            variant="plain"
-                                        >
-                                            Leave a Review
                                         </Button>
                                     </div>
                                 </BlockStack>

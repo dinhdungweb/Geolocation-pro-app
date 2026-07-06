@@ -781,7 +781,7 @@ export default function VisitorLogs() {
                 return <Badge tone="success">{label}</Badge>;
             case "blocked":
             case "ip_block":
-                return <Badge tone="critical">{label}</Badge>;
+                return <Badge tone="attention">{label}</Badge>;
             case "ip_redirect":
             case "ip_redirected":
                 return <Badge tone="warning">{label}</Badge>;
@@ -1086,14 +1086,16 @@ export default function VisitorLogs() {
 
         return (
             <>
-                <IndexTable
-                    resourceName={resourceName}
-                    itemCount={logs.length}
-                    headings={logTableHeadings}
-                    selectable={false}
-                >
-                    {renderLogRows(logs)}
-                </IndexTable>
+                <div className="visitor-log-table-wrap">
+                    <IndexTable
+                        resourceName={resourceName}
+                        itemCount={logs.length}
+                        headings={logTableHeadings}
+                        selectable={false}
+                    >
+                        {renderLogRows(logs)}
+                    </IndexTable>
+                </div>
                 <div className="visitor-log-pagination">
                     <Text as="p" variant="bodySm" tone="subdued">
                         Latest logs are shown first.
@@ -1190,6 +1192,14 @@ export default function VisitorLogs() {
                     .visitor-log-skeleton-table-wrap {
                         width: 100%;
                         overflow-x: auto;
+                    }
+                    .visitor-log-table-wrap {
+                        width: 100%;
+                        overflow-x: auto;
+                    }
+                    .visitor-log-table-wrap .Polaris-IndexTable,
+                    .visitor-log-table-wrap .Polaris-IndexTable__Table {
+                        min-width: 1040px;
                     }
                     .visitor-log-skeleton-table {
                         width: 100%;
@@ -1438,6 +1448,11 @@ export default function VisitorLogs() {
                             align-items: stretch;
                             flex-direction: column;
                             gap: 12px;
+                        }
+                        .visitor-log-header-copy {
+                            flex: none;
+                            min-width: 0;
+                            max-width: none;
                         }
                         .visitor-log-header .visitor-log-filter-area {
                             width: 100%;

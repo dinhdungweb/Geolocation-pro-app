@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
@@ -28,9 +28,8 @@ import {
     Tooltip,
 } from "@shopify/polaris";
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { ALL_PAID_PLANS } from "../billing.config";
 import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
 import { getShopifyMarkets } from "../utils/shopify-markets.server";
@@ -449,47 +448,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 };
 
-const REVIEW_PROMPTED_KEY = "geo_review_prompted";
-
 export default function RulesPage() {
     const { rules, hasProPlan, conflictSummary, markets, marketsError, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
-    const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
-    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
-    const [reviewRequested, setReviewRequested] = useState(false);
-
-    // Review prompt: show once after first rule creation
-    useEffect(() => {
-        if (
-            fetcher.state === "idle" &&
-            fetcher.data &&
-            (fetcher.data as any).success &&
-            (fetcher.data as any).message === "Rule created successfully" &&
-            rules.length === 1 &&
-            !reviewRequested
-        ) {
-            try {
-                if (localStorage.getItem(REVIEW_PROMPTED_KEY) === "true") return;
-            } catch { return; }
-
-            setReviewRequested(true);
-            const timer = setTimeout(() => {
-                try {
-                    (shopify as any).reviews.request().finally(() => {
-                        try { localStorage.setItem(REVIEW_PROMPTED_KEY, "true"); } catch {}
-                    });
-                } catch {
-                    // reviews API not available
-                }
-            }, 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [fetcher.state, fetcher.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -835,15 +801,6 @@ export default function RulesPage() {
     const selectedTargetCount = formMatchType === "market" ? selectedMarkets.length : (formMatchType === "state" ? selectedStates.length : selectedCountries.length);
     const isPaidOnlyRule = (rule: any) =>
         rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
-    const handleLockedFeatureClick = useCallback(() => {
-        setShowUpgradeModal(true);
-    }, []);
-    const handleLockedFeatureKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setShowUpgradeModal(true);
-        }
-    }, []);
 
     const rowMarkup = rules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
@@ -906,7 +863,7 @@ export default function RulesPage() {
                 <div style={{ minWidth: "180px" }}>
                     <Text as="span" variant="bodyMd" truncate>
                         {rule.ruleType === "block" ? (
-                            <Badge tone="critical">Access Blocked</Badge>
+                            <Badge tone="attention">Access Blocked</Badge>
                         ) : (
                             rule.targetUrl
                         )}
@@ -918,7 +875,7 @@ export default function RulesPage() {
                     {rule.isActive && isPaidOnlyRule(rule) && !hasProPlan ? (
                         <Badge tone="warning">Disabled (Free Plan)</Badge>
                     ) : (
-                        <Badge tone={rule.isActive ? "success" : "critical"}>
+                        <Badge tone={rule.isActive ? "success" : "warning"}>
                             {rule.isActive ? "Active" : "Inactive"}
                         </Badge>
                     )}
@@ -931,7 +888,7 @@ export default function RulesPage() {
                             {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
                         </Badge>
                     ) : (
-                        <Badge tone="critical">Block</Badge>
+                        <Badge tone="attention">Block</Badge>
                     )}
                 </div>
             </IndexTable.Cell>
@@ -952,14 +909,8 @@ export default function RulesPage() {
                         ) : (
                             <Button
                                 size="slim"
-                                onClick={() => {
-                                    if (isPaidOnlyRule(rule) && !hasProPlan) {
-                                        // Show upgrade modal instead of enabling
-                                        setShowUpgradeModal(true);
-                                    } else {
-                                        handleToggle(rule);
-                                    }
-                                }}
+                                onClick={() => handleToggle(rule)}
+                                disabled={isPaidOnlyRule(rule) && !hasProPlan}
                             >
                                 Enable
                             </Button>
@@ -1037,56 +988,97 @@ export default function RulesPage() {
                     .country-selector-scroll::-webkit-scrollbar-thumb:hover {
                         background: #6d7175;
                     }
+                    .rules-table-wrap {
+                        width: 100%;
+                        max-width: 100%;
+                        overflow-x: auto;
+                        overflow-y: hidden;
+                        -webkit-overflow-scrolling: touch;
+                        border-radius: var(--p-border-radius-200, 8px);
+                    }
+                    .rules-page .Polaris-ShadowBevel {
+                        --pc-shadow-bevel-border-radius-xs: var(--p-border-radius-200, 8px) !important;
+                        border-radius: var(--p-border-radius-200, 8px);
+                    }
+                    .rules-page .Polaris-ShadowBevel > .Polaris-Box {
+                        border-radius: inherit;
+                    }
+                    .rules-table-wrap .Polaris-IndexTable-ScrollContainer {
+                        overflow: visible !important;
+                        max-height: none;
+                    }
+                    .rules-table-wrap .Polaris-IndexTable__ScrollBarContainer {
+                        display: none !important;
+                    }
+                    .rules-table-wrap .Polaris-IndexTable,
+                    .rules-table-wrap .Polaris-IndexTable__Table {
+                        width: 100%;
+                        min-width: 1280px;
+                    }
+                    .rules-table-wrap .Polaris-IndexTable__TableHeading--first,
+                    .rules-table-wrap .Polaris-IndexTable__TableHeading--second {
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    .rules-table-wrap .Polaris-IndexTable__TableCell--first,
+                    .rules-table-wrap .Polaris-IndexTable__TableCell--first + .Polaris-IndexTable__TableCell {
+                        background: var(--p-color-bg-surface, #ffffff);
+                    }
+                    .rules-table-wrap .Polaris-IndexTable__TableHeading--first,
+                    .rules-table-wrap .Polaris-IndexTable__TableCell--first {
+                        box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
+                    }
+                    @media (max-width: 47.9975em) {
+                        .rules-table-wrap .Polaris-IndexTable,
+                        .rules-table-wrap .Polaris-IndexTable__Table {
+                            min-width: 1280px;
+                        }
+                    }
                 `}
             </style>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-end',
-                gap: '16px',
-                flexWrap: 'wrap',
-                marginBottom: '16px',
-            }}>
-                <BlockStack gap="100">
-                    <Text as="h1" variant="headingLg">Geolocation Rules</Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                        Create country-based rules to redirect, block, or target visitors by location.
-                    </Text>
-                </BlockStack>
-                <InlineStack gap="200" align="end">
-                    <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                        <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
-                            <Button
-                                icon={!hasProPlan ? LockIcon : ExportIcon}
-                                onClick={() => {
-                                    if (!hasProPlan) { setShowUpgradeModal(true); return; }
-                                    handleExportRules(true);
-                                }}
-                                disabled={rules.length === 0 && hasProPlan}
-                            >
-                                Export All
-                            </Button>
-                        </div>
-                    </Tooltip>
-                    <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                        <div style={{ opacity: !hasProPlan ? 0.6 : 1, cursor: !hasProPlan ? 'pointer' : 'default' }}>
-                            <Button
-                                icon={!hasProPlan ? LockIcon : ImportIcon}
-                                onClick={() => {
-                                    if (!hasProPlan) { setShowUpgradeModal(true); return; }
-                                    setImportModalOpen(true);
-                                }}
-                            >
-                                Import
-                            </Button>
-                        </div>
-                    </Tooltip>
-                    <Button variant="primary" onClick={() => handleOpenModal()}>
-                        Add Rule
-                    </Button>
-                </InlineStack>
-            </div>
-            <BlockStack gap="500">
+            <div className="rules-page">
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                    marginBottom: '16px',
+                }}>
+                    <BlockStack gap="100">
+                        <Text as="h1" variant="headingLg">Geolocation Rules</Text>
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                            Create country-based rules to redirect, block, or target visitors by location.
+                        </Text>
+                    </BlockStack>
+                    <InlineStack gap="200" align="end">
+                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
+                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                                <Button
+                                    icon={!hasProPlan ? LockIcon : ExportIcon}
+                                    onClick={() => handleExportRules(true)}
+                                    disabled={!hasProPlan || rules.length === 0}
+                                >
+                                    Export All
+                                </Button>
+                            </div>
+                        </Tooltip>
+                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
+                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                                <Button
+                                    icon={!hasProPlan ? LockIcon : ImportIcon}
+                                    onClick={() => setImportModalOpen(true)}
+                                    disabled={!hasProPlan}
+                                >
+                                    Import
+                                </Button>
+                            </div>
+                        </Tooltip>
+                        <Button variant="primary" onClick={() => handleOpenModal()}>
+                            Add Rule
+                        </Button>
+                    </InlineStack>
+                </div>
+                <BlockStack gap="500">
                 {appEmbedStatus.state !== "enabled" && (
                     <Banner
                         tone="warning"
@@ -1144,33 +1136,36 @@ export default function RulesPage() {
                             {rules.length === 0 ? (
                                 emptyStateMarkup
                             ) : (
-                                <IndexTable
-                                    condensed={!smUp}
-                                    resourceName={resourceName}
-                                    itemCount={rules.length}
-                                    selectedItemsCount={
-                                        allResourcesSelected ? "All" : selectedResources.length
-                                    }
-                                    onSelectionChange={handleSelectionChange}
-                                    headings={[
-                                        { title: "Name" },
-                                        { title: "Type" },
-                                        { title: "Target" },
-                                        { title: "Target URL" },
-                                        { title: "Status" },
-                                        { title: "Method" },
-                                        { title: "Priority" },
-                                        { title: "Actions", alignment: "end" },
-                                    ]}
-                                    promotedBulkActions={promotedBulkActions}
-                                >
-                                    {rowMarkup}
-                                </IndexTable>
+                                <div className="rules-table-wrap">
+                                    <IndexTable
+                                        condensed={false}
+                                        resourceName={resourceName}
+                                        itemCount={rules.length}
+                                        selectedItemsCount={
+                                            allResourcesSelected ? "All" : selectedResources.length
+                                        }
+                                        onSelectionChange={handleSelectionChange}
+                                        headings={[
+                                            { title: "Name" },
+                                            { title: "Type" },
+                                            { title: "Target" },
+                                            { title: "Target URL" },
+                                            { title: "Status" },
+                                            { title: "Method" },
+                                            { title: "Priority" },
+                                            { title: "Actions", alignment: "end" },
+                                        ]}
+                                        promotedBulkActions={promotedBulkActions}
+                                    >
+                                        {rowMarkup}
+                                    </IndexTable>
+                                </div>
                             )}
                         </Card>
                     </Layout.Section>
                 </Layout>
             </BlockStack>
+            </div>
 
             {/* Add/Edit Modal */}
             <Modal
@@ -1218,27 +1213,19 @@ export default function RulesPage() {
                                         onChange={() => setFormMatchType("state")}
                                     />
                                 ) : (
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleLockedFeatureClick}
-                                        onKeyDown={handleLockedFeatureKeyDown}
-                                        style={{ cursor: "pointer", width: "fit-content" }}
-                                    >
-                                        <div style={{ pointerEvents: "none" }}>
-                                            <RadioButton
-                                                label={(
-                                                    <InlineStack gap="200">
-                                                        <span>State/Region</span>
-                                                        <Badge tone="warning">Pro</Badge>
-                                                    </InlineStack>
-                                                )}
-                                                checked={false}
-                                                id="matchTypeState"
-                                                name="matchType"
-                                                disabled
-                                            />
-                                        </div>
+                                    <div style={{ opacity: 0.65, width: "fit-content" }}>
+                                        <RadioButton
+                                            label={(
+                                                <InlineStack gap="200">
+                                                    <span>State/Region</span>
+                                                    <Badge tone="warning">Pro</Badge>
+                                                </InlineStack>
+                                            )}
+                                            checked={false}
+                                            id="matchTypeState"
+                                            name="matchType"
+                                            disabled
+                                        />
                                     </div>
                                 )}
                                 {hasProPlan ? (
@@ -1250,27 +1237,19 @@ export default function RulesPage() {
                                         onChange={() => setFormMatchType("market")}
                                     />
                                 ) : (
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleLockedFeatureClick}
-                                        onKeyDown={handleLockedFeatureKeyDown}
-                                        style={{ cursor: "pointer", width: "fit-content" }}
-                                    >
-                                        <div style={{ pointerEvents: "none" }}>
-                                            <RadioButton
-                                                label={(
-                                                    <InlineStack gap="200">
-                                                        <span>Shopify Market</span>
-                                                        <Badge tone="warning">Pro</Badge>
-                                                    </InlineStack>
-                                                )}
-                                                checked={false}
-                                                id="matchTypeMarket"
-                                                name="matchType"
-                                                disabled
-                                            />
-                                        </div>
+                                    <div style={{ opacity: 0.65, width: "fit-content" }}>
+                                        <RadioButton
+                                            label={(
+                                                <InlineStack gap="200">
+                                                    <span>Shopify Market</span>
+                                                    <Badge tone="warning">Pro</Badge>
+                                                </InlineStack>
+                                            )}
+                                            checked={false}
+                                            id="matchTypeMarket"
+                                            name="matchType"
+                                            disabled
+                                        />
                                     </div>
                                 )}
                             </BlockStack>
@@ -1573,12 +1552,7 @@ export default function RulesPage() {
                                     name="ruleType"
                                     onChange={() => setFormRuleType("redirect")}
                                 />
-                                <div onClick={() => {
-                                    if (!hasProPlan) {
-                                        setFormRuleType("redirect");
-                                        setShowUpgradeModal(true);
-                                    }
-                                }}>
+                                <div style={{ opacity: !hasProPlan ? 0.65 : 1 }}>
                                     <RadioButton
                                         label={
                                             <InlineStack gap="200">
@@ -1711,27 +1685,19 @@ export default function RulesPage() {
                                         onChange={() => setPageTargetingType(["include"])}
                                     />
                                 ) : (
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleLockedFeatureClick}
-                                        onKeyDown={handleLockedFeatureKeyDown}
-                                        style={{ cursor: "pointer", width: "fit-content" }}
-                                    >
-                                        <div style={{ pointerEvents: "none" }}>
-                                            <RadioButton
-                                                label={(
-                                                    <InlineStack gap="200">
-                                                        <span>Specific Pages</span>
-                                                        <Badge tone="warning">Pro</Badge>
-                                                    </InlineStack>
-                                                )}
-                                                checked={false}
-                                                id="pageTargetingInclude"
-                                                name="pageTargetingType"
-                                                disabled
-                                            />
-                                        </div>
+                                    <div style={{ opacity: 0.65, width: "fit-content" }}>
+                                        <RadioButton
+                                            label={(
+                                                <InlineStack gap="200">
+                                                    <span>Specific Pages</span>
+                                                    <Badge tone="warning">Pro</Badge>
+                                                </InlineStack>
+                                            )}
+                                            checked={false}
+                                            id="pageTargetingInclude"
+                                            name="pageTargetingType"
+                                            disabled
+                                        />
                                     </div>
                                 )}
                                 {hasProPlan ? (
@@ -1743,27 +1709,19 @@ export default function RulesPage() {
                                         onChange={() => setPageTargetingType(["exclude"])}
                                     />
                                 ) : (
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleLockedFeatureClick}
-                                        onKeyDown={handleLockedFeatureKeyDown}
-                                        style={{ cursor: "pointer", width: "fit-content" }}
-                                    >
-                                        <div style={{ pointerEvents: "none" }}>
-                                            <RadioButton
-                                                label={(
-                                                    <InlineStack gap="200">
-                                                        <span>Exclude Pages</span>
-                                                        <Badge tone="warning">Pro</Badge>
-                                                    </InlineStack>
-                                                )}
-                                                checked={false}
-                                                id="pageTargetingExclude"
-                                                name="pageTargetingType"
-                                                disabled
-                                            />
-                                        </div>
+                                    <div style={{ opacity: 0.65, width: "fit-content" }}>
+                                        <RadioButton
+                                            label={(
+                                                <InlineStack gap="200">
+                                                    <span>Exclude Pages</span>
+                                                    <Badge tone="warning">Pro</Badge>
+                                                </InlineStack>
+                                            )}
+                                            checked={false}
+                                            id="pageTargetingExclude"
+                                            name="pageTargetingType"
+                                            disabled
+                                        />
                                     </div>
                                 )}
                             </BlockStack>
@@ -1856,30 +1814,6 @@ export default function RulesPage() {
                 </Modal.Section>
             </Modal>
 
-            {/* Upgrade Modal */}
-            <Modal
-                open={showUpgradeModal}
-                onClose={() => setShowUpgradeModal(false)}
-                title="Upgrade to Pro"
-                size="small"
-                primaryAction={{
-                    content: "View Plans",
-                    url: "/app/pricing",
-                }}
-                secondaryActions={[
-                    {
-                        content: "Cancel",
-                        onAction: () => setShowUpgradeModal(false),
-                    },
-                ]}
-            >
-                <Modal.Section>
-                    <Text as="p">
-                        Blocking, Shopify Markets targeting, and page-specific targeting are available on paid plans.
-                        Upgrade to use these advanced rule controls.
-                    </Text>
-                </Modal.Section>
-            </Modal>
         </Page >
     );
 }

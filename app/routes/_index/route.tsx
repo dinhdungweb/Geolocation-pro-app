@@ -1,16 +1,13 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, useLoaderData } from "@remix-run/react";
-import { useState } from "react";
+import { useLoaderData } from "@remix-run/react";
 import { login } from "../../shopify.server";
 import {
   AppProvider as PolarisAppProvider,
   Button,
   Card,
-  FormLayout,
   Page,
   Text,
-  TextField,
   BlockStack,
   Box,
   InlineStack,
@@ -20,6 +17,8 @@ import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { Globe, ShieldCheck } from "lucide-react";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
+
+const APP_STORE_URL = "https://apps.shopify.com/geo-redirect-country-block";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   return login(request);
@@ -32,18 +31,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login), polarisTranslations };
+  return { polarisTranslations };
 };
 
 export default function App() {
-  const { showForm, polarisTranslations } = useLoaderData<typeof loader>();
-  const [shop, setShop] = useState("");
-
-  const handleShopChange = (value: string) => {
-    // Auto-remove protocol and trailing slash
-    let sanitized = value.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    setShop(sanitized);
-  };
+  const { polarisTranslations } = useLoaderData<typeof loader>();
 
   return (
     <PolarisAppProvider i18n={polarisTranslations}>
@@ -84,23 +76,14 @@ export default function App() {
                   </BlockStack>
                 </Box>
 
-                {showForm && (
-                  <Form method="post" action="/auth/login">
-                    <FormLayout>
-                      <TextField
-                        label="Shop Domain"
-                        name="shop"
-                        value={shop}
-                        onChange={handleShopChange}
-                        placeholder="example.myshopify.com"
-                        autoComplete="on"
-                      />
-                      <Button variant="primary" submit fullWidth size="large">
-                        Log in / Install
-                      </Button>
-                    </FormLayout>
-                  </Form>
-                )}
+                <BlockStack gap="300">
+                  <Button variant="primary" url={APP_STORE_URL} fullWidth size="large">
+                    Open in Shopify App Store
+                  </Button>
+                  <Text variant="bodySm" as="p" alignment="center" tone="subdued">
+                    Install and open the app from Shopify-owned surfaces to keep your store secure.
+                  </Text>
+                </BlockStack>
 
                 <Box paddingBlockStart="400" borderBlockStartWidth="050" borderColor="border-secondary">
                   <BlockStack gap="300">

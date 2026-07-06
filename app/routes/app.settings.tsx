@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
@@ -14,18 +14,25 @@ import {
     Banner,
     Divider,
     InlineStack,
-    Button,
     Badge,
     Box,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { ALL_PAID_PLANS, FREE_PLAN } from "../billing.config";
+import { FREE_PLAN } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+
+declare global {
+    namespace JSX {
+        interface IntrinsicElements {
+            "ui-save-bar": HTMLAttributes<HTMLElement> & { id?: string };
+        }
+    }
+}
 
 interface Settings {
     id: string;
@@ -52,6 +59,31 @@ interface Settings {
     template: string;
     blockVpn: boolean;
 }
+
+type SettingsFormSnapshot = {
+    isEnabled: boolean;
+    mode: string;
+    template: string;
+    popupTitle: string;
+    popupMessage: string;
+    confirmBtnText: string;
+    cancelBtnText: string;
+    popupBgColor: string;
+    popupTextColor: string;
+    popupBtnColor: string;
+    excludeBots: boolean;
+    excludedIPs: string;
+    cookieDuration: string;
+    blockedTitle: string;
+    blockedMessage: string;
+    blockedLogoUrl: string;
+    blockedBgColor: string;
+    blockedTextColor: string;
+    blockedAccentColor: string;
+    blockedSupportText: string;
+    blockedSupportUrl: string;
+    blockVpn: boolean;
+};
 
 const defaultSettings: Omit<Settings, "id"> = {
     isEnabled: true,
@@ -89,6 +121,33 @@ function normalizeHexColor(value: string, fallback: string) {
 
 function isDangerousUrl(value: string) {
     return /^(javascript|data|vbscript):/i.test(value.trim());
+}
+
+function getSettingsSnapshot(settings: Settings): SettingsFormSnapshot {
+    return {
+        isEnabled: settings.isEnabled,
+        mode: settings.mode,
+        template: settings.template || "modal",
+        popupTitle: settings.popupTitle,
+        popupMessage: settings.popupMessage,
+        confirmBtnText: settings.confirmBtnText,
+        cancelBtnText: settings.cancelBtnText,
+        popupBgColor: settings.popupBgColor,
+        popupTextColor: settings.popupTextColor,
+        popupBtnColor: settings.popupBtnColor,
+        excludeBots: settings.excludeBots,
+        excludedIPs: settings.excludedIPs,
+        cookieDuration: settings.cookieDuration.toString(),
+        blockedTitle: settings.blockedTitle || "Access Denied",
+        blockedMessage: settings.blockedMessage || "We do not offer services in your country/region.",
+        blockedLogoUrl: settings.blockedLogoUrl || "",
+        blockedBgColor: settings.blockedBgColor || "#f8fafc",
+        blockedTextColor: settings.blockedTextColor || "#0f172a",
+        blockedAccentColor: settings.blockedAccentColor || "#2563eb",
+        blockedSupportText: settings.blockedSupportText || "Contact support",
+        blockedSupportUrl: settings.blockedSupportUrl || "",
+        blockVpn: settings.blockVpn,
+    };
 }
 
 function ColorPickerField({
@@ -265,6 +324,8 @@ export default function SettingsPage() {
     const { settings, isFreePlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const shopify = useAppBridge();
+    const [savedSnapshot, setSavedSnapshot] = useState<SettingsFormSnapshot>(() => getSettingsSnapshot(settings));
+    const submittedSnapshotRef = useRef<SettingsFormSnapshot | null>(null);
 
     // Form state
     const [isEnabled, setIsEnabled] = useState(settings.isEnabled);
@@ -291,15 +352,106 @@ export default function SettingsPage() {
     const [blockVpn, setBlockVpn] = useState(settings.blockVpn);
 
     const isLoading = fetcher.state !== "idle";
+    const currentSnapshot = useMemo<SettingsFormSnapshot>(() => ({
+        isEnabled,
+        mode,
+        template,
+        popupTitle,
+        popupMessage,
+        confirmBtnText,
+        cancelBtnText,
+        popupBgColor,
+        popupTextColor,
+        popupBtnColor,
+        excludeBots,
+        excludedIPs,
+        cookieDuration,
+        blockedTitle,
+        blockedMessage,
+        blockedLogoUrl,
+        blockedBgColor,
+        blockedTextColor,
+        blockedAccentColor,
+        blockedSupportText,
+        blockedSupportUrl,
+        blockVpn,
+    }), [
+        isEnabled, mode, template, popupTitle, popupMessage, confirmBtnText,
+        cancelBtnText, popupBgColor, popupTextColor, popupBtnColor, excludeBots,
+        excludedIPs, cookieDuration, blockedTitle, blockedMessage, blockedLogoUrl,
+        blockedBgColor, blockedTextColor, blockedAccentColor, blockedSupportText,
+        blockedSupportUrl, blockVpn,
+    ]);
+    const hasUnsavedChanges = JSON.stringify(currentSnapshot) !== JSON.stringify(savedSnapshot);
 
     useEffect(() => {
         if (fetcher.data?.success) {
+            if (submittedSnapshotRef.current) {
+                setSavedSnapshot(submittedSnapshotRef.current);
+                submittedSnapshotRef.current = null;
+            }
             shopify.toast.show("Settings saved!");
         }
     }, [fetcher.data, shopify]);
 
+    useEffect(() => {
+        const saveBar = (shopify as any).saveBar;
+        if (!saveBar) return;
+
+        if (hasUnsavedChanges) {
+            saveBar.show("settings-save-bar");
+        } else {
+            saveBar.hide("settings-save-bar");
+        }
+
+        return () => {
+            saveBar.hide("settings-save-bar");
+        };
+    }, [hasUnsavedChanges, shopify]);
+
+    useEffect(() => {
+        if (!hasUnsavedChanges) return;
+
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            event.returnValue = "";
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [hasUnsavedChanges]);
+
+    const applySnapshot = useCallback((snapshot: SettingsFormSnapshot) => {
+        setIsEnabled(snapshot.isEnabled);
+        setTemplate(snapshot.template);
+        setPopupTitle(snapshot.popupTitle);
+        setPopupMessage(snapshot.popupMessage);
+        setConfirmBtnText(snapshot.confirmBtnText);
+        setCancelBtnText(snapshot.cancelBtnText);
+        setPopupBgColor(snapshot.popupBgColor);
+        setPopupTextColor(snapshot.popupTextColor);
+        setPopupBtnColor(snapshot.popupBtnColor);
+        setExcludeBots(snapshot.excludeBots);
+        setExcludedIPs(snapshot.excludedIPs);
+        setCookieDuration(snapshot.cookieDuration);
+        setBlockedTitle(snapshot.blockedTitle);
+        setBlockedMessage(snapshot.blockedMessage);
+        setBlockedLogoUrl(snapshot.blockedLogoUrl);
+        setBlockedBgColor(snapshot.blockedBgColor);
+        setBlockedTextColor(snapshot.blockedTextColor);
+        setBlockedAccentColor(snapshot.blockedAccentColor);
+        setBlockedSupportText(snapshot.blockedSupportText);
+        setBlockedSupportUrl(snapshot.blockedSupportUrl);
+        setBlockVpn(snapshot.blockVpn);
+    }, []);
+
+    const handleDiscard = useCallback(() => {
+        applySnapshot(savedSnapshot);
+    }, [applySnapshot, savedSnapshot]);
+
     const handleSave = useCallback(() => {
         const formData = new FormData();
+        submittedSnapshotRef.current = currentSnapshot;
         formData.append("isEnabled", isEnabled.toString());
         formData.append("mode", mode);
         formData.append("template", template);
@@ -329,7 +481,7 @@ export default function SettingsPage() {
         popupBgColor, popupTextColor, popupBtnColor, excludeBots, excludedIPs,
         cookieDuration, fetcher, isEnabled, blockVpn, blockedTitle, blockedMessage,
         blockedLogoUrl, blockedBgColor, blockedTextColor, blockedAccentColor,
-        blockedSupportText, blockedSupportUrl
+        blockedSupportText, blockedSupportUrl, currentSnapshot
     ]);
 
     const templateOptions = [
@@ -349,6 +501,8 @@ export default function SettingsPage() {
     const blockedPreviewBgColor = normalizeHexColor(blockedBgColor, "#111827");
     const blockedPreviewTextColor = normalizeHexColor(blockedTextColor, "#ffffff");
     const blockedPreviewAccentColor = normalizeHexColor(blockedAccentColor, "#2563eb");
+    const blockedPreviewSupportText = blockedSupportText.trim() || "Contact support";
+    const blockedPreviewSupportUrl = blockedSupportUrl.trim() || "mailto:support@example.com";
     const previewButtons = (
         <div className="settings-storefront-buttons">
             <button
@@ -463,13 +617,14 @@ export default function SettingsPage() {
                             )}
                             <h3 style={{ color: blockedPreviewTextColor, fontSize: '36px', fontWeight: '600', marginBottom: '12px', letterSpacing: 0, lineHeight: 1.1 }}>{blockedTitle}</h3>
                             <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '18px', lineHeight: '1.45' }}>{blockedMessage}</p>
-                            {blockedSupportUrl && blockedSupportText ? (
+                            {blockedPreviewSupportText && blockedPreviewSupportUrl ? (
                                 <button
                                     type="button"
                                     className="settings-blocked-preview-button"
                                     style={{ background: blockedPreviewAccentColor, marginTop: '20px' }}
+                                    title={blockedPreviewSupportUrl}
                                 >
-                                    {blockedSupportText}
+                                    {blockedPreviewSupportText}
                                 </button>
                             ) : null}
                         </div>
@@ -485,29 +640,46 @@ export default function SettingsPage() {
             subtitle="Control storefront behavior, popup appearance, and visitor protection."
             fullWidth
         >
-            <TitleBar title="Settings">
+            <TitleBar title="Settings" />
+            <ui-save-bar id="settings-save-bar">
                 <button variant="primary" onClick={handleSave} disabled={isLoading}>
                     {saveButtonText}
                 </button>
-            </TitleBar>
+                <button onClick={handleDiscard} disabled={isLoading}>
+                    Discard
+                </button>
+            </ui-save-bar>
             <style>
                 {`
                     .settings-page-content {
+                        width: min(100%, 1320px);
+                        margin: 0 auto;
                         padding-bottom: 72px;
                     }
-                    .settings-content-grid {
+                    .settings-content-stack {
                         display: grid;
-                        grid-template-columns: minmax(0, 1fr) minmax(560px, 680px);
                         gap: 20px;
-                        align-items: start;
                     }
-                    .settings-form-column {
-                        min-width: 0;
+                    .settings-section-grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 20px;
+                        align-items: stretch;
                     }
-                    .settings-preview-sidebar {
-                        position: sticky;
-                        top: 20px;
+                    .settings-secondary-grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 20px;
+                        align-items: stretch;
+                    }
+                    .settings-section-grid > .Polaris-ShadowBevel,
+                    .settings-secondary-grid > .Polaris-ShadowBevel {
                         min-width: 0;
+                        height: 100%;
+                    }
+                    .settings-section-grid > .Polaris-ShadowBevel > .Polaris-Box,
+                    .settings-secondary-grid > .Polaris-ShadowBevel > .Polaris-Box {
+                        height: 100%;
                     }
                     .settings-summary-grid {
                         display: grid;
@@ -607,7 +779,7 @@ export default function SettingsPage() {
                     }
                     .settings-preview-canvas {
                         position: relative;
-                        height: 390px;
+                        height: 340px;
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                         overflow: hidden;
                         --settings-preview-scale: 1;
@@ -734,9 +906,9 @@ export default function SettingsPage() {
                         border: 1px solid currentColor;
                     }
                     .settings-blocked-preview-canvas {
-                        --settings-preview-scale: 0.72;
+                        --settings-preview-scale: 0.62;
                         width: 100%;
-                        height: 420px;
+                        height: 360px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
@@ -830,19 +1002,15 @@ export default function SettingsPage() {
                             flex-basis: 180px;
                         }
                     }
-                    .settings-save-row {
-                        display: flex;
-                        justify-content: flex-end;
-                    }
                     @media (max-width: 47.9975em) {
                         .settings-page-content {
                             padding-bottom: 88px;
                         }
-                        .settings-content-grid {
+                        .settings-section-grid {
                             grid-template-columns: 1fr;
                         }
-                        .settings-preview-sidebar {
-                            position: static;
+                        .settings-secondary-grid {
+                            grid-template-columns: 1fr;
                         }
                         .settings-summary-grid,
                         .settings-two-field-grid,
@@ -882,9 +1050,7 @@ export default function SettingsPage() {
                     )}
                     <Layout>
                         <Layout.Section>
-                            <div className="settings-content-grid">
-                                <div className="settings-form-column">
-                                    <BlockStack gap="400">
+                            <div className="settings-content-stack">
                                         <Card>
                                             <BlockStack gap="400">
                                                 <InlineStack align="space-between" blockAlign="center" gap="300">
@@ -894,7 +1060,7 @@ export default function SettingsPage() {
                                                             This controls whether redirects, blocks, and popup rules run on your storefront.
                                                         </Text>
                                                     </BlockStack>
-                                                    <Badge tone={isEnabled ? "success" : "critical"}>
+                                                    <Badge tone={isEnabled ? "success" : "warning"}>
                                                         {isEnabled ? "Enabled" : "Disabled"}
                                                     </Badge>
                                                 </InlineStack>
@@ -939,6 +1105,7 @@ export default function SettingsPage() {
                                         </Card>
 
                                         {isEnabled && (
+                                            <div className="settings-section-grid">
                                             <Card>
                                                 <BlockStack gap="400">
                                                     <BlockStack gap="100">
@@ -1009,10 +1176,13 @@ export default function SettingsPage() {
                                                     </div>
                                                 </BlockStack>
                                             </Card>
+                                            {previewMarkup}
+                                            </div>
 
                                         )}
 
                                         {isEnabled && (
+                                            <div className="settings-section-grid">
                                             <Card>
                                                 <BlockStack gap="400">
                                                     <BlockStack gap="100">
@@ -1083,9 +1253,12 @@ export default function SettingsPage() {
                                                     </div>
                                                 </BlockStack>
                                             </Card>
+                                            {blockedPreviewMarkup}
+                                            </div>
                                         )}
 
                                         {isEnabled && (
+                                            <div className="settings-secondary-grid">
                                             <Card>
                                                 <BlockStack gap="400">
                                                     <BlockStack gap="100">
@@ -1118,9 +1291,7 @@ export default function SettingsPage() {
                                                     />
                                                 </BlockStack>
                                             </Card>
-                                        )}
 
-                                        {isEnabled && (
                                             <Card>
                                                 <BlockStack gap="400">
                                                     <InlineStack align="space-between">
@@ -1148,28 +1319,9 @@ export default function SettingsPage() {
                                                     />
                                                 </BlockStack>
                                             </Card>
+                                            </div>
                                         )}
 
-                                        <div className="settings-save-row">
-                                            <Button
-                                                variant="primary"
-                                                onClick={handleSave}
-                                                loading={isLoading}
-                                                disabled={isLoading}
-                                            >
-                                                {saveButtonText}
-                                            </Button>
-                                        </div>
-                                    </BlockStack>
-                                </div>
-                                {isEnabled && (
-                                    <div className="settings-preview-sidebar">
-                                        <BlockStack gap="400">
-                                            {previewMarkup}
-                                            {blockedPreviewMarkup}
-                                        </BlockStack>
-                                    </div>
-                                )}
                             </div>
                         </Layout.Section>
 
