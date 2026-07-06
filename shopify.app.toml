@@ -1,20 +1,15 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "4c49c8e60e7361bcba5aff29006e1d94"
-name = "Geo Redirect"
+name = "Geolocation Pro"
 application_url = "https://geopro.bluepeaks.top"
 embedded = true
 
+[build]
+automatically_update_urls_on_dev = true
+
 [webhooks]
 api_version = "2026-04"
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/gdpr"
-  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
 
   [[webhooks.subscriptions]]
   topics = [ "app_subscriptions/update" ]
@@ -23,6 +18,14 @@ api_version = "2026-04"
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -38,6 +41,3 @@ redirect_urls = [
 url = "https://geopro.bluepeaks.top/proxy"
 subpath = "geolocation"
 prefix = "apps"
-
-[build]
-automatically_update_urls_on_dev = true

@@ -686,7 +686,7 @@ export default function Index() {
 
   return (
     <Page>
-      <TitleBar title="Geo: Redirect & Country Block" />
+      <TitleBar title="Geolocation Pro" />
       <style>
         {`
           .dashboard-welcome {
@@ -1381,7 +1381,7 @@ export default function Index() {
                   </BlockStack>
                   <div className="dashboard-header-badges">
                     <InlineStack gap="200">
-                      <Badge tone={isAtLimit ? "critical" : isNearLimit ? "warning" : "success"}>
+                      <Badge tone={isAtLimit ? "warning" : isNearLimit ? "warning" : "success"}>
                         {formatPlanLabel(planDisplayName)}
                       </Badge>
                       <Badge tone={isAppActive ? "success" : "warning"}>
@@ -1395,17 +1395,17 @@ export default function Index() {
                     <Text as="p" variant="bodySm">
                       <strong>{currentUsage.toLocaleString()}</strong> / {isUnlimitedPlan ? "Unlimited" : planLimit.toLocaleString()} billable visitors
                     </Text>
-                    <Text as="p" variant="bodySm" tone={isAtLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
+                    <Text as="p" variant="bodySm" tone={isAtLimit ? "caution" : isNearLimit ? "caution" : "subdued"}>
                       {isUnlimitedPlan ? "Unlimited" : `${usagePercent}%`}
                     </Text>
                   </InlineStack>
                   <ProgressBar
-                    progress={usagePercent}
-                    tone={isAtLimit ? "critical" : undefined}
+                    progress={Math.min(100, usagePercent)}
+                    tone={isAtLimit ? "highlight" : undefined}
                     size="small"
                   />
                   {remainingVisitors !== null && (
-                    <Text as="p" variant="bodySm" tone={isAtLimit ? "critical" : isNearLimit ? "caution" : "subdued"}>
+                    <Text as="p" variant="bodySm" tone={isAtLimit ? "caution" : isNearLimit ? "caution" : "subdued"}>
                       {isAtLimit
                         ? currentPlan === FREE_PLAN
                           ? "Limit reached — app paused for this period"
@@ -1424,7 +1424,7 @@ export default function Index() {
                 )}
                 {isAtLimit && (
                   <div style={{ marginTop: "12px" }}>
-                    <Banner tone="critical" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
+                    <Banner tone="warning" action={usageBannerAction} secondaryAction={usageBannerSecondaryAction}>
                       {limitReachedMessage}
                     </Banner>
                   </div>
