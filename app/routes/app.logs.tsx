@@ -1196,9 +1196,19 @@ export default function VisitorLogs() {
                     .visitor-log-table-wrap {
                         width: 100%;
                         overflow-x: auto;
+                        overflow-y: hidden;
+                        -webkit-overflow-scrolling: touch;
+                    }
+                    .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer {
+                        overflow: visible !important;
+                        max-height: none;
+                    }
+                    .visitor-log-table-wrap .Polaris-IndexTable__ScrollBarContainer {
+                        display: none !important;
                     }
                     .visitor-log-table-wrap .Polaris-IndexTable,
                     .visitor-log-table-wrap .Polaris-IndexTable__Table {
+                        width: 100%;
                         min-width: 1040px;
                     }
                     .visitor-log-skeleton-table {
