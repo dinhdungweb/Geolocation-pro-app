@@ -309,27 +309,58 @@ async function migrateOfflineSessionToExpiringIfNeeded(
 const baseAuthenticate = shopify.authenticate;
 const baseUnauthenticated = shopify.unauthenticated;
 
+function requestAuthDebugContext(request: Request) {
+  const url = new URL(request.url);
+
+  return {
+    path: `${url.pathname}${url.search}`,
+    shop: url.searchParams.get("shop") || undefined,
+    hasHost: Boolean(url.searchParams.get("host")),
+    hasEmbedded: Boolean(url.searchParams.get("embedded")),
+    hasIdToken: Boolean(url.searchParams.get("id_token")),
+    hasAuthorization: Boolean(request.headers.get("authorization")),
+  };
+}
+
+function logAdminAuthResponse(request: Request, response: Response) {
+  if (response.status !== 401) return;
+
+  console.warn("[ShopifyAuth] Admin authentication returned 401", {
+    ...requestAuthDebugContext(request),
+    retryInvalidSession: response.headers.get("X-Shopify-Retry-Invalid-Session-Request") === "1",
+    hasReauthorizeUrl: Boolean(response.headers.get("X-Shopify-API-Request-Failure-Reauthorize-Url")),
+  });
+}
+
 export default shopify;
 export const apiVersion = "2026-04" as ApiVersion;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
 export const authenticate = {
   ...baseAuthenticate,
   admin: async (request: Request) => {
-    const context = await baseAuthenticate.admin(request);
-    const migrated = await migrateOfflineSessionToExpiringIfNeeded(
-      context.session,
-    );
+    try {
+      const context = await baseAuthenticate.admin(request);
+      const migrated = await migrateOfflineSessionToExpiringIfNeeded(
+        context.session,
+      );
 
-    if (!migrated) return context;
+      if (!migrated) return context;
 
-    const refreshedContext = await baseUnauthenticated.admin(
-      context.session.shop,
-    );
-    return {
-      ...context,
-      admin: refreshedContext.admin,
-      session: refreshedContext.session,
-    };
+      const refreshedContext = await baseUnauthenticated.admin(
+        context.session.shop,
+      );
+      return {
+        ...context,
+        admin: refreshedContext.admin,
+        session: refreshedContext.session,
+      };
+    } catch (error) {
+      if (error instanceof Response) {
+        logAdminAuthResponse(request, error);
+      }
+
+      throw error;
+    }
   },
 } as typeof shopify.authenticate;
 export const unauthenticated = {

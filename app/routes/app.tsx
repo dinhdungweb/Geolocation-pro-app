@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "@remix-run/react";
+import { isRouteErrorResponse, Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -941,9 +942,36 @@ export default function App() {
   );
 }
 
+function EmbeddedAuthRecovery() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const retryKey = `geo-auth-recovery:${location.pathname}${location.search}`;
+    const lastRetryAt = Number(window.sessionStorage.getItem(retryKey) || "0");
+
+    if (Date.now() - lastRetryAt < 10000) return;
+
+    window.sessionStorage.setItem(retryKey, String(Date.now()));
+    window.location.reload();
+  }, [location.pathname, location.search]);
+
+  return (
+    <div style={{ padding: "32px", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+      <h2 style={{ margin: "0 0 8px", fontSize: "20px" }}>Reconnecting to Shopify</h2>
+      <p style={{ margin: 0, color: "#616161" }}>Refreshing the embedded app session.</p>
+    </div>
+  );
+}
+
 // Shopify needs Remix to catch some thrown responses, so that their headers are included in the response.
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+
+  if (isRouteErrorResponse(error) && error.status === 401) {
+    return <EmbeddedAuthRecovery />;
+  }
+
+  return boundary.error(error);
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
