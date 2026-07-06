@@ -14,7 +14,7 @@ import {
     syncUsagePeriodForShop,
     usagePeriodFromSubscription,
 } from "./billing-period.server";
-import { resolveEffectivePlan } from "./effective-plan.server";
+import { normalizePlanName, resolveEffectivePlan } from "./effective-plan.server";
 
 function usageChargeIdempotencyKey(
     shop: string,
@@ -362,32 +362,79 @@ export async function chargeOverageUsageRecord({
     }
 }
 
+function getBillingErrorStatus(error: any) {
+    return error?.response?.code || error?.networkStatusCode || error?.status;
+}
+
+function isRecoverableBillingAuthError(error: any) {
+    const statusCode = getBillingErrorStatus(error);
+    const message = String(error?.message || error?.statusText || error).toLowerCase();
+
+    return (
+        statusCode === 401 ||
+        statusCode === 403 ||
+        error?.name === "SessionNotFoundError" ||
+        message.includes("unauthorized") ||
+        message.includes("invalid access token") ||
+        message.includes("session")
+    );
+}
+
+function fallbackBillingCheck(plan?: string | null) {
+    const fallbackPlan = normalizePlanName(plan);
+    const appSubscriptions =
+        fallbackPlan === FREE_PLAN
+            ? []
+            : [{ name: fallbackPlan, status: "ACTIVE" }];
+
+    return {
+        hasActivePayment: appSubscriptions.length > 0,
+        appSubscriptions,
+        oneTimePurchases: [],
+    };
+}
+
 /**
  * Robustly checks billing, falling back to the opposite test state if no active payment is found.
  * This is useful because Shopify dev stores automatically convert real charges to test charges,
  * causing normal checks to fail if they assume isTest=false.
  */
-export async function checkBillingWithFallback(billing: any, isTest: boolean) {
+export async function checkBillingWithFallback(
+    billing: any,
+    isTest: boolean,
+    options: { fallbackPlan?: string | null; logContext?: string } = {},
+) {
     const { ALL_PAID_PLANS } = await import("../billing.config");
-    
-    let billingCheck = await billing.check({
-        plans: ALL_PAID_PLANS as any,
-        isTest,
-    });
-    
-    if (!billingCheck.hasActivePayment) {
-        const fallbackCheck = await billing.check({
+
+    try {
+        let billingCheck = await billing.check({
             plans: ALL_PAID_PLANS as any,
-            isTest: !isTest,
+            isTest,
         });
-        
-        if (fallbackCheck.hasActivePayment) {
-            billingCheck = fallbackCheck;
-            console.log(`[Billing Check] Recovered active payment via fallback check (isTest: ${!isTest})`);
+
+        if (!billingCheck.hasActivePayment) {
+            const fallbackCheck = await billing.check({
+                plans: ALL_PAID_PLANS as any,
+                isTest: !isTest,
+            });
+
+            if (fallbackCheck.hasActivePayment) {
+                billingCheck = fallbackCheck;
+                console.log(`[Billing Check] Recovered active payment via fallback check (isTest: ${!isTest})`);
+            }
         }
+
+        return billingCheck;
+    } catch (error: any) {
+        if (!isRecoverableBillingAuthError(error)) throw error;
+
+        const context = options.logContext ? ` for ${options.logContext}` : "";
+        console.warn(
+            `[Billing Check] Using cached plan fallback${context}: ${getBillingErrorStatus(error) || error?.name || "unknown"} ${error?.message || ""}`.trim(),
+        );
+
+        return fallbackBillingCheck(options.fallbackPlan);
     }
-    
-    return billingCheck;
 }
 
 

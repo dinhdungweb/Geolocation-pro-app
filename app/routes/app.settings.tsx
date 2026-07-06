@@ -185,13 +185,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
-    const billingCheck = await checkBillingWithFallback(billing, isBillingTestMode());
-
-    const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
-
     let settings = await prisma.settings.findUnique({
         where: { shop },
     });
+
+    const billingCheck = await checkBillingWithFallback(billing, isBillingTestMode(), {
+        fallbackPlan: settings?.currentPlan,
+        logContext: `${shop} settings loader`,
+    });
+
+    const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
 
     // Create default settings if not exists
     if (!settings) {
@@ -222,10 +225,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
 
     try {
-        const [billingCheck, settings] = await Promise.all([
-            checkBillingWithFallback(billing, isBillingTestMode()),
-            prisma.settings.findUnique({ where: { shop } }),
-        ]);
+        const settings = await prisma.settings.findUnique({ where: { shop } });
+        const billingCheck = await checkBillingWithFallback(billing, isBillingTestMode(), {
+            fallbackPlan: settings?.currentPlan,
+            logContext: `${shop} settings action`,
+        });
         const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
         const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
         const isFreePlan = effectivePlan === FREE_PLAN;

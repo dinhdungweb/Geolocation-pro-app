@@ -103,9 +103,16 @@ function redirectToPricingWithBillingError(request: Request, message: string) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { billing, session } = await authenticate.admin(request);
     const isTest = isBillingTestMode();
+    const existingSettings = await prisma.settings.findUnique({
+        where: { shop: session.shop },
+        select: { currentPlan: true },
+    });
 
     // Restore billing check
-    const billingCheck = await checkBillingWithFallback(billing, isTest);
+    const billingCheck = await checkBillingWithFallback(billing, isTest, {
+        fallbackPlan: existingSettings?.currentPlan,
+        logContext: `${session.shop} pricing loader`,
+    });
 
     const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
     const settings = await prisma.settings.upsert({
