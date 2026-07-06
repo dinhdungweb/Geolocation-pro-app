@@ -44,13 +44,13 @@ export default function Auth() {
         <Card>
           <BlockStack gap="400">
             <Text variant="headingMd" as="h2">
-              Open Geo Redirect from Shopify
+              Open Geolocation Pro from Shopify
             </Text>
             <Text as="p" tone="subdued">
               For security, install and launch the app from the Shopify App Store or your Shopify admin Apps page.
             </Text>
             {errors.shop && (
-              <Text as="p" tone="critical">
+              <Text as="p" tone="caution">
                 {errors.shop}
               </Text>
             )}

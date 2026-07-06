@@ -108,6 +108,43 @@ export default function App() {
           </Box>
         </Page>
       </div>
+
+      {/* Auto-redirect if inside Shopify Admin embedded iframe */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                // Detect if we are inside the Shopify Admin iframe
+                if (window !== window.top) {
+                  // We are in an iframe (embedded in Shopify Admin)
+                  // Try to get the shop from the Shopify App Bridge
+                  var shopMatch = document.referrer.match(/([^.]+\\.myshopify\\.com)/);
+                  if (shopMatch) {
+                    window.location.replace("/app?shop=" + encodeURIComponent(shopMatch[1]));
+                    return;
+                  }
+                  // Fallback: try to get shop from ancestor URL
+                  try {
+                    var ancestorUrl = document.referrer || window.parent.location.href;
+                    var urlObj = new URL(ancestorUrl);
+                    var shopParam = urlObj.searchParams.get("shop") || urlObj.hostname;
+                    if (shopParam && shopParam.includes("myshopify.com")) {
+                      window.location.replace("/app?shop=" + encodeURIComponent(shopParam));
+                      return;
+                    }
+                  } catch(e) {}
+                  // Last resort: redirect to /app and let Shopify auth middleware handle it
+                  window.location.replace("/app");
+                }
+              } catch(e) {
+                // Cross-origin restriction — we are definitely in an iframe
+                window.location.replace("/app");
+              }
+            })();
+          `,
+        }}
+      />
     </PolarisAppProvider>
   );
 }
