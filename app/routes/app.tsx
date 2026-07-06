@@ -12,10 +12,83 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 declare global {
   interface Window {
+    __geoShopifyFetchPatched?: boolean;
+    __geoOriginalFetch?: typeof fetch;
     shopify?: {
       idToken?: () => Promise<string>;
     };
   }
+}
+
+const SHOPIFY_INVALID_SESSION_RETRY_HEADER = "X-Shopify-Retry-Invalid-Session-Request";
+const GEO_AUTH_RETRY_HEADER = "X-Geo-Auth-Retry";
+
+function shouldRetryInvalidSessionResponse(response: Response) {
+  return (
+    response.status === 401 &&
+    response.headers.get(SHOPIFY_INVALID_SESSION_RETRY_HEADER) === "1"
+  );
+}
+
+function withAuthorizationHeader(headersInit: HeadersInit | undefined, token: string) {
+  const headers = new Headers(headersInit);
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set(GEO_AUTH_RETRY_HEADER, "1");
+  return headers;
+}
+
+async function retryWithFreshShopifyToken(
+  originalFetch: typeof fetch,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) {
+  const token = await window.shopify?.idToken?.();
+  if (!token) return null;
+
+  if (input instanceof Request) {
+    const retryHeaders = withAuthorizationHeader(init?.headers ?? input.headers, token);
+    return originalFetch(new Request(input, { ...init, headers: retryHeaders }));
+  }
+
+  return originalFetch(input, {
+    ...init,
+    headers: withAuthorizationHeader(init?.headers, token),
+  });
+}
+
+function installShopifyInvalidSessionFetchRetry() {
+  if (typeof window === "undefined" || window.__geoShopifyFetchPatched) return;
+
+  const originalFetch = window.fetch.bind(window);
+  window.__geoOriginalFetch = originalFetch;
+  window.__geoShopifyFetchPatched = true;
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestForRetry = input instanceof Request ? input.clone() : input;
+    const requestHeaders = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined),
+    );
+
+    const response = await originalFetch(input, init);
+
+    if (
+      !shouldRetryInvalidSessionResponse(response) ||
+      requestHeaders.get(GEO_AUTH_RETRY_HEADER) === "1"
+    ) {
+      return response;
+    }
+
+    try {
+      return (await retryWithFreshShopifyToken(
+        originalFetch,
+        requestForRetry,
+        init,
+      )) || response;
+    } catch (error) {
+      console.warn("[ShopifyAuth] Failed to retry request with fresh id token", error);
+      return response;
+    }
+  };
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -897,6 +970,10 @@ export default function App() {
   const pendingShell = isNavigatingToAppRoute && navigation.location
     ? getPendingShellForPath(navigation.location.pathname)
     : null;
+
+  useEffect(() => {
+    installShopifyInvalidSessionFetchRetry();
+  }, []);
 
   useEffect(() => {
     const url = new URL(window.location.href);
