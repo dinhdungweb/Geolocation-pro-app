@@ -2,18 +2,42 @@
 
 client_id = "441cf7062f21400e881f14eebbc41829"
 name = "Geo: Redirect & Country Block"
-application_url = "https://example.com"
+application_url = "https://geopro.bluepeaks.top"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-
 [webhooks]
-api_version = "2026-07"
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "/webhooks/app/subscriptions/update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_markets,read_themes"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://geopro.bluepeaks.top/auth/callback",
+  "https://geopro.bluepeaks.top/auth/shopify/callback"
+]
+
+[app_proxy]
+url = "https://geopro.bluepeaks.top/proxy"
+subpath = "geolocation"
+prefix = "apps"
+
+[build]
+automatically_update_urls_on_dev = true
