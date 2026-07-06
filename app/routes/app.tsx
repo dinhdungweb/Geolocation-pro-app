@@ -10,6 +10,14 @@ import { authenticate } from "../shopify.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
+declare global {
+  interface Window {
+    shopify?: {
+      idToken?: () => Promise<string>;
+    };
+  }
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
 
@@ -890,6 +898,14 @@ export default function App() {
     ? getPendingShellForPath(navigation.location.pathname)
     : null;
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("id_token")) return;
+
+    url.searchParams.delete("id_token");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [location.pathname, location.search]);
+
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <style>
@@ -952,7 +968,25 @@ function EmbeddedAuthRecovery() {
     if (Date.now() - lastRetryAt < 10000) return;
 
     window.sessionStorage.setItem(retryKey, String(Date.now()));
-    window.location.reload();
+
+    async function recoverEmbeddedSession() {
+      try {
+        const token = await window.shopify?.idToken?.();
+
+        if (token) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("id_token", token);
+          window.location.replace(`${url.pathname}${url.search}${url.hash}`);
+          return;
+        }
+      } catch (error) {
+        console.warn("[ShopifyAuth] Failed to refresh embedded id token", error);
+      }
+
+      window.location.reload();
+    }
+
+    recoverEmbeddedSession();
   }, [location.pathname, location.search]);
 
   return (
