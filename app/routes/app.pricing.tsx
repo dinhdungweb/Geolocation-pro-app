@@ -15,7 +15,6 @@ import { json, redirect } from "@remix-run/node";
 import { Link, useLoaderData, useNavigation, useSearchParams, useSubmit } from "@remix-run/react";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { ArrowLeftIcon } from "@shopify/polaris-icons";
-import { BillingError } from "@shopify/shopify-api";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import {
@@ -64,11 +63,20 @@ function redirectToBillingConfirmation(request: Request, shop: string, confirmat
     throw redirect(confirmationUrl);
 }
 
+function getShopifyBillingErrorData(error: unknown) {
+    if (!error || typeof error !== "object") return undefined;
+
+    const errorData = (error as { errorData?: unknown }).errorData;
+    return Array.isArray(errorData) ? errorData : undefined;
+}
+
 function getBillingErrorMessage(error: unknown) {
-    if (error instanceof BillingError) {
-        const firstError = Array.isArray(error.errorData) ? error.errorData[0] : null;
-        if (firstError?.message) return firstError.message;
-        return error.message || "Shopify could not create the billing confirmation.";
+    const errorData = getShopifyBillingErrorData(error);
+    const firstError = errorData?.[0];
+
+    if (firstError && typeof firstError === "object" && "message" in firstError) {
+        const message = (firstError as { message?: unknown }).message;
+        if (typeof message === "string" && message) return message;
     }
 
     if (error instanceof Error) return error.message;
@@ -383,7 +391,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     selectedPlan,
                     isTest,
                     message: error instanceof Error ? error.message : String(error),
-                    errorData: error instanceof BillingError ? error.errorData : undefined,
+                    errorData: getShopifyBillingErrorData(error),
                 });
 
                 redirectToPricingWithBillingError(request, getBillingErrorMessage(error));
