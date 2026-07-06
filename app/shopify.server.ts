@@ -319,16 +319,32 @@ function requestAuthDebugContext(request: Request) {
     hasEmbedded: Boolean(url.searchParams.get("embedded")),
     hasIdToken: Boolean(url.searchParams.get("id_token")),
     hasAuthorization: Boolean(request.headers.get("authorization")),
+    isClientRetry: request.headers.get("X-Geo-Auth-Retry") === "1",
   };
 }
 
 function logAdminAuthResponse(request: Request, response: Response) {
   if (response.status !== 401) return;
 
-  console.warn("[ShopifyAuth] Admin authentication returned 401", {
+  const context = {
     ...requestAuthDebugContext(request),
     retryInvalidSession: response.headers.get("X-Shopify-Retry-Invalid-Session-Request") === "1",
     hasReauthorizeUrl: Boolean(response.headers.get("X-Shopify-API-Request-Failure-Reauthorize-Url")),
+  };
+
+  if (context.retryInvalidSession && context.hasAuthorization) {
+    console.info("[ShopifyAuth] Stale embedded session token; client should retry", context);
+    return;
+  }
+
+  console.warn("[ShopifyAuth] Admin authentication returned unrecoverable 401", context);
+}
+
+function logRecoveredClientRetry(request: Request) {
+  if (request.headers.get("X-Geo-Auth-Retry") !== "1") return;
+
+  console.info("[ShopifyAuth] Recovered admin authentication with fresh session token", {
+    ...requestAuthDebugContext(request),
   });
 }
 
@@ -340,6 +356,8 @@ export const authenticate = {
   admin: async (request: Request) => {
     try {
       const context = await baseAuthenticate.admin(request);
+      logRecoveredClientRetry(request);
+
       const migrated = await migrateOfflineSessionToExpiringIfNeeded(
         context.session,
       );
