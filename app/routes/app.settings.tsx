@@ -26,14 +26,6 @@ import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/e
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
-declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            "ui-save-bar": HTMLAttributes<HTMLElement> & { id?: string };
-        }
-    }
-}
-
 interface Settings {
     id: string;
     isEnabled: boolean;
