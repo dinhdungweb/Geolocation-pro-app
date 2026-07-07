@@ -617,7 +617,7 @@ export default function SettingsPage() {
                             {blockedLogoUrl ? (
                                 <img src={blockedLogoUrl} alt="" className="settings-blocked-preview-logo" style={{ marginBottom: '16px' }} />
                             ) : (
-                                <img src="/access-denied-2.webp" alt="" className="settings-blocked-preview-default-image" />
+                                <img src="/access-denied.webp" alt="" className="settings-blocked-preview-default-image" />
                             )}
                             <h3 style={{ color: blockedPreviewTextColor, fontSize: '36px', fontWeight: '600', marginBottom: '12px', letterSpacing: 0, lineHeight: 1.1 }}>{blockedTitle}</h3>
                             <p style={{ color: blockedPreviewTextColor, opacity: 0.8, fontSize: '18px', lineHeight: '1.45' }}>{blockedMessage}</p>
