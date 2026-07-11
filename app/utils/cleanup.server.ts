@@ -2,8 +2,8 @@ import { Prisma } from "@prisma/client";
 import prisma from "../db.server";
 
 // Retention periods
-const LOG_RETENTION_DAYS = 30;
-const BILLABLE_EVENT_RETENTION_DAYS = 62; // Must exceed max billing period (~30d) + buffer
+const LOG_RETENTION_DAYS = Number.parseInt(process.env.LOG_RETENTION_DAYS || "7", 10);
+const BILLABLE_EVENT_RETENTION_DAYS = Number.parseInt(process.env.BILLABLE_EVENT_RETENTION_DAYS || "35", 10); // Must exceed max billing period (~30d) + buffer
 const FAILED_ANALYTICS_QUEUE_RETENTION_DAYS = 7;
 const DELETE_BATCH_SIZE = Number.parseInt(process.env.CLEANUP_DELETE_BATCH_SIZE || "10000", 10);
 const MAX_BATCHES_PER_RUN = Number.parseInt(process.env.CLEANUP_MAX_BATCHES_PER_RUN || "50", 10);
