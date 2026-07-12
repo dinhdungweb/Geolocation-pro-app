@@ -369,7 +369,7 @@ export default function AdminDashboard() {
           gap: var(--ed-space-8);
           padding: var(--ed-space-8);
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
           box-shadow: var(--ed-shadow-2);
         }
@@ -439,7 +439,7 @@ export default function AdminDashboard() {
         .ed-panel {
           min-width: 0;
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
         }
 
@@ -501,7 +501,7 @@ export default function AdminDashboard() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-inverse);
         }
@@ -700,7 +700,7 @@ export default function AdminDashboard() {
           min-width: 72px;
           height: 8px;
           overflow: hidden;
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-strong);
         }
 
@@ -723,7 +723,7 @@ export default function AdminDashboard() {
           gap: var(--ed-space-1);
           padding: var(--ed-space-7);
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
         }
 
@@ -745,7 +745,7 @@ export default function AdminDashboard() {
         .ed-empty {
           padding: var(--ed-space-2);
           border: 1px dashed var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           color: var(--ed-color-text-tertiary);
           text-align: center;
         }
@@ -818,7 +818,7 @@ export default function AdminDashboard() {
           .ed-metric-icon {
             width: 42px;
             height: 42px;
-            border-radius: var(--ed-radius-sm);
+            border-radius: var(--ed-radius-lg);
           }
 
           .ed-metric-icon svg {

@@ -482,7 +482,7 @@ export default function AdminLayout() {
           justify-content: center;
           flex: 0 0 auto;
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
           transition: background-color var(--ed-motion-instant) ease, border-color var(--ed-motion-instant) ease, color var(--ed-motion-instant) ease;
@@ -525,7 +525,7 @@ export default function AdminLayout() {
           padding: 9px var(--ed-space-3);
           margin-bottom: var(--ed-space-1);
           border: 1px solid transparent;
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: transparent;
           color: var(--ed-color-text-secondary);
           text-decoration: none;
@@ -617,7 +617,7 @@ export default function AdminLayout() {
           margin: var(--ed-space-4);
           padding: var(--ed-space-3);
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
         }
 
@@ -627,7 +627,7 @@ export default function AdminLayout() {
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-text-inverse);
           color: var(--ed-text-inverse);
           font-size: var(--ed-font-size-sm);
@@ -784,7 +784,7 @@ export default function AdminLayout() {
           gap: var(--ed-space-3);
           padding: 0 var(--ed-space-4);
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-secondary);
         }
@@ -820,7 +820,7 @@ export default function AdminLayout() {
           align-items: center;
           justify-content: center;
           border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
           transition: background-color var(--ed-motion-instant) ease, border-color var(--ed-motion-instant) ease, color var(--ed-motion-instant) ease;
@@ -886,7 +886,7 @@ export default function AdminLayout() {
           align-items: center;
           justify-content: center;
           flex: 0 0 auto;
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-base);
           color: var(--ed-color-surface-strong);
           font-size: 18px;
@@ -1009,7 +1009,7 @@ export default function AdminLayout() {
         .ed-admin-content input,
         .ed-admin-content select,
         .ed-admin-content textarea {
-          border-radius: var(--ed-radius-sm) !important;
+          border-radius: var(--ed-radius-lg) !important;
           border: 1px solid var(--ed-color-border-soft) !important;
           background-color: var(--ed-color-surface-muted) !important;
           color: var(--ed-color-text-primary) !important;
@@ -1044,7 +1044,7 @@ export default function AdminLayout() {
 
         .ed-admin-content button,
         .ed-admin-content a[role="button"] {
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-lg);
         }
 
         .ed-admin-content .ed-mail-row {
