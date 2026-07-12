@@ -82,10 +82,10 @@ export default function AdminLogin() {
   return (
     <div className="ed-login-screen">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 
         :root {
-          --ed-font-primary: "Outfit", sans-serif;
+          --ed-font-primary: "Inter Tight", Roboto, Arial, sans-serif;
           --ed-color-text-primary: #3d3d47;
           --ed-color-text-tertiary: #767676;
           --ed-color-surface-base: #000000;
