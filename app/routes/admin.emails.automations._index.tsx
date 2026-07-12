@@ -198,7 +198,7 @@ export default function AutomationsList() {
           display: block;
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           line-height: 1.1;
@@ -208,7 +208,7 @@ export default function AutomationsList() {
         .ed-automation-header h2 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 28px;
         }
@@ -267,7 +267,7 @@ export default function AutomationsList() {
 
         .ed-automation-summary strong {
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 28px;
         }
 
@@ -300,7 +300,7 @@ export default function AutomationsList() {
         .ed-automation-metrics span,
         .ed-automation-grid-head {
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -310,7 +310,7 @@ export default function AutomationsList() {
           display: block;
           margin-top: 8px;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 28px;
         }
@@ -392,7 +392,7 @@ export default function AutomationsList() {
           display: inline-flex;
           padding: 4px 8px;
           border-radius: var(--ed-radius-xl);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           line-height: 16px;
           text-transform: uppercase;

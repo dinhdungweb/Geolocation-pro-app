@@ -570,7 +570,7 @@ export default function AdminDashboard() {
 
         .ed-plan-cell strong {
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 28px;
           font-variant-numeric: tabular-nums;
         }
@@ -634,7 +634,7 @@ export default function AdminDashboard() {
           }
 
           .ed-metric-card strong {
-            font-size: 20px;
+            font-size: var(--ed-font-size-3xl);
             line-height: 24px;
           }
 
@@ -659,7 +659,7 @@ export default function AdminDashboard() {
           }
 
           .ed-plan-cell strong {
-            font-size: 18px;
+            font-size: var(--ed-font-size-xl);
             line-height: 22px;
           }
 

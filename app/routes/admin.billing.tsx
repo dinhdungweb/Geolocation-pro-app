@@ -753,7 +753,7 @@ export default function AdminBilling() {
           display: block;
           margin-top: var(--ed-space-1);
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 28px;
           font-variant-numeric: tabular-nums;
         }
@@ -1009,7 +1009,7 @@ export default function AdminBilling() {
           border-bottom: 1px solid #edf0f5;
           background: #fcfdfe;
           font-weight: 700;
-          font-size: 14px;
+          font-size: var(--ed-font-size-md);
           color: #1e293b;
           display: flex;
           align-items: center;
@@ -1083,7 +1083,7 @@ export default function AdminBilling() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 13px;
+          font-size: var(--ed-font-size-sm);
           font-weight: 600;
           border: none;
           background: transparent;
@@ -1223,13 +1223,13 @@ export default function AdminBilling() {
           }
 
           .ed-billing-stat span:not(.ed-billing-icon) {
-            font-size: 10px;
+            font-size: var(--ed-font-size-xs);
             line-height: 13px;
           }
 
           .ed-billing-stat strong {
             margin-top: 2px;
-            font-size: 18px;
+            font-size: var(--ed-font-size-xl);
             line-height: 22px;
           }
         }

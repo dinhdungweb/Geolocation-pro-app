@@ -634,7 +634,7 @@ export default function AdminShops() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 13px;
+          font-size: var(--ed-font-size-sm);
           font-weight: 600;
           border: none;
           background: transparent;

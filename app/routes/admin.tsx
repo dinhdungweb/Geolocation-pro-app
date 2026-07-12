@@ -308,14 +308,14 @@ export default function AdminLayout() {
           --ed-font-weight-base: 400;
           --ed-line-height-base: 21px;
 
-          --ed-font-size-xs: 12px;
-          --ed-font-size-sm: 13px;
+          --ed-font-size-xs: 10px;
+          --ed-font-size-sm: 12px;
           --ed-font-size-md: 14px;
-          --ed-font-size-lg: 15px;
-          --ed-font-size-xl: 16px;
-          --ed-font-size-2xl: 20px;
-          --ed-font-size-3xl: 22px;
-          --ed-font-size-4xl: 26px;
+          --ed-font-size-lg: 16px;
+          --ed-font-size-xl: 18px;
+          --ed-font-size-2xl: 18.2px;
+          --ed-font-size-3xl: 21px;
+          --ed-font-size-4xl: var(--ed-font-size-3xl);
 
           --ed-color-text-primary: #3d3d47;
           --ed-color-border-muted: #43b9b2;
@@ -466,7 +466,7 @@ export default function AdminLayout() {
 
         .ed-brand-copy strong {
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 800;
           line-height: 22px;
           letter-spacing: 0;
@@ -475,7 +475,7 @@ export default function AdminLayout() {
         .ed-brand-copy small {
           margin-top: 2px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 800;
           letter-spacing: 0.08em;
           text-transform: uppercase;
@@ -662,7 +662,7 @@ export default function AdminLayout() {
 
         .ed-account-copy small {
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           line-height: 15px;
         }
 
@@ -742,7 +742,7 @@ export default function AdminLayout() {
 
         .ed-mobile-title span {
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 800;
           letter-spacing: 0.08em;
           line-height: 14px;
@@ -752,7 +752,7 @@ export default function AdminLayout() {
         .ed-mobile-title strong {
           overflow: hidden;
           color: var(--ed-color-text-primary);
-          font-size: 16px;
+          font-size: var(--ed-font-size-lg);
           line-height: 20px;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -775,7 +775,7 @@ export default function AdminLayout() {
         .ed-page-title h1 {
           margin: 1px 0 0;
           color: var(--ed-color-text-primary);
-          font-size: 20px;
+          font-size: var(--ed-font-size-2xl);
           font-weight: 700;
           line-height: 24px;
           letter-spacing: 0;
@@ -855,7 +855,7 @@ export default function AdminLayout() {
           border-radius: 999px;
           background: #b86adf;
           color: var(--ed-color-surface-strong);
-          font-size: 10px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 800;
           line-height: 18px;
         }
@@ -903,7 +903,7 @@ export default function AdminLayout() {
           border-radius: 10px;
           background: linear-gradient(135deg, #ff9d78, #b86adf);
           color: var(--ed-color-surface-strong);
-          font-size: 18px;
+          font-size: var(--ed-font-size-xl);
           font-weight: 800;
         }
 
@@ -953,12 +953,12 @@ export default function AdminLayout() {
         }
 
         .ed-admin-content h1 {
-          font-size: 24px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 30px;
         }
 
         .ed-admin-content h2 {
-          font-size: 20px;
+          font-size: var(--ed-font-size-2xl);
           line-height: 26px;
         }
 
@@ -1273,12 +1273,12 @@ export default function AdminLayout() {
           }
 
           .ed-admin-content h1 {
-            font-size: 22px !important;
+            font-size: var(--ed-font-size-3xl) !important;
             line-height: 28px !important;
           }
 
           .ed-admin-content h2 {
-            font-size: 18px !important;
+            font-size: var(--ed-font-size-xl) !important;
             line-height: 24px !important;
           }
 
@@ -1316,7 +1316,7 @@ export default function AdminLayout() {
 
           .ed-mobile-title strong {
             max-width: calc(100vw - 136px);
-            font-size: 15px;
+            font-size: var(--ed-font-size-lg);
           }
         }
       `}</style>
@@ -1371,7 +1371,7 @@ export function ErrorBoundary() {
 
         .ed-error-card span {
           color: #c62828;
-          font-size: 12px;
+          font-size: var(--ed-font-size-sm);
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -1380,7 +1380,7 @@ export function ErrorBoundary() {
         .ed-error-card h1 {
           margin: 5px 0;
           color: #222222;
-          font-size: 24px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 30px;
         }
 

@@ -263,7 +263,7 @@ export default function EmailComposer() {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    font-size: 11px;
+                    font-size: var(--ed-font-size-xs);
                     font-weight: 800;
                     color: #94a3b8;
                     text-transform: uppercase;
@@ -291,7 +291,7 @@ export default function EmailComposer() {
                     border: none;
                     outline: none;
                     width: 100%;
-                    font-size: 14px;
+                    font-size: var(--ed-font-size-md);
                     margin-left: 10px;
                     color: #1e293b;
                 }
@@ -308,7 +308,7 @@ export default function EmailComposer() {
                 .plan-chip {
                     padding: 6px 14px;
                     border-radius: var(--ed-radius, 4px);
-                    font-size: 12px;
+                    font-size: var(--ed-font-size-sm);
                     font-weight: 700;
                     cursor: pointer;
                     white-space: nowrap;
@@ -353,14 +353,14 @@ export default function EmailComposer() {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 10px;
+                    font-size: var(--ed-font-size-xs);
                     font-weight: 800;
                     flex-shrink: 0;
                 }
                 
                 .audience-info { flex: 1; min-width: 0; }
-                .audience-name { font-size: 13px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .audience-sub { font-size: 11px; color: #94a3b8; }
+                .audience-name { font-size: var(--ed-font-size-sm); font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .audience-sub { font-size: var(--ed-font-size-xs); color: #94a3b8; }
                 
                 .audience-check {
                     width: 20px;
@@ -381,7 +381,7 @@ export default function EmailComposer() {
                 .form-control-group { margin-bottom: 24px; }
                 .form-control-group label {
                     display: block;
-                    font-size: 13px;
+                    font-size: var(--ed-font-size-sm);
                     font-weight: 700;
                     color: #475569;
                     margin-bottom: 8px;
@@ -393,7 +393,7 @@ export default function EmailComposer() {
                     padding: 12px 16px;
                     border: 1.5px solid #e2e8f0;
                     border-radius: var(--ed-radius, 4px);
-                    font-size: 14px;
+                    font-size: var(--ed-font-size-md);
                     color: #1e293b;
                     transition: all 0.2s;
                     background: #f8fafc;
@@ -408,7 +408,7 @@ export default function EmailComposer() {
                 
                 .modern-editor {
                     font-family: 'JetBrains Mono', 'Fira Code', monospace;
-                    font-size: 13px;
+                    font-size: var(--ed-font-size-sm);
                     min-height: 250px;
                     background: #0f172a !important;
                     color: #94a3b8 !important;
@@ -455,7 +455,7 @@ export default function EmailComposer() {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    font-size: 13px;
+                    font-size: var(--ed-font-size-sm);
                     font-weight: 700;
                     transition: all 0.2s;
                 }
@@ -494,7 +494,7 @@ export default function EmailComposer() {
                 .mac-url {
                     flex: 1;
                     text-align: center;
-                    font-size: 12px;
+                    font-size: var(--ed-font-size-sm);
                     font-weight: 600;
                     color: #94a3b8;
                     margin-left: -50px;
@@ -512,8 +512,8 @@ export default function EmailComposer() {
                     padding: 30px 40px;
                     border-bottom: 1px dashed #e2e8f0;
                 }
-                .preview-subj { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
-                .preview-from { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #64748b; }
+                .preview-subj { font-size: var(--ed-font-size-3xl); font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+                .preview-from { display: flex; align-items: center; gap: 10px; font-size: var(--ed-font-size-sm); color: #64748b; }
                 
                 .ed-submit-button {
                     background: var(--ed-surface-muted, #82b440);
@@ -522,7 +522,7 @@ export default function EmailComposer() {
                     padding: 14px 32px;
                     border-radius: var(--ed-radius, 4px);
                     font-weight: 700;
-                    font-size: 15px;
+                    font-size: var(--ed-font-size-lg);
                     cursor: pointer;
                     display: flex;
                     align-items: center;
@@ -567,12 +567,12 @@ export default function EmailComposer() {
                     .preview-email-header {
                         padding: 20px;
                     }
-                    .preview-subj { font-size: 16px; }
+                    .preview-subj { font-size: var(--ed-font-size-lg); }
                 }
                 
                 @media (max-width: 480px) {
                     .plan-filters { gap: 4px; }
-                    .plan-chip { padding: 5px 10px; font-size: 11px; }
+                    .plan-chip { padding: 5px 10px; font-size: var(--ed-font-size-xs); }
                     .footer-actions { 
                         flex-direction: column; 
                         gap: 16px; 
@@ -741,7 +741,7 @@ export default function EmailComposer() {
                         <div className="preview-email-header">
                             <div className="preview-subj">{subject || "Add a subject line..."}</div>
                             <div className="preview-from">
-                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#82b440', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 800 }}>G</div>
+                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#82b440', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 'var(--ed-font-size-xs)', fontWeight: 800 }}>G</div>
                                 <span><strong>Geo: Redirect & Country Block</strong> &lt;send@geopro.bluepeaks.top&gt;</span>
                             </div>
                         </div>

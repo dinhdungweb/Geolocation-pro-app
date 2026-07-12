@@ -655,7 +655,7 @@ export default function AdminShopDetail() {
                 .back-btn { 
                     min-height: 40px;
                     display: inline-flex; align-items: center; gap: 8px; 
-                    text-decoration: none; color: #64748b; font-size: 14px; font-weight: 600;
+                    text-decoration: none; color: #64748b; font-size: var(--ed-font-size-md); font-weight: 600;
                     padding: 8px 16px; background: white; border-radius: var(--ed-radius-xl);
                     border: 1px solid #e2e8f0; transition: none;
                     line-height: 18px;
@@ -666,7 +666,7 @@ export default function AdminShopDetail() {
                     min-height: 40px;
                     display: inline-flex; align-items: center; gap: 8px;
                     padding: 8px 16px; background: #1e293b; color: white;
-                    border: 1px solid #1e293b; border-radius: var(--ed-radius-xl); font-weight: 700; font-size: 13px;
+                    border: 1px solid #1e293b; border-radius: var(--ed-radius-xl); font-weight: 700; font-size: var(--ed-font-size-sm);
                     cursor: pointer; transition: none;
                     line-height: 18px;
                 }
@@ -686,13 +686,13 @@ export default function AdminShopDetail() {
                     color: #43b9b2; border: 1px solid #e2e8f0;
                 }
 
-                .shop-title-group h1 { font-size: 22px; font-weight: 800; color: #1e293b; margin: 0; letter-spacing: 0; }
-                .shop-title-group .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+                .shop-title-group h1 { font-size: var(--ed-font-size-3xl); font-weight: 800; color: #1e293b; margin: 0; letter-spacing: 0; }
+                .shop-title-group .label { font-size: var(--ed-font-size-sm); color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
                 .shop-link-hover { transition: color 0.2s; cursor: pointer; }
                 .shop-link-hover:hover { color: #43b9b2; text-decoration: underline; }
 
                 .ed-shop-plan-badge {
-                    padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 800;
+                    padding: 8px 16px; border-radius: 999px; font-size: var(--ed-font-size-sm); font-weight: 800;
                     display: flex; align-items: center; gap: 8px;
                     ${(() => {
                         const plan = (currentPlan || 'FREE').toUpperCase();
@@ -721,8 +721,8 @@ export default function AdminShopDetail() {
                     display: flex; align-items: center; justify-content: center;
                 }
 
-                .stat-info .label { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
-                .stat-info .value { font-size: 22px; font-weight: 800; color: #1e293b; }
+                .stat-info .label { font-size: var(--ed-font-size-sm); font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+                .stat-info .value { font-size: var(--ed-font-size-3xl); font-weight: 800; color: #1e293b; }
                 .stat-info { min-width: 0; }
 
                 .section-grid { 
@@ -739,38 +739,38 @@ export default function AdminShopDetail() {
                 }
                 .ed-shop-card-head {
                     padding: 16px 20px; border-bottom: 1px solid #f1f5f9; 
-                    background: #fcfdfe; font-weight: 700; font-size: 14px; color: #1e293b;
+                    background: #fcfdfe; font-weight: 700; font-size: var(--ed-font-size-md); color: #1e293b;
                     display: flex; align-items: center; gap: 10px;
                 }
                 .ed-shop-card-body { padding: 20px; flex: 1; }
 
                 .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
                 .info-item:last-child { border-bottom: none; }
-                .info-item .label { color: #64748b; font-size: 13px; font-weight: 500; }
-                .info-item .value { font-weight: 700; font-size: 13px; color: #1e293b; }
+                .info-item .label { color: #64748b; font-size: var(--ed-font-size-sm); font-weight: 500; }
+                .info-item .value { font-weight: 700; font-size: var(--ed-font-size-sm); color: #1e293b; }
                 .custom-plan-summary {
                     display: flex; align-items: center; justify-content: space-between; gap: 16px;
                     padding: 14px 0; border-bottom: 1px solid #f1f5f9;
                 }
                 .custom-plan-summary-main { min-width: 0; flex: 1; }
                 .custom-plan-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-                .custom-plan-name { color: #1e293b; font-size: 13px; font-weight: 800; }
-                .custom-plan-pill { padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+                .custom-plan-name { color: #1e293b; font-size: var(--ed-font-size-sm); font-weight: 800; }
+                .custom-plan-pill { padding: 3px 8px; border-radius: 999px; font-size: var(--ed-font-size-xs); font-weight: 800; }
                 .custom-plan-pill.enabled { background: #ecfdf5; color: #059669; }
                 .custom-plan-pill.disabled { background: #f1f5f9; color: #64748b; }
                 .custom-plan-pill.active { background: #eff6ff; color: #5f8f2f; }
-                .custom-plan-meta { color: #64748b; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .custom-plan-meta { color: #64748b; font-size: var(--ed-font-size-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .custom-plan-note {
                     margin-top: 8px; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 8px;
-                    background: #eff6ff; color: #1e40af; font-size: 12px; line-height: 1.45; font-weight: 600;
+                    background: #eff6ff; color: #1e40af; font-size: var(--ed-font-size-sm); line-height: 1.45; font-weight: 600;
                 }
                 .modal-content-wide { max-width: 620px; }
 
                 .monthly-list { display: flex; flex-direction: column; gap: 12px; }
                 .month-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border: 1px solid transparent; transition: none; }
                 .month-row:hover { border-color: #e2e8f0; background: #f1f5f9; }
-                .month-name { font-weight: 800; font-size: 14px; color: #43b9b2; }
-                .month-stats { display: flex; gap: 16px; font-size: 12px; color: #64748b; font-weight: 600; }
+                .month-name { font-weight: 800; font-size: var(--ed-font-size-md); color: #43b9b2; }
+                .month-stats { display: flex; gap: 16px; font-size: var(--ed-font-size-sm); color: #64748b; font-weight: 600; }
 
                 @media (max-width: 768px) {
                     .back-bar {
@@ -787,7 +787,7 @@ export default function AdminShopDetail() {
                         justify-content: center;
                         padding: 8px 10px;
                         border-radius: var(--ed-radius-xl) !important;
-                        font-size: 12px;
+                        font-size: var(--ed-font-size-sm);
                         line-height: 16px;
                         white-space: nowrap;
                     }
@@ -811,7 +811,7 @@ export default function AdminShopDetail() {
                         min-width: 0;
                     }
                     .shop-title-group h1 {
-                        font-size: 17px;
+                        font-size: var(--ed-font-size-xl);
                         overflow-wrap: anywhere;
                     }
                     .ed-shop-plan-badge {
@@ -839,11 +839,11 @@ export default function AdminShopDetail() {
                     }
                     .stat-info .label {
                         margin-bottom: 2px;
-                        font-size: 10px;
+                        font-size: var(--ed-font-size-xs);
                         line-height: 13px;
                     }
                     .stat-info .value {
-                        font-size: 20px;
+                        font-size: var(--ed-font-size-3xl);
                         line-height: 22px;
                     }
                     .section-grid {
@@ -912,13 +912,13 @@ export default function AdminShopDetail() {
                 .table-container { width: 100%; overflow-x: auto; }
                 table { width: 100%; border-collapse: collapse; min-width: 600px; }
                 th { 
-                    text-align: left; padding: 12px 20px; font-size: 11px; 
+                    text-align: left; padding: 12px 20px; font-size: var(--ed-font-size-xs);
                     font-weight: 700; color: #94a3b8; text-transform: uppercase; 
                     border-bottom: 1px solid #f1f5f9; background: #fcfdfe; 
                     letter-spacing: 0.05em;
                 }
-                td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
-                .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block; }
+                td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: var(--ed-font-size-sm); color: #334155; }
+                .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: var(--ed-font-size-xs); font-weight: 700; display: inline-block; }
                 .ed-shop-logs-table-card table {
                     min-width: 1120px;
                 }
@@ -928,13 +928,13 @@ export default function AdminShopDetail() {
                     text-overflow: ellipsis;
                     white-space: nowrap;
                     color: #64748b;
-                    font-size: 11px;
+                    font-size: var(--ed-font-size-xs);
                     line-height: 1.4;
                 }
                 .admin-log-visitor-badge {
                     padding: 5px 10px;
                     border-radius: 8px;
-                    font-size: 11px;
+                    font-size: var(--ed-font-size-xs);
                     font-weight: 700;
                     display: inline-block;
                     white-space: nowrap;
@@ -1014,7 +1014,7 @@ export default function AdminShopDetail() {
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 13px;
+                    font-size: var(--ed-font-size-sm);
                     font-weight: 600;
                     border: none;
                     background: transparent;
@@ -1058,13 +1058,13 @@ export default function AdminShopDetail() {
 
                 /* Billing Forms */
                 .billing-input-group { margin-bottom: 16px; }
-                .billing-input-group label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
-                .billing-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; transition: none; }
+                .billing-input-group label { display: block; font-size: var(--ed-font-size-sm); font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
+                .billing-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: var(--ed-font-size-md); transition: none; }
                 .billing-input:focus { border-color: #43b9b2; outline: none; box-shadow: 0 0 0 3px rgba(67, 185, 178, 0.1); }
                 
                 .primary-btn { 
                     width: 100%; padding: 12px; background: #43b9b2; color: white; border: none; border-radius: 8px;
-                    font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+                    font-weight: 700; font-size: var(--ed-font-size-md); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
                     transition: none;
                 }
                 .primary-btn:hover { background: #0a9f98; }
@@ -1072,14 +1072,14 @@ export default function AdminShopDetail() {
                 .inline-action-form { margin: 0; }
                 .inline-toggle-btn {
                     padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px;
-                    background: white; color: #334155; font-size: 12px; font-weight: 700;
+                    background: white; color: #334155; font-size: var(--ed-font-size-sm); font-weight: 700;
                     cursor: pointer; transition: all 0.2s;
                 }
                 .inline-toggle-btn:hover { border-color: #43b9b2; color: #0a9f98; }
                 .inline-toggle-btn.enabled { border-color: #10b98133; background: #ecfdf5; color: #059669; }
                 .inline-toggle-btn.disabled { border-color: #ef444433; background: #fef2f2; color: #ef4444; }
 
-                .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+                .alert { padding: 12px 16px; border-radius: 8px; font-size: var(--ed-font-size-sm); font-weight: 500; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
                 .alert-success { background: #ecfdf5; color: #059669; border: 1px solid #10b98133; }
                 .alert-error { background: #fef2f2; color: #ef4444; border: 1px solid #ef444433; }
 
@@ -1104,7 +1104,7 @@ export default function AdminShopDetail() {
                     padding: 24px; border-bottom: 1px solid #f1f5f9;
                     display: flex; align-items: center; justify-content: space-between;
                 }
-                .modal-title { display: flex; align-items: center; gap: 12px; font-weight: 800; color: #1e293b; font-size: 18px; }
+                .modal-title { display: flex; align-items: center; gap: 12px; font-weight: 800; color: #1e293b; font-size: var(--ed-font-size-xl); }
                 .modal-close { 
                     background: #f1f5f9; border: none; width: 32px; height: 32px; 
                     border-radius: 8px; display: flex; align-items: center; justify-content: center;

@@ -246,7 +246,7 @@ export default function EmailBlacklist() {
           display: block;
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           line-height: 1.1;
@@ -256,7 +256,7 @@ export default function EmailBlacklist() {
         .ed-card-head h2 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 20px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 26px;
         }
@@ -283,7 +283,7 @@ export default function EmailBlacklist() {
         .ed-blacklist-table th {
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -380,7 +380,7 @@ export default function EmailBlacklist() {
           align-items: center;
           gap: 10px;
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           text-transform: uppercase;

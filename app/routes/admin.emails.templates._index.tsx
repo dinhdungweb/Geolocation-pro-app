@@ -117,7 +117,7 @@ export default function TemplatesGallery() {
           display: block;
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           line-height: 1.1;
@@ -127,7 +127,7 @@ export default function TemplatesGallery() {
         .templates-title h2 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 1.2;
         }
@@ -233,7 +233,7 @@ export default function TemplatesGallery() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -286,7 +286,7 @@ export default function TemplatesGallery() {
         .templates-empty h3 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 17px;
+          font-size: var(--ed-font-size-xl);
           font-weight: 700;
         }
 
@@ -309,11 +309,11 @@ export default function TemplatesGallery() {
           }
 
           .templates-title h2 {
-            font-size: 19px;
+            font-size: var(--ed-font-size-2xl);
           }
 
           .templates-title p {
-            font-size: 12px;
+            font-size: var(--ed-font-size-sm);
           }
 
           .templates-actions {
@@ -326,7 +326,7 @@ export default function TemplatesGallery() {
             width: 100%;
             min-height: 38px;
             padding: 0 12px;
-            font-size: 12px;
+            font-size: var(--ed-font-size-sm);
           }
 
           .templates-grid {
@@ -382,7 +382,7 @@ export default function TemplatesGallery() {
           }
 
           .template-meta span {
-            font-size: 10px;
+            font-size: var(--ed-font-size-xs);
           }
         }
       `}</style>

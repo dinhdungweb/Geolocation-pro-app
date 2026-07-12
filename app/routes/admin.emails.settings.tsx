@@ -253,7 +253,7 @@ export default function EmailSettings() {
           display: block;
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           line-height: 1.1;
@@ -269,12 +269,12 @@ export default function EmailSettings() {
         }
 
         .ed-settings-head h2 {
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 28px;
         }
 
         .ed-settings-head h3 {
-          font-size: 18px;
+          font-size: var(--ed-font-size-xl);
           line-height: 24px;
         }
 

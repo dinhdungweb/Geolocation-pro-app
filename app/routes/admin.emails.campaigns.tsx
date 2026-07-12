@@ -162,7 +162,7 @@ export default function CampaignsList() {
           display: block;
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           line-height: 1.1;
@@ -172,7 +172,7 @@ export default function CampaignsList() {
         .ed-campaign-head h2 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 28px;
         }
@@ -247,7 +247,7 @@ export default function CampaignsList() {
         .ed-campaign-stats span,
         .ed-campaign-grid-head {
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -257,7 +257,7 @@ export default function CampaignsList() {
           display: block;
           margin-top: 8px;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 28px;
         }
@@ -355,7 +355,7 @@ export default function CampaignsList() {
           gap: 6px;
           padding: 4px 8px;
           border-radius: var(--ed-radius-xl);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           line-height: 16px;
         }

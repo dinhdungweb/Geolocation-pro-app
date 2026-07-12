@@ -188,7 +188,7 @@ export default function EmailHistory() {
           display: block;
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.08em;
           line-height: 1.1;
@@ -199,7 +199,7 @@ export default function EmailHistory() {
         .ed-modal-head h3 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 28px;
         }
@@ -321,7 +321,7 @@ export default function EmailHistory() {
           padding: 14px var(--ed-space-2);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -362,7 +362,7 @@ export default function EmailHistory() {
           border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-border-muted);
-          font-size: 10px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
         }
 
@@ -379,7 +379,7 @@ export default function EmailHistory() {
           gap: 6px;
           padding: 4px 8px;
           border-radius: var(--ed-radius-xl);
-          font-size: 11px;
+          font-size: var(--ed-font-size-xs);
           font-weight: 700;
           line-height: 16px;
         }

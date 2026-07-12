@@ -206,7 +206,7 @@ export default function AdminCampaigns() {
 
         .ed-campaign-metrics strong {
           color: var(--ed-color-text-primary);
-          font-size: 26px;
+          font-size: var(--ed-font-size-3xl);
           line-height: 32px;
           font-variant-numeric: tabular-nums;
         }

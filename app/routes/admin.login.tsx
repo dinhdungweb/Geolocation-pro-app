@@ -86,6 +86,15 @@ export default function AdminLogin() {
 
         :root {
           --ed-font-primary: "Inter Tight", Roboto, Arial, sans-serif;
+          --ed-font-size-base: 14px;
+          --ed-line-height-base: 21px;
+          --ed-font-size-xs: 10px;
+          --ed-font-size-sm: 12px;
+          --ed-font-size-md: 14px;
+          --ed-font-size-lg: 16px;
+          --ed-font-size-xl: 18px;
+          --ed-font-size-2xl: 18.2px;
+          --ed-font-size-3xl: 21px;
           --ed-color-text-primary: #3d3d47;
           --ed-color-text-tertiary: #767676;
           --ed-color-surface-base: #000000;
@@ -112,8 +121,8 @@ export default function AdminLogin() {
           background: var(--ed-page);
           color: var(--ed-color-text-tertiary);
           font-family: var(--ed-font-primary);
-          font-size: 16px;
-          line-height: 24px;
+          font-size: var(--ed-font-size-base);
+          line-height: var(--ed-line-height-base);
         }
 
         button,
@@ -143,7 +152,7 @@ export default function AdminLogin() {
           display: inline-flex;
           align-items: center;
           gap: 12px;
-          font-size: 18px;
+          font-size: var(--ed-font-size-xl);
           font-weight: 700;
         }
 
@@ -165,22 +174,22 @@ export default function AdminLogin() {
         .ed-login-brand-copy h1 {
           margin: 0 0 14px;
           color: var(--ed-text-inverse);
-          font-size: clamp(30px, 4vw, 46px);
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
-          line-height: 1.08;
+          line-height: 28px;
           letter-spacing: 0;
         }
 
         .ed-login-brand-copy p {
           margin: 0;
           color: rgba(255, 255, 255, 0.76);
-          font-size: 16px;
-          line-height: 24px;
+          font-size: var(--ed-font-size-md);
+          line-height: var(--ed-line-height-base);
         }
 
         .ed-login-meta {
           color: rgba(255, 255, 255, 0.6);
-          font-size: 12px;
+          font-size: var(--ed-font-size-sm);
           line-height: 18px;
         }
 
@@ -204,7 +213,7 @@ export default function AdminLogin() {
         .ed-login-card h2 {
           margin: 0 0 6px;
           color: var(--ed-color-text-primary);
-          font-size: 24px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 30px;
         }
@@ -212,7 +221,7 @@ export default function AdminLogin() {
         .ed-login-subtitle {
           margin: 0 0 24px;
           color: var(--ed-color-text-tertiary);
-          font-size: 14px;
+          font-size: var(--ed-font-size-md);
           line-height: 22px;
         }
 
@@ -224,7 +233,7 @@ export default function AdminLogin() {
           display: block;
           margin-bottom: 7px;
           color: var(--ed-color-text-primary);
-          font-size: 14px;
+          font-size: var(--ed-font-size-md);
           font-weight: 700;
           line-height: 20px;
         }
@@ -251,7 +260,7 @@ export default function AdminLogin() {
           outline: none;
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
-          font-size: 16px;
+          font-size: var(--ed-font-size-lg);
           line-height: 24px;
         }
 
@@ -280,7 +289,7 @@ export default function AdminLogin() {
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow);
           cursor: pointer;
-          font-size: 16px;
+          font-size: var(--ed-font-size-lg);
           font-weight: 700;
           line-height: 24px;
         }
@@ -311,7 +320,7 @@ export default function AdminLogin() {
           border-radius: var(--ed-radius-xl);
           background: var(--ed-danger-soft);
           color: #ef4444;
-          font-size: 14px;
+          font-size: var(--ed-font-size-md);
           font-weight: 700;
           line-height: 20px;
         }
@@ -337,7 +346,7 @@ export default function AdminLogin() {
           }
 
           .ed-login-brand-copy h1 {
-            font-size: 28px;
+            font-size: var(--ed-font-size-3xl);
           }
 
           .ed-login-panel {
