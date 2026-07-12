@@ -581,7 +581,7 @@ export default function AdminBilling() {
 
       <div className="ed-attempts-table-card" style={{ marginBottom: "32px", marginTop: "24px" }}>
         <div className="ed-attempts-table-card-head">
-          <DollarSign size={18} color="#43b9b2" />
+          <DollarSign size={18} color="var(--ed-color-text-inverse)" />
           Recent Overage Charge Attempts
         </div>
         <div className="ed-billing-table-scroll">
@@ -654,7 +654,7 @@ export default function AdminBilling() {
                           {attempt.status.toUpperCase()}
                         </span>
                         {attempt.error && (
-                          <div style={{ color: "#ef4444", fontSize: "10px", marginTop: "3px", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis" }} title={attempt.error}>
+                          <div style={{ color: "var(--ed-color-danger)", fontSize: "var(--ed-font-size-xs)", marginTop: "var(--ed-space-2)", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis" }} title={attempt.error}>
                             {attempt.error}
                           </div>
                         )}
@@ -678,19 +678,19 @@ export default function AdminBilling() {
       <style>{`
         .ed-billing {
           display: grid;
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-7);
         }
 
         .ed-period-label {
           width: fit-content;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          min-height: 38px;
-          padding: 0 12px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          gap: var(--ed-space-5);
+          min-height: 34px;
+          padding: 0 var(--ed-space-7);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
@@ -699,39 +699,39 @@ export default function AdminBilling() {
         .ed-billing-cards {
           display: grid;
           grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-7);
         }
 
         .ed-billing-stat {
           display: grid;
-          grid-template-columns: 52px minmax(0, 1fr);
+          grid-template-columns: 42px minmax(0, 1fr);
           align-items: start;
-          gap: 12px;
-          padding: var(--ed-space-2);
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          gap: var(--ed-space-7);
+          padding: var(--ed-space-7);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-billing-icon {
-          width: 52px;
-          height: 52px;
+          width: 42px;
+          height: 42px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--ed-radius-xl);
-          background: #f2f8ee;
-          color: var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-inverse);
         }
 
         .ed-billing-stat.warning .ed-billing-icon {
-          background: #fff8e8;
-          color: #f59e0b;
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-warning);
         }
 
         .ed-billing-stat.danger .ed-billing-icon {
-          background: #fff2f2;
-          color: #ef4444;
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-danger);
         }
 
         .ed-billing-icon svg {
@@ -753,8 +753,8 @@ export default function AdminBilling() {
           display: block;
           margin-top: var(--ed-space-1);
           color: var(--ed-color-text-primary);
-          font-size: 22px;
-          line-height: 28px;
+          font-size: var(--ed-font-size-3xl);
+          line-height: 26px;
           font-variant-numeric: tabular-nums;
         }
 
@@ -762,22 +762,22 @@ export default function AdminBilling() {
           display: grid;
           grid-template-columns: minmax(280px, 1fr) auto;
           align-items: center;
-          gap: 10px;
+          gap: var(--ed-space-7);
         }
 
         .ed-billing-filter-row {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: var(--ed-space-7);
         }
 
         .ed-billing-search,
         .ed-billing-select,
         .ed-billing-clear {
           min-height: 42px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
         }
@@ -785,15 +785,15 @@ export default function AdminBilling() {
         .ed-billing-search {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 0 12px;
+          gap: var(--ed-space-6);
+          padding: 0 var(--ed-space-7);
           color: var(--ed-color-text-tertiary);
         }
 
         .ed-billing-search:focus-within {
-          outline: 2px solid var(--ed-color-border-muted);
+          outline: 2px solid var(--ed-color-text-inverse);
           outline-offset: 2px;
-          border-color: var(--ed-color-border-muted);
+          border-color: var(--ed-color-text-inverse);
         }
 
         .ed-billing-search input {
@@ -806,7 +806,7 @@ export default function AdminBilling() {
 
         .ed-billing-select {
           min-width: 150px;
-          padding: 0 12px;
+          padding: 0 var(--ed-space-7);
           font-weight: 500;
         }
 
@@ -814,14 +814,14 @@ export default function AdminBilling() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 7px;
-          padding: 0 12px;
+          gap: var(--ed-space-5);
+          padding: 0 var(--ed-space-7);
           font-weight: 500;
         }
 
         .ed-billing-clear:hover {
-          border-color: var(--ed-color-border-muted);
-          color: var(--ed-color-border-muted);
+          border-color: var(--ed-color-text-inverse);
+          color: var(--ed-color-text-inverse);
         }
 
         .ed-billing-count {
@@ -833,9 +833,9 @@ export default function AdminBilling() {
 
         .ed-billing-table-card {
           overflow: hidden;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-billing-table-scroll {
@@ -855,15 +855,15 @@ export default function AdminBilling() {
 
         .ed-billing-shop-link strong {
           display: block;
-          color: #43b9b2 !important;
+          color: var(--ed-color-text-inverse) !important;
           font-weight: 700;
           line-height: 18px;
-          transition: color 0.15s ease;
+          transition: color var(--ed-motion-instant) ease;
         }
 
         .ed-billing-shop-link:hover strong {
           text-decoration: underline;
-          color: #0a9f98 !important;
+          color: var(--ed-color-text-primary) !important;
         }
 
         .ed-billing-shop-link small {
@@ -895,17 +895,17 @@ export default function AdminBilling() {
         }
 
         .ed-danger {
-          color: #ef4444 !important;
+          color: var(--ed-color-danger) !important;
           font-weight: 700;
         }
 
         .ed-warning {
-          color: #f59e0b !important;
+          color: var(--ed-color-warning) !important;
           font-weight: 700;
         }
 
         .ed-review {
-          color: #0a9f98 !important;
+          color: var(--ed-color-text-inverse) !important;
           font-weight: 700;
         }
 
@@ -922,37 +922,37 @@ export default function AdminBilling() {
           width: 96px;
           height: 7px;
           overflow: hidden;
-          border-radius: var(--ed-radius-xl);
-          background: #eef1ef;
+          border-radius: var(--ed-radius-xs);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-usage-bar span {
           display: block;
           height: 100%;
           min-width: 2px;
-          background: var(--ed-color-border-muted);
+          background: var(--ed-color-text-inverse);
         }
 
         .ed-usage-bar span.is-warning {
-          background: #f59e0b;
+          background: var(--ed-color-warning);
         }
 
         .ed-usage-bar span.is-danger {
-          background: #ef4444;
+          background: var(--ed-color-danger);
         }
 
         .ed-usage-bar span.is-unlimited {
-          background: #10b981;
+          background: var(--ed-color-text-inverse);
         }
 
         .ed-status {
           display: inline-flex;
           align-items: center;
           min-height: 26px;
-          padding: 0 9px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: #f6f8f5;
+          padding: 0 var(--ed-space-6);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-xs);
           font-weight: 700;
@@ -960,29 +960,29 @@ export default function AdminBilling() {
         }
 
         .ed-status.ok {
-          border-color: #d9e9cd;
-          background: #f2f8ee;
-          color: #10b981;
+          border-color: var(--ed-color-border-soft);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-inverse);
         }
 
         .ed-status.waiting,
         .ed-status.pending {
-          border-color: #f4d49f;
-          background: #fff8e8;
-          color: #f59e0b;
+          border-color: var(--ed-color-warning);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-warning);
         }
 
         .ed-status.overcharged,
         .ed-status.free_exceeded {
-          border-color: #efc8c8;
-          background: #fff2f2;
-          color: #ef4444;
+          border-color: var(--ed-color-danger);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-danger);
         }
 
         .ed-status.charge_review {
-          border-color: #b2e5e2;
-          background: #e8fbfa;
-          color: #0a9f98;
+          border-color: var(--ed-color-text-inverse);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-inverse);
         }
 
         .ed-billing-empty {
@@ -993,27 +993,27 @@ export default function AdminBilling() {
 
         .ed-attempts-table-card {
           overflow: hidden;
-          border: 1px solid #edf0f5;
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
           box-shadow: var(--ed-shadow-2);
-          transition: border-color 0.15s ease;
+          transition: border-color var(--ed-motion-instant) ease;
         }
 
         .ed-attempts-table-card:hover {
-          border-color: #d9f3f1;
+          border-color: var(--ed-color-text-inverse);
         }
 
         .ed-attempts-table-card-head {
-          padding: 16px 20px;
-          border-bottom: 1px solid #edf0f5;
-          background: #fcfdfe;
+          padding: var(--ed-space-8);
+          border-bottom: 1px solid var(--ed-color-border-soft);
+          background: var(--ed-color-surface-strong);
           font-weight: 700;
-          font-size: 14px;
-          color: #1e293b;
+          font-size: var(--ed-font-size-md);
+          color: var(--ed-color-text-primary);
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: var(--ed-space-6);
         }
 
         .ed-attempts-table-card table {
@@ -1041,9 +1041,9 @@ export default function AdminBilling() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 16px 20px;
-          border-top: 1px solid var(--ed-color-surface-muted);
-          background: var(--ed-color-surface-strong);
+          padding: var(--ed-space-8);
+          border-top: 1px solid var(--ed-color-border-soft);
+          background: var(--ed-color-surface-muted);
           font-size: var(--ed-font-size-sm);
           color: var(--ed-color-text-tertiary);
         }
@@ -1051,11 +1051,11 @@ export default function AdminBilling() {
         @media (max-width: 640px) {
           .ed-pagination {
             flex-direction: column;
-            gap: 12px;
+            gap: var(--ed-space-7);
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 12px 16px;
+            padding: var(--ed-space-7) var(--ed-space-8);
           }
           .ed-pagination-info {
             margin-bottom: 4px;
@@ -1069,9 +1069,9 @@ export default function AdminBilling() {
         .ed-pagination-buttons {
           display: inline-flex;
           align-items: center;
-          border: 1px solid #b2e5e2;
-          border-radius: 8px;
-          background: white;
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-surface-muted);
           overflow: hidden;
           gap: 0;
         }
@@ -1083,16 +1083,16 @@ export default function AdminBilling() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 13px;
+          font-size: var(--ed-font-size-sm);
           font-weight: 600;
           border: none;
           background: transparent;
-          color: #43b9b2;
-          border-right: 1px solid #b2e5e2;
+          color: var(--ed-color-text-inverse);
+          border-right: 1px solid var(--ed-color-border-soft);
           border-radius: 0 !important;
           margin: 0;
-          padding: 0 10px;
-          transition: all 0.15s ease;
+          padding: 0 var(--ed-space-6);
+          transition: background-color var(--ed-motion-instant) ease, color var(--ed-motion-instant) ease;
           cursor: pointer;
           box-sizing: border-box;
           line-height: 1;
@@ -1101,7 +1101,7 @@ export default function AdminBilling() {
         .ed-pagination-ellipsis {
           cursor: default;
           user-select: none;
-          color: #74cdc8;
+          color: var(--ed-color-text-secondary);
         }
 
         .ed-pagination-buttons > button:last-child {
@@ -1109,20 +1109,20 @@ export default function AdminBilling() {
         }
 
         .ed-pagination-btn:hover:not(:disabled) {
-          background: #e8fbfa;
-          color: #0a9f98;
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
         }
 
         .ed-pagination-btn.active {
-          background: #e8fbfa;
-          color: #0a9f98;
+          background: var(--ed-color-text-inverse);
+          color: var(--ed-text-inverse);
           font-weight: 700;
         }
 
         .ed-pagination-btn:disabled {
           opacity: 0.35;
           cursor: not-allowed;
-          background: #fcfdfe;
+          background: var(--ed-color-surface-strong);
         }
 
         @media (max-width: 1180px) {
@@ -1132,7 +1132,7 @@ export default function AdminBilling() {
 
           .ed-billing-toolbar {
             grid-template-columns: minmax(0, 1fr) auto;
-            gap: 8px;
+            gap: var(--ed-space-5);
           }
 
           .ed-billing-search {
@@ -1143,7 +1143,7 @@ export default function AdminBilling() {
           .ed-billing-filter-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 8px;
+            gap: var(--ed-space-5);
           }
 
           .ed-billing-filter-row:has(.ed-billing-clear) {
@@ -1176,7 +1176,7 @@ export default function AdminBilling() {
 
           .ed-period-label {
             min-height: 34px;
-            padding-inline: 10px;
+            padding-inline: var(--ed-space-6);
             font-size: var(--ed-font-size-xs);
             white-space: nowrap;
             overflow: hidden;
@@ -1207,14 +1207,14 @@ export default function AdminBilling() {
 
           .ed-billing-stat {
             grid-template-columns: 42px minmax(0, 1fr);
-            gap: 8px;
-            padding: 10px;
+            gap: var(--ed-space-5);
+            padding: var(--ed-space-6);
           }
 
           .ed-billing-icon {
             width: 42px;
             height: 42px;
-            border-radius: var(--ed-radius-lg);
+            border-radius: var(--ed-radius-sm);
           }
 
           .ed-billing-icon svg {
@@ -1223,7 +1223,7 @@ export default function AdminBilling() {
           }
 
           .ed-billing-stat span:not(.ed-billing-icon) {
-            font-size: 10px;
+            font-size: var(--ed-font-size-xs);
             line-height: 13px;
           }
 
