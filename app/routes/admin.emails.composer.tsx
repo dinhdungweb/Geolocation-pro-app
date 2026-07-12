@@ -428,7 +428,7 @@ export default function EmailComposer() {
                 /* Preview Panel */
                 .preview-viewport {
                     padding: 60px;
-                    background: #f2f4f1;
+                    background: var(--ed-color-surface-strong);
                     display: flex;
                     flex-direction: column;
                     align-items: center;

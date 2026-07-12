@@ -217,7 +217,7 @@ export default function EmailBlacklist() {
         .ed-blacklist-form {
           overflow: hidden;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -245,7 +245,7 @@ export default function EmailBlacklist() {
         .ed-eyebrow {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -310,9 +310,9 @@ export default function EmailBlacklist() {
           align-items: center;
           justify-content: center;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-muted);
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
         }
 
         .ed-delete-button {
@@ -322,7 +322,7 @@ export default function EmailBlacklist() {
           align-items: center;
           justify-content: center;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-tertiary);
           cursor: pointer;
@@ -330,8 +330,8 @@ export default function EmailBlacklist() {
 
         .ed-delete-button:hover {
           border-color: #ffccc7;
-          background: #fff1f0;
-          color: #b42318;
+          background: var(--ed-color-danger-soft);
+          color: var(--ed-color-danger);
         }
 
         .ed-note {
@@ -339,7 +339,7 @@ export default function EmailBlacklist() {
           gap: 10px;
           padding: 12px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
         }
@@ -368,7 +368,7 @@ export default function EmailBlacklist() {
           min-height: 40px;
           padding: 8px 10px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
@@ -401,9 +401,9 @@ export default function EmailBlacklist() {
           justify-content: center;
           gap: 8px;
           padding: 0 14px;
-          border: 1px solid var(--ed-color-border-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-border-muted);
+          border: 1px solid var(--ed-color-primary);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-primary);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow-2);
           cursor: pointer;
@@ -413,8 +413,8 @@ export default function EmailBlacklist() {
         }
 
         .ed-button-primary:hover {
-          background: #6f9a37;
-          border-color: #6f9a37;
+          background: var(--ed-color-text-inverse);
+          border-color: var(--ed-color-text-inverse);
         }
 
         .ed-button-primary:disabled {
@@ -436,7 +436,7 @@ export default function EmailBlacklist() {
           align-items: center;
           gap: 8px;
           padding: 10px;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
           line-height: 20px;
@@ -444,14 +444,14 @@ export default function EmailBlacklist() {
 
         .ed-alert.success {
           border: 1px solid #b7df9e;
-          background: #eef7e9;
-          color: #37630f;
+          background: var(--ed-color-success-soft);
+          color: var(--ed-color-success);
         }
 
         .ed-alert.danger {
           border: 1px solid #ffccc7;
-          background: #fff1f0;
-          color: #b42318;
+          background: var(--ed-color-danger-soft);
+          color: var(--ed-color-danger);
         }
 
         .ed-empty-state {

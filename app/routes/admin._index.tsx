@@ -464,18 +464,26 @@ export default function AdminDashboard() {
 
         .ed-metric-card.primary {
           --ed-card-accent: var(--ed-color-text-inverse);
+          --ed-card-icon-bg: var(--ed-color-accent-soft);
+          --ed-card-icon-color: var(--ed-color-text-inverse);
         }
 
         .ed-metric-card.secondary {
-          --ed-card-accent: var(--ed-color-text-secondary);
+          --ed-card-accent: var(--ed-color-primary);
+          --ed-card-icon-bg: var(--ed-color-primary-soft);
+          --ed-card-icon-color: var(--ed-color-primary);
         }
 
         .ed-metric-card.tertiary {
-          --ed-card-accent: var(--ed-color-text-tertiary);
+          --ed-card-accent: var(--ed-color-info);
+          --ed-card-icon-bg: var(--ed-color-info-soft);
+          --ed-card-icon-color: var(--ed-color-info);
         }
 
         .ed-metric-card.inverse {
-          --ed-card-accent: var(--ed-color-surface-base);
+          --ed-card-accent: var(--ed-color-success);
+          --ed-card-icon-bg: var(--ed-color-success-soft);
+          --ed-card-icon-color: var(--ed-color-success);
         }
 
         .ed-metric-head {
@@ -502,8 +510,8 @@ export default function AdminDashboard() {
           align-items: center;
           justify-content: center;
           border-radius: var(--ed-radius-sm);
-          background: var(--ed-color-surface-strong);
-          color: var(--ed-color-text-inverse);
+          background: var(--ed-card-icon-bg, var(--ed-color-surface-strong));
+          color: var(--ed-card-icon-color, var(--ed-color-text-inverse));
         }
 
         .ed-metric-icon svg {
@@ -643,7 +651,7 @@ export default function AdminDashboard() {
           width: 72%;
           min-height: 0;
           border-radius: var(--ed-radius-md) var(--ed-radius-md) 0 0;
-          background: var(--ed-color-text-inverse);
+          background: linear-gradient(180deg, var(--ed-color-primary), var(--ed-color-text-inverse));
           box-shadow: var(--ed-shadow-2);
         }
 
@@ -708,7 +716,7 @@ export default function AdminDashboard() {
           display: block;
           height: 100%;
           min-width: 2px;
-          background: var(--ed-color-text-inverse);
+          background: var(--ed-color-info);
         }
 
         .ed-plan-grid {

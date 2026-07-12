@@ -180,14 +180,14 @@ export default function EmailHistory() {
         .ed-history-head {
           padding: var(--ed-space-2);
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
         .ed-eyebrow {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -225,7 +225,7 @@ export default function EmailHistory() {
         .ed-filter-bar {
           padding: 12px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -238,7 +238,7 @@ export default function EmailHistory() {
           min-height: 40px;
           padding: 0 12px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
         }
@@ -258,7 +258,7 @@ export default function EmailHistory() {
           min-height: 40px;
           padding: 0 12px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
@@ -271,7 +271,7 @@ export default function EmailHistory() {
           align-items: center;
           justify-content: center;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
           cursor: pointer;
@@ -291,8 +291,8 @@ export default function EmailHistory() {
 
         .ed-icon-button:hover,
         .ed-button-secondary:hover {
-          border-color: var(--ed-color-border-muted);
-          color: var(--ed-color-border-muted);
+          border-color: var(--ed-color-primary);
+          color: var(--ed-color-primary);
         }
 
         .ed-search-field:focus-within,
@@ -306,7 +306,7 @@ export default function EmailHistory() {
         .ed-history-table {
           overflow: hidden;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -359,9 +359,9 @@ export default function EmailHistory() {
           justify-content: center;
           flex: 0 0 auto;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-muted);
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-size: 10px;
           font-weight: 700;
         }
@@ -378,24 +378,24 @@ export default function EmailHistory() {
           align-items: center;
           gap: 6px;
           padding: 4px 8px;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           font-size: 11px;
           font-weight: 700;
           line-height: 16px;
         }
 
         .ed-status.sent {
-          background: #eef7e9;
-          color: #37630f;
+          background: var(--ed-color-success-soft);
+          color: var(--ed-color-success);
         }
 
         .ed-status.failed {
-          background: #fff1f0;
-          color: #b42318;
+          background: var(--ed-color-danger-soft);
+          color: var(--ed-color-danger);
         }
 
         .ed-status.simulated {
-          background: #f2f4f1;
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-tertiary);
         }
 
@@ -440,7 +440,7 @@ export default function EmailHistory() {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -470,7 +470,7 @@ export default function EmailHistory() {
         .ed-html-preview {
           overflow: auto;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 

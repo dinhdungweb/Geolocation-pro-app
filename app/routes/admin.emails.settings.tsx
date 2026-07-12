@@ -200,7 +200,7 @@ export default function EmailSettings() {
         .ed-settings-nav,
         .ed-settings-card {
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -219,7 +219,7 @@ export default function EmailSettings() {
           gap: 10px;
           padding: 0 12px;
           border: 1px solid transparent;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: transparent;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
@@ -232,7 +232,7 @@ export default function EmailSettings() {
         .ed-settings-nav button.is-active {
           border-color: var(--ed-color-surface-muted);
           background: var(--ed-color-surface-muted);
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
         }
 
         .ed-settings-nav button:focus-visible,
@@ -252,7 +252,7 @@ export default function EmailSettings() {
         .ed-eyebrow {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -295,7 +295,7 @@ export default function EmailSettings() {
           align-items: center;
           gap: 10px;
           padding: 12px;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
           line-height: 20px;
@@ -303,14 +303,14 @@ export default function EmailSettings() {
 
         .ed-alert.success {
           border: 1px solid #b7df9e;
-          background: #eef7e9;
-          color: #37630f;
+          background: var(--ed-color-success-soft);
+          color: var(--ed-color-success);
         }
 
         .ed-alert.danger {
           border: 1px solid #ffccc7;
-          background: #fff1f0;
-          color: #b42318;
+          background: var(--ed-color-danger-soft);
+          color: var(--ed-color-danger);
         }
 
         .ed-form-grid {
@@ -341,7 +341,7 @@ export default function EmailSettings() {
           min-height: 42px;
           padding: 9px 11px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-md);
@@ -349,7 +349,7 @@ export default function EmailSettings() {
         }
 
         .ed-field input:focus-visible {
-          border-color: var(--ed-color-border-muted);
+          border-color: var(--ed-color-primary);
         }
 
         .ed-section-divider {
@@ -363,14 +363,14 @@ export default function EmailSettings() {
           gap: 10px;
           padding: 12px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-muted);
         }
 
         .ed-checkbox-row input {
           width: 18px;
           height: 18px;
-          accent-color: var(--ed-color-border-muted);
+          accent-color: var(--ed-color-primary);
         }
 
         .ed-settings-actions {
@@ -384,9 +384,9 @@ export default function EmailSettings() {
           align-items: center;
           justify-content: center;
           padding: 0 16px;
-          border: 1px solid var(--ed-color-border-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-border-muted);
+          border: 1px solid var(--ed-color-primary);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-primary);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow-2);
           cursor: pointer;
@@ -396,8 +396,8 @@ export default function EmailSettings() {
         }
 
         .ed-button-primary:hover {
-          background: #6f9a37;
-          border-color: #6f9a37;
+          background: var(--ed-color-text-inverse);
+          border-color: var(--ed-color-text-inverse);
         }
 
         @media (max-width: 900px) {

@@ -190,14 +190,14 @@ export default function AutomationsList() {
           gap: var(--ed-space-2);
           padding: var(--ed-space-2);
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
         .ed-eyebrow {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -228,9 +228,9 @@ export default function AutomationsList() {
           justify-content: center;
           gap: 8px;
           padding: 0 14px;
-          border: 1px solid var(--ed-color-border-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-border-muted);
+          border: 1px solid var(--ed-color-primary);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-primary);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow-2);
           font-size: var(--ed-font-size-sm);
@@ -240,8 +240,8 @@ export default function AutomationsList() {
         }
 
         .ed-button-primary:hover {
-          background: #6f9a37;
-          border-color: #6f9a37;
+          background: var(--ed-color-text-inverse);
+          border-color: var(--ed-color-text-inverse);
         }
 
         .ed-button-primary:focus-visible,
@@ -256,7 +256,7 @@ export default function AutomationsList() {
           gap: var(--ed-space-2);
           padding: 16px var(--ed-space-2);
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: #f2f6ee;
         }
 
@@ -280,7 +280,7 @@ export default function AutomationsList() {
         }
 
         .ed-automation-summary a:hover {
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
         }
 
         .ed-automation-metrics {
@@ -293,7 +293,7 @@ export default function AutomationsList() {
           min-width: 0;
           padding: 16px;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -318,7 +318,7 @@ export default function AutomationsList() {
         .ed-automation-table {
           overflow: hidden;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-color-surface-strong);
         }
 
@@ -333,7 +333,7 @@ export default function AutomationsList() {
           flex: 0 0 auto;
           padding: 8px 10px;
           border: 1px solid transparent;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           background: transparent;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
@@ -384,14 +384,14 @@ export default function AutomationsList() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-weight: 700;
         }
 
         .ed-status {
           display: inline-flex;
           padding: 4px 8px;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-md);
           font-size: 11px;
           font-weight: 700;
           line-height: 16px;
@@ -399,12 +399,12 @@ export default function AutomationsList() {
         }
 
         .ed-status.success {
-          background: #eef7e9;
-          color: #37630f;
+          background: var(--ed-color-success-soft);
+          color: var(--ed-color-success);
         }
 
         .ed-status.neutral {
-          background: #f2f4f1;
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-tertiary);
         }
 

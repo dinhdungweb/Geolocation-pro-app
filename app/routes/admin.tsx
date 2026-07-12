@@ -314,8 +314,16 @@ export default function AdminLayout() {
           --ed-color-border-soft: #e8eaee;
           --ed-color-accent-soft: #eef1f4;
           --ed-color-accent-active: var(--ed-color-text-inverse);
+          --ed-color-primary: #2563eb;
+          --ed-color-primary-soft: #eff6ff;
+          --ed-color-success: #057a55;
+          --ed-color-success-soft: #ecfdf3;
+          --ed-color-info: #0f766e;
+          --ed-color-info-soft: #ecfeff;
           --ed-color-warning: #b45309;
+          --ed-color-warning-soft: #fff7ed;
           --ed-color-danger: #b42318;
+          --ed-color-danger-soft: #fff1f2;
           --ed-text-inverse: #ffffff;
           --ed-content-padding-mobile: var(--ed-space-8);
           --ed-card-padding-mobile: var(--ed-space-8);
@@ -1110,8 +1118,8 @@ export default function AdminLayout() {
         .ed-admin-content .ed-button-primary,
         .ed-admin-content button[type="submit"].ed-button-primary,
         .ed-admin-content a.ed-button-primary {
-          border-color: var(--ed-color-text-inverse) !important;
-          background: var(--ed-color-text-inverse) !important;
+          border-color: var(--ed-color-primary) !important;
+          background: var(--ed-color-primary) !important;
           color: var(--ed-text-inverse) !important;
           box-shadow: var(--ed-shadow-2) !important;
         }
@@ -1119,8 +1127,8 @@ export default function AdminLayout() {
         .ed-admin-content .ed-button-primary:hover,
         .ed-admin-content button[type="submit"].ed-button-primary:hover,
         .ed-admin-content a.ed-button-primary:hover {
-          border-color: var(--ed-color-accent-active) !important;
-          background: var(--ed-color-accent-active) !important;
+          border-color: var(--ed-color-text-inverse) !important;
+          background: var(--ed-color-text-inverse) !important;
         }
 
         .ed-admin-content .ed-button-secondary:hover,
@@ -1132,7 +1140,7 @@ export default function AdminLayout() {
 
         .ed-admin-content .ed-eyebrow,
         .ed-admin-content .ed-view-icon {
-          color: var(--ed-color-accent-active) !important;
+          color: var(--ed-color-primary) !important;
         }
 
         .ed-admin-content .ed-stat-strip div,
@@ -1143,8 +1151,8 @@ export default function AdminLayout() {
         }
 
         .ed-admin-content .ed-day-cell.has-activity {
-          border-color: var(--ed-color-border-muted) !important;
-          background: var(--ed-color-accent-soft) !important;
+          border-color: var(--ed-color-primary) !important;
+          background: var(--ed-color-primary-soft) !important;
         }
 
         .ed-admin-content :where(
@@ -1251,8 +1259,8 @@ export default function AdminLayout() {
           .btn-save-indigo,
           .primary-btn
         ) {
-          border-color: var(--ed-color-text-inverse) !important;
-          background: var(--ed-color-text-inverse) !important;
+          border-color: var(--ed-color-primary) !important;
+          background: var(--ed-color-primary) !important;
           color: var(--ed-text-inverse) !important;
           box-shadow: none !important;
         }
@@ -1267,6 +1275,19 @@ export default function AdminLayout() {
           background: var(--ed-color-surface-muted) !important;
           color: var(--ed-color-text-primary) !important;
           box-shadow: none !important;
+        }
+
+        .ed-admin-content :where(
+          .ed-button-primary:hover,
+          button[type="submit"].ed-button-primary:hover,
+          a.ed-button-primary:hover,
+          .btn-save:hover,
+          .btn-shopify-primary:hover,
+          .btn-save-indigo:hover,
+          .primary-btn:hover
+        ) {
+          border-color: var(--ed-color-text-inverse) !important;
+          background: var(--ed-color-text-inverse) !important;
         }
 
         .ed-admin-content :where(
@@ -1286,6 +1307,30 @@ export default function AdminLayout() {
           color: var(--ed-color-text-primary) !important;
         }
 
+        .ed-admin-content :where(.ed-status.success, .ed-status.sent, .status-active, .label-yes, .badge-success) {
+          border-color: var(--ed-color-success) !important;
+          background: var(--ed-color-success-soft) !important;
+          color: var(--ed-color-success) !important;
+        }
+
+        .ed-admin-content :where(.ed-status.warning, .ed-status.sending, .ed-status.pending, .ed-warning, .badge-warning) {
+          border-color: var(--ed-color-warning) !important;
+          background: var(--ed-color-warning-soft) !important;
+          color: var(--ed-color-warning) !important;
+        }
+
+        .ed-admin-content :where(.ed-status.failed, .ed-status.error, .ed-status.danger, .ed-danger, .alert-error, .btn-danger, .label-no) {
+          border-color: var(--ed-color-danger) !important;
+          background: var(--ed-color-danger-soft) !important;
+          color: var(--ed-color-danger) !important;
+        }
+
+        .ed-admin-content :where(.ed-status.info, .badge-info) {
+          border-color: var(--ed-color-info) !important;
+          background: var(--ed-color-info-soft) !important;
+          color: var(--ed-color-info) !important;
+        }
+
         .ed-admin-content :where(
           .ed-panel-icon,
           .ed-row-icon,
@@ -1295,8 +1340,8 @@ export default function AdminLayout() {
           .stat-card-icon
         ) {
           border-radius: var(--ed-radius-sm) !important;
-          background: var(--ed-color-surface-strong) !important;
-          color: var(--ed-color-text-inverse) !important;
+          background: var(--ed-color-primary-soft) !important;
+          color: var(--ed-color-primary) !important;
         }
 
         .ed-admin-content :where(a:not(.ed-button-primary), .ed-billing-shop-link strong, .month-name) {

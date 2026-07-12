@@ -140,7 +140,7 @@ export default function CampaignsList() {
       <style>{`
         .ed-email-campaigns {
           display: grid;
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-8);
         }
 
         .ed-campaign-head,
@@ -148,20 +148,20 @@ export default function CampaignsList() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-8);
         }
 
         .ed-campaign-head {
-          padding: var(--ed-space-2);
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          padding: var(--ed-space-8);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-eyebrow {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-border-muted);
+          color: var(--ed-color-primary);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -172,7 +172,7 @@ export default function CampaignsList() {
         .ed-campaign-head h2 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-size: 22px;
+          font-size: var(--ed-font-size-3xl);
           font-weight: 700;
           line-height: 28px;
         }
@@ -192,7 +192,7 @@ export default function CampaignsList() {
           justify-content: center;
           gap: 8px;
           padding: 0 14px;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-sm);
           cursor: pointer;
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
@@ -201,33 +201,33 @@ export default function CampaignsList() {
         }
 
         .ed-button-primary {
-          border: 1px solid var(--ed-color-border-muted);
-          background: var(--ed-color-border-muted);
+          border: 1px solid var(--ed-color-primary);
+          background: var(--ed-color-primary);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow-2);
         }
 
         .ed-button-primary:hover {
-          background: #6f9a37;
-          border-color: #6f9a37;
+          background: var(--ed-color-text-inverse);
+          border-color: var(--ed-color-text-inverse);
         }
 
         .ed-button-secondary {
-          border: 1px solid var(--ed-color-surface-muted);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
         }
 
         .ed-button-secondary:hover {
-          border-color: var(--ed-color-border-muted);
-          color: var(--ed-color-border-muted);
+          border-color: var(--ed-color-primary);
+          color: var(--ed-color-primary);
         }
 
         .ed-button-primary:focus-visible,
         .ed-button-secondary:focus-visible,
         .ed-search-field:focus-within,
         .ed-campaign-row:focus-visible {
-          outline: 3px solid var(--ed-color-border-muted);
+          outline: 2px solid var(--ed-color-text-inverse);
           outline-offset: 2px;
         }
 
@@ -238,10 +238,36 @@ export default function CampaignsList() {
         }
 
         .ed-campaign-stats article {
+          position: relative;
+          overflow: hidden;
           padding: 16px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
+        }
+
+        .ed-campaign-stats article::before {
+          content: "";
+          position: absolute;
+          inset: 0 auto 0 0;
+          width: 3px;
+          background: var(--ed-stat-accent, var(--ed-color-primary));
+        }
+
+        .ed-campaign-stats article:nth-child(1) {
+          --ed-stat-accent: var(--ed-color-primary);
+        }
+
+        .ed-campaign-stats article:nth-child(2) {
+          --ed-stat-accent: var(--ed-color-success);
+        }
+
+        .ed-campaign-stats article:nth-child(3) {
+          --ed-stat-accent: var(--ed-color-info);
+        }
+
+        .ed-campaign-stats article:nth-child(4) {
+          --ed-stat-accent: var(--ed-color-warning);
         }
 
         .ed-campaign-stats span,
@@ -264,9 +290,9 @@ export default function CampaignsList() {
 
         .ed-filter-bar {
           padding: 12px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-search-field {
@@ -277,8 +303,8 @@ export default function CampaignsList() {
           gap: 10px;
           min-height: 40px;
           padding: 0 12px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-sm);
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
         }
@@ -296,9 +322,9 @@ export default function CampaignsList() {
 
         .ed-campaign-table {
           overflow: hidden;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-campaign-grid {
@@ -310,19 +336,19 @@ export default function CampaignsList() {
 
         .ed-campaign-grid-head {
           padding: 14px var(--ed-space-2);
-          background: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-campaign-row {
           padding: 14px var(--ed-space-2);
-          border-top: 1px solid var(--ed-color-surface-muted);
+          border-top: 1px solid var(--ed-color-border-soft);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
           text-decoration: none;
         }
 
         .ed-campaign-row:hover {
-          background: var(--ed-color-surface-strong);
+          background: var(--ed-color-primary-soft);
         }
 
         .ed-campaign-name {
@@ -354,26 +380,26 @@ export default function CampaignsList() {
           align-items: center;
           gap: 6px;
           padding: 4px 8px;
-          border-radius: var(--ed-radius-xl);
+          border-radius: var(--ed-radius-sm);
           font-size: 11px;
           font-weight: 700;
           line-height: 16px;
         }
 
         .ed-status.sent {
-          background: #eef7e9;
-          color: #37630f;
+          background: var(--ed-color-success-soft);
+          color: var(--ed-color-success);
         }
 
         .ed-status.draft {
-          background: #f2f4f1;
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-tertiary);
         }
 
         .ed-status.failed,
         .ed-status.sending {
-          background: #fff1f0;
-          color: #b42318;
+          background: var(--ed-color-danger-soft);
+          color: var(--ed-color-danger);
         }
 
         .ed-row-action {
@@ -386,7 +412,7 @@ export default function CampaignsList() {
           justify-items: center;
           gap: 8px;
           padding: 54px 16px;
-          border-top: 1px solid var(--ed-color-surface-muted);
+          border-top: 1px solid var(--ed-color-border-soft);
           color: var(--ed-color-text-tertiary);
           text-align: center;
         }
