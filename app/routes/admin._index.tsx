@@ -209,48 +209,74 @@ export default function AdminDashboard() {
       label: "Total Installations",
       value: stats.totalShops.toLocaleString(),
       note: "All active merchant records",
+      delta: "Stores",
+      tone: "primary",
       icon: <Store size={18} />,
     },
     {
       label: "Global Traffic",
       value: stats.totalVisitors.toLocaleString(),
       note: "Aggregated visitor events",
+      delta: "Visitors",
+      tone: "secondary",
       icon: <TrendingUp size={18} />,
     },
     {
       label: "Active Rules",
       value: stats.activeRules.toLocaleString(),
       note: "Redirect and block rules",
+      delta: "Policies",
+      tone: "tertiary",
       icon: <Store size={18} />,
     },
     {
       label: "Total Revenue",
       value: `$${stats.totalRevenue.toFixed(2)}`,
       note: `Subs $${stats.subscriptionRevenue.toFixed(2)} / Overage $${stats.overageRevenue.toFixed(2)}`,
+      delta: "MRR estimate",
+      tone: "inverse",
       icon: <Gem size={18} />,
     },
   ];
 
   return (
     <section className="ed-dashboard">
+      <header className="ed-dashboard-head">
+        <div className="ed-dashboard-title">
+          <span>Operational snapshot</span>
+          <h1>System Overview</h1>
+          <p>Monitor merchant installs, traffic, rules, revenue, and market concentration.</p>
+        </div>
+        <div className="ed-dashboard-actions" aria-label="Dashboard status">
+          <span>Current year</span>
+          <strong>{new Date().getFullYear()}</strong>
+        </div>
+      </header>
+
       <div className="ed-metric-grid">
         {cards.map((card) => (
-          <article className="ed-metric-card" key={card.label}>
+          <article className={`ed-metric-card ${card.tone}`} key={card.label}>
             <div className="ed-metric-head">
               <span className="ed-metric-icon">{card.icon}</span>
               <span>{card.label}</span>
             </div>
             <strong>{card.value}</strong>
-            <small>{card.note}</small>
+            <div className="ed-metric-foot">
+              <small>{card.note}</small>
+              <span>{card.delta}</span>
+            </div>
           </article>
         ))}
       </div>
 
       <div className="ed-dashboard-grid">
         <article className="ed-panel">
-          <div className="ed-panel-head">
-            <h2>Traffic Growth Trend</h2>
-            <p>Monthly visitor volume across the current year.</p>
+          <div className="ed-panel-head ed-panel-head-split">
+            <div>
+              <h2>Traffic Growth Trend</h2>
+              <p>Monthly visitor volume across the current year.</p>
+            </div>
+            <span className="ed-panel-chip">Visitors</span>
           </div>
 
           <div className="ed-trend-chart" aria-label="Traffic growth by month">
@@ -332,31 +358,124 @@ export default function AdminDashboard() {
           width: 100%;
           min-width: 0;
           display: grid;
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-8);
+        }
+
+        .ed-dashboard-head {
+          min-width: 0;
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: var(--ed-space-8);
+          padding: var(--ed-space-8);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-lg);
+          background: var(--ed-color-surface-muted);
+          box-shadow: var(--ed-shadow-2);
+        }
+
+        .ed-dashboard-title {
+          min-width: 0;
+          display: grid;
+          gap: var(--ed-space-1);
+        }
+
+        .ed-dashboard-title span {
+          color: var(--ed-color-text-inverse);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          line-height: 16px;
+          text-transform: uppercase;
+        }
+
+        .ed-dashboard-title h1 {
+          margin: 0;
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-3xl);
+          font-weight: 800;
+          line-height: 32px;
+        }
+
+        .ed-dashboard-title p {
+          max-width: 640px;
+          margin: 0;
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-sm);
+          line-height: 20px;
+        }
+
+        .ed-dashboard-actions {
+          min-width: 128px;
+          display: grid;
+          justify-items: end;
+          gap: var(--ed-space-1);
+          padding-left: var(--ed-space-5);
+          border-left: 1px solid var(--ed-color-border-soft);
+        }
+
+        .ed-dashboard-actions span {
+          color: var(--ed-color-text-tertiary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 700;
+          line-height: 16px;
+        }
+
+        .ed-dashboard-actions strong {
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-3xl);
+          line-height: 26px;
+          font-variant-numeric: tabular-nums;
         }
 
         .ed-metric-grid {
           min-width: 0;
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-8);
         }
 
         .ed-metric-card,
         .ed-panel {
           min-width: 0;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-lg);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-metric-card {
+          position: relative;
+          overflow: hidden;
           display: grid;
           grid-template-columns: 52px minmax(0, 1fr);
-          column-gap: 12px;
-          row-gap: 4px;
+          column-gap: var(--ed-space-7);
+          row-gap: var(--ed-space-2);
           align-items: start;
-          padding: var(--ed-space-2);
+          padding: var(--ed-space-8);
+        }
+
+        .ed-metric-card::after {
+          content: "";
+          position: absolute;
+          inset: 0 auto 0 0;
+          width: 3px;
+          background: var(--ed-card-accent, var(--ed-color-border-muted));
+        }
+
+        .ed-metric-card.primary {
+          --ed-card-accent: var(--ed-color-text-inverse);
+        }
+
+        .ed-metric-card.secondary {
+          --ed-card-accent: var(--ed-color-text-secondary);
+        }
+
+        .ed-metric-card.tertiary {
+          --ed-card-accent: var(--ed-color-text-tertiary);
+        }
+
+        .ed-metric-card.inverse {
+          --ed-card-accent: var(--ed-color-surface-base);
         }
 
         .ed-metric-head {
@@ -382,9 +501,9 @@ export default function AdminDashboard() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--ed-radius-xl);
-          background: #f2f8ee;
-          color: var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-lg);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-inverse);
         }
 
         .ed-metric-icon svg {
@@ -397,34 +516,64 @@ export default function AdminDashboard() {
           min-width: 0;
           overflow-wrap: anywhere;
           color: var(--ed-color-text-primary);
-          font-size: clamp(22px, 2.5vw, 28px);
-          line-height: 1.2;
+          font-size: var(--ed-font-size-3xl);
+          line-height: 28px;
           font-variant-numeric: tabular-nums;
         }
 
-        .ed-metric-card small {
+        .ed-metric-foot {
           grid-column: 2;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--ed-space-3);
+          min-width: 0;
+        }
+
+        .ed-metric-card small {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
           line-height: 16px;
+        }
+
+        .ed-metric-foot span {
+          flex: 0 0 auto;
+          padding: 3px 7px;
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-primary);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 800;
+          line-height: 14px;
         }
 
         .ed-dashboard-grid {
           min-width: 0;
           display: grid;
           grid-template-columns: minmax(0, 2fr) minmax(min(100%, 320px), 1fr);
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-8);
           align-items: start;
         }
 
         .ed-panel {
-          padding: var(--ed-space-2);
+          padding: var(--ed-space-8);
         }
 
         .ed-panel-head {
           display: grid;
           gap: var(--ed-space-1);
-          margin-bottom: var(--ed-space-2);
+          margin-bottom: var(--ed-space-8);
+        }
+
+        .ed-panel-head-split {
+          display: flex;
+          align-items: start;
+          justify-content: space-between;
+          gap: var(--ed-space-4);
         }
 
         .ed-panel-head h2 {
@@ -441,15 +590,33 @@ export default function AdminDashboard() {
           line-height: 20px;
         }
 
+        .ed-panel-chip {
+          flex: 0 0 auto;
+          padding: 4px 8px;
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-text-inverse);
+          font-size: var(--ed-font-size-xs);
+          font-weight: 800;
+          line-height: 16px;
+        }
+
         .ed-trend-chart {
           width: 100%;
           max-width: 100%;
           min-height: 240px;
           display: flex;
           align-items: flex-end;
-          gap: 8px;
-          padding-top: var(--ed-space-2);
-          border-bottom: 1px solid var(--ed-color-surface-muted);
+          gap: var(--ed-space-2);
+          padding: var(--ed-space-4) var(--ed-space-2) 0;
+          border-bottom: 1px solid var(--ed-color-border-soft);
+          background-image: repeating-linear-gradient(
+            to top,
+            transparent 0,
+            transparent 43px,
+            var(--ed-color-border-soft) 44px
+          );
           overflow-x: auto;
           overflow-y: hidden;
           -webkit-overflow-scrolling: touch;
@@ -475,8 +642,8 @@ export default function AdminDashboard() {
         .ed-trend-bar {
           width: 72%;
           min-height: 0;
-          border-radius: var(--ed-radius-xl) var(--ed-radius-xl) 0 0;
-          background: var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-md) var(--ed-radius-md) 0 0;
+          background: var(--ed-color-text-inverse);
           box-shadow: var(--ed-shadow-2);
         }
 
@@ -489,19 +656,19 @@ export default function AdminDashboard() {
         .ed-side-stack {
           min-width: 0;
           display: grid;
-          gap: var(--ed-space-2);
+          gap: var(--ed-space-8);
         }
 
         .ed-list {
           display: grid;
-          gap: 12px;
+          gap: var(--ed-space-7);
         }
 
         .ed-list-row {
           display: grid;
           grid-template-columns: minmax(64px, auto) minmax(0, 1fr) auto;
           align-items: center;
-          gap: 12px;
+          gap: var(--ed-space-7);
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
         }
@@ -521,7 +688,7 @@ export default function AdminDashboard() {
         }
 
         .ed-country img {
-          border: 1px solid var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-border-soft);
         }
 
         .ed-country strong {
@@ -533,30 +700,30 @@ export default function AdminDashboard() {
           min-width: 72px;
           height: 8px;
           overflow: hidden;
-          border-radius: var(--ed-radius-xl);
-          background: #eef1ef;
+          border-radius: var(--ed-radius-lg);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-progress span {
           display: block;
           height: 100%;
           min-width: 2px;
-          background: var(--ed-color-border-muted);
+          background: var(--ed-color-text-inverse);
         }
 
         .ed-plan-grid {
           min-width: 0;
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
+          gap: var(--ed-space-6);
         }
 
         .ed-plan-cell {
           display: grid;
           gap: var(--ed-space-1);
-          padding: 12px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          padding: var(--ed-space-7);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-lg);
           background: var(--ed-color-surface-muted);
         }
 
@@ -577,8 +744,8 @@ export default function AdminDashboard() {
 
         .ed-empty {
           padding: var(--ed-space-2);
-          border: 1px dashed var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border: 1px dashed var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-lg);
           color: var(--ed-color-text-tertiary);
           text-align: center;
         }
@@ -594,7 +761,29 @@ export default function AdminDashboard() {
           .ed-dashboard-grid,
           .ed-side-stack,
           .ed-metric-grid {
-            gap: var(--ed-space-2);
+            gap: var(--ed-space-4);
+          }
+
+          .ed-dashboard-head {
+            display: grid;
+            align-items: start;
+            padding: var(--ed-space-4);
+          }
+
+          .ed-dashboard-title h1 {
+            font-size: var(--ed-font-size-3xl);
+            line-height: 28px;
+          }
+
+          .ed-dashboard-actions {
+            width: 100%;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--ed-space-3) 0 0;
+            border-top: 1px solid var(--ed-color-border-soft);
+            border-left: 0;
           }
 
           .ed-metric-grid,
@@ -604,7 +793,11 @@ export default function AdminDashboard() {
 
           .ed-panel,
           .ed-metric-card {
-            padding: 12px;
+            padding: var(--ed-space-7);
+          }
+
+          .ed-panel-head-split {
+            display: grid;
           }
 
           .ed-metric-card {
@@ -643,6 +836,13 @@ export default function AdminDashboard() {
             overflow: hidden;
             -webkit-box-orient: vertical;
             -webkit-line-clamp: 2;
+            white-space: normal;
+          }
+
+          .ed-metric-foot {
+            display: grid;
+            justify-content: stretch;
+            gap: var(--ed-space-2);
           }
 
           .ed-panel-head {
