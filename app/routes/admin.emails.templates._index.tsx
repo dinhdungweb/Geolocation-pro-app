@@ -105,7 +105,7 @@ export default function TemplatesGallery() {
           gap: var(--ed-space-2);
           padding: var(--ed-space-2);
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-strong);
         }
 
@@ -116,7 +116,7 @@ export default function TemplatesGallery() {
         .templates-title span {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-primary);
+          color: var(--ed-color-border-muted);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -155,7 +155,7 @@ export default function TemplatesGallery() {
           justify-content: center;
           gap: 8px;
           padding: 0 14px;
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
           line-height: 1;
@@ -164,15 +164,15 @@ export default function TemplatesGallery() {
         }
 
         .templates-primary-button {
-          border: 1px solid var(--ed-color-primary);
-          background: var(--ed-color-primary);
+          border: 1px solid var(--ed-color-border-muted);
+          background: var(--ed-color-border-muted);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow-2);
         }
 
         .templates-primary-button:hover {
-          background: var(--ed-color-text-inverse);
-          border-color: var(--ed-color-text-inverse);
+          background: #6f9a37;
+          border-color: #6f9a37;
         }
 
         .templates-grid {
@@ -186,14 +186,14 @@ export default function TemplatesGallery() {
           min-width: 0;
           overflow: hidden;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-strong);
           color: inherit;
           text-decoration: none;
         }
 
         .template-item:hover {
-          border-color: var(--ed-color-primary);
+          border-color: var(--ed-color-border-muted);
         }
 
         .template-thumbnail {
@@ -211,7 +211,7 @@ export default function TemplatesGallery() {
           height: 76%;
           object-fit: cover;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-strong);
         }
 
@@ -266,7 +266,7 @@ export default function TemplatesGallery() {
           gap: 12px;
           padding: 32px 18px;
           border: 1px dashed var(--ed-color-border-muted);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-strong);
           text-align: center;
         }
@@ -278,9 +278,9 @@ export default function TemplatesGallery() {
           align-items: center;
           justify-content: center;
           border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-md);
+          border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-muted);
-          color: var(--ed-color-primary);
+          color: var(--ed-color-border-muted);
         }
 
         .templates-empty h3 {

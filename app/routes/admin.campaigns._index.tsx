@@ -174,48 +174,26 @@ export default function AdminCampaigns() {
       <style>{`
         .ed-campaigns {
           display: grid;
-          gap: var(--ed-space-8);
+          gap: var(--ed-space-2);
         }
 
         .ed-campaign-metrics {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: var(--ed-space-8);
+          gap: var(--ed-space-2);
         }
 
         .ed-campaign-metrics article,
         .ed-campaign-panel {
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
-          background: var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-campaign-metrics article {
-          position: relative;
-          overflow: hidden;
           display: grid;
-          gap: var(--ed-space-3);
-          padding: var(--ed-space-8);
-        }
-
-        .ed-campaign-metrics article::before {
-          content: "";
-          position: absolute;
-          inset: 0 auto 0 0;
-          width: 3px;
-          background: var(--ed-campaign-accent, var(--ed-color-text-inverse));
-        }
-
-        .ed-campaign-metrics article:nth-child(1) {
-          --ed-campaign-accent: var(--ed-color-primary);
-        }
-
-        .ed-campaign-metrics article:nth-child(2) {
-          --ed-campaign-accent: var(--ed-color-info);
-        }
-
-        .ed-campaign-metrics article:nth-child(3) {
-          --ed-campaign-accent: var(--ed-color-success);
+          gap: var(--ed-space-1);
+          padding: var(--ed-space-2);
         }
 
         .ed-campaign-metrics span {
@@ -228,15 +206,15 @@ export default function AdminCampaigns() {
 
         .ed-campaign-metrics strong {
           color: var(--ed-color-text-primary);
-          font-size: var(--ed-font-size-3xl);
-          line-height: 28px;
+          font-size: 26px;
+          line-height: 32px;
           font-variant-numeric: tabular-nums;
         }
 
         .ed-campaign-grid {
           display: grid;
           grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
-          gap: var(--ed-space-8);
+          gap: var(--ed-space-2);
           align-items: start;
         }
 
@@ -246,9 +224,9 @@ export default function AdminCampaigns() {
 
         .ed-panel-head {
           display: grid;
-          gap: var(--ed-space-3);
-          padding: var(--ed-space-8);
-          border-bottom: 1px solid var(--ed-color-border-soft);
+          gap: var(--ed-space-1);
+          padding: var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
         }
 
         .ed-panel-head h2,
@@ -298,14 +276,14 @@ export default function AdminCampaigns() {
           display: block;
           height: 7px;
           overflow: hidden;
-          border-radius: var(--ed-radius-xs);
-          background: var(--ed-color-surface-strong);
+          border-radius: var(--ed-radius-xl);
+          background: #eef1ef;
         }
 
         .ed-cr-cell i {
           display: block;
           height: 100%;
-          background: var(--ed-color-success);
+          background: var(--ed-color-border-muted);
         }
 
         .ed-market {
@@ -315,7 +293,7 @@ export default function AdminCampaigns() {
         }
 
         .ed-market img {
-          border: 1px solid var(--ed-color-border-soft);
+          border: 1px solid var(--ed-color-surface-muted);
         }
 
         .ed-empty {

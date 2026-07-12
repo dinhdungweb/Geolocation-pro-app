@@ -286,7 +286,7 @@ export default function MessagingDashboard() {
           --ed-mail-grid-min-width: 940px;
 
           display: grid;
-          gap: var(--ed-space-8);
+          gap: var(--ed-space-2);
         }
 
         .ed-mail-header,
@@ -299,17 +299,17 @@ export default function MessagingDashboard() {
 
         .ed-mail-header {
           justify-content: space-between;
-          gap: var(--ed-space-8);
+          gap: var(--ed-space-2);
           padding: var(--ed-mail-card-padding);
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
-          background: var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-eyebrow {
           display: block;
           margin-bottom: 6px;
-          color: var(--ed-color-primary);
+          color: var(--ed-color-border-muted);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -327,7 +327,7 @@ export default function MessagingDashboard() {
         }
 
         .ed-mail-header h2 {
-          font-size: var(--ed-font-size-3xl);
+          font-size: 22px;
           line-height: 28px;
         }
 
@@ -353,7 +353,7 @@ export default function MessagingDashboard() {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
           line-height: 1;
@@ -363,16 +363,16 @@ export default function MessagingDashboard() {
 
         .ed-button-primary {
           padding: 0 14px;
-          border: 1px solid var(--ed-color-primary);
-          background: var(--ed-color-primary);
+          border: 1px solid var(--ed-color-border-muted);
+          background: var(--ed-color-border-muted);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow-2);
         }
 
         .ed-button-secondary,
         .ed-icon-button {
-          border: 1px solid var(--ed-color-border-soft);
-          background: var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
         }
 
@@ -386,14 +386,14 @@ export default function MessagingDashboard() {
         }
 
         .ed-button-primary:hover {
-          background: var(--ed-color-text-inverse);
-          border-color: var(--ed-color-text-inverse);
+          background: #6f9a37;
+          border-color: #6f9a37;
         }
 
         .ed-button-secondary:hover,
         .ed-icon-button:hover {
-          border-color: var(--ed-color-primary);
-          color: var(--ed-color-primary);
+          border-color: var(--ed-color-border-muted);
+          color: var(--ed-color-border-muted);
         }
 
         .ed-button-primary:focus-visible,
@@ -401,22 +401,22 @@ export default function MessagingDashboard() {
         .ed-icon-button:focus-visible,
         .ed-tabs button:focus-visible,
         .ed-mail-row:focus-visible {
-          outline: 2px solid var(--ed-color-text-inverse);
+          outline: 3px solid var(--ed-color-border-muted);
           outline-offset: 2px;
         }
 
         .ed-mail-metrics {
           display: grid;
           grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.7fr);
-          gap: var(--ed-space-8);
+          gap: var(--ed-space-2);
         }
 
         .ed-panel {
           min-width: 0;
           padding: var(--ed-mail-card-padding);
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-md);
-          background: var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-panel-head {
@@ -435,14 +435,9 @@ export default function MessagingDashboard() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--ed-radius-sm);
-          background: var(--ed-color-primary-soft);
-          color: var(--ed-color-primary);
-        }
-
-        .ed-mail-performance .ed-panel-icon {
-          background: var(--ed-color-info-soft);
-          color: var(--ed-color-info);
+          border-radius: var(--ed-radius-xl);
+          background: #f2f6ee;
+          color: var(--ed-color-border-muted);
         }
 
         .ed-panel-icon {
@@ -459,9 +454,9 @@ export default function MessagingDashboard() {
         .ed-stat-strip div {
           min-width: 0;
           padding: 14px;
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-sm);
-          background: var(--ed-color-surface-strong);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-stat-strip span,
@@ -489,7 +484,7 @@ export default function MessagingDashboard() {
           align-items: center;
           gap: 4px;
           margin-top: 7px;
-          color: var(--ed-color-success);
+          color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
           font-weight: 700;
           line-height: 18px;
@@ -512,14 +507,13 @@ export default function MessagingDashboard() {
           flex-direction: column;
           justify-content: space-between;
           padding: var(--ed-mail-day-padding);
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-sm);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
           background: var(--ed-color-surface-muted);
         }
 
         .ed-day-cell.has-activity {
-          border-color: var(--ed-color-info);
-          background: var(--ed-color-info-soft);
+          border-color: var(--ed-color-border-muted);
           box-shadow: var(--ed-shadow-2);
         }
 
@@ -552,7 +546,7 @@ export default function MessagingDashboard() {
           gap: 6px;
           margin: 0;
           padding: 10px var(--ed-mail-card-padding);
-          border-bottom: 1px solid var(--ed-color-border-soft);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
           overflow-x: auto;
         }
 
@@ -561,7 +555,7 @@ export default function MessagingDashboard() {
           flex: 0 0 auto;
           padding: 8px 10px;
           border: 1px solid transparent;
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-xl);
           background: transparent;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
@@ -573,9 +567,9 @@ export default function MessagingDashboard() {
         .ed-tabs button.is-active,
         .ed-tabs a:hover,
         .ed-tabs button:hover {
-          border-color: var(--ed-color-primary);
-          background: var(--ed-color-primary-soft);
-          color: var(--ed-color-primary);
+          border-color: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-muted);
+          color: var(--ed-color-text-primary);
         }
 
         .ed-mail-grid {
@@ -598,7 +592,7 @@ export default function MessagingDashboard() {
           width: 100%;
           padding: 12px var(--ed-mail-card-padding);
           border: 0;
-          border-top: 1px solid var(--ed-color-border-soft);
+          border-top: 1px solid var(--ed-color-surface-muted);
           border-radius: 0;
           background: transparent;
           box-shadow: none;
@@ -654,7 +648,7 @@ export default function MessagingDashboard() {
         .ed-status {
           display: inline-flex;
           padding: 4px 8px;
-          border-radius: var(--ed-radius-sm);
+          border-radius: var(--ed-radius-xl);
           font-size: 11px;
           font-weight: 700;
           line-height: 16px;
@@ -662,18 +656,18 @@ export default function MessagingDashboard() {
         }
 
         .ed-status.success {
-          background: var(--ed-color-success-soft);
-          color: var(--ed-color-success);
+          background: #eef7e9;
+          color: #37630f;
         }
 
         .ed-status.neutral {
-          background: var(--ed-color-surface-strong);
+          background: #f2f4f1;
           color: var(--ed-color-text-tertiary);
         }
 
         .ed-view-icon {
           justify-self: center;
-          color: var(--ed-color-primary);
+          color: var(--ed-color-border-muted);
         }
 
         .ed-empty-state {
@@ -681,7 +675,7 @@ export default function MessagingDashboard() {
           justify-items: center;
           gap: 8px;
           padding: 44px 14px;
-          border-top: 1px solid var(--ed-color-border-soft);
+          border-top: 1px solid var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
           text-align: center;
         }
@@ -708,8 +702,8 @@ export default function MessagingDashboard() {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          border-radius: var(--ed-radius-md);
-          background: var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-modal-head {
@@ -717,13 +711,13 @@ export default function MessagingDashboard() {
           align-items: center;
           justify-content: space-between;
           gap: 14px;
-          padding: var(--ed-space-8);
-          border-bottom: 1px solid var(--ed-color-border-soft);
+          padding: 16px var(--ed-space-2);
+          border-bottom: 1px solid var(--ed-color-surface-muted);
         }
 
         .ed-modal-body {
           flex: 1;
-          padding: var(--ed-space-8);
+          padding: var(--ed-space-2);
           overflow: auto;
           background: var(--ed-color-surface-muted);
         }
@@ -731,9 +725,9 @@ export default function MessagingDashboard() {
         .ed-modal-body iframe {
           width: 100%;
           min-height: 100%;
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-sm);
-          background: var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
         }
 
         @media (max-width: 1024px) {
