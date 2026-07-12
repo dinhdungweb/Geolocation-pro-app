@@ -82,23 +82,27 @@ export default function AdminLogin() {
   return (
     <div className="ed-login-screen">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 
         :root {
-          --ed-font-primary: "Outfit", sans-serif;
-          --ed-color-text-primary: #3d3d47;
-          --ed-color-text-tertiary: #767676;
+          --ed-font-primary: "Inter Tight", Roboto, Arial, sans-serif;
+          --ed-color-text-primary: #1d232e;
+          --ed-color-text-secondary: #83868c;
+          --ed-color-text-tertiary: #393d3e;
+          --ed-color-text-inverse: #1a2f36;
           --ed-color-surface-base: #000000;
-          --ed-color-surface-muted: #f4f5f8;
-          --ed-color-surface-strong: #ffffff;
-          --ed-color-border-muted: #43b9b2;
-          --ed-radius-xl: 10px;
-          --ed-shadow: rgba(0, 0, 0, 0.1) 0px 36px 35px 0px;
+          --ed-color-surface-muted: #ffffff;
+          --ed-color-surface-raised: #f3f4f6;
+          --ed-color-surface-strong: #f6f6f6;
+          --ed-color-border-soft: #e8eaee;
+          --ed-color-danger: #b42318;
+          --ed-radius-sm: 6px;
+          --ed-radius-md: 8px;
+          --ed-shadow: rgba(29, 35, 46, 0.05) 0 6px 20px 0;
 
-          --ed-text-inverse: var(--ed-color-surface-strong);
-          --ed-page: var(--ed-color-surface-muted);
-          --ed-panel: var(--ed-color-surface-strong);
-          --ed-danger-soft: #fff1f0;
+          --ed-text-inverse: var(--ed-color-surface-muted);
+          --ed-page: var(--ed-color-surface-raised);
+          --ed-panel: var(--ed-color-surface-muted);
         }
 
         *,
@@ -135,7 +139,7 @@ export default function AdminLogin() {
           justify-content: space-between;
           gap: 40px;
           padding: 40px;
-          background: #0a9f98;
+          background: var(--ed-color-text-inverse);
           color: var(--ed-text-inverse);
         }
 
@@ -154,8 +158,8 @@ export default function AdminLogin() {
           align-items: center;
           justify-content: center;
           border: 1px solid rgba(255, 255, 255, 0.28);
-          border-radius: var(--ed-radius-xl);
-          color: var(--ed-color-border-muted);
+          border-radius: var(--ed-radius-sm);
+          color: var(--ed-text-inverse);
         }
 
         .ed-login-brand-copy {
@@ -196,8 +200,8 @@ export default function AdminLogin() {
           width: 100%;
           max-width: 430px;
           padding: 32px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-md);
           background: var(--ed-panel);
         }
 
@@ -246,8 +250,8 @@ export default function AdminLogin() {
           width: 100%;
           min-height: 44px;
           padding: 10px 12px 10px 42px;
-          border: 1px solid var(--ed-color-surface-muted);
-          border-radius: var(--ed-radius-xl);
+          border: 1px solid var(--ed-color-border-soft);
+          border-radius: var(--ed-radius-sm);
           outline: none;
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
@@ -256,12 +260,14 @@ export default function AdminLogin() {
         }
 
         .ed-login-input:focus-visible {
-          border-color: var(--ed-color-border-muted);
-          box-shadow: 0 0 0 3px var(--ed-color-border-muted);
+          border-color: var(--ed-color-text-inverse);
+          box-shadow: none;
+          outline: 2px solid var(--ed-color-text-inverse);
+          outline-offset: 2px;
         }
 
         .ed-login-input:disabled {
-          background: #f2f4f1;
+          background: var(--ed-color-surface-strong);
           cursor: not-allowed;
         }
 
@@ -274,9 +280,9 @@ export default function AdminLogin() {
           gap: 8px;
           margin-top: 4px;
           padding: 10px 16px;
-          border: 1px solid var(--ed-color-border-muted);
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-color-border-muted);
+          border: 1px solid var(--ed-color-text-inverse);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-text-inverse);
           color: var(--ed-text-inverse);
           box-shadow: var(--ed-shadow);
           cursor: pointer;
@@ -286,12 +292,12 @@ export default function AdminLogin() {
         }
 
         .ed-login-button:hover {
-          background: #6f9a37;
-          border-color: #6f9a37;
+          background: var(--ed-color-text-primary);
+          border-color: var(--ed-color-text-primary);
         }
 
         .ed-login-button:focus-visible {
-          outline: 3px solid var(--ed-color-border-muted);
+          outline: 2px solid var(--ed-color-text-inverse);
           outline-offset: 2px;
         }
 
@@ -307,10 +313,10 @@ export default function AdminLogin() {
           gap: 10px;
           margin-bottom: 24px;
           padding: 12px;
-          border: 1px solid #ffccc7;
-          border-radius: var(--ed-radius-xl);
-          background: var(--ed-danger-soft);
-          color: #ef4444;
+          border: 1px solid var(--ed-color-danger);
+          border-radius: var(--ed-radius-sm);
+          background: var(--ed-color-surface-strong);
+          color: var(--ed-color-danger);
           font-size: 14px;
           font-weight: 700;
           line-height: 20px;
