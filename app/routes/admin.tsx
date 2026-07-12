@@ -300,10 +300,10 @@ export default function AdminLayout() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap');
 
         :root {
-          --ed-font-primary: "Inter Tight", Roboto, Arial, sans-serif;
+          --ed-font-primary: "Jost", Roboto, Arial, sans-serif;
           --ed-font-size-base: 14px;
           --ed-font-weight-base: 400;
           --ed-line-height-base: 21px;
@@ -1358,7 +1358,7 @@ export function ErrorBoundary() {
           padding: 20px;
           background: var(--ed-color-surface-muted);
           color: #545454;
-          font-family: var(--ed-font-primary, "Inter Tight", Roboto, Arial, sans-serif);
+          font-family: var(--ed-font-primary, "Jost", Roboto, Arial, sans-serif);
         }
 
         .ed-error-card {

@@ -146,7 +146,7 @@ export default function TemplateEditor() {
                     z-index: 9999; 
                     display: flex; 
                     flex-direction: column;
-                    font-family: "Inter Tight", Roboto, Arial, sans-serif;
+                    font-family: "Jost", Roboto, Arial, sans-serif;
                 }
                 
                 .editor-header {
