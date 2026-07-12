@@ -16,11 +16,15 @@ import {
   ChevronDown,
   Globe,
   Home,
+  Inbox,
   LogOut,
   Mail,
   Menu,
+  Moon,
   Rocket,
   Search,
+  ShoppingBag,
+  Star,
   Store,
   X,
 } from "lucide-react";
@@ -234,11 +238,6 @@ export default function AdminLayout() {
               <Menu size={19} />
             </button>
 
-            <div className="ed-page-title">
-              <span>Admin Console</span>
-              <h1>{pageTitle}</h1>
-            </div>
-
             <label className="ed-global-search">
               <Search size={20} />
               <input type="search" placeholder="Search anything..." aria-label="Search admin" />
@@ -251,10 +250,25 @@ export default function AdminLayout() {
               <strong>{pageTitle}</strong>
             </div>
 
-            <button className="ed-topbar-action" type="button" aria-label="Open notifications">
-              <Bell size={18} />
-              <span>3</span>
-            </button>
+            <div className="ed-topbar-icon-group" aria-hidden="true">
+              <span className="ed-topbar-icon">
+                <Moon size={18} />
+              </span>
+              <span className="ed-topbar-icon has-badge">
+                <Bell size={18} />
+                <span>3</span>
+              </span>
+              <span className="ed-topbar-icon">
+                <Star size={18} />
+              </span>
+              <span className="ed-topbar-icon">
+                <ShoppingBag size={18} />
+              </span>
+              <span className="ed-topbar-icon has-badge orange">
+                <Inbox size={18} />
+                <span>3</span>
+              </span>
+            </div>
 
             <div className="ed-system-state">
               <Activity size={14} />
@@ -274,7 +288,7 @@ export default function AdminLayout() {
               <span className="ed-user-avatar">{(username?.[0] || "A").toUpperCase()}</span>
               <span className="ed-user-copy">
                 <strong>{username || "Admin"}</strong>
-                <small>Administrator</small>
+                <small>UI Designer</small>
               </span>
             </div>
           </div>
@@ -286,67 +300,61 @@ export default function AdminLayout() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
 
         :root {
-          --ed-font-primary: "Inter Tight", Roboto, Arial, sans-serif;
+          --ed-font-primary: "Outfit", sans-serif;
           --ed-font-size-base: 14px;
           --ed-font-weight-base: 400;
           --ed-line-height-base: 21px;
 
-          --ed-font-size-xs: 10px;
-          --ed-font-size-sm: 12px;
+          --ed-font-size-xs: 12px;
+          --ed-font-size-sm: 13px;
           --ed-font-size-md: 14px;
-          --ed-font-size-lg: 16px;
-          --ed-font-size-xl: 18px;
-          --ed-font-size-2xl: 18.2px;
-          --ed-font-size-3xl: 21px;
+          --ed-font-size-lg: 15px;
+          --ed-font-size-xl: 16px;
+          --ed-font-size-2xl: 20px;
+          --ed-font-size-3xl: 22px;
+          --ed-font-size-4xl: 26px;
 
-          --ed-color-text-primary: #1d232e;
-          --ed-color-text-secondary: #83868c;
-          --ed-color-text-tertiary: #393d3e;
-          --ed-color-text-inverse: #1a2f36;
+          --ed-color-text-primary: #3d3d47;
+          --ed-color-border-muted: #43b9b2;
+          --ed-color-accent-soft: #e8fbfa;
+          --ed-color-accent-active: #0a9f98;
+          --ed-color-text-tertiary: #767676;
           --ed-color-surface-base: #000000;
-          --ed-color-surface-muted: #ffffff;
-          --ed-color-surface-raised: #f3f4f6;
-          --ed-color-surface-strong: #f6f6f6;
-          --ed-color-border-muted: #d8dbe1;
-          --ed-color-border-soft: #e8eaee;
-          --ed-color-accent-soft: #eef1f4;
-          --ed-color-accent-active: var(--ed-color-text-inverse);
-          --ed-color-warning: #b45309;
-          --ed-color-danger: #b42318;
-          --ed-text-inverse: #ffffff;
-          --ed-content-padding-mobile: var(--ed-space-8);
-          --ed-card-padding-mobile: var(--ed-space-8);
+          --ed-color-surface-muted: #f4f5f8;
+          --ed-color-surface-strong: #ffffff;
+          --ed-content-padding-mobile: 15px;
+          --ed-card-padding-mobile: 15px;
 
-          --ed-space-1: 1px;
-          --ed-space-2: 3px;
-          --ed-space-3: 5px;
-          --ed-space-4: 6px;
-          --ed-space-5: 8px;
-          --ed-space-6: 10px;
-          --ed-space-7: 12px;
-          --ed-space-8: 16px;
-          --ed-card-padding: var(--ed-space-8);
+          --ed-space-1: 5px;
+          --ed-space-2: 20px;
+          --ed-card-padding: var(--ed-space-2);
+          --ed-space-3: 24px;
+          --ed-space-4: 28px;
+          --ed-space-5: 32px;
+          --ed-space-6: 40px;
+          --ed-space-7: 48px;
+          --ed-space-8: 64px;
 
-          --ed-radius-xs: 4px;
-          --ed-radius-sm: 6px;
-          --ed-radius-md: 8px;
-          --ed-radius-lg: 14px;
-          --ed-radius-xl: 50px;
+          --ed-radius-xs: 3.5px;
+          --ed-radius-sm: 3.75px;
+          --ed-radius-md: 5px;
+          --ed-radius-lg: 6px;
+          --ed-radius-xl: 10px;
           --ed-radius-2xl: 50px;
-          --ed-radius-step7: 50px;
-          --ed-radius-step8: 50px;
+          --ed-radius-step7: 60px;
+          --ed-radius-step8: 100px;
 
-          --ed-shadow-1: rgba(29, 35, 46, 0.08) 0 16px 30px 0;
-          --ed-shadow-2: rgba(29, 35, 46, 0.05) 0 6px 20px 0;
+          --ed-shadow-1: rgba(0, 0, 0, 0.1) 0px 36px 35px 0px;
+          --ed-shadow-2: rgba(10, 75, 85, 0.05) 0px 4px 34px 0px;
 
-          --ed-motion-instant: 200ms;
-          --ed-motion-fast: 200ms;
-          --ed-motion-normal: 200ms;
+          --ed-motion-instant: 300ms;
+          --ed-motion-fast: 500ms;
+          --ed-motion-normal: 1000ms;
 
-          --ed-sidebar-width: 248px;
+          --ed-sidebar-width: 252px;
         }
 
         *,
@@ -394,13 +402,13 @@ export default function AdminLayout() {
         }
 
         :focus-visible {
-          outline: 2px solid var(--ed-color-text-inverse);
+          outline: 2px solid var(--ed-color-border-muted);
           outline-offset: 2px;
         }
 
         .ed-admin-shell {
           min-height: 100vh;
-          background: var(--ed-color-surface-raised);
+          background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
         }
 
@@ -411,26 +419,25 @@ export default function AdminLayout() {
           width: var(--ed-sidebar-width);
           display: flex;
           flex-direction: column;
-          background: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-tertiary);
-          border-right: 1px solid var(--ed-color-border-soft);
-          box-shadow: var(--ed-shadow-2);
+          border-right: 1px solid var(--ed-color-surface-muted);
         }
 
         .ed-sidebar-head {
-          min-height: 76px;
+          min-height: 80px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: var(--ed-space-5) var(--ed-space-4);
-          border-bottom: 1px solid var(--ed-color-border-soft);
+          padding: 18px 16px;
+          border-bottom: 1px solid var(--ed-color-surface-muted);
         }
 
         .ed-brand {
           display: flex;
           align-items: center;
           min-width: 0;
-          gap: var(--ed-space-3);
+          gap: 10px;
         }
 
         .ed-brand-icon {
@@ -440,9 +447,9 @@ export default function AdminLayout() {
           align-items: center;
           justify-content: center;
           flex: 0 0 auto;
-          border-radius: var(--ed-radius-md);
-          background: var(--ed-color-surface-strong);
-          color: var(--ed-color-text-inverse);
+          border-radius: 10px;
+          background: #e4fbf9;
+          color: var(--ed-color-border-muted);
         }
 
         .ed-brand-copy {
@@ -459,7 +466,7 @@ export default function AdminLayout() {
 
         .ed-brand-copy strong {
           color: var(--ed-color-text-primary);
-          font-size: var(--ed-font-size-3xl);
+          font-size: 22px;
           font-weight: 800;
           line-height: 22px;
           letter-spacing: 0;
@@ -467,8 +474,8 @@ export default function AdminLayout() {
 
         .ed-brand-copy small {
           margin-top: 2px;
-          color: var(--ed-color-text-secondary);
-          font-size: var(--ed-font-size-xs);
+          color: var(--ed-color-border-muted);
+          font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.08em;
           text-transform: uppercase;
@@ -481,20 +488,20 @@ export default function AdminLayout() {
           align-items: center;
           justify-content: center;
           flex: 0 0 auto;
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-lg);
-          background: var(--ed-color-surface-muted);
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
-          transition: background-color var(--ed-motion-instant) ease, border-color var(--ed-motion-instant) ease, color var(--ed-motion-instant) ease;
+          transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
         }
 
         .ed-icon-button:hover {
-          border-color: var(--ed-color-text-inverse);
-          background: var(--ed-color-surface-strong);
+          border-color: var(--ed-color-border-muted);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-icon-button:active {
-          background: var(--ed-color-accent-soft);
+          background: #eef2ed;
         }
 
         .ed-sidebar-close {
@@ -513,43 +520,43 @@ export default function AdminLayout() {
           flex: 1;
           min-height: 0;
           overflow-y: auto;
-          padding: var(--ed-space-4);
+          padding: 14px 16px;
         }
 
         .ed-nav-row {
           width: 100%;
-          min-height: 40px;
+          min-height: 42px;
           display: flex;
           align-items: center;
-          gap: var(--ed-space-6);
-          padding: 9px var(--ed-space-3);
-          margin-bottom: var(--ed-space-1);
+          gap: 10px;
+          padding: 10px 12px;
+          margin-bottom: 4px;
           border: 1px solid transparent;
-          border-radius: var(--ed-radius-lg);
+          border-radius: var(--ed-radius-xl);
           background: transparent;
-          color: var(--ed-color-text-secondary);
+          color: #535768;
           text-decoration: none;
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
           line-height: 18px;
           text-align: left;
-          transition: background-color var(--ed-motion-instant) ease, border-color var(--ed-motion-instant) ease, color var(--ed-motion-instant) ease;
+          transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
         }
 
         .ed-nav-row:hover {
-          background: var(--ed-color-surface-strong);
+          background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
         }
 
         .ed-nav-row:active {
-          background: var(--ed-color-accent-soft);
+          background: #eaf7f6;
         }
 
         .ed-nav-row.is-active {
-          border-color: var(--ed-color-text-inverse);
-          background: var(--ed-color-surface-strong);
+          border-color: #d7f5f3;
+          background: #e5fbf9;
           color: var(--ed-color-accent-active);
-          box-shadow: inset 3px 0 0 var(--ed-color-text-inverse);
+          box-shadow: none;
         }
 
         .ed-nav-icon {
@@ -565,7 +572,7 @@ export default function AdminLayout() {
         }
 
         .ed-nav-parent > svg {
-          transition: transform var(--ed-motion-instant) ease;
+          transition: transform 120ms ease;
         }
 
         .ed-nav-parent.is-open > svg {
@@ -576,22 +583,22 @@ export default function AdminLayout() {
           display: inline-flex;
           align-items: center;
           min-width: 0;
-          gap: var(--ed-space-6);
+          gap: 10px;
         }
 
         .ed-subnav {
           display: grid;
           gap: var(--ed-space-1);
-          margin: 2px 0 var(--ed-space-3) 26px;
-          padding-left: var(--ed-space-3);
+          margin: 2px 0 10px 26px;
+          padding-left: 10px;
           border-left: 1px dashed var(--ed-color-border-muted);
         }
 
         .ed-subnav-link {
           display: block;
           padding: 8px 10px;
-          border-radius: var(--ed-radius-md);
-          color: var(--ed-color-text-secondary);
+          border-radius: var(--ed-radius-xl);
+          color: #6f7282;
           text-decoration: none;
           font-size: var(--ed-font-size-xs);
           font-weight: 700;
@@ -601,24 +608,24 @@ export default function AdminLayout() {
         .ed-subnav-link:hover,
         .ed-subnav-link:focus-visible {
           color: var(--ed-color-accent-active);
-          background: var(--ed-color-surface-strong);
+          background: #f2fbfa;
         }
 
         .ed-subnav-link.is-active {
           color: var(--ed-color-accent-active);
-          background: var(--ed-color-surface-strong);
+          background: #e5fbf9;
         }
 
         .ed-sidebar-account {
           display: grid;
           grid-template-columns: 36px minmax(0, 1fr) 38px;
           align-items: center;
-          gap: var(--ed-space-6);
-          margin: var(--ed-space-4);
-          padding: var(--ed-space-3);
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-lg);
-          background: var(--ed-color-surface-muted);
+          gap: 10px;
+          margin: 16px;
+          padding: 12px;
+          border: 1px solid var(--ed-color-surface-muted);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-account-avatar {
@@ -627,8 +634,8 @@ export default function AdminLayout() {
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--ed-radius-lg);
-          background: var(--ed-color-text-inverse);
+          border-radius: var(--ed-radius-xl);
+          background: var(--ed-color-border-muted);
           color: var(--ed-text-inverse);
           font-size: var(--ed-font-size-sm);
           font-weight: 700;
@@ -655,20 +662,20 @@ export default function AdminLayout() {
 
         .ed-account-copy small {
           color: var(--ed-color-text-tertiary);
-          font-size: var(--ed-font-size-xs);
+          font-size: 11px;
           line-height: 15px;
         }
 
         .ed-logout-button {
           border-color: var(--ed-color-surface-muted);
-          background: var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-tertiary);
         }
 
         .ed-logout-button:hover {
-          border-color: var(--ed-color-danger);
-          background: var(--ed-color-surface-strong);
-          color: var(--ed-color-danger);
+          border-color: #ffc4bd;
+          background: #fff1f0;
+          color: #c62828;
         }
 
         .ed-admin-main {
@@ -681,15 +688,14 @@ export default function AdminLayout() {
           position: sticky;
           top: 0;
           z-index: 30;
-          height: 76px;
+          height: 80px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: var(--ed-space-6);
-          padding: 0 var(--ed-space-7);
-          border-bottom: 1px solid var(--ed-color-border-soft);
-          background: rgba(255, 255, 255, 0.94);
-          backdrop-filter: blur(14px);
+          gap: 24px;
+          padding: 0 32px;
+          border-bottom: 1px solid var(--ed-color-surface-muted);
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-topbar-left,
@@ -701,12 +707,12 @@ export default function AdminLayout() {
 
         .ed-topbar-left {
           flex: 1;
-          gap: var(--ed-space-5);
+          gap: 18px;
         }
 
         .ed-topbar-tools {
           justify-content: flex-end;
-          gap: var(--ed-space-4);
+          gap: 14px;
         }
 
         .ed-menu-button {
@@ -717,11 +723,11 @@ export default function AdminLayout() {
 
         .ed-menu-button:hover {
           border-color: transparent;
-          background: var(--ed-color-surface-strong);
+          background: var(--ed-color-surface-muted);
         }
 
         .ed-menu-button:active {
-          background: var(--ed-color-accent-soft);
+          background: #eef2ed;
         }
 
         .ed-mobile-title {
@@ -736,7 +742,7 @@ export default function AdminLayout() {
 
         .ed-mobile-title span {
           color: var(--ed-color-text-tertiary);
-          font-size: var(--ed-font-size-xs);
+          font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.08em;
           line-height: 14px;
@@ -769,30 +775,30 @@ export default function AdminLayout() {
         .ed-page-title h1 {
           margin: 1px 0 0;
           color: var(--ed-color-text-primary);
-          font-size: var(--ed-font-size-2xl);
-          font-weight: 800;
+          font-size: 20px;
+          font-weight: 700;
           line-height: 24px;
           letter-spacing: 0;
           white-space: nowrap;
         }
 
         .ed-global-search {
-          width: min(34vw, 420px);
-          min-height: 42px;
+          width: min(48vw, 595px);
+          min-height: 48px;
           display: flex;
           align-items: center;
-          gap: var(--ed-space-3);
-          padding: 0 var(--ed-space-4);
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-lg);
+          gap: 14px;
+          padding: 0 18px;
+          border: 1px solid transparent;
+          border-radius: 0;
           background: var(--ed-color-surface-muted);
-          color: var(--ed-color-text-secondary);
+          color: #5b5f70;
         }
 
         .ed-global-search:focus-within {
-          border-color: var(--ed-color-text-inverse);
-          background: var(--ed-color-surface-muted);
-          box-shadow: 0 0 0 3px var(--ed-color-surface-strong);
+          border-color: #c7f1ee;
+          background: var(--ed-color-surface-strong);
+          box-shadow: 0 0 0 4px rgba(32, 191, 184, 0.09);
         }
 
         .ed-global-search input {
@@ -809,45 +815,53 @@ export default function AdminLayout() {
         }
 
         .ed-global-search input::placeholder {
-          color: var(--ed-color-text-secondary);
+          color: #8b8f9f;
         }
 
-        .ed-topbar-action {
+        .ed-topbar-icon-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ed-topbar-icon {
           position: relative;
-          width: 38px;
-          height: 38px;
+          width: 40px;
+          height: 40px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-lg);
+          border: 0;
+          border-radius: 0;
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-primary);
-          transition: background-color var(--ed-motion-instant) ease, border-color var(--ed-motion-instant) ease, color var(--ed-motion-instant) ease;
         }
 
-        .ed-topbar-action:hover {
-          border-color: var(--ed-color-text-inverse);
-          background: var(--ed-color-surface-strong);
+        .ed-topbar-icon:hover {
+          background: var(--ed-color-accent-soft);
           color: var(--ed-color-accent-active);
         }
 
-        .ed-topbar-action span {
+        .ed-topbar-icon span {
           position: absolute;
-          top: -6px;
-          right: -6px;
-          min-width: 17px;
-          height: 17px;
+          top: -7px;
+          right: -5px;
+          min-width: 18px;
+          height: 18px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 0 4px;
+          padding: 0 5px;
           border-radius: 999px;
-          background: var(--ed-color-warning);
-          color: var(--ed-text-inverse);
-          font-size: var(--ed-font-size-xs);
+          background: #b86adf;
+          color: var(--ed-color-surface-strong);
+          font-size: 10px;
           font-weight: 800;
-          line-height: 17px;
+          line-height: 18px;
+        }
+
+        .ed-topbar-icon.orange span {
+          background: #ff7d45;
         }
 
         .ed-system-state {
@@ -855,10 +869,10 @@ export default function AdminLayout() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 0 var(--ed-space-6);
-          border: 1px solid var(--ed-color-border-soft);
-          border-radius: var(--ed-radius-sm);
-          background: var(--ed-color-surface-strong);
+          padding: 0 10px;
+          border: 1px solid #c8f4f1;
+          border-radius: 4px;
+          background: var(--ed-color-accent-soft);
           color: var(--ed-color-accent-active);
           font-size: var(--ed-font-size-xs);
           font-weight: 800;
@@ -875,8 +889,8 @@ export default function AdminLayout() {
         .ed-user-chip {
           display: flex;
           align-items: center;
-          gap: var(--ed-space-6);
-          min-width: 150px;
+          gap: 10px;
+          min-width: 160px;
         }
 
         .ed-user-avatar {
@@ -886,8 +900,8 @@ export default function AdminLayout() {
           align-items: center;
           justify-content: center;
           flex: 0 0 auto;
-          border-radius: var(--ed-radius-lg);
-          background: var(--ed-color-surface-base);
+          border-radius: 10px;
+          background: linear-gradient(135deg, #ff9d78, #b86adf);
           color: var(--ed-color-surface-strong);
           font-size: 18px;
           font-weight: 800;
@@ -924,7 +938,7 @@ export default function AdminLayout() {
           width: 100%;
           max-width: 1640px;
           margin: 0 auto;
-          padding: var(--ed-space-6) var(--ed-space-7) var(--ed-space-7);
+          padding: 32px;
         }
 
         .ed-admin-overlay {
@@ -939,13 +953,13 @@ export default function AdminLayout() {
         }
 
         .ed-admin-content h1 {
-          font-size: var(--ed-font-size-3xl);
-          line-height: 28px;
+          font-size: 24px;
+          line-height: 30px;
         }
 
         .ed-admin-content h2 {
-          font-size: var(--ed-font-size-xl);
-          line-height: 24px;
+          font-size: 20px;
+          line-height: 26px;
         }
 
         .ed-admin-content h3 {
@@ -967,9 +981,9 @@ export default function AdminLayout() {
         }
 
         .ed-admin-content th {
-          background: var(--ed-color-surface-raised) !important;
+          background: #f6f8f5 !important;
           color: var(--ed-color-text-tertiary) !important;
-          border-bottom: 1px solid var(--ed-color-border-soft) !important;
+          border-bottom: 1px solid var(--ed-color-surface-muted) !important;
           font-size: var(--ed-font-size-xs) !important;
           font-weight: 700 !important;
           letter-spacing: 0.04em !important;
@@ -981,14 +995,14 @@ export default function AdminLayout() {
 
         .ed-admin-content td {
           color: var(--ed-color-text-primary);
-          border-bottom: 1px solid var(--ed-color-border-soft);
+          border-bottom: 1px solid #edf0f2;
           font-size: var(--ed-font-size-sm);
           line-height: 20px;
         }
 
         .ed-admin-content th,
         .ed-admin-content td {
-          padding: var(--ed-space-7) var(--ed-space-8) !important;
+          padding: 12px 14px !important;
           vertical-align: middle;
         }
 
@@ -1009,9 +1023,9 @@ export default function AdminLayout() {
         .ed-admin-content input,
         .ed-admin-content select,
         .ed-admin-content textarea {
-          border-radius: var(--ed-radius-lg) !important;
-          border: 1px solid var(--ed-color-border-soft) !important;
-          background-color: var(--ed-color-surface-muted) !important;
+          border-radius: var(--ed-radius-xl) !important;
+          border: 1px solid var(--ed-color-surface-muted) !important;
+          background-color: var(--ed-color-surface-strong) !important;
           color: var(--ed-color-text-primary) !important;
           box-shadow: none !important;
         }
@@ -1019,9 +1033,9 @@ export default function AdminLayout() {
         .ed-admin-content input:focus,
         .ed-admin-content select:focus,
         .ed-admin-content textarea:focus {
-          outline: 2px solid var(--ed-color-text-inverse) !important;
+          outline: 2px solid var(--ed-color-border-muted) !important;
           outline-offset: 2px !important;
-          border-color: var(--ed-color-text-inverse) !important;
+          border-color: var(--ed-color-border-muted) !important;
         }
 
         .ed-admin-content .ed-search-field input,
@@ -1044,7 +1058,7 @@ export default function AdminLayout() {
 
         .ed-admin-content button,
         .ed-admin-content a[role="button"] {
-          border-radius: var(--ed-radius-lg);
+          border-radius: var(--ed-radius-xl);
         }
 
         .ed-admin-content .ed-mail-row {
@@ -1060,7 +1074,7 @@ export default function AdminLayout() {
 
         .ed-admin-content .has-error,
         .ed-admin-content [aria-invalid="true"] {
-          border-color: var(--ed-color-danger) !important;
+          border-color: #ef4444 !important;
         }
 
         .ed-admin-content .ed-panel,
@@ -1084,8 +1098,8 @@ export default function AdminLayout() {
         .ed-admin-content .ed-shop-stat-card,
         .ed-admin-content .templates-hero,
         .ed-admin-content .template-item {
-          border-color: var(--ed-color-border-soft) !important;
-          background: var(--ed-color-surface-muted) !important;
+          border-color: #edf0f5 !important;
+          background: var(--ed-color-surface-strong) !important;
           box-shadow: var(--ed-shadow-2) !important;
         }
 
@@ -1095,7 +1109,7 @@ export default function AdminLayout() {
         .ed-admin-content .ed-billing-table-card:hover,
         .ed-admin-content .ed-shop-card:hover,
         .ed-admin-content .template-item:hover {
-          border-color: var(--ed-color-text-inverse) !important;
+          border-color: #d9f3f1 !important;
         }
 
         .ed-admin-content .ed-panel-icon,
@@ -1110,10 +1124,10 @@ export default function AdminLayout() {
         .ed-admin-content .ed-button-primary,
         .ed-admin-content button[type="submit"].ed-button-primary,
         .ed-admin-content a.ed-button-primary {
-          border-color: var(--ed-color-text-inverse) !important;
-          background: var(--ed-color-text-inverse) !important;
-          color: var(--ed-text-inverse) !important;
-          box-shadow: var(--ed-shadow-2) !important;
+          border-color: var(--ed-color-border-muted) !important;
+          background: var(--ed-color-border-muted) !important;
+          color: var(--ed-color-surface-strong) !important;
+          box-shadow: 0 8px 18px rgba(32, 191, 184, 0.22) !important;
         }
 
         .ed-admin-content .ed-button-primary:hover,
@@ -1138,20 +1152,20 @@ export default function AdminLayout() {
         .ed-admin-content .ed-stat-strip div,
         .ed-admin-content .ed-day-cell,
         .ed-admin-content .ed-plan-cell {
-          border-color: var(--ed-color-border-soft) !important;
+          border-color: #edf0f5 !important;
           background: var(--ed-color-surface-muted) !important;
         }
 
         .ed-admin-content .ed-day-cell.has-activity {
           border-color: var(--ed-color-border-muted) !important;
-          background: var(--ed-color-accent-soft) !important;
+          background: #f2fffe !important;
         }
 
         @media (max-width: 960px) {
           .ed-admin-sidebar {
             width: min(86vw, 286px);
             transform: translateX(-100%);
-            transition: transform var(--ed-motion-instant) ease;
+            transition: transform 160ms ease;
           }
 
           .ed-admin-sidebar.is-open {
@@ -1177,7 +1191,7 @@ export default function AdminLayout() {
 
           .ed-admin-topbar {
             height: 60px;
-            gap: var(--ed-space-6);
+            gap: 10px;
             padding: 0 14px;
           }
 
@@ -1186,8 +1200,7 @@ export default function AdminLayout() {
           }
 
           .ed-global-search,
-          .ed-page-title,
-          .ed-topbar-action,
+          .ed-topbar-icon-group,
           .ed-user-chip,
           .ed-topbar-date {
             display: none;
@@ -1195,14 +1208,14 @@ export default function AdminLayout() {
 
           .ed-topbar-left {
             flex: 0 0 auto;
-            gap: var(--ed-space-6);
+            gap: 10px;
           }
 
           .ed-topbar-tools {
             flex: 1;
             min-width: 0;
             justify-content: flex-end;
-            gap: var(--ed-space-6);
+            gap: 10px;
           }
 
           .ed-mobile-title {
@@ -1218,9 +1231,8 @@ export default function AdminLayout() {
 
         @media (max-width: 768px) {
           :root {
-            --ed-space-2: 8px;
-            --ed-space-3: 12px;
-            --ed-space-6: 16px;
+            --ed-space-2: 12px;
+            --ed-space-3: 16px;
           }
 
           .ed-admin-content .ed-panel,
@@ -1343,23 +1355,23 @@ export function ErrorBoundary() {
           min-height: 100vh;
           display: grid;
           place-items: center;
-          padding: var(--ed-space-8, 16px);
-          background: var(--ed-color-surface-raised, #f3f4f6);
-          color: var(--ed-color-text-tertiary, #393d3e);
-          font-family: var(--ed-font-primary, "Inter Tight", Roboto, Arial, sans-serif);
+          padding: 20px;
+          background: var(--ed-color-surface-muted);
+          color: #545454;
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
         }
 
         .ed-error-card {
           width: min(100%, 620px);
-          padding: var(--ed-space-8, 16px);
-          border: 1px solid var(--ed-color-border-soft, #e8eaee);
-          border-radius: var(--ed-radius-md, 8px);
-          background: var(--ed-color-surface-muted, #ffffff);
+          padding: 20px;
+          border: 1px solid #dfe4e8;
+          border-radius: 4px;
+          background: var(--ed-color-surface-strong);
         }
 
         .ed-error-card span {
-          color: var(--ed-color-danger, #b42318);
-          font-size: var(--ed-font-size-sm, 12px);
+          color: #c62828;
+          font-size: 12px;
           font-weight: 700;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -1367,8 +1379,8 @@ export function ErrorBoundary() {
 
         .ed-error-card h1 {
           margin: 5px 0;
-          color: var(--ed-color-text-primary, #1d232e);
-          font-size: var(--ed-font-size-3xl, 21px);
+          color: #222222;
+          font-size: 24px;
           line-height: 30px;
         }
 
@@ -1379,23 +1391,23 @@ export function ErrorBoundary() {
         .ed-error-card pre {
           max-height: 280px;
           overflow: auto;
-          padding: var(--ed-space-7, 12px);
-          border: 1px solid var(--ed-color-danger, #b42318);
-          border-radius: var(--ed-radius-sm, 6px);
-          background: var(--ed-color-surface-strong, #f6f6f6);
-          color: var(--ed-color-danger, #b42318);
+          padding: 14px;
+          border: 1px solid #efc8c8;
+          border-radius: 4px;
+          background: #fff8f8;
+          color: #9b1c1c;
           white-space: pre-wrap;
         }
 
         .ed-error-card button {
           min-height: 40px;
-          padding: 0 var(--ed-space-8, 16px);
-          border: 1px solid var(--ed-color-text-inverse, #1a2f36);
-          border-radius: var(--ed-radius-sm, 6px);
-          background: var(--ed-color-text-inverse, #1a2f36);
-          color: var(--ed-text-inverse, #ffffff);
+          padding: 0 16px;
+          border: 1px solid #82b440;
+          border-radius: 4px;
+          background: #82b440;
+          color: var(--ed-color-surface-strong);
           font-weight: 700;
-          box-shadow: var(--ed-shadow-2, rgba(29, 35, 46, 0.05) 0 6px 20px 0);
+          box-shadow: rgb(111, 154, 55) 0px 2px 0px 0px;
         }
       `}</style>
     </div>
