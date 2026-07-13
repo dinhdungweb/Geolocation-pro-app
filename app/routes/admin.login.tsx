@@ -82,10 +82,12 @@ export default function AdminLogin() {
   return (
     <div className="ed-login-screen">
       <style>{`
+        @import url('https://fonts.cdnfonts.com/css/futura-pt');
+        @import url('https://fonts.cdnfonts.com/css/futura-std-4');
         @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap');
 
         :root {
-          --ed-font-primary: "Futura", "Futura PT", "Futura Now", "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          --ed-font-primary: "Futura PT", "Futura Std", "Futura", "Futura Now", "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           --ed-font-size-base: 14px;
           --ed-line-height-base: 21px;
           --ed-font-size-xs: 10px;

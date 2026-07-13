@@ -146,7 +146,8 @@ export default function TemplateEditor() {
                     z-index: 9999; 
                     display: flex; 
                     flex-direction: column;
-                    font-family: "Futura", "Futura PT", "Jost", Roboto, Arial, sans-serif;
+                    @import url('https://fonts.cdnfonts.com/css/futura-pt');
+                    font-family: "Futura PT", "Futura Std", "Futura", "Jost", Roboto, Arial, sans-serif;
                 }
                 
                 .editor-header {
