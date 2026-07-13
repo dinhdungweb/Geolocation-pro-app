@@ -85,7 +85,7 @@ export default function AdminLogin() {
         @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap');
 
         :root {
-          --ed-font-primary: "Jost", Roboto, Arial, sans-serif;
+          --ed-font-primary: "Futura", "Futura PT", "Futura Now", "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           --ed-font-size-base: 14px;
           --ed-line-height-base: 21px;
           --ed-font-size-xs: 10px;
