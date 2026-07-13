@@ -306,18 +306,18 @@ export default function AdminLayout() {
 
         :root {
           --ed-font-primary: "Futura PT", "Futura Std", "Futura", "Futura Now", "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          --ed-font-size-base: 14px;
+          --ed-font-size-base: 15.5px;
           --ed-font-weight-base: 400;
-          --ed-line-height-base: 21px;
+          --ed-line-height-base: 24px;
 
-          --ed-font-size-xs: 10px;
-          --ed-font-size-sm: 12px;
-          --ed-font-size-md: 14px;
-          --ed-font-size-lg: 16px;
-          --ed-font-size-xl: 18px;
-          --ed-font-size-2xl: 18.2px;
-          --ed-font-size-3xl: 21px;
-          --ed-font-size-4xl: var(--ed-font-size-3xl);
+          --ed-font-size-xs: 11.5px;
+          --ed-font-size-sm: 13.5px;
+          --ed-font-size-md: 15.5px;
+          --ed-font-size-lg: 17.5px;
+          --ed-font-size-xl: 20px;
+          --ed-font-size-2xl: 22px;
+          --ed-font-size-3xl: 25px;
+          --ed-font-size-4xl: 28px;
 
           --ed-color-text-primary: #3d3d47;
           --ed-color-border-muted: #43b9b2;
@@ -377,6 +377,18 @@ export default function AdminLayout() {
           line-height: var(--ed-line-height-base);
           -webkit-font-smoothing: antialiased;
           text-rendering: optimizeLegibility;
+        }
+
+        b,
+        strong,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        th {
+          font-weight: 500;
         }
 
         button,
@@ -478,7 +490,7 @@ export default function AdminLayout() {
         .ed-brand-copy strong {
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 800;
+          font-weight: 500;
           line-height: 22px;
           letter-spacing: 0;
         }
@@ -487,7 +499,7 @@ export default function AdminLayout() {
           margin-top: 2px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 800;
+          font-weight: 500;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
@@ -548,7 +560,7 @@ export default function AdminLayout() {
           color: #535768;
           text-decoration: none;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 18px;
           text-align: left;
           transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
@@ -612,7 +624,7 @@ export default function AdminLayout() {
           color: #6f7282;
           text-decoration: none;
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 16px;
         }
 
@@ -649,7 +661,7 @@ export default function AdminLayout() {
           background: var(--ed-color-border-muted);
           color: var(--ed-text-inverse);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-account-copy {
@@ -667,7 +679,7 @@ export default function AdminLayout() {
         .ed-account-copy span {
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 18px;
         }
 
@@ -754,7 +766,7 @@ export default function AdminLayout() {
         .ed-mobile-title span {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 800;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 14px;
           text-transform: uppercase;
@@ -787,7 +799,7 @@ export default function AdminLayout() {
           margin: 1px 0 0;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-2xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 24px;
           letter-spacing: 0;
           white-space: nowrap;
@@ -820,7 +832,7 @@ export default function AdminLayout() {
           background: transparent !important;
           color: var(--ed-color-text-primary) !important;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
           box-shadow: none !important;
         }
@@ -867,7 +879,7 @@ export default function AdminLayout() {
           background: #b86adf;
           color: var(--ed-color-surface-strong);
           font-size: var(--ed-font-size-xs);
-          font-weight: 800;
+          font-weight: 500;
           line-height: 18px;
         }
 
@@ -886,7 +898,7 @@ export default function AdminLayout() {
           background: var(--ed-color-accent-soft);
           color: var(--ed-color-accent-active);
           font-size: var(--ed-font-size-xs);
-          font-weight: 800;
+          font-weight: 500;
           white-space: nowrap;
         }
 
@@ -915,7 +927,7 @@ export default function AdminLayout() {
           background: linear-gradient(135deg, #ff9d78, #b86adf);
           color: var(--ed-color-surface-strong);
           font-size: var(--ed-font-size-xl);
-          font-weight: 800;
+          font-weight: 500;
         }
 
         .ed-user-copy {
@@ -934,14 +946,14 @@ export default function AdminLayout() {
         .ed-user-copy strong {
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 800;
+          font-weight: 500;
           line-height: 18px;
         }
 
         .ed-user-copy small {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 16px;
         }
 
@@ -996,7 +1008,7 @@ export default function AdminLayout() {
           color: var(--ed-color-text-tertiary) !important;
           border-bottom: 1px solid var(--ed-color-surface-muted) !important;
           font-size: var(--ed-font-size-xs) !important;
-          font-weight: 700 !important;
+          font-weight: 500 !important;
           letter-spacing: 0.04em !important;
           line-height: 16px !important;
           text-align: left !important;
@@ -1383,7 +1395,7 @@ export function ErrorBoundary() {
         .ed-error-card span {
           color: #c62828;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
@@ -1417,7 +1429,7 @@ export function ErrorBoundary() {
           border-radius: 4px;
           background: #82b440;
           color: var(--ed-color-surface-strong);
-          font-weight: 700;
+          font-weight: 500;
           box-shadow: rgb(111, 154, 55) 0px 2px 0px 0px;
         }
       `}</style>

@@ -88,15 +88,15 @@ export default function AdminLogin() {
 
         :root {
           --ed-font-primary: "Futura PT", "Futura Std", "Futura", "Futura Now", "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          --ed-font-size-base: 14px;
-          --ed-line-height-base: 21px;
-          --ed-font-size-xs: 10px;
-          --ed-font-size-sm: 12px;
-          --ed-font-size-md: 14px;
-          --ed-font-size-lg: 16px;
-          --ed-font-size-xl: 18px;
-          --ed-font-size-2xl: 18.2px;
-          --ed-font-size-3xl: 21px;
+          --ed-font-size-base: 15.5px;
+          --ed-line-height-base: 24px;
+          --ed-font-size-xs: 11.5px;
+          --ed-font-size-sm: 13.5px;
+          --ed-font-size-md: 15.5px;
+          --ed-font-size-lg: 17.5px;
+          --ed-font-size-xl: 20px;
+          --ed-font-size-2xl: 22px;
+          --ed-font-size-3xl: 25px;
           --ed-color-text-primary: #3d3d47;
           --ed-color-text-tertiary: #767676;
           --ed-color-surface-base: #000000;
@@ -146,6 +146,17 @@ export default function AdminLogin() {
           font-family: var(--ed-font-primary);
         }
 
+        .ed-login-screen b,
+        .ed-login-screen strong,
+        .ed-login-screen h1,
+        .ed-login-screen h2,
+        .ed-login-screen h3,
+        .ed-login-screen h4,
+        .ed-login-screen h5,
+        .ed-login-screen h6 {
+          font-weight: 500;
+        }
+
         .ed-login-brand {
           min-height: 100vh;
           display: flex;
@@ -162,7 +173,7 @@ export default function AdminLogin() {
           align-items: center;
           gap: 12px;
           font-size: var(--ed-font-size-xl);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-login-brand-icon {
@@ -184,7 +195,7 @@ export default function AdminLogin() {
           margin: 0 0 14px;
           color: var(--ed-text-inverse);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 28px;
           letter-spacing: 0;
         }
@@ -223,7 +234,7 @@ export default function AdminLogin() {
           margin: 0 0 6px;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 30px;
         }
 
@@ -243,7 +254,7 @@ export default function AdminLogin() {
           margin-bottom: 7px;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-md);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
         }
 
@@ -299,7 +310,7 @@ export default function AdminLogin() {
           box-shadow: var(--ed-shadow);
           cursor: pointer;
           font-size: var(--ed-font-size-lg);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 24px;
         }
 
@@ -330,7 +341,7 @@ export default function AdminLogin() {
           background: var(--ed-danger-soft);
           color: #ef4444;
           font-size: var(--ed-font-size-md);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
         }
 
