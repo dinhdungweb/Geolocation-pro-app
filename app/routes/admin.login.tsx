@@ -135,6 +135,13 @@ export default function AdminLogin() {
           display: grid;
           grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
           background: var(--ed-page);
+          font-family: var(--ed-font-primary);
+        }
+
+        .ed-login-screen *,
+        .ed-login-screen button,
+        .ed-login-screen input {
+          font-family: var(--ed-font-primary);
         }
 
         .ed-login-brand {

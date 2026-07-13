@@ -410,6 +410,15 @@ export default function AdminLayout() {
           min-height: 100vh;
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
+          font-family: var(--ed-font-primary);
+        }
+
+        .ed-admin-shell *,
+        .ed-admin-shell button,
+        .ed-admin-shell input,
+        .ed-admin-shell select,
+        .ed-admin-shell textarea {
+          font-family: var(--ed-font-primary);
         }
 
         .ed-admin-sidebar {
