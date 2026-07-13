@@ -468,7 +468,7 @@ export default function AdminDashboard() {
           min-height: 16px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 16px;
         }
 
@@ -563,7 +563,7 @@ export default function AdminDashboard() {
         .ed-plan-cell span {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.04em;
           text-transform: uppercase;
         }

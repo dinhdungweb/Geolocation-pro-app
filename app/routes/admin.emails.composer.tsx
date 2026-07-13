@@ -264,7 +264,7 @@ export default function EmailComposer() {
                     align-items: center;
                     gap: 8px;
                     font-size: var(--ed-font-size-xs);
-                    font-weight: 800;
+                    font-weight: 500;
                     color: #94a3b8;
                     text-transform: uppercase;
                     letter-spacing: 0.1em;
@@ -309,7 +309,7 @@ export default function EmailComposer() {
                     padding: 6px 14px;
                     border-radius: var(--ed-radius, 4px);
                     font-size: var(--ed-font-size-sm);
-                    font-weight: 700;
+                    font-weight: 500;
                     cursor: pointer;
                     white-space: nowrap;
                     transition: all 0.2s;
@@ -354,7 +354,7 @@ export default function EmailComposer() {
                     align-items: center;
                     justify-content: center;
                     font-size: var(--ed-font-size-xs);
-                    font-weight: 800;
+                    font-weight: 500;
                     flex-shrink: 0;
                 }
                 
@@ -382,7 +382,7 @@ export default function EmailComposer() {
                 .form-control-group label {
                     display: block;
                     font-size: var(--ed-font-size-sm);
-                    font-weight: 700;
+                    font-weight: 500;
                     color: #475569;
                     margin-bottom: 8px;
                 }
@@ -456,7 +456,7 @@ export default function EmailComposer() {
                     align-items: center;
                     gap: 8px;
                     font-size: var(--ed-font-size-sm);
-                    font-weight: 700;
+                    font-weight: 500;
                     transition: all 0.2s;
                 }
                 .control-btn.active {
@@ -512,7 +512,7 @@ export default function EmailComposer() {
                     padding: 30px 40px;
                     border-bottom: 1px dashed #e2e8f0;
                 }
-                .preview-subj { font-size: var(--ed-font-size-3xl); font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+                .preview-subj { font-size: var(--ed-font-size-3xl); font-weight: 500; color: #0f172a; margin-bottom: 12px; }
                 .preview-from { display: flex; align-items: center; gap: 10px; font-size: var(--ed-font-size-sm); color: #64748b; }
                 
                 .ed-submit-button {
@@ -521,7 +521,7 @@ export default function EmailComposer() {
                     border: none;
                     padding: 14px 32px;
                     border-radius: var(--ed-radius, 4px);
-                    font-weight: 700;
+                    font-weight: 500;
                     font-size: var(--ed-font-size-lg);
                     cursor: pointer;
                     display: flex;

@@ -118,7 +118,7 @@ export default function TemplatesGallery() {
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 1.1;
           text-transform: uppercase;
@@ -128,7 +128,7 @@ export default function TemplatesGallery() {
           margin: 0;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1.2;
         }
 
@@ -157,7 +157,7 @@ export default function TemplatesGallery() {
           padding: 0 14px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1;
           text-decoration: none;
           white-space: nowrap;
@@ -234,7 +234,7 @@ export default function TemplatesGallery() {
           text-overflow: ellipsis;
           white-space: nowrap;
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
@@ -244,7 +244,7 @@ export default function TemplatesGallery() {
           overflow: hidden;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1.35;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -287,7 +287,7 @@ export default function TemplatesGallery() {
           margin: 0;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-xl);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .templates-empty p {

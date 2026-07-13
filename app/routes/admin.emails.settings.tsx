@@ -223,7 +223,7 @@ export default function EmailSettings() {
           background: transparent;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           text-align: left;
           cursor: pointer;
         }
@@ -254,7 +254,7 @@ export default function EmailSettings() {
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 1.1;
           text-transform: uppercase;
@@ -264,7 +264,7 @@ export default function EmailSettings() {
         .ed-settings-head h3 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0;
         }
 
@@ -297,7 +297,7 @@ export default function EmailSettings() {
           padding: 12px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
         }
 
@@ -332,7 +332,7 @@ export default function EmailSettings() {
         .ed-checkbox-row span {
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
         }
 
@@ -391,7 +391,7 @@ export default function EmailSettings() {
           box-shadow: var(--ed-shadow-2);
           cursor: pointer;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1;
         }
 

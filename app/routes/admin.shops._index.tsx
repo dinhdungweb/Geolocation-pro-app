@@ -446,7 +446,7 @@ export default function AdminShops() {
 
         .ed-shop-link {
           color: var(--ed-text-link);
-          font-weight: 700;
+          font-weight: 500;
           text-decoration: none;
         }
 
@@ -464,7 +464,7 @@ export default function AdminShops() {
           background: #f6f8f5;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.03em;
         }
 
@@ -483,7 +483,7 @@ export default function AdminShops() {
           gap: 8px;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-mode-dot {

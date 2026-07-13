@@ -189,7 +189,7 @@ export default function EmailHistory() {
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 1.1;
           text-transform: uppercase;
@@ -200,7 +200,7 @@ export default function EmailHistory() {
           margin: 0;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 28px;
         }
 
@@ -218,7 +218,7 @@ export default function EmailHistory() {
           gap: 8px;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           white-space: nowrap;
         }
 
@@ -262,7 +262,7 @@ export default function EmailHistory() {
           background: var(--ed-color-surface-strong);
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-icon-button,
@@ -286,7 +286,7 @@ export default function EmailHistory() {
           min-height: 40px;
           padding: 0 14px;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-icon-button:hover,
@@ -322,7 +322,7 @@ export default function EmailHistory() {
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
@@ -363,7 +363,7 @@ export default function EmailHistory() {
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-shop-cell strong,
@@ -380,7 +380,7 @@ export default function EmailHistory() {
           padding: 4px 8px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 16px;
         }
 

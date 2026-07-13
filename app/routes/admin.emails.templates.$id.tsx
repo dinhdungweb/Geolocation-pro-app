@@ -250,7 +250,7 @@ export default function TemplateEditor() {
                     color: #82b440;
                     transform: translateY(-2px);
                 }
-                .block-button strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
+                .block-button strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
 
                 .canvas-block {
                     position: relative;
@@ -298,7 +298,7 @@ export default function TemplateEditor() {
                 }
                 .prop-label {
                     font-size: 12px;
-                    font-weight: 700;
+                    font-weight: 500;
                     color: #64748b;
                     margin-bottom: 8px;
                     display: block;
@@ -310,7 +310,7 @@ export default function TemplateEditor() {
                     padding: 10px 24px;
                     border-radius: var(--ed-radius, 4px);
                     border: none;
-                    font-weight: 700;
+                    font-weight: 500;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
@@ -325,7 +325,7 @@ export default function TemplateEditor() {
                     padding: 2px 6px;
                     border-radius: 4px;
                     font-size: 11px;
-                    font-weight: 700;
+                    font-weight: 500;
                     margin: 4px;
                     display: inline-block;
                     cursor: pointer;

@@ -352,7 +352,7 @@ export default function AdminEmailAutomations() {
 
                 /* Header */
                 .flow-nav { height: 64px; background: white; border-bottom: 1px solid #e1e3e5; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
-                .workflow-title-input { font-size: 16px; font-weight: 700; border: 1px solid transparent; padding: 4px 8px; border-radius: 6px; width: 300px; }
+                .workflow-title-input { font-size: 16px; font-weight: 500; border: 1px solid transparent; padding: 4px 8px; border-radius: 6px; width: 300px; }
                 .workflow-title-input:hover { background: #f1f2f3; }
                 .workflow-title-input:focus { background: white; border-color: #008060; outline: none; }
                 .btn-shopify-primary { background: #008060; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
@@ -368,14 +368,14 @@ export default function AdminEmailAutomations() {
                 .node-v3:hover { transform: translateY(-2px); border-color: #008060; }
                 .node-v3.active { border-color: #008060; box-shadow: 0 0 0 2px rgba(0,128,96,0.2); }
 
-                .node-header { padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; background: #f6f6f7; color: #6d7175; }
+                .node-header { padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 500; text-transform: uppercase; background: #f6f6f7; color: #6d7175; }
                 .trigger-node .node-header { background: #e0f2fe; color: #0369a1; }
                 .action-node .node-header { background: #f3e8ff; color: #7e22ce; }
                 .wait-node .node-header { background: #fef9c3; color: #854d0e; }
                 .condition-node .node-header { background: #ecfdf5; color: #047857; }
 
                 .node-body { padding: 12px 16px; }
-                .node-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+                .node-title { font-weight: 500; font-size: 14px; margin-bottom: 2px; }
                 .node-desc { font-size: 12px; color: #6d7175; }
 
                 /* Connectors */
@@ -406,7 +406,7 @@ export default function AdminEmailAutomations() {
                 .form-input { width: 100%; padding: 10px; border: 1px solid #d2d5d8; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
                 
                 .template-preview-card { border: 1px solid #e1e3e5; border-radius: var(--ed-radius, 4px); overflow: hidden; margin-top: 12px; }
-                .preview-header { padding: 10px; background: #f6f6f7; border-bottom: 1px solid #e1e3e5; font-size: 11px; font-weight: 800; display: flex; justify-content: space-between; }
+                .preview-header { padding: 10px; background: #f6f6f7; border-bottom: 1px solid #e1e3e5; font-size: 11px; font-weight: 500; display: flex; justify-content: space-between; }
                 .preview-body { height: 180px; background: white; overflow: hidden; position: relative; }
                 .preview-body iframe { width: 100%; height: 100%; border: none; transform: scale(0.4); transform-origin: top left; width: 250%; height: 250%; }
 
@@ -421,7 +421,7 @@ export default function AdminEmailAutomations() {
                 .block-tools { position: absolute; right: -40px; top: 0; display: flex; flex-direction: column; gap: 4px; }
                 .tool-btn { width: 32px; height: 32px; background: white; border: 1px solid #d2d5d8; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
-                .status-badge { padding: 4px 10px; border-radius: var(--ed-radius, 4px); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+                .status-badge { padding: 4px 10px; border-radius: var(--ed-radius, 4px); font-size: 11px; font-weight: 500; text-transform: uppercase; }
                 .status-active { background: #e6f4ea; color: #008060; }
                 .status-inactive { background: #f1f2f3; color: #6d7175; }
 
@@ -608,7 +608,7 @@ export default function AdminEmailAutomations() {
                         
                         .block-button-v3 { width: 100%; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--ed-radius, 4px); display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; color: #475569; }
                         .block-button-v3:hover { background: #f2f6ee; border-color: #82b440; color: #82b440; transform: translateY(-2px); }
-                        .block-button-v3 strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
+                        .block-button-v3 strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
                         
                         .canvas-block-v3 { position: relative; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
                         .canvas-block-v3:hover { border-color: #e2e8f0; }
@@ -625,7 +625,7 @@ export default function AdminEmailAutomations() {
                         }
                         .canvas-block-v3.selected .modal-block-tools { display: flex; }
                         
-                        .btn-save-indigo { background: var(--ed-surface-muted, #82b440); color: white; padding: 10px 24px; border-radius: var(--ed-radius, 4px); border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
+                        .btn-save-indigo { background: var(--ed-surface-muted, #82b440); color: white; padding: 10px 24px; border-radius: var(--ed-radius, 4px); border: none; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
                         .btn-save-indigo:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(130, 180, 64, 0.3); }
                     `}</style>
                     <div className="modal-designer-root">

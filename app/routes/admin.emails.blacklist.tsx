@@ -247,7 +247,7 @@ export default function EmailBlacklist() {
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 1.1;
           text-transform: uppercase;
@@ -257,14 +257,14 @@ export default function EmailBlacklist() {
           margin: 0;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 26px;
         }
 
         .ed-count {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           white-space: nowrap;
         }
 
@@ -284,7 +284,7 @@ export default function EmailBlacklist() {
           background: var(--ed-color-surface-muted);
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
@@ -300,7 +300,7 @@ export default function EmailBlacklist() {
           align-items: center;
           gap: 10px;
           min-width: 0;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-shop-icon {
@@ -359,7 +359,7 @@ export default function EmailBlacklist() {
         .ed-field span {
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
         }
 
@@ -381,7 +381,7 @@ export default function EmailBlacklist() {
           gap: 10px;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
@@ -408,7 +408,7 @@ export default function EmailBlacklist() {
           box-shadow: var(--ed-shadow-2);
           cursor: pointer;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1;
         }
 
@@ -438,7 +438,7 @@ export default function EmailBlacklist() {
           padding: 10px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 20px;
         }
 

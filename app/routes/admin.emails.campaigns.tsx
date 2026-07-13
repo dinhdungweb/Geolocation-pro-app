@@ -163,7 +163,7 @@ export default function CampaignsList() {
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 1.1;
           text-transform: uppercase;
@@ -173,7 +173,7 @@ export default function CampaignsList() {
           margin: 0;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 28px;
         }
 
@@ -195,7 +195,7 @@ export default function CampaignsList() {
           border-radius: var(--ed-radius-xl);
           cursor: pointer;
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1;
           text-decoration: none;
         }
@@ -248,7 +248,7 @@ export default function CampaignsList() {
         .ed-campaign-grid-head {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
@@ -258,7 +258,7 @@ export default function CampaignsList() {
           margin-top: 8px;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 28px;
         }
 
@@ -339,7 +339,7 @@ export default function CampaignsList() {
 
         .ed-campaign-name strong {
           color: var(--ed-color-text-primary);
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .ed-campaign-name small {
@@ -356,7 +356,7 @@ export default function CampaignsList() {
           padding: 4px 8px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 16px;
         }
 

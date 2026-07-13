@@ -311,7 +311,7 @@ export default function MessagingDashboard() {
           margin-bottom: 6px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.08em;
           line-height: 1.1;
           text-transform: uppercase;
@@ -322,7 +322,7 @@ export default function MessagingDashboard() {
         .ed-modal-head h3 {
           margin: 0;
           color: var(--ed-color-text-primary);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0;
         }
 
@@ -355,7 +355,7 @@ export default function MessagingDashboard() {
           gap: 8px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 1;
           text-decoration: none;
           cursor: pointer;
@@ -465,7 +465,7 @@ export default function MessagingDashboard() {
         .ed-day-cell small {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 18px;
         }
 
@@ -475,7 +475,7 @@ export default function MessagingDashboard() {
           margin-top: 8px;
           color: var(--ed-color-text-primary);
           font-size: var(--ed-font-size-3xl);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 30px;
         }
 
@@ -486,7 +486,7 @@ export default function MessagingDashboard() {
           margin-top: 7px;
           color: var(--ed-color-border-muted);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 18px;
         }
 
@@ -527,7 +527,7 @@ export default function MessagingDashboard() {
         .ed-day-head span {
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 18px;
         }
 
@@ -559,7 +559,7 @@ export default function MessagingDashboard() {
           background: transparent;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-sm);
-          font-weight: 700;
+          font-weight: 500;
           text-decoration: none;
           cursor: pointer;
         }
@@ -583,7 +583,7 @@ export default function MessagingDashboard() {
           padding: 14px var(--ed-mail-card-padding) 10px;
           color: var(--ed-color-text-tertiary);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
@@ -650,7 +650,7 @@ export default function MessagingDashboard() {
           padding: 4px 8px;
           border-radius: var(--ed-radius-xl);
           font-size: var(--ed-font-size-xs);
-          font-weight: 700;
+          font-weight: 500;
           line-height: 16px;
           text-transform: uppercase;
         }
