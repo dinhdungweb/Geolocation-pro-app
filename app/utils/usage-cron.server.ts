@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
-import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml } from './email-templates';
+import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml, getLimitFreeReminderEmailHtml } from './email-templates';
 import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server';
@@ -55,7 +55,7 @@ async function releaseJobLock(lock: { key: string; owner: string }) {
     });
 }
 
-export async function hasSentUsageEmail(shop: string, type: 'limit_80' | 'limit_100' | 'limit_unlimited', usagePeriod: UsagePeriod) {
+export async function hasSentUsageEmail(shop: string, type: 'limit_80' | 'limit_100' | 'limit_unlimited' | 'limit_free_reminder', usagePeriod: UsagePeriod) {
     const directSent = await hasSentEmail(shop, type, usagePeriod.key);
     if (directSent) return true;
 
@@ -81,6 +81,50 @@ export async function hasSentUsageEmail(shop: string, type: 'limit_80' | 'limit_
     });
 
     return Boolean(previousPeriodLog);
+}
+
+export async function getUsageEmailSentAt(shop: string, type: 'limit_80' | 'limit_100' | 'limit_unlimited' | 'limit_free_reminder', usagePeriod: UsagePeriod): Promise<Date | null> {
+    const directLog = await prisma.adminEmailLog.findFirst({
+        where: {
+            shop,
+            type: `${type}:${usagePeriod.key}`,
+            status: { in: ['sent', 'simulated'] },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+    if (directLog) return directLog.createdAt;
+
+    const legacyCalendarKey = `calendar:${usagePeriod.yearMonth}`;
+    if (legacyCalendarKey !== usagePeriod.key) {
+        const legacyLog = await prisma.adminEmailLog.findFirst({
+            where: {
+                shop,
+                type: `${type}:${legacyCalendarKey}`,
+                status: { in: ['sent', 'simulated'] },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (legacyLog) return legacyLog.createdAt;
+    }
+
+    if (!usagePeriod.billingPeriodStart || !usagePeriod.billingPeriodEnd) {
+        return null;
+    }
+
+    const rangeLog = await prisma.adminEmailLog.findFirst({
+        where: {
+            shop,
+            status: { in: ['sent', 'simulated'] },
+            type: { startsWith: `${type}:` },
+            createdAt: {
+                gte: usagePeriod.billingPeriodStart,
+                lt: usagePeriod.billingPeriodEnd,
+            },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    return rangeLog ? rangeLog.createdAt : null;
 }
 
 /**
@@ -202,6 +246,22 @@ export async function checkAllShopsUsage() {
                         html: getLimit100EmailHtml(shop, currentUsage, planLimit),
                         dedupeKey: usagePeriod.key,
                     });
+                } else if (currentPlan === FREE_PLAN) {
+                    const sentReminder = await hasSentUsageEmail(shop, 'limit_free_reminder', usagePeriod);
+                    if (!sentReminder) {
+                        const sent100At = await getUsageEmailSentAt(shop, 'limit_100', usagePeriod);
+                        const oneDayMs = 24 * 60 * 60 * 1000;
+                        if (sent100At && (Date.now() - sent100At.getTime()) >= oneDayMs) {
+                            console.log(`[Cron] Sending Free plan 1-day reminder email to ${shop}`);
+                            await sendAdminEmail({
+                                shop,
+                                type: 'limit_free_reminder',
+                                subject: `[Reminder] ${shop}: Free plan limit reached - Upgrade to keep geo-redirects active`,
+                                html: getLimitFreeReminderEmailHtml(shop, currentUsage, planLimit),
+                                dedupeKey: usagePeriod.key,
+                            });
+                        }
+                    }
                 }
             }
             // 2. Check for 80% threshold
@@ -292,6 +352,22 @@ export async function checkAndSendLimitEmailIfNeeded({
                     html: getLimit100EmailHtml(shop, currentUsage, planLimit),
                     dedupeKey: usagePeriod.key,
                 });
+            } else if (currentPlan === FREE_PLAN) {
+                const sentReminder = await hasSentUsageEmail(shop, 'limit_free_reminder', usagePeriod);
+                if (!sentReminder) {
+                    const sent100At = await getUsageEmailSentAt(shop, 'limit_100', usagePeriod);
+                    const oneDayMs = 24 * 60 * 60 * 1000;
+                    if (sent100At && (Date.now() - sent100At.getTime()) >= oneDayMs) {
+                        console.log(`[Realtime Limit Check] Sending Free plan 1-day reminder email to ${shop}`);
+                        await sendAdminEmail({
+                            shop,
+                            type: 'limit_free_reminder',
+                            subject: `[Reminder] ${shop}: Free plan limit reached - Upgrade to keep geo-redirects active`,
+                            html: getLimitFreeReminderEmailHtml(shop, currentUsage, planLimit),
+                            dedupeKey: usagePeriod.key,
+                        });
+                    }
+                }
             }
         } else if (usagePercent >= 80) {
             const sent80 = await hasSentUsageEmail(shop, 'limit_80', usagePeriod);

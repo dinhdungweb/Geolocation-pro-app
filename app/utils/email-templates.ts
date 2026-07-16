@@ -94,3 +94,27 @@ export const getLimitUnlimitedEmailHtml = (shop: string, usage: number) => `
     </div>
 </div>
 `;
+
+export const getLimitFreeReminderEmailHtml = (shop: string, usage: number, limit: number) => `
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ff9800; border-radius: 8px; overflow: hidden;">
+    <div style="background-color: #fff3e0; padding: 20px; text-align: center; border-bottom: 2px solid #ff9800;">
+        <h1 style="color: #e65100; margin: 0;">Reminder: Free Plan Limit Reached</h1>
+    </div>
+    <div style="padding: 30px; line-height: 1.6; color: #333;">
+        <p>Hi there,</p>
+        <p>We noticed that yesterday your store <strong>${shop}</strong> reached its monthly Free plan limit of <strong>${limit.toLocaleString()}</strong> visitors.</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 5px 0;">Current Usage: <strong>${usage.toLocaleString()}</strong> visitors</p>
+            <p style="margin: 5px 0;">Free Plan Limit: <strong>${limit.toLocaleString()}</strong> visitors</p>
+        </div>
+        <p>To keep your location redirects, popups, and country blocking active without interruption, please upgrade to a higher plan so you can continue enjoying our full services as your store grows.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://${shop}/admin/apps/geo-redirect-country-block/app/pricing" style="background-color: #ff9800; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Explore Paid Plans</a>
+        </div>
+        <p>Best regards,<br>The Geo Support Team</p>
+    </div>
+    <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777;">
+        &copy; ${new Date().getFullYear()} Geo: Redirect & Country Block. All rights reserved.
+    </div>
+</div>
+`;

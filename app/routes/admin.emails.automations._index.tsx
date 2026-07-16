@@ -36,7 +36,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               ? "80% usage limit notification"
               : automation.type === "limit100" || automation.type === "limit_100"
                 ? "100% usage limit notification"
-                : "Custom automation"),
+                : automation.type === "limit_free_reminder"
+                  ? "Free plan limit reminder (1 day after)"
+                  : "Custom automation"),
         type: automation.type,
         status: automation.isActive ? "Active" : "Inactive",
         sent: sentMap[automation.type] || 0,
@@ -53,6 +55,7 @@ function getTriggerLabel(type: string) {
   if (type === "welcome") return "App installation";
   if (type === "limit80" || type === "limit_80") return "80% usage";
   if (type === "limit100" || type === "limit_100") return "100% usage";
+  if (type === "limit_free_reminder") return "Free plan reminder";
   if (type === "manual") return "Manual";
   return type;
 }

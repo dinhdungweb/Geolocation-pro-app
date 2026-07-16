@@ -48,7 +48,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             }
         }
 
-        if (!currentAutomation && !['welcome', 'limit_80', 'limit_100', 'manual'].includes(id || '')) {
+        if (!currentAutomation && !['welcome', 'limit_80', 'limit_100', 'limit_free_reminder', 'manual'].includes(id || '')) {
             return redirect("/admin/emails/automations");
         }
 
@@ -145,7 +145,7 @@ export default function AdminEmailAutomations() {
                 setNodes([{ id: '1', type: 'action', parentId: 'trigger', data: { label: 'Send Email', templateId: '' } }]);
             }
         } else {
-            setWorkflowName(requestedId === 'welcome' ? 'Welcome new subscribers' : 'Usage Warning Flow');
+            setWorkflowName(requestedId === 'welcome' ? 'Welcome new subscribers' : requestedId === 'limit_free_reminder' ? 'Free Plan Limit Reminder' : 'Usage Warning Flow');
             setTriggerType(requestedId || 'welcome');
             setNodes([{ id: '1', type: 'action', parentId: 'trigger', data: { label: 'Send Email', templateId: '' } }]);
         }
@@ -459,6 +459,7 @@ export default function AdminEmailAutomations() {
                                     {triggerType === 'welcome' && "App Installation"}
                                     {triggerType === 'limit_80' && "80% Usage reached"}
                                     {triggerType === 'limit_100' && "100% Limit reached"}
+                                    {triggerType === 'limit_free_reminder' && "Free Plan Limit Reminder (1 day after 100%)"}
                                     {triggerType === 'manual' && "API Trigger"}
                                 </div>
                                 <div className="node-desc">Starts when event occurs</div>
@@ -500,6 +501,7 @@ export default function AdminEmailAutomations() {
                                     <option value="welcome">New App Install</option>
                                     <option value="limit_80">Usage reach 80%</option>
                                     <option value="limit_100">Usage reach 100%</option>
+                                    <option value="limit_free_reminder">Free Plan Reminder (1 day after 100%)</option>
                                     <option value="manual">Manual API Call</option>
                                 </select>
                             </>

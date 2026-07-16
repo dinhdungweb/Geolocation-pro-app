@@ -11,7 +11,7 @@ const resend = process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_
 const DEFAULT_SENDER = process.env.SENDER_EMAIL || 'send@geopro.bluepeaks.top';
 const SHOPIFY_API_VERSION = "2026-04";
 
-export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'limit_unlimited' | 'manual';
+export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'limit_unlimited' | 'limit_free_reminder' | 'manual';
 
 function getEmailLogType(type: EmailType, dedupeKey?: string) {
     return dedupeKey ? `${type}:${dedupeKey}` : type;
