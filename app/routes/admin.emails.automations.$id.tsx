@@ -195,12 +195,26 @@ export default function AdminEmailAutomations() {
         let initialSubject = "";
         
         if(node.data.isCustom && node.data.customConfig) {
-            initialBlocks = JSON.parse(node.data.customConfig);
+            try { initialBlocks = JSON.parse(node.data.customConfig); } catch(e) {}
             initialSubject = node.data.customSubject || "";
         } else if(node.data.templateId) {
             const tmpl = templates.find((t: any) => t.id === node.data.templateId);
-            if(tmpl?.config) initialBlocks = JSON.parse(tmpl.config);
+            if(tmpl?.config) {
+                try { initialBlocks = JSON.parse(tmpl.config); } catch(e) {}
+            }
             initialSubject = tmpl?.subject || "";
+        }
+
+        if (!Array.isArray(initialBlocks) || initialBlocks.length === 0) {
+            const tmpl = templates.find((t: any) => t.id === node.data.templateId);
+            const fallbackSubject = initialSubject || tmpl?.subject || currentAutomation?.subject || "Notification";
+            initialBlocks = [
+                { id: "b1", type: "header", content: { logoText: "Geo: Redirect" }, style: { themeColor: "#6366f1", padding: "20px" } },
+                { id: "b2", type: "heading", content: { text: fallbackSubject }, style: { color: "#1e293b", fontSize: "24px", textAlign: "center", padding: "30px" } },
+                { id: "b3", type: "text", content: { text: "Hi there,\n\nThis is an automated notification from Geo: Redirect & Country Block regarding your store.\n\nPlease check your dashboard for more details and configurations." }, style: { color: "#334155", fontSize: "16px", padding: "20px" } },
+                { id: "b4", type: "button", content: { label: "Go to Dashboard", url: "https://your-store.myshopify.com/admin/apps/geo-redirect-country-block" }, style: { buttonColor: "#6366f1", textAlign: "center", padding: "30px" } },
+                { id: "b5", type: "footer", content: { text: "© 2026 Geo: Redirect & Country Block. All rights reserved." }, style: { padding: "30px" } }
+            ];
         }
         
         setDesignBlocks(initialBlocks);

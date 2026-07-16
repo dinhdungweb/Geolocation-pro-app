@@ -3,6 +3,7 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher, useNavigate } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { ensureDefaultEmailAssets } from "../utils/email-seeder.server";
 import { 
     Mail, 
     Save, 
@@ -26,6 +27,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { id } = params;
 
     try {
+        await ensureDefaultEmailAssets();
         const template = await prisma.emailTemplate.findUnique({
             where: { id }
         });
@@ -84,7 +86,18 @@ export default function TemplateEditor() {
     useEffect(() => {
         if (template?.config) {
             try {
-                setBlocks(JSON.parse(template.config));
+                const parsed = JSON.parse(template.config);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setBlocks(parsed);
+                } else {
+                    setBlocks([
+                        { id: "b1", type: "header", content: { logoText: template.name || "Geo: Redirect" }, style: { themeColor: "#6366f1", padding: "20px" } },
+                        { id: "b2", type: "heading", content: { text: template.subject || "Notification" }, style: { color: "#1e293b", fontSize: "24px", textAlign: "center", padding: "30px" } },
+                        { id: "b3", type: "text", content: { text: "Hi there,\n\nWrite your email content here or customize the blocks from the left panel." }, style: { color: "#334155", fontSize: "16px", padding: "20px" } },
+                        { id: "b4", type: "button", content: { label: "Explore Plans", url: "https://your-store.myshopify.com" }, style: { buttonColor: "#6366f1", textAlign: "center", padding: "30px" } },
+                        { id: "b5", type: "footer", content: { text: "© 2026 Geo: Redirect & Country Block. All rights reserved." }, style: { padding: "30px" } }
+                    ]);
+                }
             } catch (e) {
                 setBlocks([]);
             }
