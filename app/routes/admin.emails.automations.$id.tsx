@@ -643,6 +643,53 @@ export default function AdminEmailAutomations() {
                         }
                         .canvas-block-v3.selected .modal-block-tools { display: flex; }
                         
+                        .tool-btn {
+                            width: 36px;
+                            height: 36px;
+                            background: white;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 6px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: #64748b;
+                            box-shadow: 0 2px 4px -1px rgba(0,0,0,0.05);
+                            cursor: pointer;
+                            font-weight: 700;
+                            font-size: 13px;
+                            transition: all 0.2s;
+                        }
+                        .tool-btn:hover { color: #82b440; border-color: #82b440; background: #f2f6ee; }
+                        .tool-btn.delete:hover { color: #ef4444; border-color: #ef4444; background: #fdf2f2; }
+
+                        .prop-input {
+                            width: 100%;
+                            padding: 12px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 6px;
+                            font-size: 14px;
+                            margin-bottom: 0;
+                            box-sizing: border-box;
+                            display: block;
+                            background: white;
+                            color: #1e293b;
+                            font-family: inherit;
+                        }
+                        .prop-input:focus {
+                            outline: none;
+                            border-color: #82b440;
+                            box-shadow: 0 0 0 3px rgba(130, 180, 64, 0.1);
+                        }
+                        .prop-label {
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: #475569;
+                            margin-bottom: 6px;
+                            display: block;
+                            text-transform: uppercase;
+                            letter-spacing: 0.03em;
+                        }
+
                         .btn-save-indigo { background: var(--ed-surface-muted, #82b440); color: white; padding: 10px 24px; border-radius: var(--ed-radius, 4px); border: none; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
                         .btn-save-indigo:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(130, 180, 64, 0.3); }
                     `}</style>
@@ -739,54 +786,60 @@ export default function AdminEmailAutomations() {
                                                 </div>
 
                                                 {(block.type === 'heading' || block.type === 'text') && (
-                                                    <>
-                                                        <span className="prop-label">Text Content</span>
+                                                    <div style={{ marginBottom: '18px' }}>
+                                                        <label className="prop-label">Text Content</label>
                                                         <textarea className="prop-input" rows={6} value={(block.content as any).text} onChange={e => updateDesignBlockContent(block.id, { text: e.target.value })} />
-                                                    </>
+                                                    </div>
                                                 )}
 
                                                 {block.type === 'button' && (
                                                     <>
-                                                        <span className="prop-label">Label</span>
-                                                        <input className="prop-input" value={(block.content as any).label} onChange={e => updateDesignBlockContent(block.id, { label: e.target.value })} />
-                                                        <span className="prop-label">Link URL</span>
-                                                        <input className="prop-input" value={(block.content as any).url} onChange={e => updateDesignBlockContent(block.id, { url: e.target.value })} />
+                                                        <div style={{ marginBottom: '18px' }}>
+                                                            <label className="prop-label">Label</label>
+                                                            <input className="prop-input" value={(block.content as any).label} onChange={e => updateDesignBlockContent(block.id, { label: e.target.value })} />
+                                                        </div>
+                                                        <div style={{ marginBottom: '18px' }}>
+                                                            <label className="prop-label">Link URL</label>
+                                                            <input className="prop-input" value={(block.content as any).url} onChange={e => updateDesignBlockContent(block.id, { url: e.target.value })} />
+                                                        </div>
                                                     </>
                                                 )}
 
                                                 {block.type === 'coupon' && (
-                                                    <>
-                                                        <span className="prop-label">Coupon Code</span>
+                                                    <div style={{ marginBottom: '18px' }}>
+                                                        <label className="prop-label">Coupon Code</label>
                                                         <input className="prop-input" value={(block.content as any).code} onChange={e => updateDesignBlockContent(block.id, { code: e.target.value })} />
-                                                    </>
+                                                    </div>
                                                 )}
 
                                                 {block.type === 'header' && (
-                                                    <>
-                                                        <span className="prop-label">Logo Text</span>
+                                                    <div style={{ marginBottom: '18px' }}>
+                                                        <label className="prop-label">Logo Text</label>
                                                         <input className="prop-input" value={(block.content as any).logoText} onChange={e => updateDesignBlockContent(block.id, { logoText: e.target.value })} />
-                                                    </>
+                                                    </div>
                                                 )}
 
                                                 {block.type === 'footer' && (
-                                                    <>
-                                                        <span className="prop-label">Footer Text</span>
+                                                    <div style={{ marginBottom: '18px' }}>
+                                                        <label className="prop-label">Footer Text</label>
                                                         <textarea className="prop-input" rows={4} value={(block.content as any).text} onChange={e => updateDesignBlockContent(block.id, { text: e.target.value })} />
-                                                    </>
+                                                    </div>
                                                 )}
 
-                                                <span className="prop-label">Alignment</span>
-                                                <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-                                                    {['left', 'center', 'right'].map(align => (
-                                                        <button 
-                                                            key={align} 
-                                                            className="tool-btn" 
-                                                            style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#82b440' : '#e2e8f0', background: block.style?.textAlign === align ? '#f2f6ee' : 'white' }}
-                                                            onClick={() => updateDesignBlockStyle(block.id, { textAlign: align })}
-                                                        >
-                                                            {align[0].toUpperCase()}
-                                                        </button>
-                                                    ))}
+                                                <div style={{ marginBottom: '24px' }}>
+                                                    <label className="prop-label">Alignment</label>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        {['left', 'center', 'right'].map(align => (
+                                                            <button 
+                                                                key={align} 
+                                                                className="tool-btn" 
+                                                                style={{ flex: 1, borderColor: block.style?.textAlign === align ? '#82b440' : '#e2e8f0', background: block.style?.textAlign === align ? '#f2f6ee' : 'white' }}
+                                                                onClick={() => updateDesignBlockStyle(block.id, { textAlign: align })}
+                                                            >
+                                                                {align[0].toUpperCase()}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
 
                                                 <button className="btn-save-indigo" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setSelectedBlockId(null)}>
