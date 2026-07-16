@@ -9,8 +9,55 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireAdminAuth(request);
 
   try {
+    const defaultFlows = [
+      {
+        type: "welcome",
+        name: "Welcome new subscribers",
+        subject: "Welcome to Geo: Redirect & Country Block!",
+      },
+      {
+        type: "limit_80",
+        name: "80% usage limit notification",
+        subject: "{shop}: Usage Warning (80%) - Geo: Redirect & Country Block",
+      },
+      {
+        type: "limit_100",
+        name: "100% usage limit notification",
+        subject: "ACTION REQUIRED: {shop} reached 100% limit - Geo: Redirect & Country Block",
+      },
+      {
+        type: "limit_unlimited",
+        name: "Unlimited usage granted",
+        subject: "CONGRATULATIONS: {shop} granted UNLIMITED usage this month!",
+      },
+      {
+        type: "limit_free_reminder",
+        name: "Free plan limit reminder (1 day after)",
+        subject: "[Reminder] {shop}: Free plan limit reached - Upgrade to keep geo-redirects active",
+      },
+    ];
+
+    for (const flow of defaultFlows) {
+      await prisma.automation.upsert({
+        where: { shop_type: { shop: "GLOBAL", type: flow.type } },
+        update: {},
+        create: {
+          shop: "GLOBAL",
+          type: flow.type,
+          name: flow.name,
+          subject: flow.subject,
+          isActive: true,
+          config: JSON.stringify([
+            { id: "1", type: "action", parentId: "trigger", data: { label: "Send Email", templateId: "" } },
+          ]),
+          html: "",
+        },
+      }).catch((err) => console.error(`Failed to auto-create default automation ${flow.type}:`, err));
+    }
+
     const automations = await prisma.automation.findMany({
       where: { shop: "GLOBAL" },
+      orderBy: { createdAt: "asc" },
     });
 
     const logs = await prisma.adminEmailLog.groupBy({
@@ -29,6 +76,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       automations: automations.map((automation) => ({
         id: automation.id,
         name:
+          automation.name ||
           automation.subject ||
           (automation.type === "welcome"
             ? "Welcome new subscribers"
@@ -36,9 +84,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               ? "80% usage limit notification"
               : automation.type === "limit100" || automation.type === "limit_100"
                 ? "100% usage limit notification"
-                : automation.type === "limit_free_reminder"
-                  ? "Free plan limit reminder (1 day after)"
-                  : "Custom automation"),
+                : automation.type === "limit_unlimited"
+                  ? "Unlimited usage granted"
+                  : automation.type === "limit_free_reminder"
+                    ? "Free plan limit reminder (1 day after)"
+                    : "Custom automation"),
         type: automation.type,
         status: automation.isActive ? "Active" : "Inactive",
         sent: sentMap[automation.type] || 0,
@@ -55,6 +105,7 @@ function getTriggerLabel(type: string) {
   if (type === "welcome") return "App installation";
   if (type === "limit80" || type === "limit_80") return "80% usage";
   if (type === "limit100" || type === "limit_100") return "100% usage";
+  if (type === "limit_unlimited") return "Unlimited reward";
   if (type === "limit_free_reminder") return "Free plan reminder";
   if (type === "manual") return "Manual";
   return type;
