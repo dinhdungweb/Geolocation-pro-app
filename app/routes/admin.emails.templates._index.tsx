@@ -4,6 +4,7 @@ import { Link, useLoaderData } from "@remix-run/react";
 import { Mail, MoreHorizontal, Plus } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { ensureDefaultEmailAssets } from "../utils/email-seeder.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireAdminAuth(request);
@@ -11,6 +12,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let templates: Awaited<ReturnType<typeof prisma.emailTemplate.findMany>> = [];
 
   try {
+    await ensureDefaultEmailAssets();
     templates = await prisma.emailTemplate.findMany({
       where: { shop: "GLOBAL" },
       orderBy: { updatedAt: "desc" },

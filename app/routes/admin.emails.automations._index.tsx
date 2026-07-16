@@ -4,56 +4,13 @@ import { Link, useLoaderData } from "@remix-run/react";
 import { MoreHorizontal, Zap } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { ensureDefaultEmailAssets } from "../utils/email-seeder.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireAdminAuth(request);
 
   try {
-    const defaultFlows = [
-      {
-        type: "welcome",
-        name: "Welcome new subscribers",
-        subject: "Welcome to Geo: Redirect & Country Block!",
-      },
-      {
-        type: "limit_80",
-        name: "80% usage limit notification",
-        subject: "{shop}: Usage Warning (80%) - Geo: Redirect & Country Block",
-      },
-      {
-        type: "limit_100",
-        name: "100% usage limit notification",
-        subject: "ACTION REQUIRED: {shop} reached 100% limit - Geo: Redirect & Country Block",
-      },
-      {
-        type: "limit_unlimited",
-        name: "Unlimited usage granted",
-        subject: "CONGRATULATIONS: {shop} granted UNLIMITED usage this month!",
-      },
-      {
-        type: "limit_free_reminder",
-        name: "Free plan limit reminder (1 day after)",
-        subject: "[Reminder] {shop}: Free plan limit reached - Upgrade to keep geo-redirects active",
-      },
-    ];
-
-    for (const flow of defaultFlows) {
-      await prisma.automation.upsert({
-        where: { shop_type: { shop: "GLOBAL", type: flow.type } },
-        update: {},
-        create: {
-          shop: "GLOBAL",
-          type: flow.type,
-          name: flow.name,
-          subject: flow.subject,
-          isActive: true,
-          config: JSON.stringify([
-            { id: "1", type: "action", parentId: "trigger", data: { label: "Send Email", templateId: "" } },
-          ]),
-          html: "",
-        },
-      }).catch((err) => console.error(`Failed to auto-create default automation ${flow.type}:`, err));
-    }
+    await ensureDefaultEmailAssets();
 
     const automations = await prisma.automation.findMany({
       where: { shop: "GLOBAL" },

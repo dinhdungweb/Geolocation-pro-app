@@ -3,6 +3,7 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { ensureDefaultEmailAssets } from "../utils/email-seeder.server";
 import React, { useState, useEffect } from "react";
 import { 
     Zap, 
@@ -33,6 +34,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { id } = params;
     
     try {
+        await ensureDefaultEmailAssets();
         let currentAutomation = null;
         if (id && id !== 'new') {
             if (id.includes('-')) {

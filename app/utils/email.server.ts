@@ -141,7 +141,7 @@ export async function sendAdminEmail({
     if (customAuto) {
         console.log(`[Email Service] Using CUSTOM template for ${type} email to ${shop}`);
         finalSubject = replaceEmailVariables(customAuto.subject || subject, { shop });
-        finalHtml = replaceEmailVariables(customAuto.html, { shop });
+        finalHtml = replaceEmailVariables(customAuto.html || html, { shop });
     } else {
         finalSubject = replaceEmailVariables(subject, { shop });
         finalHtml = replaceEmailVariables(html, { shop });
