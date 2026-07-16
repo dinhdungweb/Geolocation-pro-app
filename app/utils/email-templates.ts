@@ -118,3 +118,29 @@ export const getLimitFreeReminderEmailHtml = (shop: string, usage: number, limit
     </div>
 </div>
 `;
+
+export const getReview3DaysEmailHtml = (shop: string) => `
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <div style="background: linear-gradient(135deg, #6366f1, #4f46e5); padding: 28px 20px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">We Value Your Feedback!</h1>
+    </div>
+    <div style="padding: 32px 30px; line-height: 1.6; color: #334155; font-size: 15px;">
+        <p style="margin-top: 0;">Hi there,</p>
+        <p>You have been using <strong>Geo: Redirect & Country Block</strong> on <strong>${shop}</strong> for a few days now, and we hope the app is helping you deliver a seamless, localized experience to your shoppers around the globe!</p>
+        <p>We are constantly striving to improve and provide the best possible support for merchants like you. We would love to hear your thoughts:</p>
+        <div style="background: #f8fafc; border-left: 4px solid #6366f1; padding: 18px 20px; border-radius: 0 6px 6px 0; margin: 24px 0;">
+            <p style="margin: 0; font-style: italic; color: #1e293b;">"How has your experience been with Geo: Redirect so far? Do you have any feature suggestions or need assistance with setting up rules?"</p>
+        </div>
+        <p>If you enjoy using our app, sharing a quick 2-minute review on the Shopify App Store would mean the world to our team and helps us continue supporting and enhancing the app.</p>
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal" style="background-color: #4f46e5; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);">Write a Review</a>
+        </div>
+        <p style="margin-bottom: 0;">If you need any help or have suggestions, simply reply to this email or reach out via our in-app support chat anytime. We are always here to help!</p>
+        <p style="margin-top: 24px;">Best regards,<br><strong>The Geo Support Team</strong></p>
+    </div>
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; text-align: center; font-size: 12px; color: #64748b;">
+        &copy; ${new Date().getFullYear()} Geo: Redirect & Country Block. All rights reserved.
+    </div>
+</div>
+`;
+

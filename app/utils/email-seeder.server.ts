@@ -5,6 +5,7 @@ import {
   getLimit100EmailHtml,
   getLimitUnlimitedEmailHtml,
   getLimitFreeReminderEmailHtml,
+  getReview3DaysEmailHtml,
 } from "./email-templates";
 
 export async function ensureDefaultEmailAssets() {
@@ -215,6 +216,50 @@ export async function ensureDefaultEmailAssets() {
         },
         {
           id: "f5",
+          type: "footer",
+          content: { text: "© 2026 Geo: Redirect & Country Block. All rights reserved." },
+          style: { padding: "30px" },
+        },
+      ],
+    },
+    {
+      type: "review_3_days",
+      name: "Request app review (3 days after install)",
+      templateName: "App Review Request Template",
+      subject: "How is your experience with Geo: Redirect & Country Block?",
+      html: getReview3DaysEmailHtml(shopPlaceholder),
+      blocks: [
+        {
+          id: "r1",
+          type: "header",
+          content: { logoText: "We Value Your Feedback" },
+          style: { themeColor: "#4f46e5", padding: "20px" },
+        },
+        {
+          id: "r2",
+          type: "heading",
+          content: { text: "How is your experience so far?" },
+          style: { color: "#1e293b", fontSize: "24px", textAlign: "center", padding: "30px" },
+        },
+        {
+          id: "r3",
+          type: "text",
+          content: {
+            text: `Hi there,\n\nYou have been using Geo: Redirect & Country Block on ${shopPlaceholder} for a few days now, and we hope the app is helping you deliver a seamless, localized experience to your shoppers!\n\nWe are constantly striving to improve and provide the best possible support for merchants like you. If you enjoy using our app, sharing a quick review on the Shopify App Store would mean the world to our team and helps us continue enhancing the app.\n\nIf you have any feedback, feature suggestions, or need assistance, we are always here to help!`,
+          },
+          style: { color: "#334155", fontSize: "16px", padding: "20px" },
+        },
+        {
+          id: "r4",
+          type: "button",
+          content: {
+            label: "Write a Review",
+            url: "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal",
+          },
+          style: { buttonColor: "#4f46e5", textAlign: "center", padding: "30px" },
+        },
+        {
+          id: "r5",
           type: "footer",
           content: { text: "© 2026 Geo: Redirect & Country Block. All rights reserved." },
           style: { padding: "30px" },

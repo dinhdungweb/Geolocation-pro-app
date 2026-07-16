@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../db.server';
 import { sendAdminEmail, hasSentEmail } from './email.server';
-import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml, getLimitFreeReminderEmailHtml } from './email-templates';
+import { getLimit80EmailHtml, getLimit100EmailHtml, getLimitUnlimitedEmailHtml, getLimitFreeReminderEmailHtml, getReview3DaysEmailHtml } from './email-templates';
 import { FREE_PLAN, getPlanLimit, hasMonthlyUnlimitedReward, hasUnlimitedUsage } from '../billing.config';
 import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.server';
 import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server';
@@ -275,6 +275,25 @@ export async function checkAllShopsUsage() {
                         subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
                         html: getLimit80EmailHtml(shop, currentUsage, planLimit),
                         dedupeKey: usagePeriod.key,
+                    });
+                }
+            }
+            // 3. Check for 3-day app review request email
+            const sentReview = await hasSentEmail(shop, 'review_3_days');
+            if (!sentReview) {
+                const welcomeLog = await prisma.adminEmailLog.findFirst({
+                    where: { shop, type: 'welcome', status: { in: ['sent', 'simulated'] } },
+                    orderBy: { createdAt: 'asc' },
+                });
+                const installDate = welcomeLog ? welcomeLog.createdAt : settings.createdAt;
+                const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+                if (installDate && (Date.now() - installDate.getTime()) >= threeDaysMs) {
+                    console.log(`[Cron] Sending 3-day app review request email to ${shop}`);
+                    await sendAdminEmail({
+                        shop,
+                        type: 'review_3_days',
+                        subject: `How is your experience with Geo: Redirect & Country Block?`,
+                        html: getReview3DaysEmailHtml(shop),
                     });
                 }
             }

@@ -50,7 +50,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             }
         }
 
-        if (!currentAutomation && !['welcome', 'limit_80', 'limit_100', 'limit_free_reminder', 'manual'].includes(id || '')) {
+        if (!currentAutomation && !['welcome', 'limit_80', 'limit_100', 'limit_free_reminder', 'review_3_days', 'manual'].includes(id || '')) {
             return redirect("/admin/emails/automations");
         }
 
@@ -476,6 +476,7 @@ export default function AdminEmailAutomations() {
                                     {triggerType === 'limit_80' && "80% Usage reached"}
                                     {triggerType === 'limit_100' && "100% Limit reached"}
                                     {triggerType === 'limit_free_reminder' && "Free Plan Limit Reminder (1 day after 100%)"}
+                                    {triggerType === 'review_3_days' && "Request App Review (3 days after install)"}
                                     {triggerType === 'manual' && "API Trigger"}
                                 </div>
                                 <div className="node-desc">Starts when event occurs</div>
@@ -518,6 +519,7 @@ export default function AdminEmailAutomations() {
                                     <option value="limit_80">Usage reach 80%</option>
                                     <option value="limit_100">Usage reach 100%</option>
                                     <option value="limit_free_reminder">Free Plan Reminder (1 day after 100%)</option>
+                                    <option value="review_3_days">App Review Request (3 days after install)</option>
                                     <option value="manual">Manual API Call</option>
                                 </select>
                             </>

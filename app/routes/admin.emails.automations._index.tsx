@@ -45,7 +45,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                   ? "Unlimited usage granted"
                   : automation.type === "limit_free_reminder"
                     ? "Free plan limit reminder (1 day after)"
-                    : "Custom automation"),
+                    : automation.type === "review_3_days"
+                      ? "Request app review (3 days after install)"
+                      : "Custom automation"),
         type: automation.type,
         status: automation.isActive ? "Active" : "Inactive",
         sent: sentMap[automation.type] || 0,
@@ -64,6 +66,7 @@ function getTriggerLabel(type: string) {
   if (type === "limit100" || type === "limit_100") return "100% usage";
   if (type === "limit_unlimited") return "Unlimited reward";
   if (type === "limit_free_reminder") return "Free plan reminder";
+  if (type === "review_3_days") return "3 days after install";
   if (type === "manual") return "Manual";
   return type;
 }
