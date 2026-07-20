@@ -231,6 +231,7 @@ export async function checkAllShopsUsage() {
                         subject: `CONGRATULATIONS: ${shop} granted UNLIMITED usage this month!`,
                         html: getLimitUnlimitedEmailHtml(shop, currentUsage),
                         dedupeKey: usagePeriod.key,
+                        variables: { usage: currentUsage },
                     });
                 }
             }
@@ -245,6 +246,7 @@ export async function checkAllShopsUsage() {
                         subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
                         html: getLimit100EmailHtml(shop, currentUsage, planLimit),
                         dedupeKey: usagePeriod.key,
+                        variables: { usage: currentUsage, limit: planLimit },
                     });
                 } else if (currentPlan === FREE_PLAN) {
                     const sentReminder = await hasSentUsageEmail(shop, 'limit_free_reminder', usagePeriod);
@@ -259,6 +261,7 @@ export async function checkAllShopsUsage() {
                                 subject: `[Reminder] ${shop}: Free plan limit reached - Upgrade to keep geo-redirects active`,
                                 html: getLimitFreeReminderEmailHtml(shop, currentUsage, planLimit),
                                 dedupeKey: usagePeriod.key,
+                                variables: { usage: currentUsage, limit: planLimit },
                             });
                         }
                     }
@@ -275,6 +278,7 @@ export async function checkAllShopsUsage() {
                         subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
                         html: getLimit80EmailHtml(shop, currentUsage, planLimit),
                         dedupeKey: usagePeriod.key,
+                        variables: { usage: currentUsage, limit: planLimit },
                     });
                 }
             }
@@ -353,6 +357,7 @@ export async function checkAndSendLimitEmailIfNeeded({
                     subject: `CONGRATULATIONS: ${shop} granted UNLIMITED usage this month!`,
                     html: getLimitUnlimitedEmailHtml(shop, currentUsage),
                     dedupeKey: usagePeriod.key,
+                    variables: { usage: currentUsage },
                 });
             }
             return;
@@ -370,6 +375,7 @@ export async function checkAndSendLimitEmailIfNeeded({
                     subject: `ACTION REQUIRED: ${shop} reached 100% limit - Geo: Redirect & Country Block`,
                     html: getLimit100EmailHtml(shop, currentUsage, planLimit),
                     dedupeKey: usagePeriod.key,
+                    variables: { usage: currentUsage, limit: planLimit },
                 });
             } else if (currentPlan === FREE_PLAN) {
                 const sentReminder = await hasSentUsageEmail(shop, 'limit_free_reminder', usagePeriod);
@@ -384,6 +390,7 @@ export async function checkAndSendLimitEmailIfNeeded({
                             subject: `[Reminder] ${shop}: Free plan limit reached - Upgrade to keep geo-redirects active`,
                             html: getLimitFreeReminderEmailHtml(shop, currentUsage, planLimit),
                             dedupeKey: usagePeriod.key,
+                            variables: { usage: currentUsage, limit: planLimit },
                         });
                     }
                 }
@@ -398,6 +405,7 @@ export async function checkAndSendLimitEmailIfNeeded({
                     subject: `${shop}: Usage Warning (80%) - Geo: Redirect & Country Block`,
                     html: getLimit80EmailHtml(shop, currentUsage, planLimit),
                     dedupeKey: usagePeriod.key,
+                    variables: { usage: currentUsage, limit: planLimit },
                 });
             }
         }

@@ -60,7 +60,7 @@ export async function ensureDefaultEmailAssets() {
       name: "80% usage limit notification",
       templateName: "80% Usage Warning Template",
       subject: "{shop}: Usage Warning (80%) - Geo: Redirect & Country Block",
-      html: getLimit80EmailHtml(shopPlaceholder, 8000, 10000),
+      html: getLimit80EmailHtml(shopPlaceholder, "{usage}", "{limit}"),
       blocks: [
         {
           id: "l81",
@@ -104,7 +104,7 @@ export async function ensureDefaultEmailAssets() {
       name: "100% usage limit notification",
       templateName: "100% Usage Limit Alert Template",
       subject: "ACTION REQUIRED: {shop} reached 100% limit - Geo: Redirect & Country Block",
-      html: getLimit100EmailHtml(shopPlaceholder, 10000, 10000),
+      html: getLimit100EmailHtml(shopPlaceholder, "{usage}", "{limit}"),
       blocks: [
         {
           id: "l101",
@@ -148,7 +148,7 @@ export async function ensureDefaultEmailAssets() {
       name: "Unlimited usage granted",
       templateName: "Unlimited Usage Reward Template",
       subject: "CONGRATULATIONS: {shop} granted UNLIMITED usage this month!",
-      html: getLimitUnlimitedEmailHtml(shopPlaceholder, 25000),
+      html: getLimitUnlimitedEmailHtml(shopPlaceholder, "{usage}"),
       blocks: [
         {
           id: "u1",
@@ -183,7 +183,7 @@ export async function ensureDefaultEmailAssets() {
       name: "Free plan limit reminder (1 day after)",
       templateName: "Free Plan 1-Day Reminder Template",
       subject: "[Reminder] {shop}: Free plan limit reached - Upgrade to keep geo-redirects active",
-      html: getLimitFreeReminderEmailHtml(shopPlaceholder, 1000, 1000),
+      html: getLimitFreeReminderEmailHtml(shopPlaceholder, "{usage}", "{limit}"),
       blocks: [
         {
           id: "f1",
@@ -201,7 +201,7 @@ export async function ensureDefaultEmailAssets() {
           id: "f3",
           type: "text",
           content: {
-            text: `Hi there,\n\nWe noticed that yesterday your store ${shopPlaceholder} reached its monthly Free plan limit of 1,000 visitors.\n\n• Current Usage: 1,000 visitors\n• Free Plan Limit: 1,000 visitors\n\nTo keep your location redirects, popups, and country blocking active without interruption, please upgrade to a higher plan so you can continue enjoying our full services as your store grows.`,
+            text: `Hi there,\n\nWe noticed that yesterday your store ${shopPlaceholder} reached its monthly Free plan limit of {limit} visitors.\n\n• Current Usage: {usage} visitors\n• Free Plan Limit: {limit} visitors\n\nTo keep your location redirects, popups, and country blocking active without interruption, please upgrade to a higher plan so you can continue enjoying our full services as your store grows.`,
           },
           style: { color: "#334155", fontSize: "16px", padding: "20px" },
         },

@@ -92,12 +92,17 @@ export async function sendAdminEmail({
     subject, 
     html,
     dedupeKey,
+    variables,
 }: { 
     shop: string, 
     type: EmailType, 
     subject: string, 
     html: string,
     dedupeKey?: string,
+    variables?: {
+        usage?: number;
+        limit?: number;
+    },
 }) {
     console.log(`[Email Service] Preparing to send ${type} email to ${shop}`);
     const logType = getEmailLogType(type, dedupeKey);
@@ -140,11 +145,19 @@ export async function sendAdminEmail({
 
     if (customAuto) {
         console.log(`[Email Service] Using CUSTOM template for ${type} email to ${shop}`);
-        finalSubject = replaceEmailVariables(customAuto.subject || subject, { shop });
-        finalHtml = replaceEmailVariables(customAuto.html || html, { shop });
+        const configuredContent = await resolveAutomationEmailContent(customAuto.config);
+        finalSubject = replaceEmailVariables(
+            configuredContent.subject || customAuto.subject || subject,
+            { shop, ...variables },
+        );
+        finalHtml = replaceEmailVariables(
+            configuredContent.html || customAuto.html || html,
+            { shop, ...variables },
+        );
+        finalHtml = replaceLegacyUsageTemplateValues(finalHtml, variables);
     } else {
-        finalSubject = replaceEmailVariables(subject, { shop });
-        finalHtml = replaceEmailVariables(html, { shop });
+        finalSubject = replaceEmailVariables(subject, { shop, ...variables });
+        finalHtml = replaceEmailVariables(html, { shop, ...variables });
     }
 
     const recipient = await resolveShopRecipientEmail(shop);
@@ -219,6 +232,72 @@ export async function sendAdminEmail({
         });
         return { success: false, error: err.message };
     }
+}
+
+async function resolveAutomationEmailContent(config?: string | null) {
+    if (!config) return {};
+
+    try {
+        const nodes = JSON.parse(config);
+        if (!Array.isArray(nodes)) return {};
+
+        const emailAction = nodes.find(
+            (node) => node?.type === "action" && node?.data?.label === "Send Email",
+        );
+        if (!emailAction?.data) return {};
+
+        if (emailAction.data.isCustom) {
+            return {
+                subject: emailAction.data.customSubject || undefined,
+                html: emailAction.data.customHtml || undefined,
+            };
+        }
+
+        if (emailAction.data.templateId) {
+            const template = await prisma.emailTemplate.findUnique({
+                where: { id: emailAction.data.templateId },
+                select: { subject: true, html: true },
+            });
+            return {
+                subject: template?.subject || undefined,
+                html: template?.html || undefined,
+            };
+        }
+    } catch (error) {
+        console.warn("[Email Service] Invalid automation email config; using stored HTML", error);
+    }
+
+    return {};
+}
+
+function replaceLegacyUsageTemplateValues(
+    html: string,
+    variables?: { usage?: number; limit?: number },
+) {
+    if (!variables) return html;
+
+    let result = html;
+    if (typeof variables.usage === "number") {
+        const usage = variables.usage.toLocaleString();
+        result = result.replace(
+            /(Current Usage:\s*(?:<\/?[^>]+>)*\s*)(?:8,000|10,000|1,000|25,000)(?=(?:<\/?[^>]+>)*\s*visitors)/gi,
+            `$1${usage}`,
+        );
+    }
+
+    if (typeof variables.limit === "number") {
+        const limit = variables.limit.toLocaleString();
+        result = result.replace(
+            /((?:Plan Limit|Free Plan Limit):\s*(?:<\/?[^>]+>)*\s*)(?:10,000|1,000)(?=(?:<\/?[^>]+>)*\s*visitors)/gi,
+            `$1${limit}`,
+        );
+        result = result.replace(
+            /(Free plan limit of\s*(?:<\/?[^>]+>)*\s*)(?:1,000)(?=(?:<\/?[^>]+>)*\s*visitors)/gi,
+            `$1${limit}`,
+        );
+    }
+
+    return result;
 }
 
 /**
