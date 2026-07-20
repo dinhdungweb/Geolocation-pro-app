@@ -349,6 +349,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "toggle") {
             const id = formData.get("id") as string;
             const isActive = formData.get("isActive") === "true";
+            const nextIsActive = !isActive;
 
             if (!hasProPlan && !isActive) {
                 const rule = await prisma.redirectRule.findFirst({
@@ -362,10 +363,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             await prisma.redirectRule.update({
                 where: { id, shop },
-                data: { isActive: !isActive },
+                data: { isActive: nextIsActive },
             });
             invalidateStorefrontConfigCache(shop);
-            return json({ success: true, message: "Rule toggled successfully" });
+            return json({
+                success: true,
+                message: `Rule ${nextIsActive ? "enabled" : "disabled"} successfully`,
+            });
         }
 
         if (intent === "delete") {
