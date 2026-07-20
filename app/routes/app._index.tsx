@@ -14,7 +14,7 @@ import {
   ProgressBar,
   Icon,
 } from "@shopify/polaris";
-import { CheckIcon } from "@shopify/polaris-icons";
+import { CheckIcon, XIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { apiVersion, authenticate } from "../shopify.server";
 import {
@@ -721,9 +721,6 @@ export default function Index() {
           .dashboard-page > .Polaris-BlockStack > :has(.setup-guide-card) {
             order: 2;
           }
-          .dashboard-page > .Polaris-BlockStack > :has(.dashboard-embed-card) {
-            order: 3;
-          }
           .dashboard-page > .Polaris-BlockStack,
           .dashboard-page .Polaris-ShadowBevel {
             --pc-shadow-bevel-border-radius-xs: var(--p-border-radius-200, 8px) !important;
@@ -966,12 +963,6 @@ export default function Index() {
           .dashboard-summary-grid > .Polaris-ShadowBevel > .Polaris-Box {
             height: 100%;
           }
-          .dashboard-embed-card {
-            padding: 16px;
-            display: grid;
-            gap: 12px;
-          }
-          .dashboard-embed-header,
           .setup-guide-header-actions {
             display: flex;
             align-items: flex-start;
@@ -1139,7 +1130,6 @@ export default function Index() {
               flex-direction: column;
               align-items: stretch;
             }
-            .dashboard-embed-header,
             .setup-guide-header-actions {
               justify-content: flex-start;
             }
@@ -1165,7 +1155,6 @@ export default function Index() {
             .dashboard-summary-grid {
               grid-template-columns: 1fr;
             }
-            .dashboard-embed-card,
             .setup-guide-card,
             .dashboard-usage-card,
             .dashboard-summary-card,
@@ -1173,19 +1162,16 @@ export default function Index() {
               padding: var(--p-space-400, 16px);
             }
             .dashboard-usage-header,
-            .dashboard-panel-header,
-            .dashboard-embed-header {
+            .dashboard-panel-header {
               display: grid;
               grid-template-columns: minmax(0, 1fr) max-content;
               align-items: start;
             }
-            .dashboard-embed-header > .Polaris-InlineStack,
             .dashboard-header-badge,
             .dashboard-header-badges {
               justify-self: end;
               max-width: 44vw;
             }
-            .dashboard-embed-header > .Polaris-InlineStack,
             .dashboard-header-badges .Polaris-InlineStack {
               flex-wrap: wrap;
             }
@@ -1215,40 +1201,24 @@ export default function Index() {
               {shopIdentity.shopName} dashboard overview
             </Text>
           </BlockStack>
-        </div>
-
-        <Card padding="0">
-          <div className="dashboard-embed-card">
-            <div className="dashboard-embed-header">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Theme app embed</Text>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  {appEmbedStatus.helpText}
-                </Text>
-              </BlockStack>
-              <InlineStack gap="200" blockAlign="center">
-                <Badge tone={appEmbedStatus.state === "enabled" ? "success" : appEmbedStatus.state === "missing_scope" ? "warning" : "attention"}>
-                  {appEmbedStatus.label}
-                </Badge>
-                {appEmbedStatus.themeName && (
-                  <Badge>{`Theme: ${appEmbedStatus.themeName}`}</Badge>
-                )}
-                {setupDismissed && (
-                  <Button variant="plain" onClick={handleShowSetup}>
-                    Show setup guide
-                  </Button>
-                )}
-              </InlineStack>
-            </div>
+          <InlineStack gap="200" blockAlign="center">
+            <Badge
+              tone={appEmbedStatus.state === "enabled" ? "success" : "attention"}
+            >
+              {`App embed: ${appEmbedStatus.state === "enabled" ? "Enabled" : "Not enabled"}`}
+            </Badge>
             {appEmbedStatus.state !== "enabled" && (
-              <InlineStack gap="200">
-                <Button onClick={handleOpenThemeEditor}>
-                  Enable app embed
-                </Button>
-              </InlineStack>
+              <Button variant="plain" onClick={handleOpenThemeEditor}>
+                Enable
+              </Button>
             )}
-          </div>
-        </Card>
+            {setupDismissed && (
+              <Button variant="plain" onClick={handleShowSetup}>
+                Show setup guide
+              </Button>
+            )}
+          </InlineStack>
+        </div>
 
         {!setupDismissed && (
           <Card padding="0">
@@ -1270,9 +1240,12 @@ export default function Index() {
                         {`Theme: ${appEmbedStatus.themeName}`}
                       </Badge>
                     )}
-                    <Button variant="plain" onClick={handleDismissSetup}>
-                      Dismiss
-                    </Button>
+                    <Button
+                      variant="plain"
+                      icon={XIcon}
+                      accessibilityLabel="Dismiss setup guide"
+                      onClick={handleDismissSetup}
+                    />
                   </div>
                 </div>
 

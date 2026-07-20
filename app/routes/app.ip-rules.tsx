@@ -685,18 +685,6 @@ export default function IPRulesPage() {
                 `}
             </style>
             <div className="ip-rules-page">
-                {!hasProPlan && (
-                    <div style={{ marginBottom: "16px" }}>
-                        <Banner
-                            title="IP Rules requires Premium or higher"
-                            tone="warning"
-                            action={{ content: "View plans", url: "/app/pricing" }}
-                        >
-                            <p>All IP Rule controls are disabled on the Free plan.</p>
-                        </Banner>
-                    </div>
-                )}
-                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan}>
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -739,6 +727,18 @@ export default function IPRulesPage() {
                         </Button>
                     </InlineStack>
                 </div>
+                {!hasProPlan && (
+                    <div style={{ marginBottom: "16px" }}>
+                        <Banner
+                            title="IP Rules requires Premium or higher"
+                            tone="warning"
+                            action={{ content: "View plans", url: "/app/pricing" }}
+                        >
+                            <p>All IP Rule controls are disabled on the Free plan.</p>
+                        </Banner>
+                    </div>
+                )}
+                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan}>
                 <BlockStack gap="500">
                 {hasProPlan && appEmbedStatus.state !== "enabled" && (
                     <Banner
