@@ -658,7 +658,6 @@ export default function Index() {
           .dashboard-page,
           .dashboard-shell,
           .dashboard-overview-grid,
-          .dashboard-summary-grid,
           .dashboard-content-grid,
           .dashboard-side-stack,
           .dashboard-card-frame,
@@ -906,35 +905,11 @@ export default function Index() {
             text-align: center;
             color: var(--p-color-text-secondary, #616161);
           }
-          .dashboard-summary-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-          }
-          .dashboard-summary-card {
-            padding: 16px;
-            height: 100%;
-            min-height: 94px;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-          }
-          .dashboard-summary-grid > .Polaris-ShadowBevel,
-          .dashboard-summary-grid > .Polaris-ShadowBevel > .Polaris-Box {
-            height: 100%;
-          }
           .setup-guide-header-actions {
             display: flex;
             align-items: flex-start;
             gap: 8px;
             flex: 0 0 auto;
-          }
-          .dashboard-summary-value {
-            font-size: 20px;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            line-height: 1.2;
           }
           .setup-guide-card {
             padding: 16px;
@@ -1053,9 +1028,6 @@ export default function Index() {
               grid-template-columns: 1fr;
               grid-template-rows: none;
             }
-            .dashboard-summary-grid {
-              grid-template-columns: repeat(2, 1fr);
-            }
             .dashboard-card-frame,
             .dashboard-card-frame > .Polaris-ShadowBevel,
             .dashboard-card-frame > .Polaris-ShadowBevel > .Polaris-Box,
@@ -1084,9 +1056,6 @@ export default function Index() {
             }
             .dashboard-table {
               min-width: 560px;
-            }
-            .dashboard-summary-card {
-              min-height: 104px;
             }
             .dashboard-usage-header,
             .dashboard-panel-header {
@@ -1119,17 +1088,12 @@ export default function Index() {
           @media (max-width: 30em) {
             .dashboard-shell,
             .dashboard-overview-grid,
-            .dashboard-summary-grid,
             .dashboard-content-grid,
             .dashboard-side-stack {
               gap: var(--p-space-400, 16px);
             }
-            .dashboard-summary-grid {
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
             .setup-guide-card,
             .dashboard-usage-card,
-            .dashboard-summary-card,
             .dashboard-panel-header {
               padding: var(--p-space-400, 16px);
             }
@@ -1380,37 +1344,6 @@ export default function Index() {
               </div>
             </Card>
 
-          </div>
-
-          <div className="dashboard-summary-grid">
-            <Card padding="0">
-              <div className="dashboard-summary-card">
-                <Text as="p" variant="bodySm" tone="subdued">Countries</Text>
-                <span className="dashboard-summary-value">{totalCountries}</span>
-                <Text as="p" variant="bodySm" tone="subdued">visited in last 30 days</Text>
-              </div>
-            </Card>
-            <Card padding="0">
-              <div className="dashboard-summary-card">
-                <Text as="p" variant="bodySm" tone="subdued">Redirected</Text>
-                <span className="dashboard-summary-value">{stats.totalRedirected}</span>
-                <Text as="p" variant="bodySm" tone="subdued">visitors redirected</Text>
-              </div>
-            </Card>
-            <Card padding="0">
-              <div className="dashboard-summary-card">
-                <Text as="p" variant="bodySm" tone="subdued">Blocked</Text>
-                <span className="dashboard-summary-value">{stats.totalBlocked}</span>
-                <Text as="p" variant="bodySm" tone="subdued">visitors blocked</Text>
-              </div>
-            </Card>
-            <Card padding="0">
-              <div className="dashboard-summary-card">
-                <Text as="p" variant="bodySm" tone="subdued">Active Rules</Text>
-                <span className="dashboard-summary-value">{stats.activeRules}</span>
-                <Text as="p" variant="bodySm" tone="subdued">of {stats.totalRules} total</Text>
-              </div>
-            </Card>
           </div>
 
           <div className="dashboard-content-grid">
