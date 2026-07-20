@@ -215,13 +215,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             const id = formData.get("id") as string;
             const isActive = formData.get("isActive") === "true";
+            const nextIsActive = !isActive;
 
             await prisma.redirectRule.update({
                 where: { id, shop },
-                data: { isActive: !isActive },
+                data: { isActive: nextIsActive },
             });
             invalidateStorefrontConfigCache(shop);
-            return json({ success: true, message: "IP Rule toggled successfully" });
+            return json({
+                success: true,
+                message: `IP Rule ${nextIsActive ? "enabled" : "disabled"} successfully`,
+            });
         }
 
         if (intent === "delete") {

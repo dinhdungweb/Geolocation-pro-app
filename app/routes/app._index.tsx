@@ -1235,11 +1235,6 @@ export default function Index() {
                   </div>
                 </BlockStack>
                   <div className="setup-guide-header-actions">
-                    {appEmbedStatus.themeName && (
-                      <Badge tone={appEmbedStatus.state === "enabled" ? "success" : "attention"}>
-                        {`Theme: ${appEmbedStatus.themeName}`}
-                      </Badge>
-                    )}
                     <Button
                       variant="plain"
                       icon={XIcon}
