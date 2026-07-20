@@ -696,7 +696,8 @@ export default function IPRulesPage() {
                         </Banner>
                     </div>
                 )}
-                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan} style={{
+                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan}>
+                <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
@@ -739,7 +740,7 @@ export default function IPRulesPage() {
                     </InlineStack>
                 </div>
                 <BlockStack gap="500">
-                {appEmbedStatus.state !== "enabled" && (
+                {hasProPlan && appEmbedStatus.state !== "enabled" && (
                     <Banner
                         tone="warning"
                         title={appEmbedStatus.state === "missing_scope" ? "App embed status needs permission" : "Enable app embed before testing IP rules"}
@@ -760,7 +761,7 @@ export default function IPRulesPage() {
                         <p>Active IP rules with overlapping addresses and page targeting can shadow each other. Review rules marked with conflict badges and adjust priority or targeting.</p>
                     </Banner>
                 )}
-                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan}>
+                <div>
                 <Layout>
                     <Layout.Section>
                         <Card padding="0">
@@ -795,6 +796,7 @@ export default function IPRulesPage() {
                 </Layout>
                 </div>
                 </BlockStack>
+                </div>
             </div>
 
             {/* Add/Edit Modal */}
