@@ -710,8 +710,11 @@ export default function Index() {
           .dashboard-page > .Polaris-BlockStack > .dashboard-welcome {
             order: 1;
           }
-          .dashboard-page > .Polaris-BlockStack > :has(.setup-guide-card) {
+          .dashboard-page > .Polaris-BlockStack > :has(.dashboard-app-embed-status) {
             order: 2;
+          }
+          .dashboard-page > .Polaris-BlockStack > :has(.setup-guide-card) {
+            order: 3;
           }
           .dashboard-page > .Polaris-BlockStack,
           .dashboard-page .Polaris-ShadowBevel {
@@ -969,6 +972,21 @@ export default function Index() {
           .setup-guide-card {
             padding: 16px;
           }
+          .dashboard-app-embed-status {
+            min-height: 52px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+          }
+          .dashboard-app-embed-status > :first-child {
+            flex: 1 1 auto;
+            min-width: 0;
+          }
+          .dashboard-app-embed-status > :last-child {
+            flex: 0 0 auto;
+          }
           .setup-guide-header {
             display: flex;
             align-items: flex-start;
@@ -1188,19 +1206,23 @@ export default function Index() {
               {shopIdentity.shopName} dashboard overview
             </Text>
           </BlockStack>
-          <InlineStack gap="200" blockAlign="center">
-            <Badge
-              tone={appEmbedStatus.state === "enabled" ? "success" : "attention"}
-            >
-              {`App embed: ${appEmbedStatus.state === "enabled" ? "Enabled" : "Not enabled"}`}
-            </Badge>
-            {appEmbedStatus.state !== "enabled" && (
-              <Button variant="plain" onClick={handleOpenThemeEditor}>
-                Enable
-              </Button>
-            )}
-          </InlineStack>
         </div>
+
+        <Card padding="0">
+          <div className="dashboard-app-embed-status">
+            <Text as="p" variant="bodyMd">
+              <strong>Geo: Redirect</strong>{" "}
+              {appEmbedStatus.state === "enabled"
+                ? "is enabled in your live theme"
+                : "is not enabled in your live theme"}
+            </Text>
+            {appEmbedStatus.state === "enabled" ? (
+              <Badge tone="success">Enabled</Badge>
+            ) : (
+              <Button onClick={handleOpenThemeEditor}>Enable</Button>
+            )}
+          </div>
+        </Card>
 
         {setupDismissed === false && (
           <Card padding="0">
