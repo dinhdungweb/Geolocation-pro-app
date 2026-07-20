@@ -633,14 +633,6 @@ export default function Index() {
     } catch {}
   }, [setupDismissedKey]);
 
-  const handleShowSetup = useCallback(() => {
-    setSetupDismissed(false);
-    try {
-      localStorage.removeItem(SETUP_DISMISSED_KEY);
-      localStorage.removeItem(setupDismissedKey);
-    } catch {}
-  }, [setupDismissedKey]);
-
   const setupSteps: Array<{
     id: "embed" | "rule" | "logs" | "confirm";
     title: string;
@@ -966,9 +958,7 @@ export default function Index() {
           .setup-guide-header-actions {
             display: flex;
             align-items: flex-start;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
+            flex: 0 0 auto;
           }
           .dashboard-summary-value {
             font-size: 24px;
@@ -984,6 +974,10 @@ export default function Index() {
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
+          }
+          .setup-guide-header > .Polaris-BlockStack {
+            flex: 1 1 auto;
+            min-width: 0;
           }
           .setup-guide-steps {
             display: grid;
@@ -1126,13 +1120,6 @@ export default function Index() {
             .dashboard-table-scroll-short {
               overscroll-behavior-x: contain;
             }
-            .setup-guide-header {
-              flex-direction: column;
-              align-items: stretch;
-            }
-            .setup-guide-header-actions {
-              justify-content: flex-start;
-            }
             .setup-guide-step-header {
               grid-template-columns: 24px minmax(0, 1fr) max-content;
             }
@@ -1210,11 +1197,6 @@ export default function Index() {
             {appEmbedStatus.state !== "enabled" && (
               <Button variant="plain" onClick={handleOpenThemeEditor}>
                 Enable
-              </Button>
-            )}
-            {setupDismissed && (
-              <Button variant="plain" onClick={handleShowSetup}>
-                Show setup guide
               </Button>
             )}
           </InlineStack>
