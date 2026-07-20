@@ -51,7 +51,7 @@ interface VisitsDataItem {
 }
 
 const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: string }> = {
-  [FREE_PLAN]: { label: "Pro", actionContent: "Upgrade to Pro" },
+  [FREE_PLAN]: { label: "Premium", actionContent: "Upgrade to Premium" },
   [PREMIUM_PLAN]: { label: "Plus", actionContent: "Upgrade to Plus" },
   [PLUS_PLAN]: { label: "Elite", actionContent: "Upgrade to Elite" },
 };
@@ -258,7 +258,7 @@ async function getThemeAppEmbedStatus({
 
 function formatPlanLabel(planName: string) {
   if (!planName) return "current";
-  if (planName === PREMIUM_PLAN) return "Pro";
+  if (planName === PREMIUM_PLAN) return "Premium";
   return planName.charAt(0).toUpperCase() + planName.slice(1);
 }
 
@@ -456,6 +456,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return json({
     shop,
+    onboardingInstallAt: settings.onboardingInstallAt.toISOString(),
     hasProPlan: currentPlan !== FREE_PLAN,
     shopifyPlan,
     isBillingOverridden,
@@ -491,15 +492,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 export default function Index() {
-  const { shop, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData, totalCountries } = useLoaderData<typeof loader>();
+  const { shop, onboardingInstallAt, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData, totalCountries } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [setupDismissed, setSetupDismissed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
   const hasScheduledPermissionRefresh = useRef(false);
-  const setupConfirmedKey = `${SETUP_CONFIRMED_KEY}:${shop}`;
-  const setupDismissedKey = `${SETUP_DISMISSED_KEY}:${shop}`;
+  const installKey = `${shop}:${onboardingInstallAt}`;
+  const setupConfirmedKey = `${SETUP_CONFIRMED_KEY}:${installKey}`;
+  const setupDismissedKey = `${SETUP_DISMISSED_KEY}:${installKey}`;
 
   useEffect(() => {
     try {
@@ -677,7 +679,6 @@ export default function Index() {
   ];
   const activeSetupStep = activeSetupStepId || setupSteps.find((step) => !step.completed)?.id || "confirm";
   const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
-  const isSetupComplete = completedSetupSteps === setupSteps.length;
   const totalBlockedActions = blocksData.reduce((sum: number, item: any) => sum + Number(item.blocked || 0), 0);
   const totalPopupSeen = popupsData.reduce((sum: number, item: any) => sum + Number(item.seen || 0), 0);
   const totalAutoRedirected = autoRedirectsData.reduce((sum: number, item: any) => sum + Number(item.autoRedirected || 0), 0);
@@ -686,7 +687,7 @@ export default function Index() {
 
   return (
     <Page>
-      <TitleBar title="Geolocation Pro" />
+      <TitleBar title="Geo: Redirect & Country Block" />
       <style>
         {`
           .dashboard-welcome {
@@ -710,6 +711,18 @@ export default function Index() {
           .dashboard-page {
             box-sizing: border-box;
             width: 100%;
+          }
+          .dashboard-page > .Polaris-BlockStack > * {
+            order: 4;
+          }
+          .dashboard-page > .Polaris-BlockStack > .dashboard-welcome {
+            order: 1;
+          }
+          .dashboard-page > .Polaris-BlockStack > :has(.setup-guide-card) {
+            order: 2;
+          }
+          .dashboard-page > .Polaris-BlockStack > :has(.dashboard-embed-card) {
+            order: 3;
           }
           .dashboard-page > .Polaris-BlockStack,
           .dashboard-page .Polaris-ShadowBevel {
@@ -1257,11 +1270,9 @@ export default function Index() {
                         {`Theme: ${appEmbedStatus.themeName}`}
                       </Badge>
                     )}
-                    {isSetupComplete && (
-                      <Button variant="plain" onClick={handleDismissSetup}>
-                        Dismiss
-                      </Button>
-                    )}
+                    <Button variant="plain" onClick={handleDismissSetup}>
+                      Dismiss
+                    </Button>
                   </div>
                 </div>
 

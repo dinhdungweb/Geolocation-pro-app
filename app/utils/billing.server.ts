@@ -404,17 +404,13 @@ export async function checkBillingWithFallback(
     isTest: boolean,
     options: { fallbackPlan?: string | null; logContext?: string } = {},
 ) {
-    const { ALL_PAID_PLANS } = await import("../billing.config");
-
     try {
         let billingCheck = await billing.check({
-            plans: ALL_PAID_PLANS as any,
             isTest,
         });
 
         if (!billingCheck.hasActivePayment) {
             const fallbackCheck = await billing.check({
-                plans: ALL_PAID_PLANS as any,
                 isTest: !isTest,
             });
 
@@ -570,7 +566,7 @@ export async function getShopActivePlan(shop: string): Promise<string | null> {
 
         if (!activeSubscriptions || activeSubscriptions.length === 0) return FREE_PLAN;
 
-        return activeSubscriptions[0].name || FREE_PLAN;
+        return normalizePlanName(activeSubscriptions[0].name || FREE_PLAN);
     } catch (error: any) {
         // Session not found, shop deleted, etc. - return null to signal "use fallback"
         return null;
@@ -648,7 +644,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
         const subscription =
             activeSubscriptions.find((sub: any) => usagePeriodFromSubscription(sub, settings)) ||
             activeSubscriptions[0];
-        const shopifyPlan = subscription.name;
+        const shopifyPlan = normalizePlanName(subscription.name);
         const { effectivePlan: currentPlan } = resolveEffectivePlan({ settings, shopifyPlan });
         const usagePeriod = usagePeriodFromSubscription(subscription, settings);
         if (!usagePeriod) return;

@@ -25,7 +25,7 @@ import {
     Icon,
     Tooltip,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -225,6 +225,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (intent === "delete") {
+            if (!hasProPlan) {
+                return json({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
+            }
             const ids = (formData.get("ids") as string).split(",");
             await prisma.redirectRule.deleteMany({
                 where: { id: { in: ids }, shop },
@@ -236,7 +239,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "import") {
             // Server-side plan check: paid plans can import
             if (!hasProPlan) {
-                return json({ success: false, message: "Import is only available on Pro plan and above" }, { status: 403 });
+                return json({ success: false, message: "Import is only available on Premium plan and above" }, { status: 403 });
             }
 
             const rulesJson = formData.get("rulesJson") as string;
@@ -301,6 +304,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function IPRulesPage() {
     const { rules, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
+    const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<IPRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
@@ -318,6 +322,13 @@ export default function IPRulesPage() {
     const [pagePaths, setPagePaths] = useState("");
 
     const hasNormalizedIPs = normalizeIPAddresses(formIPAddresses).length > 0;
+
+    useEffect(() => {
+        if (fetcher.state !== "idle" || !fetcher.data?.message) return;
+        shopify.toast.show(fetcher.data.message, {
+            isError: fetcher.data.success === false,
+        });
+    }, [fetcher.data, fetcher.state, shopify]);
 
     const resourceName = {
         singular: "IP rule",
@@ -353,9 +364,7 @@ export default function IPRulesPage() {
     }, [editingRule, modalOpen]);
 
     const handleOpenModal = useCallback((rule?: IPRule) => {
-        if (!hasProPlan && !rule) {
-            return;
-        }
+        if (!hasProPlan) return;
         setEditingRule(rule || null);
         setModalOpen(true);
     }, [hasProPlan]);
@@ -398,13 +407,13 @@ export default function IPRulesPage() {
     );
 
     const handleBulkDelete = useCallback(() => {
-        if (selectedResources.length === 0) return;
+        if (!hasProPlan || selectedResources.length === 0) return;
         const formData = new FormData();
         formData.append("intent", "delete");
         formData.append("ids", selectedResources.join(","));
         fetcher.submit(formData, { method: "POST" });
         clearSelection();
-    }, [selectedResources, fetcher, clearSelection]);
+    }, [hasProPlan, selectedResources, fetcher, clearSelection]);
 
     // --- Export Rules ---
     const handleExportRules = useCallback((exportAll: boolean) => {
@@ -484,7 +493,7 @@ export default function IPRulesPage() {
             key={rule.id}
             selected={selectedResources.includes(rule.id)}
             position={index}
-            onClick={() => handleOpenModal(rule)}
+            onClick={hasProPlan ? () => handleOpenModal(rule) : undefined}
         >
             <IndexTable.Cell>
                 <div className="ip-rule-name-cell">
@@ -551,11 +560,11 @@ export default function IPRulesPage() {
                     className="ip-rule-actions-cell"
                 >
                     <InlineStack gap="200" wrap={false}>
-                        <Button size="slim" onClick={() => handleOpenModal(rule)}>
+                        <Button size="slim" onClick={() => handleOpenModal(rule)} disabled={!hasProPlan}>
                             Edit
                         </Button>
                         {rule.isActive ? (
-                            <Button size="slim" onClick={() => handleToggle(rule)}>
+                            <Button size="slim" onClick={() => handleToggle(rule)} disabled={!hasProPlan}>
                                 Disable
                             </Button>
                         ) : (
@@ -583,7 +592,7 @@ export default function IPRulesPage() {
                 disabled: !hasProPlan,
             }}
             secondaryAction={!hasProPlan ? {
-                content: "Upgrade to Pro",
+                content: "Upgrade to Premium",
                 url: "/app/pricing",
             } : undefined}
             image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -592,7 +601,7 @@ export default function IPRulesPage() {
                 <p>Block or redirect specific IP addresses to protect your store.</p>
                 {!hasProPlan && (
                     <Banner tone="warning">
-                        IP Rules is a Pro feature. Upgrade your plan to create IP rules.
+                        IP Rules is a Premium feature. Upgrade your plan to create IP rules.
                     </Banner>
                 )}
             </BlockStack>
@@ -607,6 +616,12 @@ export default function IPRulesPage() {
                 {`
                     .ip-rules-page {
                         padding-bottom: var(--p-space-800, 32px);
+                    }
+                    .ip-rules-locked {
+                        opacity: 0.5;
+                        filter: grayscale(0.35);
+                        pointer-events: none;
+                        user-select: none;
                     }
                     .ip-rules-table-wrap {
                         width: 100%;
@@ -657,15 +672,31 @@ export default function IPRulesPage() {
                         min-width: 124px;
                     }
                     @media (max-width: 47.9975em) {
+                        .ip-rules-page > div:first-of-type {
+                            align-items: stretch !important;
+                        }
                         .ip-rules-table-wrap .Polaris-IndexTable,
                         .ip-rules-table-wrap .Polaris-IndexTable__Table {
-                            min-width: 1120px;
+                            min-width: 760px;
                         }
+                        .ip-rule-addresses-cell { min-width: 190px; }
+                        .ip-rule-action-cell { min-width: 170px; }
                     }
                 `}
             </style>
             <div className="ip-rules-page">
-                <div style={{
+                {!hasProPlan && (
+                    <div style={{ marginBottom: "16px" }}>
+                        <Banner
+                            title="IP Rules requires Premium or higher"
+                            tone="warning"
+                            action={{ content: "View plans", url: "/app/pricing" }}
+                        >
+                            <p>All IP Rule controls are disabled on the Free plan.</p>
+                        </Banner>
+                    </div>
+                )}
+                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
@@ -724,20 +755,12 @@ export default function IPRulesPage() {
                         </BlockStack>
                     </Banner>
                 )}
-                {!hasProPlan && rules.length > 0 && (
-                    <Banner
-                        title="Pro Feature"
-                        tone="warning"
-                        action={{ content: "Upgrade", url: "/app/pricing" }}
-                    >
-                        <p>IP Rules is a Pro feature. Upgrade to create new rules.</p>
-                    </Banner>
-                )}
                 {conflictTotal > 0 && (
                     <Banner tone="warning" title={`${conflictTotal} potential IP rule conflict${conflictTotal === 1 ? "" : "s"} found`}>
                         <p>Active IP rules with overlapping addresses and page targeting can shadow each other. Review rules marked with conflict badges and adjust priority or targeting.</p>
                     </Banner>
                 )}
+                <div className={!hasProPlan ? "ip-rules-locked" : undefined} aria-disabled={!hasProPlan}>
                 <Layout>
                     <Layout.Section>
                         <Card padding="0">
@@ -770,6 +793,7 @@ export default function IPRulesPage() {
                         </Card>
                     </Layout.Section>
                 </Layout>
+                </div>
                 </BlockStack>
             </div>
 

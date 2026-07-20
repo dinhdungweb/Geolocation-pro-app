@@ -18,6 +18,7 @@ import {
   UNLIMITED_PLAN,
   CUSTOM_PLAN,
   OVERAGE_MONTHLY_CAP_AMOUNT,
+  SHOPIFY_BILLING_PLAN_NAMES,
 } from "./billing.config";
 import { sendAdminEmail, hasSentEmail } from "./utils/email.server";
 import { getWelcomeEmailHtml } from "./utils/email-templates";
@@ -31,7 +32,7 @@ const shopify = shopifyApp({
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
   billing: {
-    [PREMIUM_PLAN]: {
+    [SHOPIFY_BILLING_PLAN_NAMES[PREMIUM_PLAN]]: {
       lineItems: [
         {
           amount: 4.99,
@@ -47,7 +48,7 @@ const shopify = shopifyApp({
       ],
       trialDays: DEFAULT_TRIAL_DAYS,
     },
-    [PLUS_PLAN]: {
+    [SHOPIFY_BILLING_PLAN_NAMES[PLUS_PLAN]]: {
       lineItems: [
         {
           amount: 7.99,
@@ -63,7 +64,7 @@ const shopify = shopifyApp({
       ],
       trialDays: DEFAULT_TRIAL_DAYS,
     },
-    [ELITE_PLAN]: {
+    [SHOPIFY_BILLING_PLAN_NAMES[ELITE_PLAN]]: {
       lineItems: [
         {
           amount: 14.99,
@@ -79,7 +80,7 @@ const shopify = shopifyApp({
       ],
       trialDays: DEFAULT_TRIAL_DAYS,
     },
-    [UNLIMITED_PLAN]: {
+    [SHOPIFY_BILLING_PLAN_NAMES[UNLIMITED_PLAN]]: {
       lineItems: [
         {
           amount: 79.99,
@@ -89,7 +90,7 @@ const shopify = shopifyApp({
       ],
       trialDays: DEFAULT_TRIAL_DAYS,
     },
-    [CUSTOM_PLAN]: {
+    [SHOPIFY_BILLING_PLAN_NAMES[CUSTOM_PLAN]]: {
       lineItems: [
         {
           amount: 79.99,

@@ -80,6 +80,7 @@ model Settings {
   excludedIPs        String   @default("")
   cookieDuration     Int      @default(7)
   createdAt          DateTime @default(now())
+  onboardingInstallAt DateTime @default(now())
   updatedAt          DateTime @updatedAt
   currentPlan        String   @default("free")
   emailSenderEmail   String?  @default("noreply@geopro.bluepeaks.top")

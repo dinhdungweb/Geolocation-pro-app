@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "441cf7062f21400e881f14eebbc41829"
-name = "Geolocation Pro"
+name = "Geo: Redirect"
 application_url = "https://geopro.bluepeaks.top"
 embedded = true
 

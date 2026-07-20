@@ -2,6 +2,7 @@ import prisma from "../db.server";
 import { FREE_PLAN, OVERAGE_RATE, hasUnlimitedUsage, type CustomPlanLimitSettings } from "../billing.config";
 import { unauthenticated } from "../shopify.server";
 import { getYearMonth } from "./analytics-token.server";
+import { normalizePlanName } from "./effective-plan.server";
 
 export type UsagePeriodSource = "calendar" | "shopify" | "cached" | "unresolved";
 
@@ -431,7 +432,7 @@ export async function fetchShopifyUsagePeriod(
   if (!period) return null;
 
   return {
-    plan: subscription.name || FREE_PLAN,
+    plan: normalizePlanName(subscription.name || FREE_PLAN),
     period,
   };
 }

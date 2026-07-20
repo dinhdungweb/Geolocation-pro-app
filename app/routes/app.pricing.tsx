@@ -31,11 +31,12 @@ import {
     CUSTOM_OVERAGE_MONTHLY_CAP_AMOUNT,
     DEFAULT_TRIAL_DAYS,
     getPlanLimit,
+    getShopifyBillingPlanName,
 } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/billing.server";
-import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getShopifyPlanFromBillingCheck, normalizePlanName, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
@@ -262,7 +263,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }`,
                 {
                     variables: {
-                        name: CUSTOM_PLAN,
+                        name: getShopifyBillingPlanName(CUSTOM_PLAN),
                         returnUrl,
                         lineItems,
                         test: isTest,
@@ -293,7 +294,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const subscription = billingCheck.appSubscriptions[0];
             if (subscription) {
                 // Bug #1 fix: Charge remaining overage BEFORE cancelling subscription
-                const activePlan = subscription.name || currentPlan;
+                const activePlan = normalizePlanName(subscription.name || currentPlan);
                 const settings = await prisma.settings.findUnique({
                     where: { shop },
                     select: {
@@ -376,18 +377,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         // Handling Paid Plans
         if (ALL_PAID_PLANS.includes(selectedPlan) && selectedPlan !== CUSTOM_PLAN) {
+            const shopifyBillingPlan = getShopifyBillingPlanName(selectedPlan);
             try {
-                await billing.require({
-                    plans: [selectedPlan] as any,
-                    isTest,
-                    onFailure: async () => {
-                        return billing.request({
-                            plan: selectedPlan as any,
-                            isTest,
-                            returnUrl: `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}/app/pricing`,
-                        });
-                    },
+                const billingCheck = await checkBillingWithFallback(billing, isTest, {
+                    fallbackPlan: currentPlan,
+                    logContext: `${shop} pricing action`,
                 });
+                const activeSubscriptionPlan = normalizePlanName(
+                    billingCheck.appSubscriptions?.[0]?.name,
+                );
+
+                if (!billingCheck.hasActivePayment || activeSubscriptionPlan !== selectedPlan) {
+                    await billing.request({
+                        plan: shopifyBillingPlan as any,
+                        isTest,
+                        returnUrl: `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}/app/pricing`,
+                    });
+                }
             } catch (error) {
                 if (error instanceof Response) {
                     throw error;
@@ -462,7 +468,7 @@ interface PlanCardProps {
 }
 
 function formatPlanName(name: string) {
-    if (name === PREMIUM_PLAN) return "Pro";
+    if (name === PREMIUM_PLAN) return "Premium";
     return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
@@ -523,11 +529,18 @@ function PlanCard({
                                 </div>
                                 <Text as="p" variant="bodySm" tone="subdued">
                                     {isFree
-                                        ? "No monthly charge"
+                                        ? "No monthly or usage charges"
                                         : hasTrial
-                                            ? `${trialDays ?? DEFAULT_TRIAL_DAYS}-day free trial included`
-                                            : "Monthly Shopify billing"}
+                                            ? `${trialDays ?? DEFAULT_TRIAL_DAYS}-day free trial, then $${price} USD every 30 days`
+                                            : `$${price} USD every 30 days`}
                                 </Text>
+                                {!isFree && (
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        {noOverage
+                                            ? "No usage-based overage charges"
+                                            : `After included visitors: $${OVERAGE_RATE.toFixed(3)} USD per visitor, capped at $${OVERAGE_MONTHLY_CAP_AMOUNT.toFixed(2)} USD per 30 days`}
+                                    </Text>
+                                )}
                             </BlockStack>
                         </BlockStack>
 
@@ -618,7 +631,7 @@ export default function PricingPage() {
         },
         {
             name: PREMIUM_PLAN,
-            displayName: "Pro",
+            displayName: "Premium",
             subtitle: "More controls",
             price: "4.99",
             visitorLimit: PLAN_LIMITS[PREMIUM_PLAN],
@@ -638,7 +651,7 @@ export default function PricingPage() {
             price: "7.99",
             visitorLimit: PLAN_LIMITS[PLUS_PLAN],
             features: [
-                "Everything in Pro",
+                "Everything in Premium",
                 "Higher monthly limit",
                 "Dedicated support",
                 "High traffic priority",

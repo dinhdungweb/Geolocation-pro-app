@@ -43,6 +43,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           billingPeriodEnd: null,
           billingSubscriptionId: null,
           billingUsageLineItemId: null,
+          onboardingInstallAt: new Date(),
         },
       }),
     ]);

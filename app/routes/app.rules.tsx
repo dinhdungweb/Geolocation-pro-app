@@ -28,7 +28,7 @@ import {
     Tooltip,
 } from "@shopify/polaris";
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
@@ -380,7 +380,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "import") {
             // Server-side plan check: paid plans can import
             if (!hasProPlan) {
-                return json({ success: false, message: "Import is only available on Pro plan and above" }, { status: 403 });
+                return json({ success: false, message: "Import is only available on Premium plan and above" }, { status: 403 });
             }
 
             const rulesJson = formData.get("rulesJson") as string;
@@ -451,6 +451,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function RulesPage() {
     const { rules, hasProPlan, conflictSummary, markets, marketsError, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
+    const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
@@ -475,6 +476,13 @@ export default function RulesPage() {
     const [timezone, setTimezone] = useState("Asia/Ho_Chi_Minh");
     const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
     const [pagePaths, setPagePaths] = useState("");
+
+    useEffect(() => {
+        if (fetcher.state !== "idle" || !fetcher.data?.message) return;
+        shopify.toast.show(fetcher.data.message, {
+            isError: fetcher.data.success === false,
+        });
+    }, [fetcher.data, fetcher.state, shopify]);
 
     // Autocomplete state
     const [inputValue, setInputValue] = useState("");
@@ -1030,7 +1038,7 @@ export default function RulesPage() {
                     @media (max-width: 47.9975em) {
                         .rules-table-wrap .Polaris-IndexTable,
                         .rules-table-wrap .Polaris-IndexTable__Table {
-                            min-width: 1280px;
+                            min-width: 880px;
                         }
                     }
                 `}
@@ -1218,7 +1226,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>State/Region</span>
-                                                    <Badge tone="warning">Pro</Badge>
+                                                    <Badge tone="warning">Premium</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -1242,7 +1250,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>Shopify Market</span>
-                                                    <Badge tone="warning">Pro</Badge>
+                                                    <Badge tone="warning">Premium</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -1557,7 +1565,7 @@ export default function RulesPage() {
                                         label={
                                             <InlineStack gap="200">
                                                 <span>Block Access</span>
-                                                {!hasProPlan && <Badge tone="warning">Pro</Badge>}
+                                                {!hasProPlan && <Badge tone="warning">Premium</Badge>}
                                             </InlineStack>
                                         }
                                         checked={formRuleType === "block"}
@@ -1690,7 +1698,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>Specific Pages</span>
-                                                    <Badge tone="warning">Pro</Badge>
+                                                    <Badge tone="warning">Premium</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -1714,7 +1722,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>Exclude Pages</span>
-                                                    <Badge tone="warning">Pro</Badge>
+                                                    <Badge tone="warning">Premium</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}

@@ -1063,6 +1063,15 @@ export default function App() {
       <style>
         {`
           @media (max-width: 30em) {
+            body:has(.Polaris-Modal-Dialog__Container) .crisp-client,
+            body:has([role="dialog"]) .crisp-client {
+              display: none !important;
+            }
+            .app-route-frame {
+              width: 100%;
+              min-width: 0;
+              overflow-x: clip;
+            }
             .app-route-frame > .Polaris-Page {
               box-sizing: border-box;
               padding-left: var(--p-space-400, 16px) !important;
@@ -1088,6 +1097,17 @@ export default function App() {
             }
             .app-route-frame > .Polaris-Page .Polaris-Banner--withinPage::before {
               border-radius: var(--p-border-radius-200, 8px) !important;
+            }
+            .app-route-frame .Polaris-InlineStack {
+              max-width: 100%;
+            }
+            .app-route-frame .Polaris-Text--root,
+            .app-route-frame p,
+            .app-route-frame li {
+              overflow-wrap: anywhere;
+            }
+            .app-route-frame .Polaris-Modal-Dialog__Modal {
+              max-width: calc(100vw - 16px);
             }
           }
         `}

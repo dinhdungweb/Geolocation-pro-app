@@ -11,6 +11,18 @@ export const ALL_PLANS = [FREE_PLAN, PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN, UNLIMI
 export const STANDARD_PAID_PLANS = [PREMIUM_PLAN, PLUS_PLAN, ELITE_PLAN];
 export const DEFAULT_TRIAL_DAYS = 3;
 
+export const SHOPIFY_BILLING_PLAN_NAMES = {
+    [PREMIUM_PLAN]: PREMIUM_PLAN,
+    [PLUS_PLAN]: "Plus",
+    [ELITE_PLAN]: "Elite",
+    [UNLIMITED_PLAN]: "Unlimited",
+    [CUSTOM_PLAN]: "Custom plan",
+} as const;
+
+export function getShopifyBillingPlanName(plan: string) {
+    return SHOPIFY_BILLING_PLAN_NAMES[plan as keyof typeof SHOPIFY_BILLING_PLAN_NAMES] || plan;
+}
+
 // Visitor limits per plan
 export const PLAN_LIMITS = {
     [FREE_PLAN]: 100,

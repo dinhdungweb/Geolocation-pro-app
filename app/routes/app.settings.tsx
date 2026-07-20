@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
@@ -387,6 +387,9 @@ export default function SettingsPage() {
                 submittedSnapshotRef.current = null;
             }
             shopify.toast.show("Settings saved!");
+        } else if (fetcher.data?.message) {
+            submittedSnapshotRef.current = null;
+            shopify.toast.show(fetcher.data.message, { isError: true });
         }
     }, [fetcher.data, shopify]);
 

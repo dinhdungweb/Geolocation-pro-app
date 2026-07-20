@@ -4,6 +4,7 @@ import db from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { fetchShopifyUsagePeriod, syncUsagePeriodForShop } from "../utils/billing-period.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { normalizePlanName } from "../utils/effective-plan.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { payload, topic, shop } = await authenticate.webhook(request);
@@ -17,7 +18,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // If status is ACTIVE, use the subscription name, otherwise fallback to FREE_PLAN
     let currentPlan = FREE_PLAN;
     if (appSubscription && appSubscription.status === "ACTIVE") {
-        currentPlan = appSubscription.name;
+        currentPlan = normalizePlanName(appSubscription.name);
     }
 
     console.log(`[Subscription Update] Shop ${shop} plan updated to: ${currentPlan} (Status: ${appSubscription?.status})`);

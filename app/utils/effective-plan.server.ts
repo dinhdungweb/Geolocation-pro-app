@@ -26,7 +26,10 @@ type BillingOverrideSettings = {
 };
 
 export function normalizePlanName(plan?: string | null): PlanName {
-  return ALL_PLANS.includes(plan as PlanName) ? (plan as PlanName) : FREE_PLAN;
+  const normalized = plan?.trim().toLowerCase();
+  if (normalized === "pro") return PREMIUM_PLAN;
+  if (normalized === "custom plan") return CUSTOM_PLAN;
+  return ALL_PLANS.includes(normalized as PlanName) ? (normalized as PlanName) : FREE_PLAN;
 }
 
 export function normalizeBillingOverridePlan(plan?: string | null): BillingOverridePlan | null {
