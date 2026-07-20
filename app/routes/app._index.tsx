@@ -14,7 +14,7 @@ import {
   ProgressBar,
   Icon,
 } from "@shopify/polaris";
-import { CheckIcon, XIcon } from "@shopify/polaris-icons";
+import { CheckIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { apiVersion, authenticate } from "../shopify.server";
 import {
@@ -496,7 +496,7 @@ export default function Index() {
   const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [setupConfirmed, setSetupConfirmed] = useState(false);
-  const [setupDismissed, setSetupDismissed] = useState(false);
+  const [setupDismissed, setSetupDismissed] = useState<boolean | null>(null);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
   const hasScheduledPermissionRefresh = useRef(false);
   const installKey = `${shop}:${onboardingInstallAt}`;
@@ -1202,7 +1202,7 @@ export default function Index() {
           </InlineStack>
         </div>
 
-        {!setupDismissed && (
+        {setupDismissed === false && (
           <Card padding="0">
             <div className="setup-guide-card">
               <BlockStack gap="400">
@@ -1216,14 +1216,13 @@ export default function Index() {
                     <Badge>{`${completedSetupSteps} / ${setupSteps.length} completed`}</Badge>
                   </div>
                 </BlockStack>
-                  <div className="setup-guide-header-actions">
-                    <Button
-                      variant="plain"
-                      icon={XIcon}
-                      accessibilityLabel="Dismiss setup guide"
-                      onClick={handleDismissSetup}
-                    />
-                  </div>
+                  {completedSetupSteps === setupSteps.length && (
+                    <div className="setup-guide-header-actions">
+                      <Button variant="primary" onClick={handleDismissSetup}>
+                        Finish
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
               <div className="setup-guide-steps">
