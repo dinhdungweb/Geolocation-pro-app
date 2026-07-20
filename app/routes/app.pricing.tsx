@@ -527,20 +527,15 @@ function PlanCard({
                                         </span>
                                     )}
                                 </div>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                    {isFree
-                                        ? "No monthly or usage charges"
-                                        : hasTrial
-                                            ? `${trialDays ?? DEFAULT_TRIAL_DAYS}-day free trial, then $${price} USD every 30 days`
-                                            : `$${price} USD every 30 days`}
-                                </Text>
-                                {!isFree && (
+                                {isFree ? (
                                     <Text as="p" variant="bodySm" tone="subdued">
-                                        {noOverage
-                                            ? "No usage-based overage charges"
-                                            : `After included visitors: $${OVERAGE_RATE.toFixed(3)} USD per visitor, capped at $${OVERAGE_MONTHLY_CAP_AMOUNT.toFixed(2)} USD per 30 days`}
+                                        No monthly or usage charges
                                     </Text>
-                                )}
+                                ) : hasTrial ? (
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        {`${trialDays ?? DEFAULT_TRIAL_DAYS}-day free trial`}
+                                    </Text>
+                                ) : null}
                             </BlockStack>
                         </BlockStack>
 
