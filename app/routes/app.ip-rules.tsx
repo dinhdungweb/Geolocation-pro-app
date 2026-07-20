@@ -308,12 +308,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function IPRulesPage() {
     const { rules, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
+    const formFetcher = useFetcher<typeof action>();
+    const importFetcher = useFetcher<typeof action>();
+    const deleteFetcher = useFetcher<typeof action>();
     const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<IPRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -334,6 +338,25 @@ export default function IPRulesPage() {
         });
     }, [fetcher.data, fetcher.state, shopify]);
 
+    useEffect(() => {
+        if (formFetcher.state !== "idle" || !formFetcher.data?.message) return;
+        shopify.toast.show(formFetcher.data.message, { isError: formFetcher.data.success === false });
+        if (formFetcher.data.success) {
+            setModalOpen(false);
+            setEditingRule(null);
+        }
+    }, [formFetcher.data, formFetcher.state, shopify]);
+
+    useEffect(() => {
+        if (importFetcher.state !== "idle" || !importFetcher.data?.message) return;
+        shopify.toast.show(importFetcher.data.message, { isError: importFetcher.data.success === false });
+        if (importFetcher.data.success) {
+            setImportModalOpen(false);
+            setImportData("");
+            setImportFileName("");
+        }
+    }, [importFetcher.data, importFetcher.state, shopify]);
+
     const resourceName = {
         singular: "IP rule",
         plural: "IP rules",
@@ -343,6 +366,15 @@ export default function IPRulesPage() {
         useIndexResourceState(rules);
     const conflictsByRuleId = conflictSummary?.byRuleId || {};
     const conflictTotal = conflictSummary?.total || 0;
+
+    useEffect(() => {
+        if (deleteFetcher.state !== "idle" || !deleteFetcher.data?.message) return;
+        shopify.toast.show(deleteFetcher.data.message, { isError: deleteFetcher.data.success === false });
+        if (deleteFetcher.data.success) {
+            setDeleteModalOpen(false);
+            clearSelection();
+        }
+    }, [clearSelection, deleteFetcher.data, deleteFetcher.state, shopify]);
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -392,11 +424,10 @@ export default function IPRulesPage() {
         formData.append("pageTargetingType", pageTargetingType[0]);
         formData.append("pagePaths", pagePaths);
 
-        fetcher.submit(formData, { method: "POST" });
-        handleCloseModal();
+        formFetcher.submit(formData, { method: "POST" });
     }, [
         editingRule, formName, formIPAddresses, formTargetUrl, formPriority,
-        formRuleType, formRedirectMode, pageTargetingType, pagePaths, fetcher, handleCloseModal
+        formRuleType, formRedirectMode, pageTargetingType, pagePaths, formFetcher
     ]);
 
     const handleToggle = useCallback(
@@ -412,12 +443,16 @@ export default function IPRulesPage() {
 
     const handleBulkDelete = useCallback(() => {
         if (!hasProPlan || selectedResources.length === 0) return;
+        setDeleteModalOpen(true);
+    }, [hasProPlan, selectedResources]);
+
+    const handleConfirmBulkDelete = useCallback(() => {
+        if (!hasProPlan || selectedResources.length === 0) return;
         const formData = new FormData();
         formData.append("intent", "delete");
         formData.append("ids", selectedResources.join(","));
-        fetcher.submit(formData, { method: "POST" });
-        clearSelection();
-    }, [hasProPlan, selectedResources, fetcher, clearSelection]);
+        deleteFetcher.submit(formData, { method: "POST" });
+    }, [hasProPlan, selectedResources, deleteFetcher]);
 
     // --- Export Rules ---
     const handleExportRules = useCallback((exportAll: boolean) => {
@@ -466,11 +501,8 @@ export default function IPRulesPage() {
         const formData = new FormData();
         formData.append("intent", "import");
         formData.append("rulesJson", importData);
-        fetcher.submit(formData, { method: "POST" });
-        setImportModalOpen(false);
-        setImportData("");
-        setImportFileName("");
-    }, [importData, fetcher]);
+        importFetcher.submit(formData, { method: "POST" });
+    }, [importData, importFetcher]);
 
     const promotedBulkActions = [
         {
@@ -811,7 +843,8 @@ export default function IPRulesPage() {
                 primaryAction={{
                     content: editingRule ? "Save" : "Create",
                     onAction: handleSubmit,
-                    disabled: !hasNormalizedIPs || !formName || (formRuleType === "redirect" && !formTargetUrl),
+                    loading: formFetcher.state !== "idle",
+                    disabled: formFetcher.state !== "idle" || !hasNormalizedIPs || !formName || (formRuleType === "redirect" && !formTargetUrl),
                 }}
                 secondaryActions={[
                     {
@@ -821,6 +854,10 @@ export default function IPRulesPage() {
                 ]}
             >
                 <Modal.Section>
+                    <BlockStack gap="400">
+                    {formFetcher.state === "idle" && formFetcher.data?.success === false && (
+                        <Banner tone="critical">{formFetcher.data.message}</Banner>
+                    )}
                     <FormLayout>
                         <TextField
                             label="Rule Name"
@@ -919,6 +956,7 @@ export default function IPRulesPage() {
                             )}
                         </BlockStack>
                     </FormLayout>
+                    </BlockStack>
                 </Modal.Section>
             </Modal>
 
@@ -930,7 +968,8 @@ export default function IPRulesPage() {
                 primaryAction={{
                     content: "Import",
                     onAction: handleImportSubmit,
-                    disabled: !importData,
+                    loading: importFetcher.state !== "idle",
+                    disabled: importFetcher.state !== "idle" || !importData,
                 }}
                 secondaryActions={[
                     {
@@ -941,6 +980,9 @@ export default function IPRulesPage() {
             >
                 <Modal.Section>
                     <BlockStack gap="400">
+                        {importFetcher.state === "idle" && importFetcher.data?.success === false && (
+                            <Banner tone="critical">{importFetcher.data.message}</Banner>
+                        )}
                         <Text as="p">
                             Upload a JSON file containing IP rules to import. The file should be in the same format as the exported file.
                         </Text>
@@ -990,6 +1032,30 @@ export default function IPRulesPage() {
                                 </p>
                             </Banner>
                         )}
+                    </BlockStack>
+                </Modal.Section>
+            </Modal>
+
+            <Modal
+                open={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                title="Delete selected IP rules?"
+                primaryAction={{
+                    content: `Delete ${selectedResources.length} IP rule${selectedResources.length === 1 ? "" : "s"}`,
+                    destructive: true,
+                    loading: deleteFetcher.state !== "idle",
+                    onAction: handleConfirmBulkDelete,
+                }}
+                secondaryActions={[{ content: "Cancel", onAction: () => setDeleteModalOpen(false) }]}
+            >
+                <Modal.Section>
+                    <BlockStack gap="300">
+                        {deleteFetcher.state === "idle" && deleteFetcher.data?.success === false && (
+                            <Banner tone="critical">{deleteFetcher.data.message}</Banner>
+                        )}
+                        <Text as="p">
+                            This action cannot be undone. The selected IP rules will stop affecting your storefront immediately.
+                        </Text>
                     </BlockStack>
                 </Modal.Section>
             </Modal>

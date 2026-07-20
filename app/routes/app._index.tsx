@@ -14,8 +14,8 @@ import {
   ProgressBar,
   Icon,
 } from "@shopify/polaris";
-import { CheckIcon } from "@shopify/polaris-icons";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { apiVersion, authenticate } from "../shopify.server";
 import {
   FREE_PLAN,
@@ -58,9 +58,7 @@ const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: str
 
 const CUSTOM_PLAN_REQUEST_ACTION = { content: "Request custom plan", url: "/app/pricing" };
 const APP_EMBED_BLOCK_HANDLE = "geolocation-popup";
-const SETUP_CONFIRMED_KEY = "geo_dashboard_setup_confirmed";
 const SETUP_DISMISSED_KEY = "geo_dashboard_setup_dismissed";
-const REVIEW_URL = "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal";
 
 type AppEmbedStatusState = "enabled" | "disabled" | "missing_scope" | "unavailable";
 
@@ -494,26 +492,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Index() {
   const { shop, onboardingInstallAt, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData, totalCountries } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
-  const shopify = useAppBridge();
-  const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [setupDismissed, setSetupDismissed] = useState<boolean | null>(null);
+  const [setupCollapsed, setSetupCollapsed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
   const hasScheduledPermissionRefresh = useRef(false);
   const installKey = `${shop}:${onboardingInstallAt}`;
-  const setupConfirmedKey = `${SETUP_CONFIRMED_KEY}:${installKey}`;
   const setupDismissedKey = `${SETUP_DISMISSED_KEY}:${installKey}`;
 
   useEffect(() => {
     try {
-      localStorage.removeItem(SETUP_CONFIRMED_KEY);
       localStorage.removeItem(SETUP_DISMISSED_KEY);
-      setSetupConfirmed(localStorage.getItem(setupConfirmedKey) === "true");
       setSetupDismissed(localStorage.getItem(setupDismissedKey) === "true");
     } catch {
-      setSetupConfirmed(false);
       setSetupDismissed(false);
     }
-  }, [setupConfirmedKey, setupDismissedKey]);
+  }, [setupDismissedKey]);
 
   useEffect(() => {
     if (appEmbedStatus.state !== "missing_scope") {
@@ -605,26 +598,6 @@ export default function Index() {
     window.open(`https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps`, '_blank');
   };
 
-  const handleConfirmSetup = useCallback(async () => {
-    setSetupConfirmed(true);
-    try {
-      localStorage.removeItem(SETUP_CONFIRMED_KEY);
-      localStorage.setItem(setupConfirmedKey, "true");
-    } catch {}
-
-    try {
-      const reviewsApi = (shopify as any).reviews;
-      if (reviewsApi && typeof reviewsApi.request === "function") {
-        await reviewsApi.request();
-        return;
-      }
-    } catch {
-      // Fall back to opening the App Store review URL when App Bridge reviews are unavailable.
-    }
-
-    window.open(REVIEW_URL, "_blank");
-  }, [shopify, setupConfirmedKey]);
-
   const handleDismissSetup = useCallback(() => {
     setSetupDismissed(true);
     try {
@@ -634,7 +607,7 @@ export default function Index() {
   }, [setupDismissedKey]);
 
   const setupSteps: Array<{
-    id: "embed" | "rule" | "logs" | "confirm";
+    id: "embed" | "rule" | "logs";
     title: string;
     completed: boolean;
     status: string;
@@ -661,15 +634,8 @@ export default function Index() {
       status: stats.hasVisitorLogs ? "Available" : "No logs yet",
       statusTone: stats.hasVisitorLogs ? "success" : "attention",
     },
-    {
-      id: "confirm",
-      title: "Confirm",
-      completed: setupConfirmed,
-      status: setupConfirmed ? "Confirmed" : "Pending",
-      statusTone: setupConfirmed ? "success" : "attention",
-    },
   ];
-  const activeSetupStep = activeSetupStepId || setupSteps.find((step) => !step.completed)?.id || "confirm";
+  const activeSetupStep = activeSetupStepId || setupSteps.find((step) => !step.completed)?.id || "logs";
   const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
   const totalBlockedActions = blocksData.reduce((sum: number, item: any) => sum + Number(item.blocked || 0), 0);
   const totalPopupSeen = popupsData.reduce((sum: number, item: any) => sum + Number(item.seen || 0), 0);
@@ -961,6 +927,7 @@ export default function Index() {
           .setup-guide-header-actions {
             display: flex;
             align-items: flex-start;
+            gap: 8px;
             flex: 0 0 auto;
           }
           .dashboard-summary-value {
@@ -1238,16 +1205,21 @@ export default function Index() {
                     <Badge>{`${completedSetupSteps} / ${setupSteps.length} completed`}</Badge>
                   </div>
                 </BlockStack>
-                  {completedSetupSteps === setupSteps.length && (
-                    <div className="setup-guide-header-actions">
+                  <div className="setup-guide-header-actions">
+                    {completedSetupSteps === setupSteps.length && (
                       <Button variant="primary" onClick={handleDismissSetup}>
                         Finish
                       </Button>
-                    </div>
-                  )}
+                    )}
+                    <Button
+                      icon={setupCollapsed ? ChevronDownIcon : ChevronUpIcon}
+                      onClick={() => setSetupCollapsed((collapsed) => !collapsed)}
+                      accessibilityLabel={setupCollapsed ? "Expand setup guide" : "Collapse setup guide"}
+                    />
+                  </div>
                 </div>
 
-              <div className="setup-guide-steps">
+              {!setupCollapsed && <div className="setup-guide-steps">
                 {setupSteps.map((step) => {
                   const isActive = activeSetupStep === step.id;
 
@@ -1328,25 +1300,12 @@ export default function Index() {
                             </BlockStack>
                           )}
 
-                          {step.id === "confirm" && (
-                            <BlockStack gap="300">
-                              <Text as="p" variant="bodyMd" tone="subdued">
-                                Confirm your store once the app embed, rules, and visitor logs look correct.
-                              </Text>
-                              <InlineStack gap="200">
-                                <Button variant="primary" onClick={handleConfirmSetup}>
-                                  Yes, it's working
-                                </Button>
-                                <Button url="/app/support">Contact support</Button>
-                              </InlineStack>
-                            </BlockStack>
-                          )}
                         </div>
                       )}
                     </div>
                   );
                 })}
-              </div>
+              </div>}
               </BlockStack>
             </div>
           </Card>
