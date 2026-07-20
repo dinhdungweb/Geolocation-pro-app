@@ -931,7 +931,7 @@ export default function Index() {
             flex: 0 0 auto;
           }
           .dashboard-summary-value {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             font-variant-numeric: tabular-nums;
             line-height: 1.2;
@@ -1125,7 +1125,7 @@ export default function Index() {
               gap: var(--p-space-400, 16px);
             }
             .dashboard-summary-grid {
-              grid-template-columns: 1fr;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
             }
             .setup-guide-card,
             .dashboard-usage-card,
