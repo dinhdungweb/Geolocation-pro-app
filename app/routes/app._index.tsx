@@ -1175,7 +1175,7 @@ export default function Index() {
           </BlockStack>
         </div>
 
-        <Card padding="0">
+        {setupDismissed === true && <Card padding="0">
           <div className="dashboard-app-embed-status">
             <Text as="p" variant="bodyMd">
               <strong>Geo: Redirect</strong>{" "}
@@ -1189,7 +1189,7 @@ export default function Index() {
               <Button onClick={handleOpenThemeEditor}>Enable</Button>
             )}
           </div>
-        </Card>
+        </Card>}
 
         {setupDismissed === false && (
           <Card padding="0">

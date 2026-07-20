@@ -17,6 +17,7 @@ import {
     Popover,
     Select,
     TextField,
+    useBreakpoints,
 } from "@shopify/polaris";
 import { CalendarIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
@@ -593,6 +594,7 @@ export default function VisitorLogs() {
     const { filters, visitorLogsData } = useLoaderData<typeof loader>();
     const navigation = useNavigation();
     const [searchParams, setSearchParams] = useSearchParams();
+    const { smUp } = useBreakpoints();
     const searchParamsString = searchParams.toString();
     const today = startOfDay(new Date());
     const effectiveDateParams = getEffectiveLogDateParams(filters, today);
@@ -858,6 +860,7 @@ export default function VisitorLogs() {
                             onClearButtonClick={() => setQueryDraft("")}
                         />
                     </div>
+                    <div className="visitor-log-filter-date-wrap">
                     <Popover
                         active={datePopoverActive}
                         activator={
@@ -945,7 +948,7 @@ export default function VisitorLogs() {
                                             >
                                                 <LazyDatePicker
                                                     allowRange
-                                                    multiMonth
+                                                    multiMonth={smUp}
                                                     month={datePickerMonth}
                                                     year={datePickerYear}
                                                     selected={draftDatePreset === "all" ? undefined : draftDateRange}
@@ -966,6 +969,7 @@ export default function VisitorLogs() {
                             </div>
                         ) : null}
                     </Popover>
+                    </div>
                     <div className="visitor-log-filter-select">
                         <Select
                             label="Country"
@@ -1075,12 +1079,14 @@ export default function VisitorLogs() {
 
         if (logs.length === 0) {
             return (
-                <EmptyState
-                    heading="No logs found"
-                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                    <p>Visitor activity will appear here.</p>
-                </EmptyState>
+                <div className="visitor-log-empty-state">
+                    <EmptyState
+                        heading="No logs found"
+                        image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                    >
+                        <p>Visitor activity will appear here.</p>
+                    </EmptyState>
+                </div>
             );
         }
 
@@ -1334,6 +1340,9 @@ export default function VisitorLogs() {
                     .visitor-log-date-filter {
                         display: inline-flex;
                     }
+                    .visitor-log-filter-date-wrap {
+                        min-width: 0;
+                    }
                     .visitor-log-date-filter .Polaris-Button {
                         background: var(--p-color-bg-fill, #ffffff);
                         border: none;
@@ -1450,6 +1459,9 @@ export default function VisitorLogs() {
                     .visitor-log-filter-clear {
                         display: inline-flex;
                     }
+                    .visitor-log-empty-state {
+                        min-height: 320px;
+                    }
                     @media (max-width: 47.9975em) {
                         .visitor-log-page-content {
                             padding-bottom: 88px;
@@ -1477,9 +1489,21 @@ export default function VisitorLogs() {
                             flex-direction: column;
                         }
                         .visitor-log-filter-bar {
+                            display: grid;
+                            grid-template-columns: repeat(2, minmax(0, 1fr));
                             align-items: stretch;
                         }
-                        .visitor-log-filter-search,
+                        .visitor-log-filter-search {
+                            grid-column: 1 / -1;
+                        }
+                        .visitor-log-filter-date-wrap {
+                            grid-column: 1 / -1;
+                            width: 100%;
+                        }
+                        .visitor-log-date-filter,
+                        .visitor-log-date-filter .Polaris-Button {
+                            width: 100%;
+                        }
                         .visitor-log-filter-select {
                             width: 100%;
                             max-width: none;
@@ -1496,6 +1520,38 @@ export default function VisitorLogs() {
                         }
                         .visitor-log-date-calendar {
                             overflow: visible;
+                        }
+                        .visitor-log-filter-clear {
+                            grid-column: 1 / -1;
+                            justify-content: flex-end;
+                        }
+                        .visitor-log-empty-state {
+                            min-height: 220px;
+                        }
+                        .visitor-log-empty-state .Polaris-EmptyState {
+                            padding: 24px 16px;
+                        }
+                        .visitor-log-empty-state .Polaris-EmptyState__ImageContainer,
+                        .visitor-log-empty-state .Polaris-EmptyState__Image {
+                            max-width: 112px;
+                        }
+                        .visitor-log-table-wrap {
+                            max-width: 100%;
+                            overscroll-behavior-x: contain;
+                        }
+                        .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer {
+                            overflow-x: auto;
+                            -webkit-overflow-scrolling: touch;
+                        }
+                    }
+                    @media (max-width: 24em) {
+                        .visitor-log-filter-bar {
+                            grid-template-columns: 1fr;
+                        }
+                        .visitor-log-filter-search,
+                        .visitor-log-filter-date-wrap,
+                        .visitor-log-filter-clear {
+                            grid-column: 1;
                         }
                     }
                 `}
