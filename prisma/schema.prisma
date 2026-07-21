@@ -295,6 +295,7 @@ model AdminEmailLog {
   id        String   @id @default(uuid())
   shop      String
   type      String
+  deliveryKey String? @unique
   subject   String?
   status    String   @default("sent")
   error     String?

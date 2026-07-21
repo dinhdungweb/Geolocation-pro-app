@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
+import { Prisma } from '@prisma/client';
 import prisma from '../db.server';
 import { replaceEmailVariables } from './email-parser';
 import { decryptSecret } from './secret-crypto.server';
@@ -15,6 +16,39 @@ export type EmailType = 'welcome' | 'limit_80' | 'limit_100' | 'limit_unlimited'
 
 function getEmailLogType(type: EmailType, dedupeKey?: string) {
     return dedupeKey ? `${type}:${dedupeKey}` : type;
+}
+
+async function reserveAutomatedEmailDelivery({
+    shop,
+    type,
+    subject,
+    html,
+}: {
+    shop: string;
+    type: string;
+    subject: string;
+    html: string;
+}) {
+    const deliveryKey = `${shop}:${type}`;
+
+    try {
+        return await prisma.adminEmailLog.create({
+            data: { shop, type, deliveryKey, subject, html, status: 'pending' },
+        });
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            const retried = await prisma.adminEmailLog.updateMany({
+                where: { deliveryKey, status: 'failed' },
+                data: { status: 'pending', error: null, subject, html },
+            });
+            if (retried.count > 0) {
+                return prisma.adminEmailLog.findUnique({ where: { deliveryKey } });
+            }
+            console.log(`[Email Service] Skipping duplicate delivery ${deliveryKey}`);
+            return null;
+        }
+        throw error;
+    }
 }
 
 async function fetchAndStoreShopEmail(shop: string, accessToken: string) {
@@ -168,6 +202,32 @@ export async function sendAdminEmail({
 
     const senderName = settings?.emailSenderName || "Geo Admin";
     const senderEmail = settings?.emailSenderEmail || DEFAULT_SENDER;
+    const reservation = type === 'manual'
+        ? null
+        : await reserveAutomatedEmailDelivery({
+            shop,
+            type: logType,
+            subject: finalSubject,
+            html: finalHtml,
+        });
+
+    if (type !== 'manual' && !reservation) {
+        return { success: true, skipped: true, reason: 'duplicate' };
+    }
+
+    const recordDeliveryResult = async (status: string, error?: string) => {
+        if (reservation) {
+            await prisma.adminEmailLog.update({
+                where: { id: reservation.id },
+                data: { status, error },
+            });
+            return;
+        }
+
+        await prisma.adminEmailLog.create({
+            data: { shop, type: logType, subject: finalSubject, html: finalHtml, status, error },
+        });
+    };
 
     try {
         // Option 1: SMTP Transporter
@@ -190,9 +250,7 @@ export async function sendAdminEmail({
                 html: finalHtml,
             });
 
-            await prisma.adminEmailLog.create({
-                data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'sent' }
-            });
+            await recordDeliveryResult('sent');
             return { success: true };
         }
 
@@ -206,30 +264,22 @@ export async function sendAdminEmail({
             });
 
             if (error) {
-                await prisma.adminEmailLog.create({
-                    data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'failed', error: JSON.stringify(error) }
-                });
+                await recordDeliveryResult('failed', JSON.stringify(error));
                 return { success: false, error };
             }
 
-            await prisma.adminEmailLog.create({
-                data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'sent' }
-            });
+            await recordDeliveryResult('sent');
             return { success: true, data };
         }
 
         // Fallback: Simulation
         console.log(`[Email Simulation] TO: ${recipient} | SUBJECT: ${finalSubject}`);
-        await prisma.adminEmailLog.create({
-            data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'simulated' }
-        });
+        await recordDeliveryResult('simulated');
         
         return { success: true, simulated: true };
     } catch (err: any) {
         console.error(`[Email Service] Error:`, err);
-        await prisma.adminEmailLog.create({
-            data: { shop, type: logType, subject: finalSubject, html: finalHtml, status: 'failed', error: err.message }
-        });
+        await recordDeliveryResult('failed', err.message);
         return { success: false, error: err.message };
     }
 }
