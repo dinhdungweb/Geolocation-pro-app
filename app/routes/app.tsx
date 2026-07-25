@@ -2,10 +2,10 @@ import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { isRouteErrorResponse, Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
+import { EmbeddedAppProviders } from "../components/embedded-app-providers";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 
@@ -1059,7 +1059,7 @@ export default function App() {
   }, [location.pathname, location.search]);
 
   return (
-    <AppProvider embedded apiKey={apiKey}>
+    <EmbeddedAppProviders apiKey={apiKey}>
       <style>
         {`
           @media (max-width: 30em) {
@@ -1126,7 +1126,7 @@ export default function App() {
       <div className="app-route-frame">
         {pendingShell || <Outlet />}
       </div>
-    </AppProvider>
+    </EmbeddedAppProviders>
   );
 }
 
