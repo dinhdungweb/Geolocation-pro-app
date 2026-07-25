@@ -23,7 +23,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { isBillingTestMode } from "../utils/billing-mode.server";
-import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
@@ -187,7 +187,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         logContext: `${shop} settings loader`,
     });
 
-    const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
+    const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+        billingCheck,
+        settings?.currentPlan,
+    );
 
     // Create default settings if not exists
     if (!settings) {
@@ -223,7 +226,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             fallbackPlan: settings?.currentPlan,
             logContext: `${shop} settings action`,
         });
-        const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
+        const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+            billingCheck,
+            settings?.currentPlan,
+        );
         const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
         const isFreePlan = effectivePlan === FREE_PLAN;
 

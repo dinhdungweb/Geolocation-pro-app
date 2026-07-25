@@ -275,6 +275,48 @@ describe("Shopify webhook cleanup integration", () => {
     });
   });
 
+  it("keeps Plus when Shopify briefly returns no active plan after declining Elite", async () => {
+    await seedShop(subscriptionShop);
+    await prisma.settings.update({
+      where: { shop: subscriptionShop },
+      data: {
+        billingPlanName: "plus",
+        billingSubscriptionId: "gid://shopify/AppSubscription/plus",
+        currentPlan: "plus",
+      },
+    });
+    webhookAuth.mockResolvedValue({
+      admin: adminWithActiveSubscriptions([]),
+      payload: {
+        app_subscription: {
+          id: "gid://shopify/AppSubscription/elite-pending",
+          name: "Elite",
+          status: "DECLINED",
+        },
+      },
+      shop: subscriptionShop,
+      topic: "APP_SUBSCRIPTIONS_UPDATE",
+    } as never);
+
+    const response = await subscriptionUpdateAction({
+      context: {},
+      params: {},
+      request: webhookRequest("APP_SUBSCRIPTIONS_UPDATE", subscriptionShop),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect(
+      await prisma.settings.findUniqueOrThrow({
+        where: { shop: subscriptionShop },
+      }),
+    ).toMatchObject({
+      billingPlanName: "plus",
+      billingSubscriptionId: "gid://shopify/AppSubscription/plus",
+      blockVpn: true,
+      currentPlan: "plus",
+    });
+  });
+
   it("uses Elite when the old Plus cancellation webhook arrives after an upgrade", async () => {
     await seedShop(subscriptionShop);
     await prisma.settings.update({

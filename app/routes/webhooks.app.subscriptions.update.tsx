@@ -71,6 +71,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         const activeSubscription = await fetchActiveSubscription(admin);
+        const eventStatus = String(appSubscription?.status || "").toUpperCase();
+        const eventPlan = normalizePlanName(appSubscription?.name);
+        const storedPlan = normalizePlanName(existingSettings?.currentPlan);
+        const shouldPreserveStoredPaidPlan = Boolean(
+            !activeSubscription &&
+            existingSettings &&
+            storedPlan !== FREE_PLAN &&
+            (
+                ["PENDING", "DECLINED", "EXPIRED"].includes(eventStatus) ||
+                (eventPlan !== FREE_PLAN && eventPlan !== storedPlan)
+            ),
+        );
+
         if (!existingSettings && !activeSubscription) {
             invalidateStorefrontConfigCache(shop);
             console.log(`[Subscription Update] Ignored inactive subscription update for unknown shop ${shop}`);
@@ -79,17 +92,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         const currentPlan = activeSubscription
             ? normalizePlanName(activeSubscription.name)
-            : FREE_PLAN;
+            : shouldPreserveStoredPaidPlan
+                ? storedPlan
+                : FREE_PLAN;
         const hasBillingOverride = Boolean(existingSettings?.billingOverrideEnabled && existingSettings?.billingOverridePlan);
 
         console.log(
             `[Subscription Update] Shop ${shop} authoritative plan: ${currentPlan} ` +
-            `(Event: ${appSubscription?.name || "unknown"} ${appSubscription?.status || "unknown"})`,
+            `(Event: ${appSubscription?.name || "unknown"} ${appSubscription?.status || "unknown"}, ` +
+            `source: ${activeSubscription ? "activeSubscriptions" : shouldPreserveStoredPaidPlan ? "stored-plan-grace" : "no-active-subscription"})`,
         );
 
         await db.settings.upsert({
             where: { shop },
-            update: activeSubscription
+            update: activeSubscription || shouldPreserveStoredPaidPlan
                 ? { currentPlan }
                 : {
                     currentPlan,

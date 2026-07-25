@@ -37,7 +37,7 @@ import {
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/billing.server";
-import { getShopifyPlanFromBillingCheck, normalizePlanName, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getStableShopifyPlanFromBillingCheck, normalizePlanName, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 function getShopifyBillingErrorData(error: unknown) {
@@ -91,7 +91,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         logContext: `${session.shop} pricing loader`,
     });
 
-    const shopifyPlan = getShopifyPlanFromBillingCheck(billingCheck);
+    const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+        billingCheck,
+        existingSettings?.currentPlan,
+    );
     const settings = await prisma.settings.upsert({
         where: { shop: session.shop },
         update: { currentPlan: shopifyPlan },
