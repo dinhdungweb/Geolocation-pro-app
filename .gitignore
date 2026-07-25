@@ -15,11 +15,11 @@ data/*.mmdb
 
 .env
 .env.*
+!.env.example
 !.env.test.example
 
-
-
-
+/backups
+/.runtime
 
 /extensions/*/dist
 
