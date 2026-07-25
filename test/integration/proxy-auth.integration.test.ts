@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../app/db.server";
 import { authenticate } from "../../app/shopify.server";
 import { action as analyticsAction } from "../../app/routes/proxy.analytics";
-import { loader as configLoader } from "../../app/routes/proxy.config";
+import {
+  action as configAction,
+  loader as configLoader,
+} from "../../app/routes/proxy.config";
 
 vi.mock("../../app/shopify.server", () => ({
   authenticate: {
@@ -34,6 +37,29 @@ afterEach(async () => {
 });
 
 describe("app proxy authentication integration", () => {
+  it("answers proxy CORS preflight requests without authentication", async () => {
+    const analyticsResponse = await analyticsAction({
+      context: {},
+      params: {},
+      request: new Request("https://app.test/proxy/analytics", {
+        method: "OPTIONS",
+      }),
+    } as never);
+    const configResponse = await configAction({
+      context: {},
+      params: {},
+      request: new Request("https://app.test/proxy/config", {
+        method: "OPTIONS",
+      }),
+    } as never);
+
+    expect(analyticsResponse.status).toBe(204);
+    expect(analyticsResponse.headers.get("access-control-allow-origin")).toBe("*");
+    expect(configResponse.status).toBe(204);
+    expect(configResponse.headers.get("access-control-allow-origin")).toBe("*");
+    expect(appProxyAuth).not.toHaveBeenCalled();
+  });
+
   it("rejects config requests without a shop before authentication", async () => {
     const response = await configLoader({
       context: {},

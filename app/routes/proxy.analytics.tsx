@@ -1,5 +1,4 @@
-import { json } from "@remix-run/node";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -29,6 +28,10 @@ const VALID_TYPES = [
   "dismissed",
   "vpn_blocked",
 ];
+
+function responseData<T>(payload: T, init?: ResponseInit) {
+  return Response.json(payload, init);
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,13 +84,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (request.method !== "POST") {
-    return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
+    return responseData({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
   }
 
   try {
     await authenticate.public.appProxy(request);
   } catch {
-    return json({ error: "Unauthorized: Invalid signature" }, { status: 401, headers: corsHeaders });
+    return responseData({ error: "Unauthorized: Invalid signature" }, { status: 401, headers: corsHeaders });
   }
 
   try {
@@ -98,11 +101,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const type = asSafeString(data.type, 40);
 
     if (!shop || !type) {
-      return json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
+      return responseData({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 
     if (!VALID_TYPES.includes(type)) {
-      return json({ error: "Invalid event type" }, { status: 400, headers: corsHeaders });
+      return responseData({ error: "Invalid event type" }, { status: 400, headers: corsHeaders });
     }
 
     const settings = await prisma.settings.findUnique({
@@ -110,10 +113,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       select: { id: true, isEnabled: true, mode: true },
     });
     if (!settings) {
-      return json({ error: "Unauthorized: Invalid shop" }, { status: 401, headers: corsHeaders });
+      return responseData({ error: "Unauthorized: Invalid shop" }, { status: 401, headers: corsHeaders });
     }
     if (!settings.isEnabled || settings.mode === "disabled") {
-      return json({ success: true, logged: false, reason: "disabled" }, { headers: corsHeaders });
+      return responseData({ success: true, logged: false, reason: "disabled" }, { headers: corsHeaders });
     }
 
     let tokenPayload: AnalyticsTokenPayload | null = null;
@@ -121,21 +124,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     tokenPayload = token ? verifyAnalyticsToken(token) : null;
 
     if (!tokenPayload) {
-      return json({ error: "Missing or invalid analytics token" }, { status: 401, headers: corsHeaders });
+      return responseData({ error: "Missing or invalid analytics token" }, { status: 401, headers: corsHeaders });
     }
     if (tokenPayload.shop !== shop || tokenPayload.ipHash !== hashIP(visitorIP)) {
-      return json({ error: "Analytics token does not match request" }, { status: 401, headers: corsHeaders });
+      return responseData({ error: "Analytics token does not match request" }, { status: 401, headers: corsHeaders });
     }
     if (!analyticsEventAllowedForToken(type, tokenPayload)) {
-      return json({ error: "Analytics event is not allowed for this token" }, { status: 400, headers: corsHeaders });
+      return responseData({ error: "Analytics event is not allowed for this token" }, { status: 400, headers: corsHeaders });
     }
     const bodyPath = asSafeString(data.path, 500);
     const bodyRuleId = asSafeString(data.ruleId, 100);
     if (bodyPath && bodyPath !== tokenPayload.path) {
-      return json({ error: "Analytics token path mismatch" }, { status: 401, headers: corsHeaders });
+      return responseData({ error: "Analytics token path mismatch" }, { status: 401, headers: corsHeaders });
     }
     if (bodyRuleId && bodyRuleId !== tokenPayload.ruleId) {
-      return json({ error: "Analytics token rule mismatch" }, { status: 401, headers: corsHeaders });
+      return responseData({ error: "Analytics token rule mismatch" }, { status: 401, headers: corsHeaders });
     }
 
     const hasRegionCodeField = Object.prototype.hasOwnProperty.call(data, "regionCode");
@@ -175,16 +178,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (type === "visit") {
       const queued = await enqueueStorefrontAnalyticsEvent(analyticsInput);
-      return json({ success: true, queued }, { headers: corsHeaders });
+      return responseData({ success: true, queued }, { headers: corsHeaders });
     }
 
     await recordStorefrontAnalyticsEvent(analyticsInput);
 
-    return json({ success: true }, { headers: corsHeaders });
+    return responseData({ success: true }, { headers: corsHeaders });
   } catch (error) {
     if (error instanceof Response) return error;
     console.error("Analytics Error:", error);
-    return json({ error: "Internal Server Error" }, { status: 500, headers: corsHeaders });
+    return responseData({ error: "Internal Server Error" }, { status: 500, headers: corsHeaders });
   }
 };
 
@@ -192,5 +195,5 @@ export const loader = async ({ request }: ActionFunctionArgs) => {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-  return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
+  return responseData({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
 };

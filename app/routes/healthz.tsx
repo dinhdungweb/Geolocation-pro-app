@@ -1,7 +1,10 @@
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 
-export async function loader({ request: _request }: LoaderFunctionArgs) {
+function responseData<T>(payload: T, init?: ResponseInit) {
+  return Response.json(payload, init);
+}
+
+export async function loader() {
   const headers = {
     "Cache-Control": "no-store",
     "Content-Type": "application/json; charset=utf-8",
@@ -9,9 +12,9 @@ export async function loader({ request: _request }: LoaderFunctionArgs) {
 
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return json({ status: "ok" }, { headers });
+    return responseData({ status: "ok" }, { headers });
   } catch (error) {
     console.error("[Health] Database check failed:", error);
-    return json({ status: "unavailable" }, { status: 503, headers });
+    return responseData({ status: "unavailable" }, { status: 503, headers });
   }
 }

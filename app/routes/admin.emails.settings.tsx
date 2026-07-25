@@ -1,6 +1,6 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Form, useActionData, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Form, useActionData, useLoaderData } from "react-router";
 import { Bell, CheckCircle, Mail, Shield } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
@@ -21,7 +21,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Prisma error in Settings loader:", error);
   }
 
-  return json({ settings });
+  return responseData({ settings });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -65,10 +65,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     });
 
-    return json({ success: true });
+    return responseData({ success: true });
   } catch (error: any) {
     console.error("Failed to save email settings:", error);
-    return json(
+    return responseData(
       { success: false, error: error.message || "Failed to save settings" },
       { status: 500 },
     );

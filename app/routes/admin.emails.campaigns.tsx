@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { useState } from "react";
 import {
   AlertCircle,
@@ -22,10 +22,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const campaigns = await prisma.campaign.findMany({
       orderBy: { createdAt: "desc" },
     });
-    return json({ campaigns });
+    return responseData({ campaigns });
   } catch (error) {
     console.error("Error loading campaigns:", error);
-    return json({ campaigns: [] });
+    return responseData({ campaigns: [] });
   }
 };
 

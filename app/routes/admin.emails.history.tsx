@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useLoaderData } from "react-router";
 import {
   AlertCircle,
   ArrowUpDown,
@@ -24,10 +24,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    return json({ logs });
+    return responseData({ logs });
   } catch (error) {
     console.error("Error loading email logs:", error);
-    return json({ logs: [] });
+    return responseData({ logs: [] });
   }
 };
 

@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useLoaderData } from "react-router";
 import { Gem, Store, TrendingUp } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
@@ -148,7 +148,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return items;
     }, []);
 
-    return json<AdminDashboardLoaderData>({
+    return responseData<AdminDashboardLoaderData>({
       stats: {
         totalShops,
         activeRules,
@@ -163,7 +163,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
   } catch (error) {
     console.error("Dashboard Loader Error:", error);
-    return json<AdminDashboardLoaderData>({
+    return responseData<AdminDashboardLoaderData>({
       stats: {
         totalShops: 0,
         activeRules: 0,

@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return `${date.getMonth() + 1}/${date.getDate()}`;
   });
 
-  return json({
+  return responseData({
     stats: {
       email: {
         sent: totalSent.toLocaleString(),

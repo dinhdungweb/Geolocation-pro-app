@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData, useRevalidator } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 import {
   Page,
   Card,
@@ -17,6 +17,7 @@ import {
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { apiVersion, authenticate } from "../shopify.server";
+export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
   FREE_PLAN,
   PREMIUM_PLAN,
@@ -452,7 +453,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     blocked: stat._sum.blocked || 0
   })) : [];
 
-  return json({
+  return responseData({
     shop,
     onboardingInstallAt: settings.onboardingInstallAt.toISOString(),
     hasProPlan: currentPlan !== FREE_PLAN,

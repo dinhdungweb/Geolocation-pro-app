@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { isRouteErrorResponse, Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "@remix-run/react";
-import { boundary } from "@shopify/shopify-app-remix/server";
-import { AppProvider } from "@shopify/shopify-app-remix/react";
+import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
+import { boundary } from "@shopify/shopify-app-react-router/server";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
+import { EmbeddedAppProviders } from "../components/embedded-app-providers";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 
@@ -1059,7 +1059,7 @@ export default function App() {
   }, [location.pathname, location.search]);
 
   return (
-    <AppProvider isEmbeddedApp apiKey={apiKey}>
+    <EmbeddedAppProviders apiKey={apiKey}>
       <style>
         {`
           @media (max-width: 30em) {
@@ -1126,58 +1126,13 @@ export default function App() {
       <div className="app-route-frame">
         {pendingShell || <Outlet />}
       </div>
-    </AppProvider>
+    </EmbeddedAppProviders>
   );
 }
 
-function EmbeddedAuthRecovery() {
-  const location = useLocation();
-
-  useEffect(() => {
-    const retryKey = `geo-auth-recovery:${location.pathname}${location.search}`;
-    const lastRetryAt = Number(window.sessionStorage.getItem(retryKey) || "0");
-
-    if (Date.now() - lastRetryAt < 10000) return;
-
-    window.sessionStorage.setItem(retryKey, String(Date.now()));
-
-    async function recoverEmbeddedSession() {
-      try {
-        const token = await window.shopify?.idToken?.();
-
-        if (token) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("id_token", token);
-          window.location.replace(`${url.pathname}${url.search}${url.hash}`);
-          return;
-        }
-      } catch (error) {
-        console.warn("[ShopifyAuth] Failed to refresh embedded id token", error);
-      }
-
-      window.location.reload();
-    }
-
-    recoverEmbeddedSession();
-  }, [location.pathname, location.search]);
-
-  return (
-    <div style={{ padding: "32px", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      <h2 style={{ margin: "0 0 8px", fontSize: "20px" }}>Reconnecting to Shopify</h2>
-      <p style={{ margin: 0, color: "#616161" }}>Refreshing the embedded app session.</p>
-    </div>
-  );
-}
-
-// Shopify needs Remix to catch some thrown responses, so that their headers are included in the response.
+// Shopify needs React Router to catch thrown responses so their headers are included.
 export function ErrorBoundary() {
-  const error = useRouteError();
-
-  if (isRouteErrorResponse(error) && error.status === 401) {
-    return <EmbeddedAuthRecovery />;
-  }
-
-  return boundary.error(error);
+  return boundary.error(useRouteError());
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
