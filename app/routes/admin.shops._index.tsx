@@ -338,7 +338,7 @@ export default function AdminShops() {
         />
       </div>
 
-      <style>{`
+      <style suppressHydrationWarning>{`
         .ed-shops {
           display: grid;
           gap: var(--ed-space-2);

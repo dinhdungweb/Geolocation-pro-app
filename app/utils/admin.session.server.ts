@@ -59,7 +59,10 @@ export const adminSessionStorage = createCookieSessionStorage({
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        path: "/admin",
+        // React Router client navigations for /admin use /admin.data. A cookie
+        // scoped to /admin is not sent to that sibling path, which makes an
+        // authenticated navigation look logged out until a full page refresh.
+        path: "/",
         maxAge: SESSION_MAX_AGE,
         secrets: [ADMIN_SESSION_SECRET],
     },
