@@ -327,7 +327,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <style>{`
+      <style suppressHydrationWarning>{`
         .ed-dashboard {
           width: 100%;
           min-width: 0;

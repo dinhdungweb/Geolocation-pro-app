@@ -81,7 +81,7 @@ export default function AdminLogin() {
 
   return (
     <div className="ed-login-screen">
-      <style>{`
+      <style suppressHydrationWarning>{`
         @import url('https://fonts.cdnfonts.com/css/futura-pt');
         @import url('https://fonts.cdnfonts.com/css/futura-std-4');
         @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap');
