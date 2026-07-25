@@ -79,7 +79,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             existingSettings &&
             storedPlan !== FREE_PLAN &&
             (
-                ["PENDING", "DECLINED", "EXPIRED"].includes(eventStatus) ||
+                // Shopify documents CANCELLED as an ambiguous terminal state:
+                // it can mean that a replacement subscription was activated,
+                // that the app was uninstalled, or that the app cancelled the
+                // subscription directly. A replacement flow can also briefly
+                // return no activeSubscriptions while its confirmation page is
+                // being left. The explicit Free action and APP_UNINSTALLED
+                // webhook already own real paid-to-Free transitions, so this
+                // partial event must not downgrade a known paid shop.
+                ["PENDING", "DECLINED", "EXPIRED", "CANCELLED"].includes(eventStatus) ||
                 (eventPlan !== FREE_PLAN && eventPlan !== storedPlan)
             ),
         );

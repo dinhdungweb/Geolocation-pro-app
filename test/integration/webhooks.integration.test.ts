@@ -359,22 +359,108 @@ describe("Shopify webhook cleanup integration", () => {
     });
   });
 
-  it("moves to Free only when Shopify reports no active subscription", async () => {
+  it("keeps Plus when cancelling an Elite replacement briefly hides the active subscription", async () => {
     await seedShop(subscriptionShop);
     await prisma.settings.update({
       where: { shop: subscriptionShop },
       data: {
-        billingPlanName: "elite",
-        billingSubscriptionId: "gid://shopify/AppSubscription/elite",
+        currentPlan: "plus",
+        billingPlanName: "plus",
+        billingSubscriptionId: "gid://shopify/AppSubscription/plus",
       },
     });
     webhookAuth.mockResolvedValue({
       admin: adminWithActiveSubscriptions([]),
       payload: {
         app_subscription: {
-          id: "gid://shopify/AppSubscription/elite",
-          name: "Elite",
+          id: "gid://shopify/AppSubscription/plus",
+          name: "Plus",
           status: "CANCELLED",
+        },
+      },
+      shop: subscriptionShop,
+      topic: "APP_SUBSCRIPTIONS_UPDATE",
+    } as never);
+
+    const response = await subscriptionUpdateAction({
+      context: {},
+      params: {},
+      request: webhookRequest("APP_SUBSCRIPTIONS_UPDATE", subscriptionShop),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect(
+      await prisma.settings.findUniqueOrThrow({
+        where: { shop: subscriptionShop },
+      }),
+    ).toMatchObject({
+      billingPlanName: "plus",
+      billingSubscriptionId: "gid://shopify/AppSubscription/plus",
+      blockVpn: true,
+      currentPlan: "plus",
+    });
+  });
+
+  it("keeps Free when the explicit downgrade already updated the database", async () => {
+    await seedShop(subscriptionShop);
+    await prisma.settings.update({
+      where: { shop: subscriptionShop },
+      data: {
+        currentPlan: "free",
+        billingPlanName: null,
+        billingSubscriptionId: null,
+        blockVpn: false,
+      },
+    });
+    webhookAuth.mockResolvedValue({
+      admin: adminWithActiveSubscriptions([]),
+      payload: {
+        app_subscription: {
+          id: "gid://shopify/AppSubscription/plus",
+          name: "Plus",
+          status: "CANCELLED",
+        },
+      },
+      shop: subscriptionShop,
+      topic: "APP_SUBSCRIPTIONS_UPDATE",
+    } as never);
+
+    const response = await subscriptionUpdateAction({
+      context: {},
+      params: {},
+      request: webhookRequest("APP_SUBSCRIPTIONS_UPDATE", subscriptionShop),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect(
+      await prisma.settings.findUniqueOrThrow({
+        where: { shop: subscriptionShop },
+      }),
+    ).toMatchObject({
+      billingPlanName: null,
+      billingSubscriptionId: null,
+      blockVpn: false,
+      currentPlan: "free",
+    });
+  });
+
+  it("moves a frozen paid subscription to Free when Shopify reports no active subscription", async () => {
+    await seedShop(subscriptionShop);
+    await prisma.settings.update({
+      where: { shop: subscriptionShop },
+      data: {
+        billingPlanName: "plus",
+        billingSubscriptionId: "gid://shopify/AppSubscription/plus",
+        currentPlan: "plus",
+      },
+    });
+    webhookAuth.mockResolvedValue({
+      admin: adminWithActiveSubscriptions([]),
+      payload: {
+        app_subscription: {
+          id: "gid://shopify/AppSubscription/plus",
+          name: "Plus",
+          status: "FROZEN",
         },
       },
       shop: subscriptionShop,
