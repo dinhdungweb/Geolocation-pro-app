@@ -42,6 +42,24 @@ export function getShopifyPlanFromBillingCheck(billingCheck: any): PlanName {
   return normalizePlanName(billingCheck?.appSubscriptions?.[0]?.name || FREE_PLAN);
 }
 
+export function getStableShopifyPlanFromBillingCheck(
+  billingCheck: any,
+  storedPlan?: string | null,
+): PlanName {
+  const checkedPlan = getShopifyPlanFromBillingCheck(billingCheck);
+  const normalizedStoredPlan = normalizePlanName(storedPlan);
+
+  // Shopify can briefly return an empty active-subscription list while a
+  // merchant is leaving a replacement-plan confirmation page. Explicit Free
+  // actions and subscription webhooks own paid-to-Free transitions, so a
+  // request loader must not erase a known paid plan from one empty read.
+  if (checkedPlan === FREE_PLAN && normalizedStoredPlan !== FREE_PLAN) {
+    return normalizedStoredPlan;
+  }
+
+  return checkedPlan;
+}
+
 export function resolveEffectivePlan({
   settings,
   shopifyPlan,

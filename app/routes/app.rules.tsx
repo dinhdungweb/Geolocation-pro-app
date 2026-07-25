@@ -35,7 +35,7 @@ import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
 import { getShopifyMarkets } from "../utils/shopify-markets.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
-import { getShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getStableShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
@@ -110,7 +110,10 @@ function validateUrl(url: string) {
 }
 
 function isPaidBillingConfig(billingConfig: any, settings: any) {
-    const shopifyPlan = getShopifyPlanFromBillingCheck(billingConfig);
+    const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+        billingConfig,
+        settings?.currentPlan,
+    );
     const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
     return hasPaidPlanAccess(effectivePlan) || billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 }

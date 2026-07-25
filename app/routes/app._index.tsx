@@ -32,7 +32,7 @@ import { COUNTRY_MAP } from "../utils/countries";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
-import { getShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
+import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 // Helper to get country name (simplified version of the one in app.rules.tsx)
@@ -366,7 +366,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }),
   ]);
 
-  const shopifyPlan = getShopifyPlanFromBillingCheck(billingConfig);
+  const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+    billingConfig,
+    settings.currentPlan,
+  );
   const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
     settings,
     shopifyPlan,
