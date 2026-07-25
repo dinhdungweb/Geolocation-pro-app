@@ -3,6 +3,7 @@ node_modules
 
 /.cache
 /build
+/coverage
 /app/build
 /public/build/
 /public/_dev
