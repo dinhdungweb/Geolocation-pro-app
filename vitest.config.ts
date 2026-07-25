@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["app/**/*.test.ts"],
+    exclude: ["app/**/*.integration.test.ts"],
     restoreMocks: true,
     coverage: {
       provider: "v8",

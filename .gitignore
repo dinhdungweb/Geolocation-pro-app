@@ -15,6 +15,7 @@ data/*.mmdb
 
 .env
 .env.*
+!.env.test.example
 
 
 

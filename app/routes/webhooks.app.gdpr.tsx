@@ -30,12 +30,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log(`[GDPR] Received ${topic} webhook for ${shop}`);
 
         switch (topic) {
+            case "CUSTOMERS_DATA_REQUEST":
             case "customers/data_request":
                 // This app stores visitor IPs and user agents in VisitorLog.
                 // These could be considered personal data under GDPR.
                 console.log(`[GDPR] Customer Data Request received from ${shop}.`);
                 break;
 
+            case "CUSTOMERS_REDACT":
             case "customers/redact":
                 // This app doesn't directly link data to Shopify customer IDs,
                 // but VisitorLog contains IP addresses which are PII.
@@ -43,6 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 console.log(`[GDPR] Customer Redact Request received from ${shop}. No customer-linked data stored.`);
                 break;
 
+            case "SHOP_REDACT":
             case "shop/redact":
                 console.log(`[GDPR] Shop Redact Request received for ${shop}. Queueing cleanup job...`);
                 stage = "enqueue_cleanup";
