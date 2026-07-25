@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
+export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
     Page,
     Layout,

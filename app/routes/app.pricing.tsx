@@ -11,8 +11,9 @@ import {
     Badge,
 } from "@shopify/polaris";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { data as responseData, redirect } from "react-router";
+import { data as responseData } from "react-router";
 import { Link, useLoaderData, useNavigation, useSearchParams, useSubmit } from "react-router";
+export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { ArrowLeftIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -39,31 +40,6 @@ import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/bil
 import { getShopifyPlanFromBillingCheck, normalizePlanName, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
-function redirectToBillingConfirmation(request: Request, shop: string, confirmationUrl: string) {
-    const requestUrl = new URL(request.url);
-
-    if (request.headers.get("authorization")) {
-        throw new Response(undefined, {
-            status: 401,
-            statusText: "Unauthorized",
-            headers: {
-                "X-Shopify-API-Request-Failure-Reauthorize-Url": confirmationUrl,
-            },
-        });
-    }
-
-    if (requestUrl.searchParams.get("embedded") === "1" && requestUrl.searchParams.get("host")) {
-        const params = new URLSearchParams({
-            shop,
-            host: requestUrl.searchParams.get("host")!,
-            exitIframe: confirmationUrl,
-        });
-        throw redirect(`/auth/exit-iframe?${params.toString()}`);
-    }
-
-    throw redirect(confirmationUrl);
-}
-
 function getShopifyBillingErrorData(error: unknown) {
     if (!error || typeof error !== "object") return undefined;
 
@@ -85,7 +61,7 @@ function getBillingErrorMessage(error: unknown) {
     return "Shopify could not create the billing confirmation.";
 }
 
-function redirectToPricingWithBillingError(request: Request, message: string) {
+function pricingUrlWithBillingError(request: Request, message: string) {
     const requestUrl = new URL(request.url);
     const params = new URLSearchParams();
     params.set("billingError", message);
@@ -98,7 +74,7 @@ function redirectToPricingWithBillingError(request: Request, message: string) {
     if (host) params.set("host", host);
     if (embedded) params.set("embedded", embedded);
 
-    throw redirect(`/app/pricing?${params.toString()}`);
+    return `/app/pricing?${params.toString()}`;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -158,7 +134,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { billing, session, admin } = await authenticate.admin(request);
+    const {
+        billing,
+        session,
+        admin,
+        redirect: shopifyRedirect,
+    } = await authenticate.admin(request);
     const shop = session.shop;
     const isTest = isBillingTestMode();
     const formData = await request.formData();
@@ -283,7 +264,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return responseData({ error: "Shopify did not return a billing confirmation URL" }, { status: 500 });
             }
 
-            redirectToBillingConfirmation(request, shop, confirmationUrl);
+            return shopifyRedirect(confirmationUrl, { target: "_top" });
         }
 
         // Handling Downgrade to Free Plan
@@ -407,7 +388,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     errorData: getShopifyBillingErrorData(error),
                 });
 
-                redirectToPricingWithBillingError(request, getBillingErrorMessage(error));
+                return shopifyRedirect(
+                    pricingUrlWithBillingError(
+                        request,
+                        getBillingErrorMessage(error),
+                    ),
+                );
             }
 
             try {

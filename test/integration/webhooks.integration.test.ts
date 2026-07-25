@@ -3,6 +3,8 @@ import prisma from "../../app/db.server";
 import { authenticate } from "../../app/shopify.server";
 import { processPendingShopCleanupJobs } from "../../app/utils/cleanup.server";
 import { action as gdprAction } from "../../app/routes/webhooks.app.gdpr";
+import { action as scopesUpdateAction } from "../../app/routes/webhooks.app.scopes_update";
+import { action as subscriptionUpdateAction } from "../../app/routes/webhooks.app.subscriptions.update";
 import { action as uninstallAction } from "../../app/routes/webhooks.app.uninstalled";
 
 vi.mock("../../app/shopify.server", () => ({
@@ -11,8 +13,15 @@ vi.mock("../../app/shopify.server", () => ({
   },
 }));
 
+vi.mock("../../app/utils/billing-period.server", () => ({
+  fetchShopifyUsagePeriod: vi.fn().mockResolvedValue(null),
+  syncUsagePeriodForShop: vi.fn(),
+}));
+
 const uninstallShop = "uninstall-webhook.integration.test";
 const redactShop = "redact-webhook.integration.test";
+const subscriptionShop = "subscription-webhook.integration.test";
+const scopesShop = "scopes-webhook.integration.test";
 const webhookAuth = vi.mocked(authenticate.webhook);
 
 function webhookRequest(topic: string, shop: string) {
@@ -80,6 +89,8 @@ afterEach(async () => {
   vi.clearAllMocks();
   await clearShop(uninstallShop);
   await clearShop(redactShop);
+  await clearShop(subscriptionShop);
+  await clearShop(scopesShop);
 });
 
 describe("Shopify webhook cleanup integration", () => {
@@ -164,5 +175,58 @@ describe("Shopify webhook cleanup integration", () => {
     expect(response.status).toBe(401);
     expect(await prisma.settings.count({ where: { shop: uninstallShop } })).toBe(1);
     expect(await prisma.shopCleanupJob.count({ where: { shop: uninstallShop } })).toBe(0);
+  });
+
+  it("syncs an active subscription plan from Shopify", async () => {
+    await seedShop(subscriptionShop);
+    webhookAuth.mockResolvedValue({
+      payload: {
+        app_subscription: {
+          name: "Plus",
+          status: "ACTIVE",
+        },
+      },
+      shop: subscriptionShop,
+      topic: "APP_SUBSCRIPTIONS_UPDATE",
+    } as never);
+
+    const response = await subscriptionUpdateAction({
+      context: {},
+      params: {},
+      request: webhookRequest("APP_SUBSCRIPTIONS_UPDATE", subscriptionShop),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect(
+      await prisma.settings.findUniqueOrThrow({
+        where: { shop: subscriptionShop },
+      }),
+    ).toMatchObject({ currentPlan: "plus" });
+  });
+
+  it("updates stored session scopes after a Shopify scope change", async () => {
+    await seedShop(scopesShop);
+    const session = await prisma.session.findUniqueOrThrow({
+      where: { id: `offline_${scopesShop}` },
+    });
+    webhookAuth.mockResolvedValue({
+      payload: { current: ["read_markets", "read_themes"] },
+      session,
+      shop: scopesShop,
+      topic: "APP_SCOPES_UPDATE",
+    } as never);
+
+    const response = await scopesUpdateAction({
+      context: {},
+      params: {},
+      request: webhookRequest("APP_SCOPES_UPDATE", scopesShop),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect(
+      await prisma.session.findUniqueOrThrow({
+        where: { id: session.id },
+      }),
+    ).toMatchObject({ scope: "read_markets,read_themes" });
   });
 });

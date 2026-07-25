@@ -21,6 +21,7 @@ import {
 import { CalendarIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import prisma from "../db.server";
 import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
 

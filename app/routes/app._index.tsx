@@ -17,6 +17,7 @@ import {
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { apiVersion, authenticate } from "../shopify.server";
+export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
   FREE_PLAN,
   PREMIUM_PLAN,
