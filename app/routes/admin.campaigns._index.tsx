@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useLoaderData } from "react-router";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 
@@ -33,7 +33,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     take: 10,
   });
 
-  return json({
+  return responseData({
     campaigns: ruleStats.map((rule: any) => ({
       ...rule,
       name: rule.ruleName,

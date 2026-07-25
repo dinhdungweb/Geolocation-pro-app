@@ -1,6 +1,6 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
 import { useMemo, useState } from "react";
 import { CheckCircle, Info, Plus, ShieldAlert, Store, Trash2, XCircle } from "lucide-react";
 import prisma from "../db.server";
@@ -20,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     select: { shop: true },
   });
 
-  return json({ blacklist, knownShops });
+  return responseData({ blacklist, knownShops });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -30,15 +30,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (action === "add") {
     const shop = formData.get("shop") as string;
-    if (!shop) return json({ error: "Shop domain is required" }, { status: 400 });
+    if (!shop) return responseData({ error: "Shop domain is required" }, { status: 400 });
 
     try {
       await prisma.emailBlacklist.create({
         data: { shop: shop.trim() },
       });
-      return json({ success: true, message: "Shop added to blacklist" });
+      return responseData({ success: true, message: "Shop added to blacklist" });
     } catch {
-      return json({ error: "Shop is already in the blacklist or an error occurred" }, { status: 400 });
+      return responseData({ error: "Shop is already in the blacklist or an error occurred" }, { status: 400 });
     }
   }
 
@@ -47,10 +47,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await prisma.emailBlacklist.delete({
       where: { id },
     });
-    return json({ success: true, message: "Shop removed from blacklist" });
+    return responseData({ success: true, message: "Shop removed from blacklist" });
   }
 
-  return json({});
+  return responseData({});
 };
 
 export default function EmailBlacklist() {

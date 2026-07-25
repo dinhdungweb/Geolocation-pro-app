@@ -1,5 +1,5 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
 import {
   Form,
   isRouteErrorResponse,
@@ -8,7 +8,7 @@ import {
   useLoaderData,
   useLocation,
   useRouteError,
-} from "@remix-run/react";
+} from "react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -34,11 +34,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
   if (url.pathname === "/admin/login") {
-    return json({ username: null });
+    return responseData({ username: null });
   }
 
   const session = await requireAdminAuth(request);
-  return json({ username: session.get("admin_username") });
+  return responseData({ username: session.get("admin_username") });
 };
 
 function getPageTitle(pathname: string) {

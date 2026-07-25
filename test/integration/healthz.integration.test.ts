@@ -3,11 +3,7 @@ import { loader } from "../../app/routes/healthz";
 
 describe("health endpoint", () => {
   it("reports ok when the application database is reachable", async () => {
-    const response = await loader({
-      request: new Request("http://localhost/healthz"),
-      context: {},
-      params: {},
-    });
+    const response = await loader();
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");

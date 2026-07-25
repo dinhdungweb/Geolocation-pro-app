@@ -10,9 +10,9 @@ import {
     InlineStack,
     Badge,
 } from "@shopify/polaris";
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { Link, useLoaderData, useNavigation, useSearchParams, useSubmit } from "@remix-run/react";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { data as responseData, redirect } from "react-router";
+import { Link, useLoaderData, useNavigation, useSearchParams, useSubmit } from "react-router";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { ArrowLeftIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -138,7 +138,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         shopifyPlan,
     });
 
-    return json({
+    return responseData({
         canUseUnlimitedPlan: Boolean(settings?.allowUnlimitedPlan) || currentPlan === UNLIMITED_PLAN,
         canUseCustomPlan: Boolean(settings?.customPlanEnabled) || currentPlan === CUSTOM_PLAN,
         customPlan: settings ? {
@@ -200,11 +200,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             const customPrice = Number(settings.customPlanPrice);
             if (!Number.isFinite(customPrice) || customPrice <= 0) {
-                return json({ error: "Custom plan price is invalid" }, { status: 400 });
+                return responseData({ error: "Custom plan price is invalid" }, { status: 400 });
             }
 
             if (!settings.customPlanNoOverage && !settings.customPlanVisitorLimit) {
-                return json({ error: "Custom plan visitor limit is required for overage billing" }, { status: 400 });
+                return responseData({ error: "Custom plan visitor limit is required for overage billing" }, { status: 400 });
             }
 
             const returnUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}/app/pricing`;
@@ -275,12 +275,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const data = await response.json();
             const userErrors = data?.data?.appSubscriptionCreate?.userErrors || [];
             if (userErrors.length > 0) {
-                return json({ error: userErrors[0].message }, { status: 400 });
+                return responseData({ error: userErrors[0].message }, { status: 400 });
             }
 
             const confirmationUrl = data?.data?.appSubscriptionCreate?.confirmationUrl;
             if (!confirmationUrl) {
-                return json({ error: "Shopify did not return a billing confirmation URL" }, { status: 500 });
+                return responseData({ error: "Shopify did not return a billing confirmation URL" }, { status: 500 });
             }
 
             redirectToBillingConfirmation(request, shop, confirmationUrl);

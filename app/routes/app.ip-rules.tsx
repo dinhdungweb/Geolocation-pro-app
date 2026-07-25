@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useFetcher, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import {
     Page,
     Layout,
@@ -105,7 +105,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const canCreateRule = hasProPlan;
     const conflictSummary = detectRuleConflicts(rules, "ip");
 
-    return json({
+    return responseData({
         rules,
         shop,
         hasProPlan,
@@ -132,17 +132,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (intent === "create") {
             if (!hasProPlan) {
-                return json({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
+                return responseData({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
             }
 
             const name = formData.get("name") as string;
             const ipAddresses = normalizeIPAddresses(formData.get("ipAddresses")).join(",");
             if (!ipAddresses) {
-                return json({ success: false, message: IP_REQUIRED_MESSAGE }, { status: 400 });
+                return responseData({ success: false, message: IP_REQUIRED_MESSAGE }, { status: 400 });
             }
             const targetUrl = formData.get("targetUrl") as string || "";
             if (!validateUrl(targetUrl)) {
-                return json({ success: false, message: "Invalid URL format" }, { status: 400 });
+                return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
@@ -167,23 +167,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             invalidateStorefrontConfigCache(shop);
-            return json({ success: true, message: "IP Rule created successfully" });
+            return responseData({ success: true, message: "IP Rule created successfully" });
         }
 
         if (intent === "update") {
             if (!hasProPlan) {
-                return json({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
+                return responseData({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
             }
 
             const id = formData.get("id") as string;
             const name = formData.get("name") as string;
             const ipAddresses = normalizeIPAddresses(formData.get("ipAddresses")).join(",");
             if (!ipAddresses) {
-                return json({ success: false, message: IP_REQUIRED_MESSAGE }, { status: 400 });
+                return responseData({ success: false, message: IP_REQUIRED_MESSAGE }, { status: 400 });
             }
             const targetUrl = formData.get("targetUrl") as string || "";
             if (!validateUrl(targetUrl)) {
-                return json({ success: false, message: "Invalid URL format" }, { status: 400 });
+                return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
@@ -205,12 +205,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             invalidateStorefrontConfigCache(shop);
-            return json({ success: true, message: "IP Rule updated successfully" });
+            return responseData({ success: true, message: "IP Rule updated successfully" });
         }
 
         if (intent === "toggle") {
             if (!hasProPlan) {
-                return json({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
+                return responseData({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
             }
 
             const id = formData.get("id") as string;
@@ -222,7 +222,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 data: { isActive: nextIsActive },
             });
             invalidateStorefrontConfigCache(shop);
-            return json({
+            return responseData({
                 success: true,
                 message: `IP Rule ${nextIsActive ? "enabled" : "disabled"} successfully`,
             });
@@ -230,35 +230,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (intent === "delete") {
             if (!hasProPlan) {
-                return json({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
+                return responseData({ success: false, message: "IP rules are available on paid plans only" }, { status: 403 });
             }
             const ids = (formData.get("ids") as string).split(",");
             await prisma.redirectRule.deleteMany({
                 where: { id: { in: ids }, shop },
             });
             invalidateStorefrontConfigCache(shop);
-            return json({ success: true, message: "IP Rule(s) deleted successfully" });
+            return responseData({ success: true, message: "IP Rule(s) deleted successfully" });
         }
 
         if (intent === "import") {
             // Server-side plan check: paid plans can import
             if (!hasProPlan) {
-                return json({ success: false, message: "Import is only available on Premium plan and above" }, { status: 403 });
+                return responseData({ success: false, message: "Import is only available on Premium plan and above" }, { status: 403 });
             }
 
             const rulesJson = formData.get("rulesJson") as string;
             if (!rulesJson) {
-                return json({ success: false, message: "No rules data provided" }, { status: 400 });
+                return responseData({ success: false, message: "No rules data provided" }, { status: 400 });
             }
 
             let importedRules: any[];
             try {
                 importedRules = JSON.parse(rulesJson);
                 if (!Array.isArray(importedRules)) {
-                    return json({ success: false, message: "Invalid format: expected an array of rules" }, { status: 400 });
+                    return responseData({ success: false, message: "Invalid format: expected an array of rules" }, { status: 400 });
                 }
             } catch {
-                return json({ success: false, message: "Invalid JSON format" }, { status: 400 });
+                return responseData({ success: false, message: "Invalid JSON format" }, { status: 400 });
             }
 
             let created = 0;
@@ -295,13 +295,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             const skippedMessage = skipped > 0 ? ` Skipped ${skipped} invalid IP rule(s).` : "";
             if (created > 0) invalidateStorefrontConfigCache(shop);
-            return json({ success: true, message: `Imported ${created} IP rule(s).${skippedMessage}` });
+            return responseData({ success: true, message: `Imported ${created} IP rule(s).${skippedMessage}` });
         }
 
-        return json({ success: false, message: "Unknown intent" });
+        return responseData({ success: false, message: "Unknown intent" });
     } catch (error) {
         console.error("Action error:", error);
-        return json({ success: false, message: "An error occurred" }, { status: 500 });
+        return responseData({ success: false, message: "An error occurred" }, { status: 500 });
     }
 };
 

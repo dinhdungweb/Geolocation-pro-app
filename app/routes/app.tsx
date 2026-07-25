@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { isRouteErrorResponse, Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "@remix-run/react";
-import { boundary } from "@shopify/shopify-app-remix/server";
-import { AppProvider } from "@shopify/shopify-app-remix/react";
+import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { isRouteErrorResponse, Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
+import { boundary } from "@shopify/shopify-app-react-router/server";
+import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
@@ -1059,7 +1059,7 @@ export default function App() {
   }, [location.pathname, location.search]);
 
   return (
-    <AppProvider isEmbeddedApp apiKey={apiKey}>
+    <AppProvider embedded apiKey={apiKey}>
       <style>
         {`
           @media (max-width: 30em) {
@@ -1169,7 +1169,7 @@ function EmbeddedAuthRecovery() {
   );
 }
 
-// Shopify needs Remix to catch some thrown responses, so that their headers are included in the response.
+// Shopify needs React Router to catch thrown responses so their headers are included.
 export function ErrorBoundary() {
   const error = useRouteError();
 

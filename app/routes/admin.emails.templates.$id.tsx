@@ -1,6 +1,6 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useFetcher, useNavigate } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData, redirect } from "react-router";
+import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { ensureDefaultEmailAssets } from "../utils/email-seeder.server";
@@ -36,7 +36,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             return redirect("/admin/emails/templates");
         }
 
-        return json({ template });
+        return responseData({ template });
     } catch (e) {
         console.error("Error loading template:", e);
         return redirect("/admin/emails/templates");
@@ -60,7 +60,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             data: { name, subject, config, html }
         });
 
-        return json({ success: true });
+        return responseData({ success: true });
     }
 
     if (action === "delete") {
@@ -70,7 +70,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return redirect("/admin/emails/templates");
     }
 
-    return json({ error: "Invalid action" });
+    return responseData({ error: "Invalid action" });
 };
 
 export default function TemplateEditor() {

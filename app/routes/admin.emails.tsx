@@ -1,11 +1,11 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Outlet } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Outlet } from "react-router";
 import { requireAdminAuth } from "../utils/admin.session.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     await requireAdminAuth(request);
-    return json({});
+    return responseData({});
 };
 
 export default function AdminEmailsLayout() {

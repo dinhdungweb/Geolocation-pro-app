@@ -19,7 +19,7 @@ GeoPro là ứng dụng Shopify embedded giúp cửa hàng điều hướng, hi�
 ## Công nghệ
 
 - Node.js, TypeScript và React 18
-- Shopify App Remix, App Bridge và Polaris
+- Shopify App React Router, App Bridge và Polaris
 - PostgreSQL với Prisma
 - Vite và Vitest
 - PM2 và Nginx cho production

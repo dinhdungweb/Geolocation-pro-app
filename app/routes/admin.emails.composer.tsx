@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import { useState, useMemo, useEffect } from "react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
@@ -78,7 +78,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const templates = await prisma.emailTemplate.findMany({ select: { id: true, name: true, subject: true, html: true } });
 
-    return json({ shops: shopMap, templates });
+    return responseData({ shops: shopMap, templates });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -90,7 +90,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const html = formData.get("body") as string;
 
     if (!selectedShops.length || !subject || !html) {
-        return json({ success: false, error: "Missing required fields (Shops, Subject, or HTML Body)." }, { status: 400 });
+        return responseData({ success: false, error: "Missing required fields (Shops, Subject, or HTML Body)." }, { status: 400 });
     }
 
     const results = [];
@@ -146,7 +146,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     });
 
-    return json({ 
+    return responseData({
         success: true, 
         message: `Campaign complete: ${successCount} successful, ${failCount} failed.` 
     });

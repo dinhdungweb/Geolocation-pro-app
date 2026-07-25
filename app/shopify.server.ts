@@ -1,12 +1,12 @@
 import "dotenv/config";
-import "@shopify/shopify-app-remix/adapters/node";
-import type { ApiVersion } from "@shopify/shopify-app-remix/server";
+import "@shopify/shopify-app-react-router/adapters/node";
+import type { ApiVersion } from "@shopify/shopify-app-react-router/server";
 import {
   AppDistribution,
   BillingInterval,
   LogSeverity,
   shopifyApp,
-} from "@shopify/shopify-app-remix/server";
+} from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
@@ -102,7 +102,6 @@ const shopify = shopifyApp({
     },
   },
   future: {
-    unstable_newEmbeddedAuthStrategy: true,
     expiringOfflineAccessTokens: true,
   },
   logger: {

@@ -1,6 +1,6 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { Form, useActionData, useNavigation } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData, redirect } from "react-router";
+import { Form, useActionData, useNavigation } from "react-router";
 import { AlertCircle, Globe, Loader2, Lock, User } from "lucide-react";
 import {
   adminSessionStorage,
@@ -18,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect("/admin");
   }
 
-  return json({});
+  return responseData({});
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -26,7 +26,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const rateCheck = checkRateLimit(ip);
 
   if (rateCheck.blocked) {
-    return json(
+    return responseData(
       {
         error: `Too many failed attempts. Try again in ${rateCheck.resetIn} minute(s).`,
       },
@@ -43,7 +43,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const newCheck = checkRateLimit(ip);
     const remaining = newCheck.remaining;
 
-    return json(
+    return responseData(
       {
         error:
           remaining > 0

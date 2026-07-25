@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useFetcher, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import {
     Page,
     Layout,
@@ -207,7 +207,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
     const isFreePlan = effectivePlan === FREE_PLAN;
 
-    return json({ settings, shop, isFreePlan });
+    return responseData({ settings, shop, isFreePlan });
 };
 
 // Action: Update settings
@@ -250,7 +250,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const blockVpn = !isFreePlan && formData.get("blockVpn") === "true";
 
         if ((blockedLogoUrl && isDangerousUrl(blockedLogoUrl)) || (blockedSupportUrl && isDangerousUrl(blockedSupportUrl))) {
-            return json({ success: false, message: "Blocked page URLs cannot use unsafe protocols" }, { status: 400 });
+            return responseData({ success: false, message: "Blocked page URLs cannot use unsafe protocols" }, { status: 400 });
         }
 
         await prisma.settings.upsert({
@@ -309,10 +309,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         invalidateStorefrontConfigCache(shop);
-        return json({ success: true, message: "Settings saved successfully" });
+        return responseData({ success: true, message: "Settings saved successfully" });
     } catch (error) {
         console.error("Settings save error:", error);
-        return json({ success: false, message: "Failed to save settings" }, { status: 500 });
+        return responseData({ success: false, message: "Failed to save settings" }, { status: 500 });
     }
 };
 

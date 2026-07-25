@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { Form, Link, useLoaderData, useActionData, useNavigation } from "@remix-run/react";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { data as responseData, redirect } from "react-router";
+import { Form, Link, useLoaderData, useActionData, useNavigation } from "react-router";
 import { useState, useEffect, useMemo } from "react";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
@@ -156,11 +156,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const description = formData.get("description") as string;
         
         if (isNaN(amount) || amount <= 0) {
-            return json({ success: false, error: "Invalid amount" }, { status: 400 });
+            return responseData({ success: false, error: "Invalid amount" }, { status: 400 });
         }
 
         const result = await issueApplicationCredit(shop, amount, description);
-        return json(result);
+        return responseData(result);
     }
 
     if (intent === "adjust_usage") {
@@ -168,7 +168,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const chargedVisitors = parseInt(formData.get("chargedVisitors") as string);
 
         if (isNaN(chargedVisitors) || !billingPeriodKey) {
-            return json({ success: false, error: "Invalid input" }, { status: 400 });
+            return responseData({ success: false, error: "Invalid input" }, { status: 400 });
         }
 
         try {
@@ -176,9 +176,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 where: { shop_billingPeriodKey: { shop, billingPeriodKey } },
                 data: { chargedVisitors }
             });
-            return json({ success: true, message: "Usage adjusted successfully" });
+            return responseData({ success: true, message: "Usage adjusted successfully" });
         } catch (e: any) {
-            return json({ success: false, error: e.message }, { status: 500 });
+            return responseData({ success: false, error: e.message }, { status: 500 });
         }
     }
 
@@ -190,7 +190,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const billingOverrideReason = ((formData.get("billingOverrideReason") as string) || "").trim();
 
         if (billingOverrideEnabled && !billingOverridePlan) {
-            return json({ success: false, error: "Select a valid override plan" }, { status: 400 });
+            return responseData({ success: false, error: "Select a valid override plan" }, { status: 400 });
         }
 
         try {
@@ -208,14 +208,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                     billingOverrideReason: billingOverrideEnabled ? billingOverrideReason || null : null,
                 },
             });
-            return json({
+            return responseData({
                 success: true,
                 message: billingOverrideEnabled
                     ? "Billing override enabled for this shop"
                     : "Billing override disabled for this shop",
             });
         } catch (e: any) {
-            return json({ success: false, error: e.message }, { status: 500 });
+            return responseData({ success: false, error: e.message }, { status: 500 });
         }
     }
 
@@ -229,19 +229,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const customPlanTrialDays = Number.parseInt((formData.get("customPlanTrialDays") as string) || String(DEFAULT_TRIAL_DAYS), 10);
 
         if (customPlanEnabled && (!Number.isFinite(customPlanPrice) || customPlanPrice <= 0)) {
-            return json({ success: false, error: "Custom plan price must be greater than 0" }, { status: 400 });
+            return responseData({ success: false, error: "Custom plan price must be greater than 0" }, { status: 400 });
         }
 
         if (visitorLimitInput && (customPlanVisitorLimit === null || !Number.isFinite(customPlanVisitorLimit) || customPlanVisitorLimit <= 0)) {
-            return json({ success: false, error: "Visitor limit must be a positive number or empty for unlimited" }, { status: 400 });
+            return responseData({ success: false, error: "Visitor limit must be a positive number or empty for unlimited" }, { status: 400 });
         }
 
         if (!customPlanNoOverage && !customPlanVisitorLimit) {
-            return json({ success: false, error: "Visitor limit is required when overage billing is enabled" }, { status: 400 });
+            return responseData({ success: false, error: "Visitor limit is required when overage billing is enabled" }, { status: 400 });
         }
 
         if (!Number.isFinite(customPlanTrialDays) || customPlanTrialDays < 0 || customPlanTrialDays > 90) {
-            return json({ success: false, error: "Trial days must be between 0 and 90" }, { status: 400 });
+            return responseData({ success: false, error: "Trial days must be between 0 and 90" }, { status: 400 });
         }
 
         try {
@@ -267,18 +267,18 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                     allowUnlimitedPlan: false,
                 },
             });
-            return json({
+            return responseData({
                 success: true,
                 message: customPlanEnabled
                     ? "Custom plan saved and made available to this shop"
                     : "Custom plan saved and hidden from this shop",
             });
         } catch (e: any) {
-            return json({ success: false, error: e.message }, { status: 500 });
+            return responseData({ success: false, error: e.message }, { status: 500 });
         }
     }
 
-    return json({ success: false, error: "Unknown intent" }, { status: 400 });
+    return responseData({ success: false, error: "Unknown intent" }, { status: 400 });
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -366,7 +366,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         return true;
     }).length;
 
-    return json({
+    return responseData({
         shop,
         hasSettings: !!settings,
         hasProPlan,

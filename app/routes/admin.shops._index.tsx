@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, Search, X } from "lucide-react";
 import { FREE_PLAN, hasUnlimitedUsage } from "../billing.config";
@@ -51,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const rulesMap = new Map(ruleCounts.map((rule: any) => [rule.shop, rule._count.id]));
   const usageMap = new Map((usage as any[]).map((row: any) => [`${row.shop}:${row.billingPeriodKey}`, row]));
 
-  return json({
+  return responseData({
     shops: shops.map((shop: any) => {
       const { effectivePlan, isBillingOverridden } = resolveEffectivePlan({
         settings: shop,

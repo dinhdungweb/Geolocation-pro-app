@@ -1,6 +1,5 @@
-import { defer } from "@remix-run/node";
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { Await, useLoaderData, useNavigation, useSearchParams } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { Await, useLoaderData, useNavigation, useSearchParams } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
     Page,
@@ -584,10 +583,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         dateScope: url.searchParams.get(DATE_SCOPE_PARAM) || "",
     };
 
-    return defer({
+    return {
         filters,
         visitorLogsData: loadVisitorLogsData(session.shop, filters, page),
-    });
+    };
 };
 
 export default function VisitorLogs() {

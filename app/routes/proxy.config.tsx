@@ -1,5 +1,4 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "react-router";
 import { isbot } from "isbot";
 import { FREE_PLAN, getPlanLimit } from "../billing.config";
 import prisma from "../db.server";
@@ -19,12 +18,17 @@ import {
   recordBillableUsage,
   startStorefrontAnalyticsQueueWorker,
 } from "../utils/storefront-analytics.server";
+
 import {
   getStorefrontConfigCache,
   setStorefrontConfigCache,
 } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPattern, splitPagePathPatterns } from "../utils/page-targeting";
 import { stateCodeMatchesRegion } from "../utils/states";
+
+function responseData<T>(payload: T, init?: ResponseInit) {
+  return Response.json(payload, init);
+}
 
 type ProxyRule = {
   id: string;
@@ -557,13 +561,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const debugRequested = url.searchParams.get("debug") === "true" || url.searchParams.get("geo_debug") === "true";
 
   if (!shop) {
-    return json({ error: "Missing shop parameter", enabled: false, action: "none" }, { status: 400, headers: corsHeaders });
+    return responseData({ error: "Missing shop parameter", enabled: false, action: "none" }, { status: 400, headers: corsHeaders });
   }
 
   try {
     await authenticate.public.appProxy(request);
   } catch {
-    return json({ error: "Unauthorized: Invalid signature", enabled: false, action: "none" }, { status: 401, headers: corsHeaders });
+    return responseData({ error: "Unauthorized: Invalid signature", enabled: false, action: "none" }, { status: 401, headers: corsHeaders });
   }
 
   const visitorIP = getVisitorIP(request);
@@ -621,7 +625,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const runtimeConfig = await loadStorefrontRuntimeConfig(shop);
     if (!runtimeConfig) {
-      return json(
+      return responseData(
         buildActionResponse({
           action: "none",
           analyticsEvent: null,
@@ -671,7 +675,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const visitToken = visitAnalytics.token;
 
     if (!settings.isEnabled || settings.mode === "disabled") {
-      return json(
+      return responseData(
         buildActionResponse({
           action: "none",
           analyticsEvent: null,
@@ -694,7 +698,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (currentPlan === FREE_PLAN && currentUsage >= planLimit) {
-      return json(
+      return responseData(
         buildActionResponse({
           action: "none",
           analyticsEvent: null,
@@ -718,7 +722,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (settings.excludeBots && isbot(request.headers.get("user-agent") || "")) {
-      return json(
+      return responseData(
         buildActionResponse({
           action: "none",
           analyticsEvent: null,
@@ -747,7 +751,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       .some((excludedIP: string) => isIPMatch(visitorIP, excludedIP));
 
     if (isIPExcluded) {
-      return json(
+      return responseData(
         buildActionResponse({
           action: "none",
           analyticsEvent: null,
@@ -899,7 +903,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       isAlreadyOnTargetUrl(selectedRule.targetUrl, currentPath, currentOrigin);
 
     if (selectedRule && source && (suppressedByPopupChoice || suppressedByTarget)) {
-      return json(
+      return responseData(
         buildActionResponse({
           action: "none",
           analyticsEvent: null,
@@ -970,7 +974,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
-    return json(
+    return responseData(
       buildActionResponse({
         action,
         analyticsEvent,
@@ -992,7 +996,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   } catch (error) {
     console.error("[Proxy] Error resolving storefront action:", error);
-    return json({ error: "Internal server error", enabled: false, action: "none" }, { status: 500, headers: corsHeaders });
+    return responseData({ error: "Internal server error", enabled: false, action: "none" }, { status: 500, headers: corsHeaders });
   }
 };
 
@@ -1000,5 +1004,5 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-  return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
+  return responseData({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
 };

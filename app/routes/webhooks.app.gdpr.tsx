@@ -1,9 +1,12 @@
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { enqueueShopCleanupJob } from "../utils/cleanup.server";
+
+function responseData<T>(payload: T, init?: ResponseInit) {
+    return Response.json(payload, init);
+}
 
 function webhookMeta(request: Request) {
     return {
@@ -75,10 +78,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 console.log(`[GDPR] Unhandled topic: ${topic}`);
         }
 
-        return json({ success: true }, { status: 200 });
+        return responseData({ success: true }, { status: 200 });
     } catch (error) {
         console.error(`[GDPR] Webhook failed during ${stage}:`, webhookMeta(request), error);
         if (error instanceof Response) return error;
-        return json({ success: false }, { status: 500 });
+        return responseData({ success: false }, { status: 500 });
     }
 };

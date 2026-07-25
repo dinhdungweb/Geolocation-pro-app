@@ -1,6 +1,6 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as responseData, redirect } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import { ensureDefaultEmailAssets } from "../utils/email-seeder.server";
@@ -59,7 +59,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             select: { id: true, name: true, html: true, config: true, subject: true }
         });
 
-        return json({ currentAutomation, requestedId: id, templates });
+        return responseData({ currentAutomation, requestedId: id, templates });
     } catch (error) {
         console.error("Prisma error in Automation Editor loader:", error);
         return redirect("/admin/emails/automations");
@@ -92,7 +92,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
         }
 
-        return json({ success: true });
+        return responseData({ success: true });
     }
 
     if (action === "delete") {
@@ -110,10 +110,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             where: { id },
             data: { isActive }
         });
-        return json({ success: true });
+        return responseData({ success: true });
     }
 
-    return json({ error: "Invalid action" });
+    return responseData({ error: "Invalid action" });
 };
 
 export default function AdminEmailAutomations() {

@@ -1,6 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "react-router";
+import { data as responseData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, Clock, DollarSign, Search, Users, X } from "lucide-react";
 import {
@@ -217,7 +217,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ["overcharged", "pending", "charge_review"].includes(shop.status),
   ).length;
 
-  return json({
+  return responseData({
     shops,
     yearMonth: "current Shopify billing periods",
     summary: {
