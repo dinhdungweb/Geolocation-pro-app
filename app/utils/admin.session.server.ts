@@ -55,7 +55,9 @@ async function verifyPasswordHash(password: string, storedHash: string) {
 
 export const adminSessionStorage = createCookieSessionStorage({
     cookie: {
-        name: "__geo_admin_session",
+        // Version the cookie while widening its path so an existing
+        // Path=/admin cookie cannot shadow the React Router-compatible one.
+        name: "__geo_admin_session_v2",
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

@@ -8,6 +8,7 @@ describe("admin session cookie", () => {
 
     const setCookie = await adminSessionStorage.commitSession(session);
 
+    expect(setCookie).toContain("__geo_admin_session_v2=");
     expect(setCookie).toMatch(/(?:^|;\s*)Path=\/(?:;|$)/);
     expect(setCookie).not.toContain("Path=/admin");
   });
