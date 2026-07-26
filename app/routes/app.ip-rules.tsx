@@ -29,7 +29,7 @@ import {
     ActionList,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
+import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon, EditIcon, ToggleOnIcon, ToggleOffIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
@@ -645,16 +645,30 @@ export default function IPRulesPage() {
                     className="ip-rule-actions-cell"
                 >
                     <InlineStack gap="200" wrap={false}>
-                        <Button size="slim" onClick={() => handleOpenModal(rule)} disabled={!hasProPlan}>
+                        <Button
+                            size="slim"
+                            variant="tertiary"
+                            icon={EditIcon}
+                            onClick={() => handleOpenModal(rule)}
+                            disabled={!hasProPlan}
+                        >
                             Edit
                         </Button>
                         {rule.isActive ? (
-                            <Button size="slim" onClick={() => handleToggle(rule)} disabled={!hasProPlan}>
+                            <Button
+                                size="slim"
+                                variant="tertiary"
+                                icon={ToggleOffIcon}
+                                onClick={() => handleToggle(rule)}
+                                disabled={!hasProPlan}
+                            >
                                 Disable
                             </Button>
                         ) : (
                             <Button
                                 size="slim"
+                                variant="tertiary"
+                                icon={ToggleOnIcon}
                                 onClick={() => handleToggle(rule)}
                                 disabled={!hasProPlan}
                             >

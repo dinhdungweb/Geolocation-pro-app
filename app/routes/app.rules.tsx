@@ -31,7 +31,7 @@ import {
     Popover,
     ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon, EditIcon, ToggleOnIcon, ToggleOffIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -1058,12 +1058,19 @@ export default function RulesPage() {
                     style={{ display: "flex", justifyContent: "flex-end", minWidth: "124px" }}
                 >
                     <InlineStack gap="200" wrap={false}>
-                        <Button size="slim" onClick={() => handleOpenModal(rule)}>
+                        <Button
+                            size="slim"
+                            variant="tertiary"
+                            icon={EditIcon}
+                            onClick={() => handleOpenModal(rule)}
+                        >
                             Edit
                         </Button>
                         {rule.isActive ? (
                             <Button
                                 size="slim"
+                                variant="tertiary"
+                                icon={ToggleOffIcon}
                                 onClick={() => handleToggle(rule)}
                                 loading={isThisRuleToggling}
                                 disabled={toggleInProgress}
@@ -1073,6 +1080,8 @@ export default function RulesPage() {
                         ) : (
                             <Button
                                 size="slim"
+                                variant="tertiary"
+                                icon={ToggleOnIcon}
                                 onClick={() => handleToggle(rule)}
                                 loading={isThisRuleToggling}
                                 disabled={toggleInProgress || (isPaidOnlyRule(rule) && !hasProPlan)}
