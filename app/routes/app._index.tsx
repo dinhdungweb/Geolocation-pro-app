@@ -54,6 +54,7 @@ import {
   resolveCountryActionTotal,
   resolveCountryTrafficTotal,
 } from "../utils/country-traffic";
+import { createExpiringAsyncCache } from "../utils/expiring-async-cache.server";
 import {
   getStableShopifyPlanFromBillingCheck,
   resolveEffectivePlan,
@@ -333,6 +334,10 @@ async function loadDashboardAnalytics(
   };
 }
 
+const dashboardAnalyticsCache = createExpiringAsyncCache<
+  Awaited<ReturnType<typeof loadDashboardAnalytics>>
+>();
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const loaderStartedAt = performance.now();
   const { session, billing } = await authenticate.admin(request);
@@ -356,7 +361,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }),
   ]);
 
-  const analytics = loadDashboardAnalytics(shop, thirtyDaysAgo);
+  const analyticsPromise = dashboardAnalyticsCache.get(
+    shop,
+    () => loadDashboardAnalytics(shop, thirtyDaysAgo),
+    10_000,
+  );
   const settingsAndBillingPromise = Promise.all([
     prisma.settings.upsert({
       where: { shop },
@@ -411,7 +420,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       usagePeriod,
       monthlyUsage,
     },
-  ] = await Promise.all([dashboardDataPromise, planAndUsagePromise]);
+    analytics,
+  ] = await Promise.all([
+    dashboardDataPromise,
+    planAndUsagePromise,
+    analyticsPromise,
+  ]);
 
   const planLimit = getPlanLimit(currentPlan, settings);
   const planDisplayName =
