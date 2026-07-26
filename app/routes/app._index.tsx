@@ -862,7 +862,7 @@ export default function Index() {
         }
         .geo-home-header {
           display: flex;
-          align-items: flex-start;
+          align-items: flex-end;
           justify-content: space-between;
           gap: 20px;
           padding: 2px 2px 0;
@@ -2026,7 +2026,7 @@ export default function Index() {
                                 <span>{item.country}</span>
                               </div>
                               <span className="geo-country-share">
-                                {item.actions.toLocaleString()} · {item.share}%
+                                {item.share}%
                               </span>
                             </div>
                             ) : (
@@ -2060,7 +2060,7 @@ export default function Index() {
                                   <span>{item.country}</span>
                                 </div>
                                 <span className="geo-country-share">
-                                  {item.actions.toLocaleString()} · {item.share}%
+                                  {item.share}%
                                 </span>
                               </button>
                             ),
