@@ -306,6 +306,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 id: true, name: true, matchType: true, ruleType: true,
                 isActive: true, priority: true, countryCodes: true, ipAddresses: true,
                 stateCodes: true, marketHandles: true,
+                cityNames: true, cityCountryCode: true, cityRegionCode: true,
                 scheduleEnabled: true, createdAt: true,
             },
         }),
@@ -360,7 +361,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const effectiveActiveRules = rules.filter((r: any) => {
         if (!r.isActive) return false;
         if (!hasProPlan) {
-            if (r.matchType === "ip") return false;
+            if (r.matchType !== "country") return false;
             if (r.ruleType === "block") return false;
         }
         return true;
@@ -630,6 +631,11 @@ export default function AdminShopDetail() {
 
         if (rule.matchType === "market") {
             return formatListPreview(rule.marketHandles, "Invalid: no markets selected");
+        }
+
+        if (rule.matchType === "city") {
+            const scope = rule.cityRegionCode || rule.cityCountryCode || "unknown location";
+            return `${formatListPreview(rule.cityNames, "Invalid: no cities selected")} (${scope})`;
         }
 
         if (rule.countryCodes === "*") return "All Countries (*)";

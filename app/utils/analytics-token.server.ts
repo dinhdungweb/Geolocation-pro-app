@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 export type StorefrontAction = "none" | "popup" | "auto_redirect" | "block";
-export type RuleSource = "country" | "ip" | "market" | "state" | "vpn";
+export type RuleSource = "country" | "ip" | "market" | "state" | "city" | "vpn";
 
 export interface AnalyticsTokenPayload {
   shop: string;
@@ -14,6 +14,7 @@ export interface AnalyticsTokenPayload {
   countryCode: string;
   regionCode?: string;
   regionName?: string;
+  city?: string;
   ipHash: string;
   iat: number;
   eventKey: string;

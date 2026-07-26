@@ -18,7 +18,32 @@ import {
     TextField,
     useBreakpoints,
 } from "@shopify/polaris";
-import { CalendarIcon, SearchIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
+import {
+    CalendarIcon,
+    FilterIcon,
+    SearchIcon,
+    XIcon,
+} from "@shopify/polaris-icons";
+import {
+    FaAndroid,
+    FaApple,
+    FaChrome,
+    FaCircleQuestion,
+    FaDesktop,
+    FaEdge,
+    FaFirefoxBrowser,
+    FaGlobe,
+    FaInternetExplorer,
+    FaLinux,
+    FaMobileScreen,
+    FaOpera,
+    FaRobot,
+    FaSafari,
+    FaTabletScreenButton,
+    FaWindows,
+} from "react-icons/fa6";
+import type { IconType } from "react-icons";
+import { SiSamsung } from "react-icons/si";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import { authenticate } from "../shopify.server";
@@ -91,6 +116,7 @@ const logTableHeadings: [{ title: string }, ...Array<{ title: string }>] = [
     { title: "IP Address" },
     { title: "Country" },
     { title: "Region" },
+    { title: "City" },
     { title: "Action" },
     { title: "Page Path" },
     { title: "Details / Rule" },
@@ -462,6 +488,56 @@ function VisitorLogsTableSkeleton() {
     );
 }
 
+function getVisitorDetailIcon(type: "device" | "os" | "browser", value: string): IconType {
+    if (!value || value === "Unknown") return FaCircleQuestion;
+
+    if (type === "device") {
+        if (value === "Mobile") return FaMobileScreen;
+        if (value === "Tablet") return FaTabletScreenButton;
+        if (value === "Bot") return FaRobot;
+        return FaDesktop;
+    }
+
+    if (type === "os") {
+        if (/^Windows/i.test(value)) return FaWindows;
+        if (/^(macOS|iOS)/i.test(value)) return FaApple;
+        if (/^Android/i.test(value)) return FaAndroid;
+        if (/^Linux/i.test(value)) return FaLinux;
+        if (/^ChromeOS/i.test(value)) return FaChrome;
+        return FaCircleQuestion;
+    }
+
+    if (/^Chrome/i.test(value)) return FaChrome;
+    if (/^Edge/i.test(value)) return FaEdge;
+    if (/^Firefox/i.test(value)) return FaFirefoxBrowser;
+    if (/^Safari/i.test(value)) return FaSafari;
+    if (/^Opera/i.test(value)) return FaOpera;
+    if (/^Samsung Internet/i.test(value)) return SiSamsung;
+    if (/^Internet Explorer/i.test(value)) return FaInternetExplorer;
+    return FaGlobe;
+}
+
+function VisitorDetailIcon({
+    label,
+    type,
+}: {
+    label: string;
+    type: "device" | "os" | "browser";
+}) {
+    const DetailIcon = getVisitorDetailIcon(type, label);
+
+    return (
+        <span
+            className="visitor-log-detail-icon"
+            title={label}
+            aria-label={label}
+            tabIndex={0}
+        >
+            <DetailIcon aria-hidden="true" focusable="false" />
+        </span>
+    );
+}
+
 async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, page: number): Promise<VisitorLogsData> {
     const today = startOfDay(new Date());
     const effectiveDateParams = getEffectiveLogDateParams(filters, today);
@@ -518,6 +594,7 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
                 countryCode: true,
                 regionCode: true,
                 regionName: true,
+                city: true,
                 action: true,
                 ruleName: true,
                 userAgent: true,
@@ -838,7 +915,7 @@ export default function VisitorLogs() {
                             className="visitor-log-filter-search-input"
                             type="search"
                             aria-label="Search visitor logs"
-                            placeholder="Search IP, rule, path..."
+                            placeholder="Search IP, city, rule, path..."
                             value={queryDraft}
                             onChange={(event) => setQueryDraft(event.currentTarget.value)}
                             autoComplete="off"
@@ -1058,6 +1135,11 @@ export default function VisitorLogs() {
                             {log.regionName || "-"}
                         </span>
                     </IndexTable.Cell>
+                    <IndexTable.Cell>
+                        <span title={log.city || ""}>
+                            {log.city || "-"}
+                        </span>
+                    </IndexTable.Cell>
                     <IndexTable.Cell>{getActionBadge(log.action)}</IndexTable.Cell>
                     <IndexTable.Cell>
                         {log.path ? (
@@ -1083,19 +1165,13 @@ export default function VisitorLogs() {
                         </span>
                     </IndexTable.Cell>
                     <IndexTable.Cell>
-                        <div className="visitor-log-user-agent-detail" title={userAgentTitle}>
-                            {userAgentDetails.device}
-                        </div>
+                        <VisitorDetailIcon label={userAgentDetails.device} type="device" />
                     </IndexTable.Cell>
                     <IndexTable.Cell>
-                        <div className="visitor-log-user-agent-detail" title={userAgentTitle}>
-                            {userAgentDetails.os}
-                        </div>
+                        <VisitorDetailIcon label={userAgentDetails.os} type="os" />
                     </IndexTable.Cell>
                     <IndexTable.Cell>
-                        <div className="visitor-log-user-agent-detail" title={userAgentTitle}>
-                            {userAgentDetails.browser}
-                        </div>
+                        <VisitorDetailIcon label={userAgentDetails.browser} type="browser" />
                     </IndexTable.Cell>
                 </IndexTable.Row>
             );
@@ -1239,11 +1315,11 @@ export default function VisitorLogs() {
                     .visitor-log-table-wrap .Polaris-IndexTable,
                     .visitor-log-table-wrap .Polaris-IndexTable__Table {
                         width: 100%;
-                        min-width: 1040px;
+                        min-width: 1000px;
                     }
                     .visitor-log-skeleton-table {
                         width: 100%;
-                        min-width: 1040px;
+                        min-width: 1000px;
                         border-collapse: collapse;
                     }
                     .visitor-log-skeleton-table th {
@@ -1561,6 +1637,34 @@ export default function VisitorLogs() {
                     }
                     .visitor-log-empty-state {
                         min-height: 320px;
+                    }
+                    .visitor-log-detail-icon {
+                        display: inline-flex;
+                        width: 24px;
+                        height: 24px;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: var(--p-border-radius-200, 6px);
+                        cursor: help;
+                    }
+                    .visitor-log-detail-icon:focus-visible {
+                        outline: 2px solid var(--p-color-border-focus, #005bd3);
+                        outline-offset: 1px;
+                    }
+                    .visitor-log-detail-icon svg {
+                        width: 16px;
+                        height: 16px;
+                        color: var(--p-color-icon-secondary, #616161);
+                    }
+                    .visitor-log-table-wrap th:nth-child(10),
+                    .visitor-log-table-wrap td:nth-child(10),
+                    .visitor-log-table-wrap th:nth-child(11),
+                    .visitor-log-table-wrap td:nth-child(11),
+                    .visitor-log-table-wrap th:nth-child(12),
+                    .visitor-log-table-wrap td:nth-child(12) {
+                        width: 64px;
+                        min-width: 64px;
+                        text-align: center;
                     }
                     @media (max-width: 47.9975em) {
                         .visitor-log-page-content {

@@ -202,6 +202,9 @@ async function loadDashboardAnalytics(
         matchType: true,
         countryCodes: true,
         stateCodes: true,
+        cityNames: true,
+        cityCountryCode: true,
+        cityRegionCode: true,
         ipAddresses: true,
         updatedAt: true,
       },
@@ -847,7 +850,9 @@ export default function Index() {
     setSetupConfirmed(true);
     try {
       localStorage.setItem(setupConfirmedKey, "true");
-    } catch {}
+    } catch {
+      // Continue when browser storage is unavailable.
+    }
 
     try {
       if (
@@ -868,7 +873,9 @@ export default function Index() {
     setSetupDismissed(true);
     try {
       localStorage.setItem(setupDismissedKey, "true");
-    } catch {}
+    } catch {
+      // Continue when browser storage is unavailable.
+    }
   };
 
   return (
@@ -2165,6 +2172,8 @@ export default function Index() {
                               ? rule.ipAddresses
                               : rule.matchType === "state"
                                 ? rule.stateCodes
+                                : rule.matchType === "city"
+                                  ? `${rule.cityNames} (${rule.cityRegionCode || rule.cityCountryCode})`
                                 : rule.countryCodes;
 
                           return (

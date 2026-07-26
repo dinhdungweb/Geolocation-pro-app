@@ -60,6 +60,9 @@ type RuleOverrides = Partial<{
   scheduleEnabled: boolean;
   startTime: string | null;
   stateCodes: string;
+  cityNames: string;
+  cityCountryCode: string;
+  cityRegionCode: string;
   targetUrl: string;
   timezone: string | null;
 }>;
@@ -355,6 +358,43 @@ describe("storefront rule resolution integration", () => {
       rule: {
         ruleId: stateRule.id,
         source: "state",
+      },
+    });
+  });
+
+  it("matches a paid city rule before state and country rules", async () => {
+    await seedSettings("plus");
+    await seedRule({
+      name: "Country fallback",
+      priority: 100,
+    });
+    await seedRule({
+      countryCodes: "",
+      matchType: "state",
+      name: "California fallback",
+      priority: 100,
+      stateCodes: "US-CA",
+    });
+    const cityRule = await seedRule({
+      cityCountryCode: "US",
+      cityNames: "Los Angeles,San Francisco",
+      cityRegionCode: "US-CA",
+      countryCodes: "",
+      matchType: "city",
+      name: "Los Angeles redirect",
+      priority: 1,
+      redirectMode: "auto_redirect",
+    });
+
+    const { body } = await loadConfig();
+
+    expect(body).toMatchObject({
+      action: "auto_redirect",
+      city: "Los Angeles",
+      rule: {
+        name: "Los Angeles redirect",
+        ruleId: cityRule.id,
+        source: "city",
       },
     });
   });

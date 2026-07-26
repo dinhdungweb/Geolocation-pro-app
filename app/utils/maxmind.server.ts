@@ -25,6 +25,7 @@ type GeoLookupResult = {
 
 type GeoLookupOptions = {
     useFreeFallback?: boolean;
+    requireCity?: boolean;
 };
 
 type FallbackCacheEntry = {
@@ -55,7 +56,8 @@ function isPublicLookupCandidate(ip: string) {
     return /^[0-9a-f:.]+$/i.test(value);
 }
 
-function shouldUseFreeFallback(geo: GeoLookupResult) {
+function shouldUseFreeFallback(geo: GeoLookupResult, options: GeoLookupOptions) {
+    if (options.requireCity && !geo.city) return true;
     if (geo.regionCode || geo.regionName) return false;
     return !geo.countryCode || countriesWithStates.has(geo.countryCode);
 }
@@ -263,7 +265,7 @@ export async function getGeoFromIP(ip: string, options: GeoLookupOptions = {}): 
         const city = result.city?.names?.en || '';
 
         const localGeo = { countryCode, regionCode, regionName, city };
-        if (!options.useFreeFallback || !isPublicLookupCandidate(ip) || !shouldUseFreeFallback(localGeo)) {
+        if (!options.useFreeFallback || !isPublicLookupCandidate(ip) || !shouldUseFreeFallback(localGeo, options)) {
             return localGeo;
         }
 

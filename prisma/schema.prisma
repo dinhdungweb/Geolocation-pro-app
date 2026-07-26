@@ -28,86 +28,89 @@ model Session {
 }
 
 model RedirectRule {
-  id                String   @id @default(uuid())
-  shop              String
-  name              String
-  countryCodes      String   @default("")
-  targetUrl         String   @default("")
-  isActive          Boolean  @default(true)
-  priority          Int      @default(0)
-  ruleType          String   @default("redirect")
-  scheduleEnabled   Boolean  @default(false)
-  startTime         String?
-  endTime           String?
-  daysOfWeek        String?
-  timezone          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  ipAddresses       String   @default("")
-  marketHandles     String   @default("")
-  marketCountryCodes String  @default("")
-  matchType         String   @default("country")
-  stateCodes        String   @default("")
-  redirectMode      String   @default("popup")
-  pagePaths         String?
-  pageTargetingType String   @default("all")
+  id                 String   @id @default(uuid())
+  shop               String
+  name               String
+  countryCodes       String   @default("")
+  targetUrl          String   @default("")
+  isActive           Boolean  @default(true)
+  priority           Int      @default(0)
+  ruleType           String   @default("redirect")
+  scheduleEnabled    Boolean  @default(false)
+  startTime          String?
+  endTime            String?
+  daysOfWeek         String?
+  timezone           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  ipAddresses        String   @default("")
+  marketHandles      String   @default("")
+  marketCountryCodes String   @default("")
+  matchType          String   @default("country")
+  stateCodes         String   @default("")
+  cityNames          String   @default("")
+  cityCountryCode    String   @default("")
+  cityRegionCode     String   @default("")
+  redirectMode       String   @default("popup")
+  pagePaths          String?
+  pageTargetingType  String   @default("all")
 
   @@index([shop])
   @@index([shop, matchType])
 }
 
 model Settings {
-  id                 String   @id @default(uuid())
-  shop               String   @unique
-  mode               String   @default("popup")
-  template           String   @default("modal")
-  popupTitle         String   @default("Would you like to switch to a local version?")
-  popupMessage       String   @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
-  confirmBtnText     String   @default("Go now")
-  cancelBtnText      String   @default("Stay here")
-  popupBgColor       String   @default("#ffffff")
-  popupTextColor     String   @default("#333333")
-  popupBtnColor      String   @default("#007bff")
-  blockedTitle       String   @default("Access Denied")
-  blockedMessage     String   @default("We do not offer services in your country/region.")
-  blockedLogoUrl     String   @default("")
-  blockedBgColor     String   @default("#f8fafc")
-  blockedTextColor   String   @default("#0f172a")
-  blockedAccentColor String   @default("#2563eb")
-  blockedSupportText String   @default("Contact support")
-  blockedSupportUrl  String   @default("")
-  excludeBots        Boolean  @default(true)
-  excludedIPs        String   @default("")
-  cookieDuration     Int      @default(7)
-  createdAt          DateTime @default(now())
-  onboardingInstallAt DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  currentPlan        String   @default("free")
-  emailSenderEmail   String?  @default("noreply@geopro.bluepeaks.top")
-  emailSenderName    String?  @default("Geo Admin")
-  smtpHost           String?
-  smtpPass           String?
-  smtpPort           Int?
-  smtpSecure         Boolean  @default(true)
-  smtpUser           String?
-  isEnabled          Boolean  @default(true)
-  blockVpn           Boolean  @default(false)
-  allowUnlimitedPlan Boolean  @default(false)
-  billingOverrideEnabled Boolean @default(false)
-  billingOverridePlan String?
-  billingOverrideReason String?
-  customPlanEnabled  Boolean  @default(false)
-  customPlanName     String   @default("Custom plan")
-  customPlanPrice    Decimal  @default(79.99) @db.Decimal(10, 2)
+  id                     String    @id @default(uuid())
+  shop                   String    @unique
+  mode                   String    @default("popup")
+  template               String    @default("modal")
+  popupTitle             String    @default("Would you like to switch to a local version?")
+  popupMessage           String    @default("We noticed you are visiting from {country}. Would you like to go to {target}?")
+  confirmBtnText         String    @default("Go now")
+  cancelBtnText          String    @default("Stay here")
+  popupBgColor           String    @default("#ffffff")
+  popupTextColor         String    @default("#333333")
+  popupBtnColor          String    @default("#007bff")
+  blockedTitle           String    @default("Access Denied")
+  blockedMessage         String    @default("We do not offer services in your country/region.")
+  blockedLogoUrl         String    @default("")
+  blockedBgColor         String    @default("#f8fafc")
+  blockedTextColor       String    @default("#0f172a")
+  blockedAccentColor     String    @default("#2563eb")
+  blockedSupportText     String    @default("Contact support")
+  blockedSupportUrl      String    @default("")
+  excludeBots            Boolean   @default(true)
+  excludedIPs            String    @default("")
+  cookieDuration         Int       @default(7)
+  createdAt              DateTime  @default(now())
+  onboardingInstallAt    DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  currentPlan            String    @default("free")
+  emailSenderEmail       String?   @default("noreply@geopro.bluepeaks.top")
+  emailSenderName        String?   @default("Geo Admin")
+  smtpHost               String?
+  smtpPass               String?
+  smtpPort               Int?
+  smtpSecure             Boolean   @default(true)
+  smtpUser               String?
+  isEnabled              Boolean   @default(true)
+  blockVpn               Boolean   @default(false)
+  allowUnlimitedPlan     Boolean   @default(false)
+  billingOverrideEnabled Boolean   @default(false)
+  billingOverridePlan    String?
+  billingOverrideReason  String?
+  customPlanEnabled      Boolean   @default(false)
+  customPlanName         String    @default("Custom plan")
+  customPlanPrice        Decimal   @default(79.99) @db.Decimal(10, 2)
   customPlanVisitorLimit Int?
-  customPlanNoOverage Boolean @default(true)
-  customPlanTrialDays Int     @default(3)
-  billingPeriodKey String?
-  billingPeriodStart DateTime?
-  billingPeriodEnd DateTime?
-  billingSubscriptionId String?
+  customPlanNoOverage    Boolean   @default(true)
+  customPlanTrialDays    Int       @default(3)
+  billingPeriodKey       String?
+  billingPeriodStart     DateTime?
+  billingPeriodEnd       DateTime?
+  billingSubscriptionId  String?
   billingUsageLineItemId String?
-  billingPlanName String?
+  billingPlanName        String?
 }
 
 model AnalyticsCountry {
@@ -146,21 +149,21 @@ model AnalyticsRule {
 }
 
 model MonthlyUsage {
-  id              String   @id @default(uuid())
-  shop            String
-  yearMonth       String
-  billingPeriodKey String
-  billingPeriodStart DateTime?
-  billingPeriodEnd DateTime?
-  billingSubscriptionId String?
+  id                     String    @id @default(uuid())
+  shop                   String
+  yearMonth              String
+  billingPeriodKey       String
+  billingPeriodStart     DateTime?
+  billingPeriodEnd       DateTime?
+  billingSubscriptionId  String?
   billingUsageLineItemId String?
-  totalVisitors   Int      @default(0)
-  redirected      Int      @default(0)
-  blocked         Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  chargedVisitors Int      @default(0)
-  popupShown      Int      @default(0)
+  totalVisitors          Int       @default(0)
+  redirected             Int       @default(0)
+  blocked                Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  chargedVisitors        Int       @default(0)
+  popupShown             Int       @default(0)
 
   @@unique([shop, billingPeriodKey])
   @@index([shop])
@@ -170,20 +173,20 @@ model MonthlyUsage {
 }
 
 model UsageChargeAttempt {
-  id                       String   @id @default(uuid())
-  shop                     String
-  billingPeriodKey         String
-  billingUsageLineItemId   String?
-  fromChargedVisitors      Int
-  toChargedVisitors        Int
-  overageVisitors          Int
-  amount                   Decimal  @db.Decimal(10, 2)
-  idempotencyKey           String   @unique
-  shopifyUsageRecordId     String?
-  status                   String   @default("pending")
-  error                    String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                     String   @id @default(uuid())
+  shop                   String
+  billingPeriodKey       String
+  billingUsageLineItemId String?
+  fromChargedVisitors    Int
+  toChargedVisitors      Int
+  overageVisitors        Int
+  amount                 Decimal  @db.Decimal(10, 2)
+  idempotencyKey         String   @unique
+  shopifyUsageRecordId   String?
+  status                 String   @default("pending")
+  error                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([shop, billingPeriodKey, status])
   @@index([shop, status])
@@ -217,17 +220,17 @@ model ShopCleanupJob {
 }
 
 model BillableUsageEvent {
-  id          String   @id @default(uuid())
-  shop        String
-  yearMonth   String
+  id               String   @id @default(uuid())
+  shop             String
+  yearMonth        String
   billingPeriodKey String?
-  eventKey    String   @unique
-  ruleId      String?
-  action      String
-  countryCode String?
-  path        String?
-  ipHash      String
-  createdAt   DateTime @default(now())
+  eventKey         String   @unique
+  ruleId           String?
+  action           String
+  countryCode      String?
+  path             String?
+  ipHash           String
+  createdAt        DateTime @default(now())
 
   @@index([shop, yearMonth])
   @@index([shop, billingPeriodKey])
@@ -236,13 +239,13 @@ model BillableUsageEvent {
 }
 
 model BillableUsageActionEvent {
-  id          String   @id @default(uuid())
-  shop        String
-  yearMonth   String
+  id               String   @id @default(uuid())
+  shop             String
+  yearMonth        String
   billingPeriodKey String?
-  eventKey    String
-  action      String
-  createdAt   DateTime @default(now())
+  eventKey         String
+  action           String
+  createdAt        DateTime @default(now())
 
   @@unique([eventKey, action])
   @@index([shop, yearMonth])
@@ -273,17 +276,17 @@ model VisitorLog {
 }
 
 model StorefrontAnalyticsEventQueue {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   shop          String
   type          String
   payload       Json
-  status        String   @default("pending")
-  attempts      Int      @default(0)
-  nextAttemptAt DateTime @default(now())
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
   lockedAt      DateTime?
   lastError     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, lockedAt])
@@ -292,15 +295,15 @@ model StorefrontAnalyticsEventQueue {
 }
 
 model AdminEmailLog {
-  id        String   @id @default(uuid())
-  shop      String
-  type      String
-  deliveryKey String? @unique
-  subject   String?
-  status    String   @default("sent")
-  error     String?
-  createdAt DateTime @default(now())
-  html      String?
+  id          String   @id @default(uuid())
+  shop        String
+  type        String
+  deliveryKey String?  @unique
+  subject     String?
+  status      String   @default("sent")
+  error       String?
+  createdAt   DateTime @default(now())
+  html        String?
 
   @@index([shop, type])
 }

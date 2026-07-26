@@ -48,7 +48,7 @@ const troubleshootingLinks = [
 const faqItems = [
     {
         question: "Why is my redirect not working?",
-        answer: "Confirm that Geolocation and the theme app embed are enabled, then verify the rule is active and matches the visitor country, market, state, or IP address.",
+        answer: "Confirm that Geolocation and the theme app embed are enabled, then verify the rule is active and matches the visitor country, market, state, city, or IP address.",
     },
     {
         question: "Why does a repeated test behave differently?",

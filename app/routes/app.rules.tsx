@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
@@ -38,12 +39,14 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
 import type { ShopifyMarketOption, ShopifyMarketsResult } from "../utils/shopify-markets.server";
+import type { CityOptionsResult } from "./app.rules-cities";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getStableShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
+import { normalizeCityNamesForStorage, splitCityNames } from "../utils/city-targeting";
 
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -82,6 +85,13 @@ const REGIONS: Record<string, string[]> = {
 };
 const ALL_REGION_COUNTRY_CODES = Array.from(new Set(Object.values(REGIONS).flat()));
 const RULES_PER_PAGE = 20;
+const MAX_CITIES_PER_RULE = 100;
+const CITY_COUNTRY_OPTIONS = [
+    { label: "Select a country", value: "" },
+    ...Object.entries(COUNTRY_MAP)
+        .sort(([, left], [, right]) => left.localeCompare(right))
+        .map(([code, name]) => ({ label: `${name} (${code})`, value: code })),
+];
 
 interface RedirectRule {
     id: string;
@@ -103,6 +113,9 @@ interface RedirectRule {
     pageTargetingType: string;
     pagePaths: string | null;
     stateCodes: string;
+    cityNames: string;
+    cityCountryCode: string;
+    cityRegionCode: string;
 }
 
 function normalizeOption(value: string | null, allowed: string[], fallback: string) {
@@ -125,7 +138,7 @@ function isPaidBillingConfig(billingConfig: any, settings: any) {
 }
 
 function isFreePlanFeatureRequest(ruleType: string, pageTargetingType: string, matchType = "country") {
-    return ruleType === "block" || pageTargetingType !== "all" || matchType === "market" || matchType === "state";
+    return ruleType === "block" || pageTargetingType !== "all" || matchType === "market" || matchType === "state" || matchType === "city";
 }
 
 function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConflicts>[]) {
@@ -152,7 +165,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         prisma.redirectRule.findMany({
             where: {
                 shop,
-                matchType: { in: ["country", "market", "state"] },
+                matchType: { in: ["country", "market", "state", "city"] },
             },
             orderBy: { priority: "desc" },
         }),
@@ -170,6 +183,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         detectRuleConflicts(rules, "country"),
         detectRuleConflicts(rules, "market"),
         detectRuleConflicts(rules, "state"),
+        detectRuleConflicts(rules, "city"),
         detectCrossRuleConflicts(rules),
     );
 
@@ -205,11 +219,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (intent === "create") {
             const name = formData.get("name") as string;
-            const matchType = normalizeOption(formData.get("matchType") as string | null, ["country", "market", "state"], "country");
+            const matchType = normalizeOption(formData.get("matchType") as string | null, ["country", "market", "state", "city"], "country");
             const countryCodes = formData.get("countryCodes") as string;
             const marketHandles = formData.get("marketHandles") as string;
             const marketCountryCodes = formData.get("marketCountryCodes") as string;
             const stateCodes = formData.get("stateCodes") as string || "";
+            const cityNames = normalizeCityNamesForStorage(formData.get("cityNames") as string | null);
+            const cityCountryCode = String(formData.get("cityCountryCode") || "").trim().toUpperCase();
+            const cityRegionCode = String(formData.get("cityRegionCode") || "").trim().toUpperCase();
             const targetUrl = formData.get("targetUrl") as string;
             if (!validateUrl(targetUrl)) {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
@@ -237,6 +254,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (matchType === "state" && !stateCodes) {
                 return responseData({ success: false, message: "Select at least one state/region" }, { status: 400 });
             }
+            if (matchType === "city" && (!cityNames || !COUNTRY_MAP[cityCountryCode])) {
+                return responseData({ success: false, message: "Select a country and enter at least one city" }, { status: 400 });
+            }
+            if (matchType === "city" && splitCityNames(cityNames).length > MAX_CITIES_PER_RULE) {
+                return responseData({ success: false, message: `A city rule can target up to ${MAX_CITIES_PER_RULE} cities` }, { status: 400 });
+            }
+            if (matchType === "city" && cityRegionCode && !cityRegionCode.startsWith(`${cityCountryCode}-`)) {
+                return responseData({ success: false, message: "The selected state/region does not belong to the city country" }, { status: 400 });
+            }
  
             await prisma.redirectRule.create({
                 data: {
@@ -252,6 +278,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     redirectMode,
                     matchType,
                     stateCodes: matchType === "state" ? stateCodes : "",
+                    cityNames: matchType === "city" ? cityNames : "",
+                    cityCountryCode: matchType === "city" ? cityCountryCode : "",
+                    cityRegionCode: matchType === "city" ? cityRegionCode : "",
                     scheduleEnabled,
                     startTime,
                     endTime,
@@ -268,11 +297,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (intent === "update") {
             const id = formData.get("id") as string;
             const name = formData.get("name") as string;
-            const matchType = normalizeOption(formData.get("matchType") as string | null, ["country", "market", "state"], "country");
+            const matchType = normalizeOption(formData.get("matchType") as string | null, ["country", "market", "state", "city"], "country");
             const countryCodes = formData.get("countryCodes") as string;
             const marketHandles = formData.get("marketHandles") as string;
             const marketCountryCodes = formData.get("marketCountryCodes") as string;
             const stateCodes = formData.get("stateCodes") as string || "";
+            const cityNames = normalizeCityNamesForStorage(formData.get("cityNames") as string | null);
+            const cityCountryCode = String(formData.get("cityCountryCode") || "").trim().toUpperCase();
+            const cityRegionCode = String(formData.get("cityRegionCode") || "").trim().toUpperCase();
             const targetUrl = formData.get("targetUrl") as string;
             if (!validateUrl(targetUrl)) {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
@@ -300,6 +332,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (matchType === "state" && !stateCodes) {
                 return responseData({ success: false, message: "Select at least one state/region" }, { status: 400 });
             }
+            if (matchType === "city" && (!cityNames || !COUNTRY_MAP[cityCountryCode])) {
+                return responseData({ success: false, message: "Select a country and enter at least one city" }, { status: 400 });
+            }
+            if (matchType === "city" && splitCityNames(cityNames).length > MAX_CITIES_PER_RULE) {
+                return responseData({ success: false, message: `A city rule can target up to ${MAX_CITIES_PER_RULE} cities` }, { status: 400 });
+            }
+            if (matchType === "city" && cityRegionCode && !cityRegionCode.startsWith(`${cityCountryCode}-`)) {
+                return responseData({ success: false, message: "The selected state/region does not belong to the city country" }, { status: 400 });
+            }
 
             await prisma.redirectRule.update({
                 where: { id, shop },
@@ -310,6 +351,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     marketCountryCodes: matchType === "market" ? marketCountryCodes : "",
                     matchType,
                     stateCodes: matchType === "state" ? stateCodes : "",
+                    cityNames: matchType === "city" ? cityNames : "",
+                    cityCountryCode: matchType === "city" ? cityCountryCode : "",
+                    cityRegionCode: matchType === "city" ? cityRegionCode : "",
                     targetUrl,
                     priority,
                     ruleType,
@@ -332,12 +376,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const isActive = formData.get("isActive") === "true";
             const nextIsActive = !isActive;
 
-            if (!hasProPlan && !isActive) {
+            if (nextIsActive) {
                 const rule = await prisma.redirectRule.findFirst({
-                    where: { id, shop, matchType: { in: ["country", "market", "state"] } },
-                    select: { ruleType: true, pageTargetingType: true, matchType: true },
+                    where: { id, shop, matchType: { in: ["country", "market", "state", "city"] } },
+                    select: {
+                        ruleType: true,
+                        pageTargetingType: true,
+                        matchType: true,
+                        countryCodes: true,
+                        marketHandles: true,
+                        stateCodes: true,
+                        cityNames: true,
+                        cityCountryCode: true,
+                    },
                 });
-                if (rule && isFreePlanFeatureRequest(rule.ruleType, rule.pageTargetingType || "all", rule.matchType)) {
+                if (!rule) {
+                    return responseData({ success: false, message: "Rule not found" }, { status: 404 });
+                }
+
+                const targetMissing =
+                    (rule.matchType === "country" && !rule.countryCodes.trim()) ||
+                    (rule.matchType === "market" && !rule.marketHandles.trim()) ||
+                    (rule.matchType === "state" && !rule.stateCodes.trim()) ||
+                    (rule.matchType === "city" && (!rule.cityNames.trim() || !rule.cityCountryCode.trim()));
+                if (targetMissing) {
+                    return responseData(
+                        { success: false, message: "Edit this rule and select a valid target before enabling it" },
+                        { status: 400 },
+                    );
+                }
+
+                if (!hasProPlan && isFreePlanFeatureRequest(rule.ruleType, rule.pageTargetingType || "all", rule.matchType)) {
                     return responseData({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
                 }
             }
@@ -385,15 +454,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             let created = 0;
             for (const rule of importedRules) {
-                const matchType = normalizeOption(rule.matchType, ["country", "market", "state"], "country");
+                const matchType = normalizeOption(rule.matchType, ["country", "market", "state", "city"], "country");
                 const countryCodes = rule.countryCodes || "";
                 const marketHandles = rule.marketHandles || "";
                 const marketCountryCodes = rule.marketCountryCodes || "";
                 const stateCodes = rule.stateCodes || "";
+                const cityNames = normalizeCityNamesForStorage(rule.cityNames || "");
+                const cityCountryCode = String(rule.cityCountryCode || "").trim().toUpperCase();
+                const cityRegionCode = String(rule.cityRegionCode || "").trim().toUpperCase();
                 if (!rule.name) continue;
                 if (matchType === "country" && !countryCodes) continue;
                 if (matchType === "market" && !marketHandles) continue;
                 if (matchType === "state" && !stateCodes) continue;
+                if (matchType === "city" && (!cityNames || !COUNTRY_MAP[cityCountryCode])) continue;
+                if (matchType === "city" && splitCityNames(cityNames).length > MAX_CITIES_PER_RULE) continue;
+                if (matchType === "city" && cityRegionCode && !cityRegionCode.startsWith(`${cityCountryCode}-`)) continue;
                 if (rule.targetUrl && !validateUrl(rule.targetUrl)) continue;
 
                 await prisma.redirectRule.create({
@@ -410,6 +485,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         redirectMode: normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
                         matchType,
                         stateCodes: matchType === "state" ? stateCodes : "",
+                        cityNames: matchType === "city" ? cityNames : "",
+                        cityCountryCode: matchType === "city" ? cityCountryCode : "",
+                        cityRegionCode: matchType === "city" ? cityRegionCode : "",
                         scheduleEnabled: rule.scheduleEnabled || false,
                         startTime: rule.startTime || null,
                         endTime: rule.endTime || null,
@@ -448,6 +526,8 @@ export default function RulesPage() {
     const importFetcher = useFetcher<typeof action>();
     const deleteFetcher = useFetcher<typeof action>();
     const marketsFetcher = useFetcher<ShopifyMarketsResult>();
+    const citiesFetcher = useFetcher<CityOptionsResult>();
+    const loadCities = citiesFetcher.load;
     const hasRequestedMarkets = useRef(false);
     const hasRequestedStateData = useRef(false);
     const shopify = useAppBridge();
@@ -472,6 +552,10 @@ export default function RulesPage() {
     const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
     const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
     const [selectedStates, setSelectedStates] = useState<string[]>([]);
+    const [cityNames, setCityNames] = useState("");
+    const [citySearchValue, setCitySearchValue] = useState("");
+    const [cityCountryCode, setCityCountryCode] = useState("");
+    const [cityRegionCode, setCityRegionCode] = useState("");
     const [formTargetUrl, setFormTargetUrl] = useState("");
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
@@ -498,11 +582,35 @@ export default function RulesPage() {
     const getStatesForCountry =
         stateData?.getStatesForCountry ||
         ((_countryCode: string) => [] as string[]);
+    const cityRegionOptions = [
+        { label: "Any state/region", value: "" },
+        ...getStatesForCountry(cityCountryCode).map((code) => ({
+            label: `${getStateName(code)} (${code})`,
+            value: code,
+        })),
+    ];
+    const selectedCityNames = useMemo(() => splitCityNames(cityNames), [cityNames]);
+    const cityOptions = useMemo(() => {
+        const options = citiesFetcher.data?.cities || [];
+        const existingValues = new Set(options.map((option) => option.value));
+        const normalizedSearch = citySearchValue.trim().toLocaleLowerCase();
+        return [
+            ...selectedCityNames
+                .filter(
+                    (city) =>
+                        !existingValues.has(city) &&
+                        (!normalizedSearch || city.toLocaleLowerCase().includes(normalizedSearch)),
+                )
+                .map((city) => ({ label: city, value: city })),
+            ...options,
+        ];
+    }, [citiesFetcher.data?.cities, citySearchValue, selectedCityNames]);
 
     useEffect(() => {
         const needsStateData =
             formMatchType === "state" ||
-            rules.some((rule) => rule.matchType === "state");
+            formMatchType === "city" ||
+            rules.some((rule) => rule.matchType === "state" || rule.matchType === "city");
         if (!needsStateData || stateData || hasRequestedStateData.current) return;
 
         hasRequestedStateData.current = true;
@@ -530,6 +638,28 @@ export default function RulesPage() {
         hasRequestedMarkets.current = true;
         marketsFetcher.load("/app/rules-markets");
     }, [formMatchType, markets.length, marketsFetcher, rules]);
+
+    useEffect(() => {
+        if (!modalOpen || formMatchType !== "city" || !cityCountryCode) return;
+
+        const timeoutId = window.setTimeout(() => {
+            const params = new URLSearchParams({
+                country: cityCountryCode,
+                q: citySearchValue.trim(),
+            });
+            if (cityRegionCode) params.set("region", cityRegionCode);
+            loadCities(`/app/rules-cities?${params.toString()}`);
+        }, 250);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [
+        cityCountryCode,
+        cityRegionCode,
+        citySearchValue,
+        formMatchType,
+        loadCities,
+        modalOpen,
+    ]);
 
     useEffect(() => {
         if (fetcher.state !== "idle") return;
@@ -590,6 +720,9 @@ export default function RulesPage() {
                 rule.countryCodes,
                 rule.marketHandles,
                 rule.stateCodes,
+                rule.cityNames,
+                rule.cityCountryCode,
+                rule.cityRegionCode,
             ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
         });
     }, [conflictSummary?.byRuleId, matchTypeFilter, ruleQuery, rules, statusFilter]);
@@ -629,6 +762,7 @@ export default function RulesPage() {
         { label: "All targets", value: "all" },
         { label: "Country", value: "country" },
         { label: "State/Region", value: "state" },
+        { label: "City", value: "city" },
         { label: "Shopify Market", value: "market" },
     ];
     const selectTargetType = (value: string) => {
@@ -695,9 +829,13 @@ export default function RulesPage() {
         if (editingRule) {
             setFormName(editingRule.name);
             setFormMatchType(editingRule.matchType || "country");
-            setSelectedCountries(editingRule.countryCodes.split(",").map(c => c.trim()).filter(Boolean));
+            setSelectedCountries((editingRule.countryCodes || "").split(",").map(c => c.trim()).filter(Boolean));
             setSelectedMarkets((editingRule.marketHandles || "").split(",").map(c => c.trim()).filter(Boolean));
             setSelectedStates((editingRule.stateCodes || "").split(",").map(c => c.trim()).filter(Boolean));
+            setCityNames((editingRule.cityNames || "").split(",").join("\n"));
+            setCitySearchValue("");
+            setCityCountryCode(editingRule.cityCountryCode || "");
+            setCityRegionCode(editingRule.cityRegionCode || "");
             setFormTargetUrl(editingRule.targetUrl);
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "redirect");
@@ -717,6 +855,10 @@ export default function RulesPage() {
             setSelectedCountries([]);
             setSelectedMarkets([]);
             setSelectedStates([]);
+            setCityNames("");
+            setCitySearchValue("");
+            setCityCountryCode("");
+            setCityRegionCode("");
             setFormTargetUrl("");
             setFormPriority("0");
             setFormRuleType("redirect");
@@ -756,6 +898,9 @@ export default function RulesPage() {
         formData.append("countryCodes", selectedCountries.join(","));
         formData.append("marketHandles", selectedMarkets.join(","));
         formData.append("stateCodes", selectedStates.join(","));
+        formData.append("cityNames", cityNames);
+        formData.append("cityCountryCode", cityCountryCode);
+        formData.append("cityRegionCode", cityRegionCode);
         const selectedMarketCountryCodes = Array.from(new Set(
             selectedMarkets.flatMap((handle) => marketCountryCodesByHandle[handle] || []),
         ));
@@ -779,7 +924,7 @@ export default function RulesPage() {
 
         formFetcher.submit(formData, { method: "POST" });
     }, [
-        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, marketCountryCodesByHandle, formTargetUrl, formPriority,
+        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, cityNames, cityCountryCode, cityRegionCode, marketCountryCodesByHandle, formTargetUrl, formPriority,
         formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
         pageTargetingType, pagePaths,
         formFetcher
@@ -897,6 +1042,27 @@ export default function RulesPage() {
         }
     };
 
+    const toggleCitySelection = (city: string) => {
+        const nextCities = selectedCityNames.includes(city)
+            ? selectedCityNames.filter((selectedCity) => selectedCity !== city)
+            : [...selectedCityNames, city].slice(0, MAX_CITIES_PER_RULE);
+        setCityNames(nextCities.join(", "));
+    };
+
+    const handleCityBulkSelect = (action: "ALL" | "CLEAR") => {
+        if (action === "CLEAR") {
+            setCityNames("");
+            return;
+        }
+
+        const visibleCities = cityOptions.map((option) => option.value);
+        setCityNames(
+            Array.from(new Set([...selectedCityNames, ...visibleCities]))
+                .slice(0, MAX_CITIES_PER_RULE)
+                .join(", "),
+        );
+    };
+
     const toggleMarketSelection = (marketHandle: string) => {
         if (selectedMarkets.includes(marketHandle)) {
             setSelectedMarkets(selectedMarkets.filter(handle => handle !== marketHandle));
@@ -918,6 +1084,9 @@ export default function RulesPage() {
             marketHandles: rule.marketHandles,
             marketCountryCodes: rule.marketCountryCodes,
             stateCodes: rule.stateCodes,
+            cityNames: rule.cityNames,
+            cityCountryCode: rule.cityCountryCode,
+            cityRegionCode: rule.cityRegionCode,
             targetUrl: rule.targetUrl,
             priority: rule.priority,
             ruleType: rule.ruleType,
@@ -942,7 +1111,7 @@ export default function RulesPage() {
         downloadAnchor.remove();
     }, [rules, selectedResources]);
 
-    const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImportFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         setImportFileName(file.name);
@@ -972,9 +1141,16 @@ export default function RulesPage() {
             onAction: () => handleExportRules(false),
         }] : []),
     ];
-    const selectedTargetCount = formMatchType === "market" ? selectedMarkets.length : (formMatchType === "state" ? selectedStates.length : selectedCountries.length);
+    const selectedTargetCount =
+        formMatchType === "market"
+            ? selectedMarkets.length
+            : formMatchType === "state"
+                ? selectedStates.length
+                : formMatchType === "city"
+                    ? (cityCountryCode && splitCityNames(cityNames).length > 0 ? splitCityNames(cityNames).length : 0)
+                    : selectedCountries.length;
     const isPaidOnlyRule = (rule: any) =>
-        rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
+        rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || rule.matchType === "city" || (rule.pageTargetingType || "all") !== "all";
     const rowMarkup = paginatedRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
         const toggleInProgress = fetcher.state !== "idle";
@@ -984,10 +1160,27 @@ export default function RulesPage() {
             .slice(0, 3)
             .map((item: any) => `${item.message} (${item.scope})`)
             .join("\n");
-        const targetValues = (rule.matchType === "market" ? rule.marketHandles : (rule.matchType === "state" ? rule.stateCodes : rule.countryCodes))
+        const targetValues = String(
+            rule.matchType === "market"
+                ? rule.marketHandles || ""
+                : rule.matchType === "state"
+                    ? rule.stateCodes || ""
+                    : rule.matchType === "city"
+                        ? rule.cityNames || ""
+                        : rule.countryCodes || "",
+        )
             .split(",")
             .map((value: string) => value.trim())
             .filter(Boolean);
+        const matchTypeLabel =
+            rule.matchType === "market"
+                ? "Market"
+                : rule.matchType === "state"
+                    ? "State"
+                    : rule.matchType === "city"
+                        ? "City"
+                        : "Country";
+        const targetMissing = targetValues.length === 0;
 
         return (
         <IndexTable.Row
@@ -997,8 +1190,8 @@ export default function RulesPage() {
             position={index}
             onClick={() => handleOpenModal(rule)}
         >
-            <IndexTable.Cell>
-                <div style={{ minWidth: "120px" }}>
+            <IndexTable.Cell className="rule-name-column">
+                <div className="rule-name-cell">
                     <InlineStack gap="100" blockAlign="center" wrap={false}>
                         <Text variant="bodyMd" fontWeight="bold" as="span">
                             {rule.name}
@@ -1013,19 +1206,30 @@ export default function RulesPage() {
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>
-                <div style={{ minWidth: "64px" }}>
-                    <Badge tone={rule.matchType === "market" ? "attention" : (rule.matchType === "state" ? "warning" : "info")}>
-                        {rule.matchType === "market" ? "Market" : (rule.matchType === "state" ? "State" : "Country")}
+            <IndexTable.Cell className="rule-type-column">
+                <div className="rule-type-cell">
+                    <Badge tone={rule.matchType === "market" ? "attention" : (rule.matchType === "state" || rule.matchType === "city" ? "warning" : "info")}>
+                        {matchTypeLabel}
                     </Badge>
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>
-                <div style={{ minWidth: "300px" }}>
+            <IndexTable.Cell className="rule-target-column">
+                <div className="rule-target-cell">
                     <InlineStack gap="100" wrap={false}>
+                        {targetMissing && (
+                            <Badge tone="critical">
+                                {rule.matchType === "city" ? "Missing city target" : "Missing target"}
+                            </Badge>
+                        )}
                         {targetValues.slice(0, 3).map((value: string) => (
-                            <Badge key={value} tone={rule.matchType === "market" ? "attention" : (rule.matchType === "state" ? "warning" : "info")}>
-                                {rule.matchType === "market" ? formatMarketLabel(value, rule) : (rule.matchType === "state" ? `${getStateName(value)} (${value})` : value)}
+                            <Badge key={value} tone={rule.matchType === "market" ? "attention" : (rule.matchType === "state" || rule.matchType === "city" ? "warning" : "info")}>
+                                {rule.matchType === "market"
+                                    ? formatMarketLabel(value, rule)
+                                    : rule.matchType === "state"
+                                        ? `${getStateName(value)} (${value})`
+                                        : rule.matchType === "city"
+                                            ? `${value} (${rule.cityRegionCode || rule.cityCountryCode})`
+                                            : value}
                             </Badge>
                         ))}
                         {targetValues.length > 3 && (
@@ -1034,8 +1238,8 @@ export default function RulesPage() {
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>
-                <div style={{ minWidth: "180px" }}>
+            <IndexTable.Cell className="rule-url-column">
+                <div className="rule-url-cell">
                     <Text as="span" variant="bodyMd" truncate>
                         {rule.ruleType === "block" ? (
                             <Badge tone="attention">Access Blocked</Badge>
@@ -1045,9 +1249,9 @@ export default function RulesPage() {
                     </Text>
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>
+            <IndexTable.Cell className="rule-status-column">
                 <div
-                    style={{ minWidth: "144px" }}
+                    className="rule-status-cell"
                     onClick={(event) => event.stopPropagation()}
                 >
                     <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -1062,14 +1266,18 @@ export default function RulesPage() {
                             checked={rule.isActive}
                             label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
                             loading={isThisRuleToggling}
-                            disabled={toggleInProgress || (!rule.isActive && isPaidOnlyRule(rule) && !hasProPlan)}
+                            disabled={
+                                toggleInProgress ||
+                                (!rule.isActive && targetMissing) ||
+                                (!rule.isActive && isPaidOnlyRule(rule) && !hasProPlan)
+                            }
                             onChange={() => handleToggle(rule)}
                         />
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>
-                <div style={{ minWidth: "110px" }}>
+            <IndexTable.Cell className="rule-method-column">
+                <div className="rule-method-cell">
                     {rule.ruleType === 'redirect' ? (
                         <Badge tone={rule.redirectMode === 'auto_redirect' ? 'warning' : 'info'}>
                             {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
@@ -1079,11 +1287,11 @@ export default function RulesPage() {
                     )}
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
-            <IndexTable.Cell>
+            <IndexTable.Cell className="rule-priority-column">{rule.priority}</IndexTable.Cell>
+            <IndexTable.Cell className="rule-actions-column">
                 <div
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: "flex", justifyContent: "flex-end", minWidth: "72px" }}
+                    className="rule-actions-cell"
                 >
                     <InlineStack gap="200" wrap={false}>
                         <Tooltip content="Edit rule">
@@ -1311,6 +1519,47 @@ export default function RulesPage() {
                         width: 100%;
                         min-width: 1280px;
                     }
+                    .rule-name-column,
+                    .rule-name-cell {
+                        min-width: 160px;
+                    }
+                    .rule-type-column,
+                    .rule-type-cell {
+                        min-width: 80px;
+                    }
+                    .rule-type-cell {
+                        align-items: center;
+                        display: flex;
+                        justify-content: flex-start;
+                        visibility: visible;
+                    }
+                    .rule-target-column,
+                    .rule-target-cell {
+                        min-width: 320px;
+                    }
+                    .rule-url-column,
+                    .rule-url-cell {
+                        min-width: 200px;
+                    }
+                    .rule-status-column,
+                    .rule-status-cell {
+                        min-width: 150px;
+                    }
+                    .rule-method-column,
+                    .rule-method-cell {
+                        min-width: 120px;
+                    }
+                    .rule-priority-column {
+                        min-width: 80px;
+                    }
+                    .rule-actions-column,
+                    .rule-actions-cell {
+                        min-width: 80px;
+                    }
+                    .rule-actions-cell {
+                        display: flex;
+                        justify-content: flex-end;
+                    }
                     .rules-table-wrap .Polaris-IndexTable__TableHeading--first,
                     .rules-table-wrap .Polaris-IndexTable__TableHeading--second {
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
@@ -1331,8 +1580,14 @@ export default function RulesPage() {
                             margin-left: auto;
                         }
                         .rules-table-wrap .Polaris-IndexTable__Table {
-                            min-width: 880px;
+                            min-width: 980px;
                         }
+                        .rule-name-column,
+                        .rule-name-cell { min-width: 140px; }
+                        .rule-target-column,
+                        .rule-target-cell { min-width: 240px; }
+                        .rule-url-column,
+                        .rule-url-cell { min-width: 170px; }
                     }
                 `}
             </style>
@@ -1655,6 +1910,30 @@ export default function RulesPage() {
                                 )}
                                 {hasProPlan ? (
                                     <RadioButton
+                                        label="City"
+                                        checked={formMatchType === "city"}
+                                        id="matchTypeCity"
+                                        name="matchType"
+                                        onChange={() => setFormMatchType("city")}
+                                    />
+                                ) : (
+                                    <div style={{ opacity: 0.65, width: "fit-content" }}>
+                                        <RadioButton
+                                            label={(
+                                                <InlineStack gap="200">
+                                                    <span>City</span>
+                                                    <Badge tone="warning">Premium</Badge>
+                                                </InlineStack>
+                                            )}
+                                            checked={false}
+                                            id="matchTypeCity"
+                                            name="matchType"
+                                            disabled
+                                        />
+                                    </div>
+                                )}
+                                {hasProPlan ? (
+                                    <RadioButton
                                         label="Shopify Market"
                                         checked={formMatchType === "market"}
                                         id="matchTypeMarket"
@@ -1930,6 +2209,141 @@ export default function RulesPage() {
                                             );
                                         })}
                                     </div>
+                                </BlockStack>
+                            )}
+
+                            {formMatchType === "city" && (
+                                <BlockStack gap="300">
+                                    <FormLayout.Group>
+                                        <Select
+                                            label="Country"
+                                            options={CITY_COUNTRY_OPTIONS}
+                                            value={cityCountryCode}
+                                            onChange={(value) => {
+                                                setCityCountryCode(value);
+                                                setCityRegionCode("");
+                                                setCityNames("");
+                                                setCitySearchValue("");
+                                            }}
+                                        />
+                                        <Select
+                                            label="State/Region (optional)"
+                                            options={cityRegionOptions}
+                                            value={cityRegionCode}
+                                            onChange={(value) => {
+                                                setCityRegionCode(value);
+                                                setCityNames("");
+                                                setCitySearchValue("");
+                                            }}
+                                            disabled={!cityCountryCode || !stateData || cityRegionOptions.length === 1}
+                                        />
+                                    </FormLayout.Group>
+                                    <InlineStack align="space-between" blockAlign="center">
+                                        <Text as="p" variant="bodySm" fontWeight="semibold">Cities</Text>
+                                        <Badge tone={selectedCityNames.length > 0 ? "success" : "attention"}>
+                                            {`${selectedCityNames.length} selected`}
+                                        </Badge>
+                                    </InlineStack>
+
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: smUp ? "minmax(0, 1fr) auto" : "1fr",
+                                            gap: "8px",
+                                            alignItems: "stretch",
+                                        }}
+                                    >
+                                        <TextField
+                                            label="Search cities"
+                                            labelHidden
+                                            placeholder={
+                                                cityCountryCode
+                                                    ? "Search cities..."
+                                                    : "Select a country first"
+                                            }
+                                            value={citySearchValue}
+                                            onChange={setCitySearchValue}
+                                            prefix={<Icon source={SearchIcon} />}
+                                            disabled={!cityCountryCode}
+                                            autoComplete="off"
+                                        />
+
+                                        <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                                            <Button
+                                                disabled={!cityCountryCode || cityOptions.length === 0}
+                                                onClick={() => handleCityBulkSelect("ALL")}
+                                            >
+                                                Select All
+                                            </Button>
+                                            <Button
+                                                disabled={selectedCityNames.length === 0}
+                                                onClick={() => handleCityBulkSelect("CLEAR")}
+                                            >
+                                                Clear All
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className="country-selector-scroll"
+                                        style={{
+                                            maxHeight: "340px",
+                                            overflowY: "auto",
+                                            border: "1px solid #dfe3e8",
+                                            borderRadius: "8px",
+                                            padding: "6px",
+                                            background: "#ffffff",
+                                        }}
+                                    >
+                                        {!cityCountryCode ? (
+                                            <div style={{ padding: "12px" }}>
+                                                <Text as="p" variant="bodySm" tone="subdued">
+                                                    Select a country to load cities.
+                                                </Text>
+                                            </div>
+                                        ) : citiesFetcher.state !== "idle" ? (
+                                            <div style={{ padding: "12px" }}>
+                                                <Text as="p" variant="bodySm" tone="subdued">
+                                                    Loading cities...
+                                                </Text>
+                                            </div>
+                                        ) : cityOptions.length > 0 ? (
+                                            <div
+                                                style={{
+                                                    display: "grid",
+                                                    gap: "2px 12px",
+                                                    gridTemplateColumns: smUp
+                                                        ? "repeat(2, minmax(0, 1fr))"
+                                                        : "1fr",
+                                                }}
+                                            >
+                                                {cityOptions.map((option) => (
+                                                    <div
+                                                        key={option.value}
+                                                        style={{ padding: "3px 8px", borderRadius: "6px" }}
+                                                    >
+                                                        <Checkbox
+                                                            label={option.label}
+                                                            checked={selectedCityNames.includes(option.value)}
+                                                            onChange={() => toggleCitySelection(option.value)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div style={{ padding: "12px" }}>
+                                                <Text as="p" variant="bodySm" tone="subdued">
+                                                    No matching cities found.
+                                                </Text>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        Select up to {MAX_CITIES_PER_RULE} cities. Matching is case- and accent-insensitive.
+                                    </Text>
+                                    <Banner tone="info">
+                                        City is estimated from the visitor IP address. Country is required; choose a state/region when city names may be duplicated.
+                                    </Banner>
                                 </BlockStack>
                             )}
 

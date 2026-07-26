@@ -1,0 +1,4 @@
+ALTER TABLE "RedirectRule"
+ADD COLUMN "cityNames" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "cityCountryCode" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "cityRegionCode" TEXT NOT NULL DEFAULT '';

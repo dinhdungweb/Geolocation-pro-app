@@ -13,6 +13,7 @@ export type RecordStorefrontAnalyticsEventInput = {
   path: string | null;
   regionCode?: string | null;
   regionName?: string | null;
+  city?: string | null;
   request?: Request;
   ruleId: string | null;
   ruleName: string | null;
@@ -64,6 +65,7 @@ function fromJsonPayload(value: Prisma.JsonValue): RecordStorefrontAnalyticsEven
     path: typeof payload.path === "string" ? payload.path : null,
     regionCode: typeof payload.regionCode === "string" ? payload.regionCode : null,
     regionName: typeof payload.regionName === "string" ? payload.regionName : null,
+    city: typeof payload.city === "string" ? payload.city : null,
     ruleId: typeof payload.ruleId === "string" ? payload.ruleId : null,
     ruleName: typeof payload.ruleName === "string" ? payload.ruleName : null,
     shop: payload.shop,
@@ -472,6 +474,7 @@ export async function recordStorefrontAnalyticsDetails(
     path,
     regionCode = null,
     regionName = null,
+    city = null,
     request,
     ruleId,
     ruleName,
@@ -490,7 +493,7 @@ export async function recordStorefrontAnalyticsDetails(
         countryCode,
         regionCode,
         regionName,
-        city: null,
+        city,
         action: actionFromType(type),
         ruleName,
         targetUrl,

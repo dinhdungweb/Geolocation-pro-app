@@ -1,6 +1,7 @@
 import { normalizePagePathPattern, splitPagePathPatterns } from "./page-targeting";
+import { normalizeCityName } from "./city-targeting";
 
-export type ConflictMatchType = "country" | "ip" | "market" | "state";
+export type ConflictMatchType = "country" | "ip" | "market" | "state" | "city";
 
 export type ConflictSeverity = "warning" | "critical";
 
@@ -13,6 +14,9 @@ export interface ConflictRule {
   marketHandles?: string | null;
   marketCountryCodes?: string | null;
   stateCodes?: string | null;
+  cityNames?: string | null;
+  cityCountryCode?: string | null;
+  cityRegionCode?: string | null;
   isActive: boolean;
   priority: number;
   ruleType: string;
@@ -272,6 +276,27 @@ function stateOverlap(left: ConflictRule, right: ConflictRule) {
   };
 }
 
+function cityOverlap(left: ConflictRule, right: ConflictRule) {
+  const leftCountry = left.cityCountryCode?.trim().toUpperCase() || "";
+  const rightCountry = right.cityCountryCode?.trim().toUpperCase() || "";
+  if (!leftCountry || leftCountry !== rightCountry) {
+    return { overlaps: false, label: "different countries" };
+  }
+
+  const leftRegion = left.cityRegionCode?.trim().toUpperCase() || "";
+  const rightRegion = right.cityRegionCode?.trim().toUpperCase() || "";
+  if (leftRegion && rightRegion && leftRegion !== rightRegion) {
+    return { overlaps: false, label: "different regions" };
+  }
+
+  const rightCities = new Set(splitList(right.cityNames).map(normalizeCityName));
+  const shared = splitList(left.cityNames).find((city) => rightCities.has(normalizeCityName(city)));
+  return {
+    overlaps: Boolean(shared),
+    label: shared ? `${shared}, ${leftRegion || leftCountry}` : "different cities",
+  };
+}
+
 function addConflict(
   summary: RuleConflictSummary,
   conflict: Omit<RuleConflict, "id">,
@@ -300,6 +325,7 @@ export function detectRuleConflicts(
         matchType === "country" ? countryOverlap(left, right) :
         matchType === "market" ? marketOverlap(left, right) :
         matchType === "state" ? stateOverlap(left, right) :
+        matchType === "city" ? cityOverlap(left, right) :
         ipOverlap(left, right);
       if (!matchOverlap.overlaps) continue;
 
@@ -371,6 +397,39 @@ function marketStateOverlap(marketRule: ConflictRule, stateRule: ConflictRule) {
   };
 }
 
+function countryCityOverlap(countryRule: ConflictRule, cityRule: ConflictRule) {
+  const countries = splitList(countryRule.countryCodes).map((code) => code.toUpperCase());
+  const cityCountry = cityRule.cityCountryCode?.trim().toUpperCase() || "";
+  const overlaps = Boolean(cityCountry) && (countries.includes("*") || countries.includes(cityCountry));
+  return {
+    overlaps,
+    label: overlaps ? cityCountry : "different countries/cities",
+  };
+}
+
+function stateCityOverlap(stateRule: ConflictRule, cityRule: ConflictRule) {
+  const cityCountry = cityRule.cityCountryCode?.trim().toUpperCase() || "";
+  const cityRegion = cityRule.cityRegionCode?.trim().toUpperCase() || "";
+  const states = splitList(stateRule.stateCodes).map((code) => code.toUpperCase());
+  const matchingState = states.find((state) =>
+    cityRegion ? state === cityRegion : state.split("-")[0] === cityCountry,
+  );
+  return {
+    overlaps: Boolean(matchingState),
+    label: matchingState || "different states/cities",
+  };
+}
+
+function marketCityOverlap(marketRule: ConflictRule, cityRule: ConflictRule) {
+  const marketCountries = splitList(marketRule.marketCountryCodes).map((code) => code.toUpperCase());
+  const cityCountry = cityRule.cityCountryCode?.trim().toUpperCase() || "";
+  const overlaps = Boolean(cityCountry) && marketCountries.includes(cityCountry);
+  return {
+    overlaps,
+    label: overlaps ? cityCountry : "different markets/cities",
+  };
+}
+
 export function detectCrossRuleConflicts(
   rules: ConflictRule[],
 ): RuleConflictSummary {
@@ -378,6 +437,7 @@ export function detectCrossRuleConflicts(
   const activeCountryRules = rules.filter((rule) => rule.isActive && rule.matchType === "country");
   const activeStateRules = rules.filter((rule) => rule.isActive && rule.matchType === "state");
   const activeMarketRules = rules.filter((rule) => rule.isActive && rule.matchType === "market");
+  const activeCityRules = rules.filter((rule) => rule.isActive && rule.matchType === "city");
 
   // 1. Check Country vs State
   for (const countryRule of activeCountryRules) {
@@ -450,6 +510,48 @@ export function detectCrossRuleConflicts(
       summary.total += 1;
     }
   }
+
+  const addCityCrossConflicts = (
+    broaderRules: ConflictRule[],
+    broaderLabel: string,
+    overlap: (broaderRule: ConflictRule, cityRule: ConflictRule) => { overlaps: boolean; label: string },
+  ) => {
+    for (const broaderRule of broaderRules) {
+      for (const cityRule of activeCityRules) {
+        if (broaderRule.priority !== cityRule.priority) continue;
+
+        const matchOverlap = overlap(broaderRule, cityRule);
+        if (!matchOverlap.overlaps) continue;
+        const pageOverlap = pageTargetingOverlaps(broaderRule, cityRule);
+        if (!pageOverlap.overlaps) continue;
+        const scheduleOverlap = schedulesOverlap(broaderRule, cityRule);
+        if (!scheduleOverlap.overlaps) continue;
+
+        const scope = buildScope(matchOverlap.label, pageOverlap.label, scheduleOverlap.label);
+        addConflict(summary, {
+          ruleId: broaderRule.id,
+          otherRuleId: cityRule.id,
+          otherRuleName: cityRule.name,
+          severity: "critical",
+          scope,
+          message: `"${cityRule.name}" (City Rule) has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
+        });
+        addConflict(summary, {
+          ruleId: cityRule.id,
+          otherRuleId: broaderRule.id,
+          otherRuleName: broaderRule.name,
+          severity: "critical",
+          scope,
+          message: `"${broaderRule.name}" (${broaderLabel} Rule) has the same priority and overlapping targeting. Raise or lower one priority so the winning rule is deterministic.`,
+        });
+        summary.total += 1;
+      }
+    }
+  };
+
+  addCityCrossConflicts(activeCountryRules, "Country", countryCityOverlap);
+  addCityCrossConflicts(activeStateRules, "State", stateCityOverlap);
+  addCityCrossConflicts(activeMarketRules, "Market", marketCityOverlap);
 
   return summary;
 }

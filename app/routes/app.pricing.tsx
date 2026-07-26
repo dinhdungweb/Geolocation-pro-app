@@ -621,8 +621,8 @@ export default function PricingPage() {
             visitorLimit: PLAN_LIMITS[PREMIUM_PLAN],
             features: [
                 "Everything in Free",
-                "State redirects",
-                "Country & state blocking",
+                "State & city redirects",
+                "Country, state & city blocking",
                 "IP redirects & blocking",
                 "Markets & page targeting",
                 "VPN/proxy/Tor protection",

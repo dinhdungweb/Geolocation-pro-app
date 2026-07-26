@@ -155,6 +155,28 @@ describe("detectRuleConflicts", () => {
 
     expect(summary.total).toBe(1);
   });
+
+  it("detects duplicate city targets in the same scoped location", () => {
+    const summary = detectRuleConflicts([
+      rule({
+        matchType: "city",
+        countryCodes: "",
+        cityNames: "Los Angeles, San Francisco",
+        cityCountryCode: "US",
+        cityRegionCode: "US-CA",
+      }),
+      rule({
+        id: "rule-2",
+        matchType: "city",
+        countryCodes: "",
+        cityNames: "los angeles",
+        cityCountryCode: "US",
+        cityRegionCode: "US-CA",
+      }),
+    ], "city");
+
+    expect(summary.total).toBe(1);
+  });
 });
 
 describe("detectCrossRuleConflicts", () => {
@@ -206,5 +228,23 @@ describe("detectCrossRuleConflicts", () => {
     ]);
 
     expect(summary.total).toBe(0);
+  });
+
+  it("detects country and city rules covering the same country", () => {
+    const summary = detectCrossRuleConflicts([
+      rule({ countryCodes: "US" }),
+      rule({
+        id: "city-rule",
+        name: "Los Angeles",
+        matchType: "city",
+        countryCodes: "",
+        cityNames: "Los Angeles",
+        cityCountryCode: "US",
+        cityRegionCode: "US-CA",
+      }),
+    ]);
+
+    expect(summary.total).toBe(1);
+    expect(summary.byRuleId["rule-1"][0].otherRuleId).toBe("city-rule");
   });
 });

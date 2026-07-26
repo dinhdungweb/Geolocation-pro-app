@@ -25,8 +25,9 @@ import {
 } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPattern, splitPagePathPatterns } from "../utils/page-targeting";
 import { stateCodeMatchesRegion } from "../utils/states";
+import { cityMatchesRule } from "../utils/city-targeting";
 
-function responseData<T>(payload: T, init?: ResponseInit) {
+function responseData<T>(payload: T, init?: Parameters<typeof Response.json>[1]) {
   return Response.json(payload, init);
 }
 
@@ -50,6 +51,9 @@ type ProxyRule = {
   pageTargetingType: string;
   pagePaths?: string | null;
   stateCodes?: string;
+  cityNames?: string;
+  cityCountryCode?: string;
+  cityRegionCode?: string;
 };
 
 type StorefrontRuntimeConfig = {
@@ -139,7 +143,9 @@ function getSafeOrigin(origin: string | null) {
     if (parsed.protocol === "http:" || parsed.protocol === "https:") {
       return parsed.origin;
     }
-  } catch {}
+  } catch {
+    // Invalid origins use the safe storefront fallback below.
+  }
   return "https://storefront.local";
 }
 
@@ -452,6 +458,7 @@ function buildActionResponse({
   popup,
   regionCode,
   regionName,
+  city = "",
   rule,
   usage,
   visitToken,
@@ -469,6 +476,7 @@ function buildActionResponse({
   popup: any;
   regionCode?: string;
   regionName?: string;
+  city?: string;
   rule: ReturnType<typeof buildRulePayload> | null;
   usage: number;
   visitToken?: string | null;
@@ -488,6 +496,7 @@ function buildActionResponse({
     popup,
     regionCode,
     regionName,
+    city,
     rule,
     usage,
     visitToken,
@@ -533,6 +542,9 @@ async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRunt
         pageTargetingType: true,
         pagePaths: true,
         stateCodes: true,
+        cityNames: true,
+        cityCountryCode: true,
+        cityRegionCode: true,
       },
     }),
   ]);
@@ -576,6 +588,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let countryCode = "";
   let regionCode = "";
   let regionName = "";
+  let city = "";
 
   try {
     const geoResult = await getGeoFromIP(visitorIP);
@@ -583,6 +596,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     countryCode = geoResult.countryCode;
     regionCode = geoResult.regionCode;
     regionName = geoResult.regionName;
+    city = geoResult.city;
   } catch (error: any) {
     console.error(`[Proxy] MaxMind lookup error:`, error.message);
   }
@@ -597,6 +611,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           maxmindCountryCode,
           regionCode,
           regionName,
+          city,
           shopifyMarketHandle,
           shopifyMarketId,
           realIp: request.headers.get("x-real-ip"),
@@ -614,6 +629,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       maxmindCountryCode,
       regionCode,
       regionName,
+      city,
       shopifyMarketHandle,
       shopifyMarketId,
       shopifyClientIp: request.headers.get("x-shopify-client-ip"),
@@ -670,6 +686,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       countryCode,
       regionCode,
       regionName,
+      city,
       ipHash,
     });
     const visitToken = visitAnalytics.token;
@@ -828,6 +845,37 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (!selectedRule && hasPaidPlan) {
+      const cityRules = activeRules.filter((rule) => rule.matchType === "city");
+      const eligibleCityRules = cityRules
+        .filter((rule) => isRuleInSchedule(rule))
+        .filter((rule) => isRuleOnPage(rule, currentPath))
+        .filter((rule) => Boolean(rule.cityNames?.trim() && rule.cityCountryCode?.trim()));
+
+      if (eligibleCityRules.length > 0 && !city) {
+        const fallbackGeo = await getGeoFromIP(visitorIP, { useFreeFallback: true, requireCity: true });
+        if (!countryCode) countryCode = fallbackGeo.countryCode;
+        if (!regionCode) regionCode = fallbackGeo.regionCode;
+        if (!regionName) regionName = fallbackGeo.regionName;
+        if (!city) city = fallbackGeo.city;
+        debug = buildDebug();
+      }
+
+      selectedRule =
+        eligibleCityRules.find((rule) =>
+          cityMatchesRule(
+            rule,
+            { city, countryCode, regionCode, regionName },
+            { regionMatches: stateCodeMatchesRegion },
+          ),
+        ) || null;
+
+      if (selectedRule) {
+        source = "city";
+        action = getActionForRule(selectedRule);
+      }
+    }
+
+    if (!selectedRule && hasPaidPlan) {
       const stateRules = activeRules.filter((rule) => rule.matchType === "state");
 
       const eligibleStateRules = stateRules
@@ -857,6 +905,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         if (!countryCode) countryCode = fallbackGeo.countryCode;
         if (!regionCode) regionCode = fallbackGeo.regionCode;
         if (!regionName) regionName = fallbackGeo.regionName;
+        if (!city) city = fallbackGeo.city;
         debug = buildDebug();
       }
 
@@ -938,6 +987,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             countryCode,
             regionCode,
             regionName,
+            city,
             ipHash,
           })
         : null;
@@ -960,6 +1010,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             path: currentPath,
             regionCode,
             regionName,
+            city,
             request,
             ruleId: selectedRule.id,
             ruleName: selectedRule.name,
@@ -988,6 +1039,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         popup,
         regionCode,
         regionName,
+        city,
         rule: rulePayload,
         usage: currentUsage,
         visitToken,

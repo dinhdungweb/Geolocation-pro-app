@@ -29,7 +29,7 @@ const VALID_TYPES = [
   "vpn_blocked",
 ];
 
-function responseData<T>(payload: T, init?: ResponseInit) {
+function responseData<T>(payload: T, init?: Parameters<typeof Response.json>[1]) {
   return Response.json(payload, init);
 }
 
@@ -145,11 +145,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let countryCode = tokenPayload?.countryCode || asSafeString(data.countryCode, 2).toUpperCase() || null;
     let regionCode = tokenPayload?.regionCode || asSafeString(data.regionCode, 20).toUpperCase() || null;
     let regionName = tokenPayload?.regionName || asSafeString(data.regionName, 120) || null;
-    if (type === "visit" && (!regionCode || !regionName) && (!hasRegionCodeField || !regionName)) {
+    let city = tokenPayload?.city || asSafeString(data.city, 120) || null;
+    if (type === "visit" && ((!regionCode || !regionName) && (!hasRegionCodeField || !regionName) || !city)) {
       const geo = await getGeoFromIP(visitorIP);
       countryCode = countryCode || geo.countryCode || null;
       regionCode = regionCode || geo.regionCode || null;
       regionName = regionName || geo.regionName || null;
+      city = city || geo.city || null;
     }
 
     const ruleId = tokenPayload?.ruleId || asSafeString(data.ruleId, 100) || null;
@@ -166,6 +168,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       path,
       regionCode,
       regionName,
+      city,
       request,
       ruleId,
       ruleName,
