@@ -3,8 +3,10 @@ import prisma from "../../app/db.server";
 import {
   enqueueStorefrontAnalyticsEvent,
   processQueuedStorefrontAnalyticsEvents,
+  recordBillableUsage,
   type RecordStorefrontAnalyticsEventInput,
 } from "../../app/utils/storefront-analytics.server";
+import type { AnalyticsTokenPayload } from "../../app/utils/analytics-token.server";
 
 const SHOP = "analytics-queue.integration.test";
 
@@ -29,6 +31,9 @@ function analyticsInput(
 
 async function clearAnalyticsData() {
   await prisma.storefrontAnalyticsEventQueue.deleteMany({ where: { shop: SHOP } });
+  await prisma.billableUsageActionEvent.deleteMany({ where: { shop: SHOP } });
+  await prisma.billableUsageEvent.deleteMany({ where: { shop: SHOP } });
+  await prisma.monthlyUsage.deleteMany({ where: { shop: SHOP } });
   await prisma.analyticsRule.deleteMany({ where: { shop: SHOP } });
   await prisma.analyticsCountry.deleteMany({ where: { shop: SHOP } });
   await prisma.visitorLog.deleteMany({ where: { shop: SHOP } });
@@ -115,6 +120,59 @@ describe("storefront analytics queue integration", () => {
       attempts: 1,
       lastError: "Invalid analytics payload",
       status: "failed",
+    });
+  });
+
+  it("counts one visitor and one action when the same billing event arrives concurrently", async () => {
+    const payload: AnalyticsTokenPayload = {
+      action: "auto_redirect",
+      billingPeriodKey: "integration:billing-idempotency",
+      countryCode: "US",
+      eventKey: "concurrent-event-key",
+      iat: Date.now(),
+      ipHash: "integration-ip-hash",
+      path: "/products/example",
+      ruleId: "rule-1",
+      shop: SHOP,
+      source: "country",
+      yearMonth: "2026-07",
+    };
+
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        recordBillableUsage({
+          countryCode: "US",
+          path: payload.path,
+          payload,
+          type: "auto_redirected",
+        }),
+      ),
+    );
+
+    expect(results.filter((result) => result.inserted)).toHaveLength(1);
+    expect(results.filter((result) => result.actionInserted)).toHaveLength(1);
+    expect(
+      await prisma.billableUsageEvent.count({
+        where: { eventKey: payload.eventKey },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.billableUsageActionEvent.count({
+        where: { eventKey: payload.eventKey, action: "auto_redirected" },
+      }),
+    ).toBe(1);
+
+    const usage = await prisma.monthlyUsage.findUniqueOrThrow({
+      where: {
+        shop_billingPeriodKey: {
+          billingPeriodKey: payload.billingPeriodKey!,
+          shop: SHOP,
+        },
+      },
+    });
+    expect(usage).toMatchObject({
+      redirected: 1,
+      totalVisitors: 1,
     });
   });
 });

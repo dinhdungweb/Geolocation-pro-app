@@ -1,6 +1,7 @@
 node_modules
 build
 public/build
+extensions/geolocation-popup/assets/geolocation.js
 shopify-app-remix
 */*.yml
 .shopify

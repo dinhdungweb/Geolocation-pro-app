@@ -1,0 +1,1028 @@
+(function() {
+  'use strict';
+
+  const APP_VERSION = '2026.07.26.1';
+
+  const GEOLOCATION_CONFIG = window.__GEOLOCATION_CONFIG__;
+  if (!GEOLOCATION_CONFIG || !GEOLOCATION_CONFIG.shop) {
+    console.warn('[Geolocation] Storefront configuration is missing');
+    return;
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const DEBUG = urlParams.get('debug') === 'true';
+  const log = (...args) => DEBUG && console.log('[Geolocation]', ...args);
+
+  const ensureAppContainer = () => {
+    let container = document.getElementById('geolocation-app-container');
+    if (container) return container;
+    if (!document.body) return null;
+
+    container = document.createElement('div');
+    container.id = 'geolocation-app-container';
+    container.style.display = 'none';
+    document.body.appendChild(container);
+    return container;
+  };
+
+  const escapeHtml = (value) => {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(value || ''));
+    return div.innerHTML;
+  };
+
+  const safeColor = (value, fallback) => {
+    return /^#[0-9a-f]{3,8}$/i.test(value || '') ? value : fallback;
+  };
+
+  const safeUrl = (value) => {
+    const raw = (value || '').trim();
+    if (!raw) return '';
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+        return parsed.href;
+      }
+    } catch {
+      // Invalid merchant-provided URLs are rejected below.
+    }
+    if (raw.startsWith('/')) return raw;
+    return '';
+  };
+
+  const CookieManager = {
+    set(name, value, days) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+    },
+    get(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    },
+    has(name) {
+      return this.get(name) !== null;
+    },
+    remove(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }
+  };
+
+  const SessionManager = {
+    get(name) {
+      try {
+        return sessionStorage.getItem(name);
+      } catch {
+        return null;
+      }
+    },
+    set(name, value) {
+      try {
+        sessionStorage.setItem(name, value);
+      } catch {
+        // Storage can be unavailable in privacy-restricted browsers.
+      }
+    },
+    remove(name) {
+      try {
+        sessionStorage.removeItem(name);
+      } catch {
+        // Storage can be unavailable in privacy-restricted browsers.
+      }
+    },
+    has(name) {
+      return this.get(name) !== null;
+    }
+  };
+
+  const CONFIG_CACHE_TTL_MS = 10_000;
+  const configCacheKey = [
+    'geo_config',
+    GEOLOCATION_CONFIG.shop,
+    window.location.pathname,
+    GEOLOCATION_CONFIG.visitorCountry || '',
+    GEOLOCATION_CONFIG.marketHandle || '',
+    GEOLOCATION_CONFIG.marketId || ''
+  ].join(':');
+  let inFlightConfig = null;
+
+  const fetchConfig = async () => {
+    if (!DEBUG) {
+      try {
+        const cached = JSON.parse(SessionManager.get(configCacheKey) || 'null');
+        if (cached?.expiresAt > Date.now() && cached?.config) {
+          return cached.config;
+        }
+      } catch {
+        SessionManager.remove(configCacheKey);
+      }
+    }
+
+    if (inFlightConfig) return inFlightConfig;
+
+    inFlightConfig = (async () => {
+      const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&origin=${encodeURIComponent(window.location.origin)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}&market_handle=${encodeURIComponent(GEOLOCATION_CONFIG.marketHandle || '')}&market_id=${encodeURIComponent(GEOLOCATION_CONFIG.marketId || '')}&_geo_ts=${Date.now()}${DEBUG ? '&debug=true' : ''}`;
+      const response = await fetch(apiUrl, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const config = await response.json();
+      if (!DEBUG) {
+        SessionManager.set(configCacheKey, JSON.stringify({
+          expiresAt: Date.now() + CONFIG_CACHE_TTL_MS,
+          config
+        }));
+      }
+      return config;
+    })();
+
+    try {
+      return await inFlightConfig;
+    } finally {
+      inFlightConfig = null;
+    }
+  };
+
+  const getCountryCode = (config) => {
+    if (DEBUG && urlParams.get('test_country')) {
+      return urlParams.get('test_country').toUpperCase();
+    }
+    return (config.countryCode || GEOLOCATION_CONFIG.visitorCountry || '').toUpperCase();
+  };
+
+  const getCountryFlagUrl = (countryCode) => {
+    const code = (countryCode || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) return '';
+
+    return `https://flagcdn.com/${code.toLowerCase()}.svg`;
+  };
+
+  const getCountryLabelHtml = (countryCode) => {
+    const code = (countryCode || '').toUpperCase();
+    if (!code) return 'your region';
+
+    const flagUrl = getCountryFlagUrl(code);
+    const escapedCode = escapeHtml(code);
+    if (!flagUrl) return escapedCode;
+
+    return `<span class="geo-country-label"><img class="geo-country-flag" src="${flagUrl}" alt="" loading="lazy" onerror="this.style.display='none'"><span>${escapedCode}</span></span>`;
+  };
+
+  const trackEvent = (type, config, extra = {}) => {
+    try {
+      if (window.Shopify && window.Shopify.designMode) return;
+
+      const isVisit = type === 'visit';
+      let visitKey = null;
+      if (type === 'visit') {
+        visitKey = `geo_visit_tracked:${GEOLOCATION_CONFIG.shop}:${window.location.pathname}`;
+        if (SessionManager.has(visitKey)) return;
+        if (!config.visitToken) return;
+        SessionManager.set(visitKey, 'pending');
+      }
+
+      const rule = config.rule || {};
+      const payload = {
+        type,
+        path: window.location.pathname,
+        countryCode: getCountryCode(config),
+        regionCode: typeof config.regionCode === 'string' ? config.regionCode : undefined,
+        regionName: typeof config.regionName === 'string' ? config.regionName : undefined,
+        eventToken: isVisit ? config.visitToken : (config.eventToken || undefined),
+        ruleId: rule.ruleId || undefined,
+        ruleName: rule.name || undefined,
+        targetUrl: rule.targetUrl || undefined,
+        ...extra
+      };
+
+      if (!isVisit && navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        if (navigator.sendBeacon(GEOLOCATION_CONFIG.analyticsUrl, blob)) return;
+      }
+
+      fetch(GEOLOCATION_CONFIG.analyticsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (visitKey) SessionManager.set(visitKey, 'true');
+      }).catch((error) => {
+        if (visitKey) SessionManager.remove(visitKey);
+        log('Analytics error:', error);
+      });
+    } catch (error) {
+      log('Analytics failed:', error);
+    }
+  };
+
+  const alreadyOnTarget = (targetUrl) => {
+    if (!targetUrl) return true;
+    try {
+      const current = new URL(window.location.href);
+      const target = new URL(targetUrl, current.origin);
+      if (current.origin !== target.origin) return false;
+
+      const normalizePath = (path) => path.replace(/\/+$/, '') || '/';
+      return normalizePath(current.pathname) === normalizePath(target.pathname);
+    } catch {
+      return window.location.href.includes(targetUrl);
+    }
+  };
+
+  const getTargetUrl = (targetUrl) => {
+    if (!targetUrl) return null;
+    try {
+      return new URL(targetUrl, window.location.origin);
+    } catch {
+      return null;
+    }
+  };
+
+  const isInternalTarget = (targetUrl) => {
+    const target = getTargetUrl(targetUrl);
+    return Boolean(target && target.origin === window.location.origin);
+  };
+
+  const getInternalRedirectKey = (rule) => {
+    const keySource = rule.ruleId || rule.name || rule.targetUrl || 'unknown';
+    return `geo_internal_redirected:${GEOLOCATION_CONFIG.shop}:${keySource}`;
+  };
+
+  const showPopup = (config) => {
+    const rule = config.rule || {};
+    const popup = config.popup || {};
+    const template = popup.template || 'modal';
+    const container = ensureAppContainer();
+    if (!container) {
+      document.addEventListener('DOMContentLoaded', () => showPopup(config), { once: true });
+      return;
+    }
+
+    let targetName = rule.targetUrl || '';
+    try {
+      targetName = new URL(rule.targetUrl, window.location.origin).hostname;
+    } catch {
+      // Fall back to displaying the configured target string.
+    }
+
+    const title = escapeHtml(popup.title || 'Redirect Available');
+    const countryCode = getCountryCode(config);
+    const message = escapeHtml(popup.message || 'We detected you are from {country}. Would you like to visit {target}?')
+      .replaceAll('{country}', getCountryLabelHtml(countryCode))
+      .replaceAll('{target}', escapeHtml(targetName || 'this store'));
+    const confirmBtn = escapeHtml(popup.confirmBtn || 'Go now');
+    const cancelBtn = escapeHtml(popup.cancelBtn || 'Stay here');
+    const bgColor = safeColor(popup.bgColor, '#ffffff');
+    const textColor = safeColor(popup.textColor, '#333333');
+    const btnColor = safeColor(popup.btnColor, '#007bff');
+
+    let overlayStyle = '';
+    let contentStyle = '';
+    if (template === 'top_bar' || template === 'bottom_bar') {
+      const verticalPosition = template === 'top_bar' ? 'top: 0 !important;' : 'bottom: 0 !important;';
+      const animation = template === 'top_bar' ? 'geo-slide-down' : 'geo-slide-up';
+      overlayStyle = `
+        position: fixed !important; ${verticalPosition} left: 0 !important; right: 0 !important;
+        background: ${bgColor} !important; color: ${textColor} !important;
+        padding: 12px 20px !important; z-index: 2147483647 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        display: flex !important; align-items: center !important; justify-content: space-between !important;
+        flex-wrap: wrap !important; gap: 15px !important; animation: ${animation} 0.3s ease !important;
+      `;
+      contentStyle = 'display: flex !important; align-items: center !important; gap: 15px !important; flex: 1 !important;';
+    } else {
+      overlayStyle = `
+        position: fixed !important; inset: 0 !important; background: rgba(17, 24, 39, 0.46) !important;
+        z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+        padding: 20px !important; animation: geo-fade-in 0.16s ease !important;
+      `;
+      contentStyle = `
+        --geo-popup-bg: ${bgColor}; --geo-popup-text: ${textColor}; --geo-popup-accent: ${btnColor};
+      `;
+    }
+
+    const buttonsHtml = template === 'modal'
+      ? `
+        <div class="geo-popup-actions">
+          <button id="geo-confirm-btn" class="geo-popup-btn geo-popup-btn-primary">${confirmBtn}</button>
+          <button id="geo-cancel-btn" class="geo-popup-btn geo-popup-btn-secondary">${cancelBtn}</button>
+        </div>
+      `
+      : `
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <button id="geo-confirm-btn" style="background: ${btnColor}; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${confirmBtn}</button>
+          <button id="geo-cancel-btn" style="background: transparent; color: ${textColor}; border: 1px solid ${textColor}; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">${cancelBtn}</button>
+        </div>
+      `;
+
+    const contentHtml = template === 'modal'
+      ? `
+        <div id="geo-popup-modal" class="geo-popup-card" style="${contentStyle}" role="dialog" aria-modal="true" aria-labelledby="geo-popup-title">
+          <button id="geo-close-btn" class="geo-popup-close" type="button" aria-label="Close">&times;</button>
+          <div class="geo-popup-copy">
+            <h3 id="geo-popup-title" class="geo-popup-title">${title}</h3>
+            <p class="geo-popup-message">${message}</p>
+          </div>
+          ${buttonsHtml}
+        </div>
+      `
+      : `
+        <div id="geo-bar-content" style="${contentStyle}">
+          <span style="font-weight: 600; font-size: 14px;">${title}</span>
+          <span style="font-size: 14px; opacity: 0.9; margin-right: auto;">${message}</span>
+          ${buttonsHtml}
+        </div>
+      `;
+
+    container.innerHTML = `
+      <div id="geo-popup-overlay" style="${overlayStyle}">
+        ${contentHtml}
+      </div>
+      <style>
+        @keyframes geo-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes geo-scale-in { from { transform: scale(0.98); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes geo-slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes geo-slide-down { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .geo-country-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 6px;
+          border: 1px solid #e3e5e8;
+          border-radius: 0;
+          background: #f7f8f9;
+          color: #202223;
+          font-size: 13px;
+          font-weight: 600;
+          line-height: 1.2;
+          white-space: nowrap;
+          vertical-align: 0;
+        }
+        .geo-country-flag { display: inline-block; width: 16px; height: 11px; object-fit: cover; border-radius: 0; box-shadow: none; }
+        .geo-popup-card,
+        .geo-popup-card * { box-sizing: border-box !important; }
+        .geo-popup-card {
+          width: min(390px, 100%) !important;
+          background: var(--geo-popup-bg) !important;
+          color: var(--geo-popup-text) !important;
+          border: 1px solid #e3e5e8 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          padding: 24px !important;
+          position: relative !important;
+          text-align: left !important;
+          animation: geo-scale-in 0.16s ease !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        }
+        .geo-popup-close {
+          position: absolute !important;
+          top: 12px !important;
+          right: 12px !important;
+          width: 28px !important;
+          height: 28px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+          color: var(--geo-popup-text) !important;
+          font-size: 21px !important;
+          line-height: 1 !important;
+          cursor: pointer !important;
+          opacity: 0.55 !important;
+        }
+        .geo-popup-close:hover { opacity: 0.9 !important; background: #f6f6f7 !important; }
+        .geo-popup-copy { padding-right: 28px !important; }
+        .geo-popup-title {
+          margin: 0 !important;
+          color: var(--geo-popup-text) !important;
+          font-size: 18px !important;
+          font-weight: 700 !important;
+          letter-spacing: 0 !important;
+          line-height: 1.3 !important;
+        }
+        .geo-popup-message {
+          margin: 12px 0 0 !important;
+          color: var(--geo-popup-text) !important;
+          font-size: 14px !important;
+          line-height: 1.5 !important;
+          opacity: 0.74 !important;
+        }
+        .geo-popup-actions {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          gap: 8px !important;
+          margin-top: 18px !important;
+          flex-wrap: wrap !important;
+        }
+        .geo-popup-btn {
+          min-height: 38px !important;
+          padding: 0 16px !important;
+          border-radius: 0 !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          line-height: 1 !important;
+          cursor: pointer !important;
+          font-family: inherit !important;
+          transition: background 0.14s ease, border-color 0.14s ease, opacity 0.14s ease !important;
+        }
+        .geo-popup-btn:hover { opacity: 0.9 !important; }
+        .geo-popup-btn-primary {
+          order: 1 !important;
+          background: var(--geo-popup-accent) !important;
+          color: #ffffff !important;
+          border: 1px solid var(--geo-popup-accent) !important;
+          box-shadow: none !important;
+        }
+        .geo-popup-btn-secondary {
+          order: 2 !important;
+          background: transparent !important;
+          color: var(--geo-popup-text) !important;
+          border: 1px solid #d7dade !important;
+        }
+        @media (max-width: 480px) {
+          .geo-popup-card { padding: 22px !important; border-radius: 0 !important; }
+          .geo-popup-copy { padding-right: 28px !important; }
+          .geo-popup-title { font-size: 18px !important; line-height: 1.3 !important; }
+          .geo-popup-message { font-size: 14px !important; line-height: 1.5 !important; }
+          .geo-popup-actions { flex-direction: column !important; align-items: stretch !important; }
+          .geo-popup-btn { width: 100% !important; }
+        }
+      </style>
+    `;
+    container.style.display = 'block';
+
+    document.getElementById('geo-confirm-btn').addEventListener('click', () => {
+      CookieManager.set('geo_choice', 'redirected', config.popup?.cookieDuration || 7);
+      trackEvent('redirected', config);
+      window.location.href = rule.targetUrl;
+    });
+
+    document.getElementById('geo-cancel-btn').addEventListener('click', () => {
+      CookieManager.set('geo_choice', 'stayed', config.popup?.cookieDuration || 7);
+      trackEvent('clicked_no', config);
+      container.style.display = 'none';
+    });
+
+    if (template === 'modal') {
+      document.getElementById('geo-close-btn').addEventListener('click', () => {
+        trackEvent('dismissed', config);
+        container.style.display = 'none';
+      });
+
+      document.getElementById('geo-popup-overlay').addEventListener('click', (event) => {
+        if (event.target.id === 'geo-popup-overlay') {
+          trackEvent('dismissed', config);
+          container.style.display = 'none';
+        }
+      });
+    }
+  };
+
+  let blockLayerObserver = null;
+  let blockLayerPromoteQueued = false;
+  let blockLayerNeedsDialogReopen = false;
+  let blockLayerNeutralizing = false;
+  let blockTakeoverHooksInstalled = false;
+  let blockDocumentStyle = null;
+
+  const supportsModalDialog = () => {
+    return typeof HTMLDialogElement !== 'undefined' && typeof HTMLDialogElement.prototype.showModal === 'function';
+  };
+
+  const openBlockDialog = (layer, forceReopen) => {
+    if (layer.tagName !== 'DIALOG' || typeof layer.showModal !== 'function') return false;
+
+    try {
+      if (forceReopen && layer.open) layer.close();
+      if (!layer.open) layer.showModal();
+      return true;
+    } catch (error) {
+      log('Could not open block dialog as modal:', error);
+      return false;
+    }
+  };
+
+  const isBlockLayerElement = (element, layer) => {
+    if (!element || element.nodeType !== 1) return false;
+    if (element === layer) return true;
+    if (element === document.body || element === document.documentElement || element === document.head) return false;
+    if (element.id === 'geo-block-root' || element.id === 'geo-block-dialog' || element.id === 'geo-block-layer' || element.id === 'geo-block-screen' || element.id === 'geolocation-app-container') return true;
+    const rootNode = element.getRootNode && element.getRootNode();
+    if (rootNode && rootNode.host && (rootNode.host === layer || rootNode.host.id === 'geo-block-root')) return true;
+    return Boolean(element.closest && element.closest('#geo-block-root, #geo-block-dialog, #geo-block-layer, #geo-block-screen, #geolocation-app-container'));
+  };
+
+  const setImportantStyle = (element, property, value) => {
+    if (element.style.getPropertyValue(property) === value && element.style.getPropertyPriority(property) === 'important') return;
+    element.style.setProperty(property, value, 'important');
+  };
+
+  const hideCompetingElement = (element, layer) => {
+    if (!element || element.nodeType !== 1 || !element.style || isBlockLayerElement(element, layer)) return;
+    if (/^(SCRIPT|STYLE|LINK|META|TEMPLATE|NOSCRIPT)$/i.test(element.tagName)) return;
+
+    if (element.getAttribute('aria-hidden') !== 'true') element.setAttribute('aria-hidden', 'true');
+    setImportantStyle(element, 'display', 'none');
+    setImportantStyle(element, 'visibility', 'hidden');
+    setImportantStyle(element, 'opacity', '0');
+    setImportantStyle(element, 'pointer-events', 'none');
+    setImportantStyle(element, 'z-index', '-1');
+  };
+
+  const getOpenPopovers = () => {
+    try {
+      return Array.prototype.slice.call(document.querySelectorAll(':popover-open'));
+    } catch {
+      return [];
+    }
+  };
+
+  const neutralizeCompetingLayers = (layer) => {
+    if (blockLayerNeutralizing || !document.body) return;
+
+    blockLayerNeutralizing = true;
+    try {
+      setImportantStyle(document.body, 'position', 'fixed');
+      setImportantStyle(document.body, 'display', 'none');
+      setImportantStyle(document.body, 'width', '100%');
+      setImportantStyle(document.body, 'overflow', 'hidden');
+      setImportantStyle(document.body, 'visibility', 'hidden');
+      setImportantStyle(document.body, 'opacity', '0');
+      setImportantStyle(document.body, 'pointer-events', 'none');
+
+      if (document.fullscreenElement && !isBlockLayerElement(document.fullscreenElement, layer) && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => undefined);
+      }
+
+      Array.prototype.forEach.call(document.querySelectorAll('dialog[open]'), (dialog) => {
+        if (isBlockLayerElement(dialog, layer)) return;
+        try {
+          if (typeof dialog.close === 'function') dialog.close();
+        } catch {
+          // Some theme dialogs cannot be closed programmatically.
+        }
+        dialog.removeAttribute('open');
+        hideCompetingElement(dialog, layer);
+      });
+
+      getOpenPopovers().forEach((popover) => {
+        if (isBlockLayerElement(popover, layer)) return;
+        try {
+          if (typeof popover.hidePopover === 'function') popover.hidePopover();
+        } catch {
+          // Popover support and permissions vary by browser/theme.
+        }
+        hideCompetingElement(popover, layer);
+      });
+
+      Array.prototype.forEach.call(document.body.children, (child) => {
+        hideCompetingElement(child, layer);
+      });
+
+      Array.prototype.forEach.call(document.documentElement.children, (child) => {
+        if (child === document.head || child === document.body || isBlockLayerElement(child, layer)) return;
+        hideCompetingElement(child, layer);
+      });
+    } finally {
+      blockLayerNeutralizing = false;
+    }
+  };
+
+  const getBlockDialog = (layer) => {
+    if (!layer) return null;
+    if (layer.__geoBlockDialog) return layer.__geoBlockDialog;
+    if (layer.shadowRoot) return layer.shadowRoot.getElementById('geo-block-dialog');
+    return document.getElementById('geo-block-dialog');
+  };
+
+  const getBlockOverlay = (layer) => {
+    const dialog = getBlockDialog(layer);
+    if (dialog) return dialog;
+    if (layer && layer.shadowRoot) return layer.shadowRoot.getElementById('geo-block-layer');
+    return layer && layer.querySelector ? layer.querySelector('#geo-block-layer') : null;
+  };
+
+  const promoteBlockLayer = (layer, forceReopenDialog) => {
+    if (!document.documentElement || !layer) return;
+
+    document.documentElement.classList.add('geo-blocked');
+    if (blockDocumentStyle && !blockDocumentStyle.isConnected) {
+      (document.head || document.documentElement).appendChild(blockDocumentStyle);
+    }
+
+    if (layer.parentNode !== document.documentElement) {
+      document.documentElement.appendChild(layer);
+    }
+
+    layer.style.setProperty('z-index', '2147483647', 'important');
+
+    const dialog = getBlockDialog(layer);
+    if (dialog) openBlockDialog(dialog, forceReopenDialog);
+    neutralizeCompetingLayers(layer);
+  };
+
+  const installBlockDocumentStyle = (bgColor) => {
+    if (!blockDocumentStyle) {
+      blockDocumentStyle = document.createElement('style');
+      blockDocumentStyle.id = 'geo-block-document-overrides';
+      (document.head || document.documentElement).appendChild(blockDocumentStyle);
+    }
+
+    blockDocumentStyle.textContent = `
+      html.geo-blocked { overflow: hidden !important; height: 100% !important; overscroll-behavior: none !important; }
+      html.geo-blocked body { display: none !important; position: fixed !important; width: 100% !important; overflow: hidden !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
+      html.geo-blocked > *:not(head):not(body):not(#geo-block-root) { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; z-index: -1 !important; }
+      html.geo-blocked #geo-block-root {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 2147483647 !important;
+        isolation: isolate !important;
+        contain: layout style paint !important;
+      }
+      html.geo-blocked #geo-block-root * { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
+      html.geo-blocked dialog:not(#geo-block-dialog),
+      html.geo-blocked #preventify---container,
+      html.geo-blocked [id^="preventify"],
+      html.geo-blocked [class*="preventify"],
+      html.geo-blocked [popover]:not(#geo-block-root):not(#geo-block-dialog):not(#geo-block-screen) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+    `;
+
+    document.documentElement.style.setProperty('background', bgColor, 'important');
+  };
+
+  const installBlockTakeoverHooks = (layer) => {
+    if (blockTakeoverHooksInstalled || window.__geoBlockTakeoverHooksInstalled) return;
+    blockTakeoverHooksInstalled = true;
+    window.__geoBlockTakeoverHooksInstalled = true;
+
+    if (typeof HTMLDialogElement !== 'undefined' && HTMLDialogElement.prototype.showModal) {
+      const originalShowModal = HTMLDialogElement.prototype.showModal;
+      HTMLDialogElement.prototype.showModal = function() {
+        if (isBlockLayerElement(this, layer)) return originalShowModal.apply(this, arguments);
+        hideCompetingElement(this, layer);
+        scheduleBlockLayerPromote(layer, false);
+        return undefined;
+      };
+    }
+
+    if (Element.prototype.showPopover) {
+      const originalShowPopover = Element.prototype.showPopover;
+      Element.prototype.showPopover = function() {
+        if (isBlockLayerElement(this, layer)) return originalShowPopover.apply(this, arguments);
+        hideCompetingElement(this, layer);
+        scheduleBlockLayerPromote(layer, false);
+        return undefined;
+      };
+    }
+
+    ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'wheel', 'keydown'].forEach((eventName) => {
+      window.addEventListener(eventName, (event) => {
+        const path = event.composedPath ? event.composedPath() : [];
+        const insideBlockLayer = path.some((item) => isBlockLayerElement(item, layer));
+        if (insideBlockLayer) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }, true);
+    });
+  };
+
+  const scheduleBlockLayerPromote = (layer, forceReopenDialog) => {
+    blockLayerNeedsDialogReopen = blockLayerNeedsDialogReopen || forceReopenDialog;
+    if (blockLayerPromoteQueued) return;
+    blockLayerPromoteQueued = true;
+
+    requestAnimationFrame(() => {
+      const shouldReopenDialog = blockLayerNeedsDialogReopen;
+      blockLayerPromoteQueued = false;
+      blockLayerNeedsDialogReopen = false;
+      promoteBlockLayer(layer, shouldReopenDialog);
+    });
+  };
+
+  const startBlockLayerGuard = (layer) => {
+    if (!window.MutationObserver || blockLayerObserver) return;
+
+    blockLayerObserver = new MutationObserver((mutations) => {
+      if (blockLayerNeutralizing) return;
+
+      let shouldPromote = false;
+
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (target === layer || isBlockLayerElement(target, layer)) continue;
+          if (target === document.documentElement || target === document.body || target.parentNode === document.body || target.tagName === 'DIALOG' || target.hasAttribute('popover')) {
+            shouldPromote = true;
+          }
+          continue;
+        }
+
+        if (mutation.type === 'childList') {
+          shouldPromote = true;
+          Array.prototype.forEach.call(mutation.addedNodes, (node) => {
+            if (node.nodeType !== 1) return;
+            if (node.tagName === 'DIALOG' || node.hasAttribute('popover') || (node.querySelector && node.querySelector('dialog, [popover]'))) {
+              shouldPromote = true;
+            }
+          });
+        }
+      }
+
+      if (shouldPromote) scheduleBlockLayerPromote(layer, false);
+    });
+
+    blockLayerObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['open', 'style', 'class', 'popover']
+    });
+  };
+
+  const showBlockScreen = (config) => {
+    const blockedSettings = config.blocked || {};
+    const isVpn = config.rule && config.rule.source === 'vpn';
+    const title = escapeHtml(isVpn ? 'Security Alert' : (blockedSettings.title || 'Access Denied'));
+    const message = escapeHtml(isVpn ? 'Access via VPN or proxy is not allowed for this store.' : (blockedSettings.message || 'We do not offer services in your country/region.'));
+    const bgColor = safeColor(blockedSettings.bgColor, '#f8fafc');
+    const textColor = safeColor(blockedSettings.textColor, '#0f172a');
+    const accentColor = safeColor(blockedSettings.accentColor, '#2563eb');
+    const logoUrl = safeUrl(blockedSettings.logoUrl);
+    const defaultImageUrl = safeUrl(blockedSettings.defaultImageUrl);
+    const supportUrl = safeUrl(blockedSettings.supportUrl);
+    const supportText = escapeHtml(blockedSettings.supportText || 'Contact support');
+    const logoMarkup = logoUrl
+      ? `<img src="${logoUrl}" alt="" class="geo-block-logo">`
+      : defaultImageUrl
+        ? `<img src="${defaultImageUrl}" alt="" class="geo-block-default-image">`
+        : '';
+    const supportMarkup = supportUrl && supportText
+      ? `<a href="${supportUrl}" class="geo-btn-support">${supportText}</a>`
+      : '';
+
+    installBlockDocumentStyle(bgColor);
+
+    const existingRoot = document.getElementById('geo-block-root') || window.__geoBlockRoot;
+    if (existingRoot) {
+      const existingOverlay = getBlockOverlay(existingRoot);
+      if (existingOverlay) {
+        existingOverlay.style.setProperty('--geo-block-bg', bgColor);
+        existingOverlay.style.setProperty('--geo-block-text', textColor);
+        existingOverlay.style.setProperty('--geo-block-accent', accentColor);
+      }
+      window.__geoBlockRoot = existingRoot;
+      installBlockTakeoverHooks(existingRoot);
+      promoteBlockLayer(existingRoot, false);
+      startBlockLayerGuard(existingRoot);
+      return;
+    }
+
+    const root = document.createElement('div');
+    root.id = 'geo-block-root';
+    window.__geoBlockRoot = root;
+
+    const useDialog = supportsModalDialog();
+    const shadowRoot = root.attachShadow ? root.attachShadow({ mode: 'open' }) : null;
+    const overlay = document.createElement(useDialog ? 'dialog' : 'div');
+    overlay.id = useDialog ? 'geo-block-dialog' : 'geo-block-layer';
+    root.__geoBlockDialog = useDialog ? overlay : null;
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('role', 'dialog');
+    if (useDialog) {
+      overlay.addEventListener('cancel', (event) => event.preventDefault());
+    }
+    overlay.style.setProperty('--geo-block-bg', bgColor);
+    overlay.style.setProperty('--geo-block-text', textColor);
+    overlay.style.setProperty('--geo-block-accent', accentColor);
+
+    const layerStyles = document.createElement('style');
+    layerStyles.textContent = `
+      #geo-block-dialog,
+      #geo-block-layer {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: var(--geo-block-bg) !important;
+        color: var(--geo-block-text) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        visibility: visible !important;
+      }
+      #geo-block-dialog::backdrop {
+        background: var(--geo-block-bg) !important;
+        opacity: 1 !important;
+      }
+      #geo-block-screen {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        background: var(--geo-block-bg) !important;
+        color: var(--geo-block-text) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 24px !important;
+        visibility: visible !important;
+      }
+      #geo-block-screen,
+      #geo-block-screen * {
+        box-sizing: border-box !important;
+      }
+      .geo-block-card {
+        text-align: center !important;
+        max-width: 560px !important;
+        width: 100% !important;
+      }
+      .geo-block-media {
+        margin-bottom: 18px !important;
+      }
+      .geo-block-logo {
+        max-width: 160px !important;
+        max-height: 70px !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto 32px !important;
+      }
+      .geo-block-default-image {
+        width: 220px !important;
+        max-width: min(60vw, 260px) !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto 28px !important;
+      }
+      .geo-block-title {
+        font-size: 40px !important;
+        font-weight: 600 !important;
+        margin: 0 0 14px !important;
+        color: var(--geo-block-text) !important;
+        letter-spacing: 0 !important;
+        line-height: 1.1 !important;
+      }
+      .geo-block-message {
+        font-size: 18px !important;
+        line-height: 1.5 !important;
+        color: var(--geo-block-text) !important;
+        opacity: 0.8 !important;
+        margin: 0 !important;
+        font-weight: 450 !important;
+      }
+      .geo-btn-support {
+        display: inline-block !important;
+        margin-top: 32px !important;
+        background: var(--geo-block-accent) !important;
+        color: #ffffff !important;
+        text-decoration: none !important;
+        padding: 14px 32px !important;
+        border-radius: 10px !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15) !important;
+        font-family: inherit !important;
+      }
+      .geo-btn-support:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
+        opacity: 0.9 !important;
+      }
+    `;
+
+    overlay.innerHTML = `
+      <div id="geo-block-screen">
+        <div class="geo-block-card">
+          <div class="geo-block-media">
+            ${logoMarkup}
+          </div>
+          <h1 class="geo-block-title">${title}</h1>
+          <p class="geo-block-message">${message}</p>
+          ${supportMarkup}
+        </div>
+      </div>
+    `;
+
+    document.documentElement.classList.add('geo-blocked');
+    if (shadowRoot) {
+      shadowRoot.appendChild(layerStyles);
+      shadowRoot.appendChild(overlay);
+    } else {
+      root.appendChild(layerStyles);
+      root.appendChild(overlay);
+    }
+    document.documentElement.appendChild(root);
+    installBlockTakeoverHooks(root);
+    if (useDialog) openBlockDialog(overlay, false);
+    promoteBlockLayer(root, false);
+    startBlockLayerGuard(root);
+  };
+
+  const init = async () => {
+    if (window.Shopify && window.Shopify.designMode) return;
+    if (window.location.search.includes('preview_theme_id') || window.location.pathname.includes('/editor')) return;
+    let config;
+    try {
+      config = await fetchConfig();
+    } catch (error) {
+      log('Could not fetch config:', error);
+      return;
+    }
+
+    trackEvent('visit', config);
+
+    if (!config || config.action === 'none' || config.limitExceeded) {
+      log('No storefront action required', config);
+      return;
+    }
+
+    const rule = config.rule || {};
+    if ((config.action === 'popup' || config.action === 'auto_redirect') && alreadyOnTarget(rule.targetUrl)) {
+      if (config.action === 'auto_redirect' && isInternalTarget(rule.targetUrl)) {
+        SessionManager.set(getInternalRedirectKey(rule), 'true');
+      }
+      log('Already on target URL');
+      return;
+    }
+
+    if (config.action === 'block') {
+      CookieManager.remove('geo_choice');
+      trackEvent(config.analyticsEvent || 'blocked', config);
+      showBlockScreen(config);
+      return;
+    }
+
+    if (config.action === 'auto_redirect') {
+      if (isInternalTarget(rule.targetUrl)) {
+        const internalRedirectKey = getInternalRedirectKey(rule);
+        if (SessionManager.has(internalRedirectKey)) {
+          log('Internal redirect already handled for this session');
+          return;
+        }
+        SessionManager.set(internalRedirectKey, 'true');
+      }
+
+      CookieManager.remove('geo_choice');
+      trackEvent(config.analyticsEvent || 'auto_redirected', config);
+      window.location.href = rule.targetUrl;
+      return;
+    }
+
+    if (config.action === 'popup') {
+      if (CookieManager.has('geo_choice')) {
+        log('User preference found, skipping popup');
+        return;
+      }
+      trackEvent('popup_shown', config);
+      showPopup(config);
+    }
+  };
+
+  window.GeolocationDebug = {
+    version: APP_VERSION,
+    clearPreference: () => {
+      CookieManager.remove('geo_choice');
+      console.log('Cleared geolocation preference. Refresh the page to test again.');
+    },
+    getPreference: () => CookieManager.get('geo_choice'),
+    getConfig: fetchConfig
+  };
+
+  init();
+
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) init();
+  });
+})();
