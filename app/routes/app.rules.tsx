@@ -31,7 +31,7 @@ import {
     Popover,
     ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -629,8 +629,6 @@ export default function RulesPage() {
         { label: "State/Region", value: "state" },
         { label: "Shopify Market", value: "market" },
     ];
-    const selectedTargetTypeLabel =
-        targetTypeViews.find((view) => view.value === matchTypeFilter)?.label || "All targets";
     const selectTargetType = (value: string) => {
         setMatchTypeFilter(value);
         setTargetFilterPopoverOpen(false);
@@ -1215,7 +1213,7 @@ export default function RulesPage() {
                         display: flex;
                         flex: 1 1 320px;
                         gap: 6px;
-                        min-width: 200px;
+                        min-width: 0;
                         padding: 4px 8px;
                         transition: background-color 120ms ease, box-shadow 120ms ease;
                     }
@@ -1305,12 +1303,8 @@ export default function RulesPage() {
                         box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
                     }
                     @media (max-width: 47.9975em) {
-                        .rules-index-toolbar {
-                            flex-wrap: wrap;
-                        }
                         .rules-index-search {
-                            flex-basis: 100%;
-                            order: 3;
+                            flex-basis: auto;
                         }
                         .rules-index-target {
                             margin-left: auto;
@@ -1494,12 +1488,11 @@ export default function RulesPage() {
                                                     <Button
                                                         size="slim"
                                                         variant="tertiary"
-                                                        disclosure="down"
-                                                        pressed={targetFilterPopoverOpen}
+                                                        icon={FilterIcon}
+                                                        accessibilityLabel="Filter by target type"
+                                                        pressed={targetFilterPopoverOpen || matchTypeFilter !== "all"}
                                                         onClick={() => setTargetFilterPopoverOpen((open) => !open)}
-                                                    >
-                                                        {`Target: ${selectedTargetTypeLabel}`}
-                                                    </Button>
+                                                    />
                                                 }
                                                 onClose={() => setTargetFilterPopoverOpen(false)}
                                                 preferredAlignment="right"

@@ -29,7 +29,7 @@ import {
     ActionList,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon } from "@shopify/polaris-icons";
+import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
@@ -412,9 +412,6 @@ export default function IPRulesPage() {
     ];
     const selectedStatusLabel =
         statusViews.find((view) => view.value === statusFilter)?.label || "All";
-    const selectedActionLabel =
-        actionViews.find((view) => view.value === actionFilter)?.label || "All actions";
-
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(filteredRules);
     const conflictTotal = conflictSummary?.total || 0;
@@ -725,7 +722,7 @@ export default function IPRulesPage() {
                         display: flex;
                         flex: 1 1 320px;
                         gap: 6px;
-                        min-width: 200px;
+                        min-width: 0;
                         padding: 4px 8px;
                         transition: background-color 120ms ease, box-shadow 120ms ease;
                     }
@@ -827,12 +824,8 @@ export default function IPRulesPage() {
                         .ip-rules-page > div:first-of-type {
                             align-items: stretch !important;
                         }
-                        .ip-rules-toolbar {
-                            flex-wrap: wrap;
-                        }
                         .ip-rules-search {
-                            flex-basis: 100%;
-                            order: 3;
+                            flex-basis: auto;
                         }
                         .ip-rules-action-filter {
                             margin-left: auto;
@@ -995,12 +988,11 @@ export default function IPRulesPage() {
                                                 <Button
                                                     size="slim"
                                                     variant="tertiary"
-                                                    disclosure="down"
-                                                    pressed={actionPopoverOpen}
+                                                    icon={FilterIcon}
+                                                    accessibilityLabel="Filter by action"
+                                                    pressed={actionPopoverOpen || actionFilter !== "all"}
                                                     onClick={() => setActionPopoverOpen((open) => !open)}
-                                                >
-                                                    {`Action: ${selectedActionLabel}`}
-                                                </Button>
+                                                />
                                             }
                                             onClose={() => setActionPopoverOpen(false)}
                                             preferredAlignment="right"

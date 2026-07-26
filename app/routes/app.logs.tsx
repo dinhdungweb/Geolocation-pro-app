@@ -18,7 +18,7 @@ import {
     TextField,
     useBreakpoints,
 } from "@shopify/polaris";
-import { CalendarIcon, SearchIcon, XIcon } from "@shopify/polaris-icons";
+import { CalendarIcon, SearchIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
@@ -612,11 +612,19 @@ export default function VisitorLogs() {
         filters.to ||
         filters.dateScope === DATE_SCOPE_ALL
     );
+    const hasFilterMenuValues = Boolean(
+        filters.action ||
+        filters.country ||
+        filters.from ||
+        filters.to ||
+        filters.dateScope === DATE_SCOPE_ALL
+    );
     const dateRangeLabel = effectiveDateParams.isAllDates
         ? "All dates"
         : formatDateRangeLabel(effectiveDateParams.from, effectiveDateParams.to, today);
     const [queryDraft, setQueryDraft] = useState(filters.query);
     const [datePopoverActive, setDatePopoverActive] = useState(false);
+    const [filterPopoverActive, setFilterPopoverActive] = useState(false);
     const [draftDatePreset, setDraftDatePreset] = useState<DateRangePreset>(currentDatePreset);
     const [draftDateRange, setDraftDateRange] = useState<DateRangeValue>(currentDateRange);
     const [datePickerMonth, setDatePickerMonth] = useState(currentDateRange.start.getMonth());
@@ -870,7 +878,29 @@ export default function VisitorLogs() {
                             </button>
                         )}
                     </div>
-                    <div className="visitor-log-filter-date-wrap">
+                    <div className="visitor-log-filter-menu">
+                    <Popover
+                        active={filterPopoverActive}
+                        activator={
+                            <Button
+                                icon={FilterIcon}
+                                variant="tertiary"
+                                size="slim"
+                                accessibilityLabel="Filter visitor logs"
+                                pressed={filterPopoverActive || hasFilterMenuValues}
+                                onClick={() => setFilterPopoverActive((active) => !active)}
+                            />
+                        }
+                        onClose={() => setFilterPopoverActive(false)}
+                        preferredAlignment="right"
+                        preferredPosition="below"
+                        preventCloseOnChildOverlayClick
+                    >
+                    <div className="visitor-log-filter-popover">
+                    <div className="visitor-log-filter-popover-controls">
+                    <div className="visitor-log-filter-field">
+                        <Text as="p" variant="bodySm" fontWeight="medium">Date</Text>
+                        <div className="visitor-log-filter-date-wrap">
                     <Popover
                         active={datePopoverActive}
                         activator={
@@ -981,10 +1011,10 @@ export default function VisitorLogs() {
                         ) : null}
                     </Popover>
                     </div>
+                    </div>
                     <div className="visitor-log-filter-select">
                         <Select
                             label="Country"
-                            labelHidden
                             options={countryOptions}
                             value={filters.country || "all"}
                             onChange={(value) => updateSearchParam("country", value)}
@@ -993,17 +1023,27 @@ export default function VisitorLogs() {
                     <div className="visitor-log-filter-select">
                         <Select
                             label="Action"
-                            labelHidden
                             options={actionOptions}
                             value={selectedActionValue}
                             onChange={(value) => updateSearchParam("action", value)}
                         />
                     </div>
-                    {hasFilters && (
-                        <div className="visitor-log-filter-clear">
-                            <Button onClick={clearFilters} size="slim" variant="tertiary">Clear</Button>
-                        </div>
-                    )}
+                    </div>
+                    <div className="visitor-log-filter-popover-footer">
+                        {hasFilters && (
+                            <Button onClick={clearFilters} size="slim" variant="tertiary">Clear filters</Button>
+                        )}
+                        <Button
+                            onClick={() => setFilterPopoverActive(false)}
+                            size="slim"
+                            variant="primary"
+                        >
+                            Done
+                        </Button>
+                    </div>
+                    </div>
+                    </Popover>
+                    </div>
                 </div>
             </div>
         );
@@ -1313,7 +1353,7 @@ export default function VisitorLogs() {
                     .visitor-log-filter-bar {
                         display: flex;
                         align-items: center;
-                        flex-wrap: wrap;
+                        flex-wrap: nowrap;
                         gap: 8px;
                         min-height: 44px;
                         padding: 6px 12px;
@@ -1324,7 +1364,7 @@ export default function VisitorLogs() {
                         display: flex;
                         flex: 1 1 280px;
                         gap: 6px;
-                        min-width: 200px;
+                        min-width: 0;
                         padding: 4px 8px;
                         transition: background-color 120ms ease, box-shadow 120ms ease;
                     }
@@ -1369,7 +1409,7 @@ export default function VisitorLogs() {
                         background: var(--p-color-bg-surface-hover, #f1f1f1);
                     }
                     .visitor-log-filter-select {
-                        min-width: 132px;
+                        min-width: 0;
                     }
                     .visitor-log-filter-area .Polaris-Select__Backdrop {
                         border: none;
@@ -1384,10 +1424,40 @@ export default function VisitorLogs() {
                         display: inline-flex;
                     }
                     .visitor-log-filter-date-wrap {
-                        border-left: 1px solid var(--p-color-border-secondary, #ebebeb);
-                        margin-left: auto;
+                        border-left: 0;
+                        margin-left: 0;
                         min-width: 0;
+                        padding-left: 0;
+                    }
+                    .visitor-log-filter-menu {
+                        border-left: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        flex: 0 0 auto;
+                        margin-left: auto;
                         padding-left: 8px;
+                    }
+                    .visitor-log-filter-popover {
+                        width: min(300px, calc(100vw - 32px));
+                    }
+                    .visitor-log-filter-popover-controls {
+                        display: grid;
+                        gap: 12px;
+                        padding: 14px;
+                    }
+                    .visitor-log-filter-field {
+                        display: grid;
+                        gap: 6px;
+                    }
+                    .visitor-log-filter-popover .visitor-log-date-filter,
+                    .visitor-log-filter-popover .visitor-log-date-filter .Polaris-Button {
+                        width: 100%;
+                    }
+                    .visitor-log-filter-popover-footer {
+                        align-items: center;
+                        border-top: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 8px;
+                        padding: 10px 14px;
                     }
                     .visitor-log-date-filter .Polaris-Button {
                         background: transparent;
@@ -1502,9 +1572,6 @@ export default function VisitorLogs() {
                         border-top: 1px solid var(--p-color-border-secondary, #dfe3e8);
                         background: var(--p-color-bg-surface-secondary, #f7f7f7);
                     }
-                    .visitor-log-filter-clear {
-                        display: inline-flex;
-                    }
                     .visitor-log-empty-state {
                         min-height: 320px;
                     }
@@ -1526,32 +1593,6 @@ export default function VisitorLogs() {
                             align-items: flex-start;
                             flex-direction: column;
                         }
-                        .visitor-log-filter-bar {
-                            display: grid;
-                            grid-template-columns: repeat(2, minmax(0, 1fr));
-                            align-items: stretch;
-                        }
-                        .visitor-log-filter-search {
-                            grid-column: 1 / -1;
-                        }
-                        .visitor-log-filter-date-wrap {
-                            border-left: 0;
-                            grid-column: 1 / -1;
-                            margin-left: 0;
-                            padding-left: 0;
-                            width: 100%;
-                        }
-                        .visitor-log-date-filter,
-                        .visitor-log-date-filter .Polaris-Button {
-                            width: 100%;
-                        }
-                        .visitor-log-filter-select {
-                            width: 100%;
-                            max-width: none;
-                        }
-                        .visitor-log-filter-select {
-                            min-width: 0;
-                        }
                         .visitor-log-date-popover-body {
                             grid-template-columns: 1fr;
                             gap: 12px;
@@ -1561,10 +1602,6 @@ export default function VisitorLogs() {
                         }
                         .visitor-log-date-calendar {
                             overflow: visible;
-                        }
-                        .visitor-log-filter-clear {
-                            grid-column: 1 / -1;
-                            justify-content: flex-end;
                         }
                         .visitor-log-empty-state {
                             min-height: 220px;
@@ -1583,16 +1620,6 @@ export default function VisitorLogs() {
                         .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer {
                             overflow-x: auto;
                             -webkit-overflow-scrolling: touch;
-                        }
-                    }
-                    @media (max-width: 24em) {
-                        .visitor-log-filter-bar {
-                            grid-template-columns: 1fr;
-                        }
-                        .visitor-log-filter-search,
-                        .visitor-log-filter-date-wrap,
-                        .visitor-log-filter-clear {
-                            grid-column: 1;
                         }
                     }
                 `}
