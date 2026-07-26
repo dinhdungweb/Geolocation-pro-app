@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
-import { useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
     Page,
@@ -41,7 +41,6 @@ import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
-import { placeRuleIds } from "../utils/rule-placement";
 
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -139,37 +138,6 @@ function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConfli
     );
 }
 
-async function applyRulePlacement({
-    shop,
-    matchType,
-    ruleId,
-    placement,
-}: {
-    shop: string;
-    matchType: string;
-    ruleId: string;
-    placement: string;
-}) {
-    const orderedRules = await prisma.redirectRule.findMany({
-        where: { shop, matchType },
-        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-        select: { id: true },
-    });
-    const reorderedIds = placeRuleIds(
-        orderedRules.map((rule) => rule.id),
-        ruleId,
-        placement,
-    );
-    await prisma.$transaction(
-        reorderedIds.map((id, index) =>
-            prisma.redirectRule.update({
-                where: { id, shop },
-                data: { priority: (reorderedIds.length - index) * 10 },
-            }),
-        ),
-    );
-}
-
 // Loader: Fetch all rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const loaderStartedAt = performance.now();
@@ -243,7 +211,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (!validateUrl(targetUrl)) {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
-            const priorityPlacement = (formData.get("priorityPlacement") as string) || "first";
+            const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
             const daysOfWeek = formData.get("daysOfWeek") as string;
@@ -267,7 +235,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return responseData({ success: false, message: "Select at least one state/region" }, { status: 400 });
             }
  
-            const createdRule = await prisma.redirectRule.create({
+            await prisma.redirectRule.create({
                 data: {
                     shop,
                     name,
@@ -275,7 +243,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     marketHandles: matchType === "market" ? marketHandles : "",
                     marketCountryCodes: matchType === "market" ? marketCountryCodes : "",
                     targetUrl,
-                    priority: 0,
+                    priority,
                     isActive: true,
                     ruleType,
                     redirectMode,
@@ -289,12 +257,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pageTargetingType,
                     pagePaths,
                 },
-            });
-            await applyRulePlacement({
-                shop,
-                matchType,
-                ruleId: createdRule.id,
-                placement: priorityPlacement,
             });
             invalidateStorefrontConfigCache(shop);
             return responseData({ success: true, message: "Rule created successfully" });
@@ -312,7 +274,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (!validateUrl(targetUrl)) {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
-            const priorityPlacement = (formData.get("priorityPlacement") as string) || "first";
+            const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
             const daysOfWeek = formData.get("daysOfWeek") as string;
@@ -346,6 +308,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     matchType,
                     stateCodes: matchType === "state" ? stateCodes : "",
                     targetUrl,
+                    priority,
                     ruleType,
                     redirectMode,
                     scheduleEnabled,
@@ -356,12 +319,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pageTargetingType,
                     pagePaths,
                 },
-            });
-            await applyRulePlacement({
-                shop,
-                matchType,
-                ruleId: id,
-                placement: priorityPlacement,
             });
             invalidateStorefrontConfigCache(shop);
             return responseData({ success: true, message: "Rule updated successfully" });
@@ -491,15 +448,8 @@ export default function RulesPage() {
     const hasRequestedMarkets = useRef(false);
     const hasRequestedStateData = useRef(false);
     const shopify = useAppBridge();
-    const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-    const editorRuleParam = searchParams.get("rule");
-    const [modalOpen, setModalOpen] = useState(Boolean(editorRuleParam));
-    const [editingRule, setEditingRule] = useState<RedirectRule | null>(() =>
-        editorRuleParam && editorRuleParam !== "new"
-            ? rules.find((rule) => rule.id === editorRuleParam) || null
-            : null
-    );
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
@@ -516,7 +466,7 @@ export default function RulesPage() {
     const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
     const [selectedStates, setSelectedStates] = useState<string[]>([]);
     const [formTargetUrl, setFormTargetUrl] = useState("");
-    const [priorityPlacement, setPriorityPlacement] = useState("first");
+    const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
     const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
     // Scheduling State
@@ -539,27 +489,6 @@ export default function RulesPage() {
     const getStatesForCountry =
         stateData?.getStatesForCountry ||
         ((_countryCode: string) => [] as string[]);
-
-    useEffect(() => {
-        if (!editorRuleParam) {
-            setModalOpen(false);
-            setEditingRule(null);
-            return;
-        }
-
-        const nextRule =
-            editorRuleParam === "new"
-                ? null
-                : rules.find((rule) => rule.id === editorRuleParam);
-        if (editorRuleParam !== "new" && !nextRule) {
-            shopify.toast.show("Rule not found", { isError: true });
-            navigate("/app/rules", { replace: true });
-            return;
-        }
-
-        setEditingRule(nextRule || null);
-        setModalOpen(true);
-    }, [editorRuleParam, navigate, rules, shopify]);
 
     useEffect(() => {
         const needsStateData =
@@ -606,9 +535,8 @@ export default function RulesPage() {
         if (formFetcher.data.success) {
             setModalOpen(false);
             setEditingRule(null);
-            navigate("/app/rules");
         }
-    }, [formFetcher.data, formFetcher.state, navigate, shopify]);
+    }, [formFetcher.data, formFetcher.state, shopify]);
 
     useEffect(() => {
         if (importFetcher.state !== "idle" || !importFetcher.data?.message) return;
@@ -737,13 +665,7 @@ export default function RulesPage() {
             setSelectedMarkets((editingRule.marketHandles || "").split(",").map(c => c.trim()).filter(Boolean));
             setSelectedStates((editingRule.stateCodes || "").split(",").map(c => c.trim()).filter(Boolean));
             setFormTargetUrl(editingRule.targetUrl);
-            const peers = rules
-                .filter((rule) => rule.matchType === editingRule.matchType)
-                .sort((left, right) => right.priority - left.priority);
-            const currentIndex = peers.findIndex((rule) => rule.id === editingRule.id);
-            setPriorityPlacement(
-                currentIndex > 0 ? `after:${peers[currentIndex - 1].id}` : "first",
-            );
+            setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "redirect");
             setFormRedirectMode(editingRule.redirectMode || "popup");
             setScheduleEnabled(editingRule.scheduleEnabled || false);
@@ -762,7 +684,7 @@ export default function RulesPage() {
             setSelectedMarkets([]);
             setSelectedStates([]);
             setFormTargetUrl("");
-            setPriorityPlacement("first");
+            setFormPriority("0");
             setFormRuleType("redirect");
             setFormRedirectMode("auto_redirect");
             setScheduleEnabled(false);
@@ -777,15 +699,17 @@ export default function RulesPage() {
         }
         setInputValue("");
         setStateInputValue("");
-    }, [editingRule, modalOpen, rules]);
+    }, [editingRule, modalOpen]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
-        navigate(`/app/rules?rule=${encodeURIComponent(rule?.id || "new")}`);
-    }, [navigate]);
+        setEditingRule(rule || null);
+        setModalOpen(true);
+    }, []);
 
     const handleCloseModal = useCallback(() => {
-        navigate("/app/rules");
-    }, [navigate]);
+        setModalOpen(false);
+        setEditingRule(null);
+    }, []);
 
     const handleSubmit = useCallback(() => {
         const formData = new FormData();
@@ -806,7 +730,7 @@ export default function RulesPage() {
                 : editingRule?.marketCountryCodes || "",
         );
         formData.append("targetUrl", formTargetUrl);
-        formData.append("priorityPlacement", priorityPlacement);
+        formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
         formData.append("redirectMode", formRedirectMode);
         formData.append("scheduleEnabled", scheduleEnabled.toString());
@@ -819,7 +743,7 @@ export default function RulesPage() {
 
         formFetcher.submit(formData, { method: "POST" });
     }, [
-        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, marketCountryCodesByHandle, formTargetUrl, priorityPlacement,
+        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, marketCountryCodesByHandle, formTargetUrl, formPriority,
         formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
         pageTargetingType, pagePaths,
         formFetcher
@@ -1001,29 +925,6 @@ export default function RulesPage() {
     const selectedTargetCount = formMatchType === "market" ? selectedMarkets.length : (formMatchType === "state" ? selectedStates.length : selectedCountries.length);
     const isPaidOnlyRule = (rule: any) =>
         rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
-    const priorityPeers = rules
-        .filter((rule) => rule.matchType === formMatchType && rule.id !== editingRule?.id)
-        .sort((left, right) => right.priority - left.priority);
-    const priorityOptions = [
-        { label: "Run before all other rules", value: "first" },
-        ...priorityPeers.map((rule) => ({
-            label: `Run after “${rule.name}”`,
-            value: `after:${rule.id}`,
-        })),
-        ...(priorityPeers.length > 0 ? [{ label: "Run last", value: "last" }] : []),
-    ];
-    useEffect(() => {
-        if (priorityOptions.some((option) => option.value === priorityPlacement)) return;
-        setPriorityPlacement("first");
-    }, [priorityOptions, priorityPlacement]);
-    const getRuleOrderLabel = (rule: RedirectRule) => {
-        const peers = rules
-            .filter((candidate) => candidate.matchType === rule.matchType)
-            .sort((left, right) => right.priority - left.priority);
-        const index = peers.findIndex((candidate) => candidate.id === rule.id);
-        return index <= 0 ? "Runs first" : `After ${peers[index - 1].name}`;
-    };
-
     const rowMarkup = paginatedRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
         const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
@@ -1114,9 +1015,7 @@ export default function RulesPage() {
                     )}
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>
-                <Text as="span" variant="bodySm">{getRuleOrderLabel(rule)}</Text>
-            </IndexTable.Cell>
+            <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
             <IndexTable.Cell>
                 <div
                     onClick={(e) => e.stopPropagation()}
@@ -1188,11 +1087,8 @@ export default function RulesPage() {
     );
 
     return (
-        <Page
-            fullWidth
-            backAction={modalOpen ? { content: "Geolocation Rules", onAction: handleCloseModal } : undefined}
-        >
-            <TitleBar title={modalOpen ? (editingRule ? "Edit Rule" : "Add Rule") : "Geolocation Rules"}>
+        <Page fullWidth>
+            <TitleBar title="Geolocation Rules">
             </TitleBar>
             <style>
                 {`
@@ -1254,71 +1150,14 @@ export default function RulesPage() {
                     .rules-table-wrap .Polaris-IndexTable__TableCell--first {
                         box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
                     }
-                    .rule-drawer {
-                        display: grid;
-                        grid-template-rows: auto auto auto;
-                        width: min(960px, 100%);
-                        margin: 0 auto;
-                        overflow: hidden;
-                        border: 1px solid var(--p-color-border-secondary, #ebebeb);
-                        border-radius: var(--p-border-radius-300, 12px);
-                        background: var(--p-color-bg-surface, #ffffff);
-                        box-shadow: var(--p-shadow-200, 0 1px 2px rgba(0, 0, 0, 0.08));
-                    }
-                    .rule-drawer-header,
-                    .rule-drawer-footer {
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 16px;
-                        padding: 16px 20px;
-                        border-color: var(--p-color-border-secondary, #ebebeb);
-                    }
-                    .rule-drawer-header {
-                        border-bottom-style: solid;
-                        border-bottom-width: 1px;
-                    }
-                    .rule-drawer-footer {
-                        justify-content: flex-end;
-                        position: sticky;
-                        bottom: 0;
-                        z-index: 2;
-                        background: var(--p-color-bg-surface, #ffffff);
-                        border-top-style: solid;
-                        border-top-width: 1px;
-                    }
-                    .rule-drawer-body {
-                        padding: 20px;
-                    }
-                    .rule-drawer-section {
-                        border: 1px solid var(--p-color-border-secondary, #ebebeb);
-                        border-radius: 10px;
-                        background: var(--p-color-bg-surface, #ffffff);
-                    }
-                    .rule-drawer-section > summary {
-                        cursor: pointer;
-                        padding: 14px 16px;
-                        font-weight: 650;
-                        list-style-position: inside;
-                    }
-                    .rule-drawer-section-content {
-                        padding: 4px 16px 16px;
-                    }
                     @media (max-width: 47.9975em) {
                         .rules-table-wrap .Polaris-IndexTable,
                         .rules-table-wrap .Polaris-IndexTable__Table {
                             min-width: 880px;
                         }
-                        .rule-drawer {
-                            width: 100%;
-                            border-right: 0;
-                            border-left: 0;
-                            border-radius: 0;
-                        }
                     }
                 `}
             </style>
-            {!modalOpen && (
             <div className="rules-page">
                 <div style={{
                     display: 'flex',
@@ -1495,7 +1334,7 @@ export default function RulesPage() {
                                                     { title: "Target URL" },
                                                     { title: "Status" },
                                                     { title: "Method" },
-                                                    { title: "Runs" },
+                                                    { title: "Priority" },
                                                     { title: "Actions", alignment: "end" },
                                                 ]}
                                                 promotedBulkActions={promotedBulkActions}
@@ -1522,21 +1361,26 @@ export default function RulesPage() {
                 </Layout>
             </BlockStack>
             </div>
-            )}
 
-            {/* Dedicated Add/Edit page */}
-            {modalOpen && (
-                <div
-                    className="rule-drawer"
-                    aria-labelledby="rule-drawer-title"
-                >
-                <div className="rule-drawer-header">
-                    <Text id="rule-drawer-title" as="h2" variant="headingLg">
-                        {editingRule ? "Edit Rule" : "Add New Rule"}
-                    </Text>
-                    <Button onClick={handleCloseModal}>Close</Button>
-                </div>
-                <div className="rule-drawer-body">
+            {/* Add/Edit Modal */}
+            <Modal
+                open={modalOpen}
+                onClose={handleCloseModal}
+                title={editingRule ? "Edit Rule" : "Add New Rule"}
+                primaryAction={{
+                    content: editingRule ? "Save" : "Create",
+                    onAction: handleSubmit,
+                    loading: formFetcher.state !== "idle",
+                    disabled: formFetcher.state !== "idle" || selectedTargetCount === 0 || !formName || (formRuleType === "redirect" && !formTargetUrl),
+                }}
+                secondaryActions={[
+                    {
+                        content: "Cancel",
+                        onAction: handleCloseModal,
+                    },
+                ]}
+            >
+                <Modal.Section>
                     <BlockStack gap="400">
                     {formFetcher.state === "idle" && formFetcher.data?.success === false && (
                         <Banner tone="critical">{formFetcher.data.message}</Banner>
@@ -1961,26 +1805,24 @@ export default function RulesPage() {
                                 />
                             </BlockStack>
                         )}
-                        <Select
-                            label="Rule order"
-                            value={priorityPlacement}
-                            onChange={setPriorityPlacement}
-                            options={priorityOptions}
-                            helpText="Rules with the same target type are evaluated from top to bottom."
+                        <TextField
+                            label="Priority"
+                            type="number"
+                            value={formPriority}
+                            onChange={setFormPriority}
+                            helpText="Higher priority rules are checked first"
+                            autoComplete="off"
                         />
 
-                        <details className="rule-drawer-section">
-                        <summary>Schedule (optional){scheduleEnabled ? " — enabled" : ""}</summary>
-                        <div className="rule-drawer-section-content">
-                        <BlockStack gap="400">
-                            <Checkbox
-                                label="Enable Scheduling"
-                                checked={scheduleEnabled}
-                                onChange={setScheduleEnabled}
-                                helpText="Limit this rule to specific days and times"
-                            />
+                        <Text as="h3" variant="headingSm">Scheduling (Optional)</Text>
+                        <Checkbox
+                            label="Enable Scheduling"
+                            checked={scheduleEnabled}
+                            onChange={setScheduleEnabled}
+                            helpText="Limit this rule to specific days and times"
+                        />
 
-                            {scheduleEnabled && (
+                        {scheduleEnabled && (
                             <BlockStack gap="400">
                                 <FormLayout.Group>
                                     <TextField
@@ -2030,17 +1872,11 @@ export default function RulesPage() {
                                     onChange={setActiveDays}
                                 />
                             </BlockStack>
-                            )}
-                        </BlockStack>
-                        </div>
-                        </details>
+                        )}
 
-                        <details className="rule-drawer-section">
-                        <summary>
-                            Page targeting{pageTargetingType[0] === "all" ? " — all pages" : " — customized"}
-                        </summary>
-                        <div className="rule-drawer-section-content">
-                        <BlockStack gap="300">
+                        <Divider />
+                        <BlockStack gap="200">
+                            <Text as="h3" variant="headingSm">Page Targeting</Text>
                             <BlockStack gap="200">
                                 <Text as="p" variant="bodyMd">Apply to</Text>
                                 <RadioButton
@@ -2112,24 +1948,10 @@ export default function RulesPage() {
                                 />
                             )}
                         </BlockStack>
-                        </div>
-                        </details>
                     </FormLayout>
                     </BlockStack>
-                </div>
-                <div className="rule-drawer-footer">
-                    <Button onClick={handleCloseModal}>Cancel</Button>
-                    <Button
-                        variant="primary"
-                        onClick={handleSubmit}
-                        loading={formFetcher.state !== "idle"}
-                        disabled={formFetcher.state !== "idle" || selectedTargetCount === 0 || !formName || (formRuleType === "redirect" && !formTargetUrl)}
-                    >
-                        {editingRule ? "Save" : "Create"}
-                    </Button>
-                </div>
-                </div>
-            )}
+                </Modal.Section>
+            </Modal>
 
             {/* Import Modal */}
             <Modal
