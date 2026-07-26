@@ -15,8 +15,12 @@ interface TrafficPoint {
 const chartThemes = {
   HomeTraffic: {
     chartContainer: {
-      minHeight: 212,
+      minHeight: 190,
       padding: "0",
+    },
+    grid: {
+      horizontalOverflow: false,
+      verticalOverflow: false,
     },
     line: {
       hasArea: true,
@@ -25,17 +29,6 @@ const chartThemes = {
     },
   },
 };
-
-function getNiceStep(value: number) {
-  if (value <= 0) return 1;
-
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  const normalized = value / magnitude;
-  const factor =
-    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-
-  return factor * magnitude;
-}
 
 function formatCompactNumber(value: string | number | null) {
   if (typeof value !== "number") return String(value ?? "");
@@ -72,13 +65,6 @@ export default function TrafficLineChart({
     (sum, point) => sum + point.blocked,
     0,
   );
-  const maxValue = Math.max(
-    0,
-    ...points.flatMap((point) => [point.redirects, point.blocked]),
-  );
-  const tickStep = getNiceStep(maxValue / 5);
-  const maxY = tickStep * 5;
-  const ticks = Array.from({ length: 6 }, (_, index) => tickStep * index);
   const data = [
     {
       name: "Redirects",
@@ -116,31 +102,47 @@ export default function TrafficLineChart({
         themes={chartThemes}
         defaultTheme="HomeTraffic"
       >
-        <LineChart
-          id="home-traffic-chart"
-          data={data}
-          isAnimated={false}
-          showLegend={false}
-          skipLinkText="Skip traffic chart"
-          xAxisOptions={{
-            allowLineWrap: false,
-            labelFormatter: formatDateLabel,
-          }}
-          yAxisOptions={{
-            integersOnly: true,
-            labelFormatter: formatCompactNumber,
-            maxYOverride: maxY,
-            ticksOverride: ticks,
-          }}
-          tooltipOptions={{
-            titleFormatter: formatDateLabel,
-            valueFormatter: (value) =>
-              typeof value === "number"
-                ? value.toLocaleString()
-                : String(value),
-          }}
-        />
+        <div className="geo-polaris-traffic-plot">
+          <LineChart
+            id="home-traffic-chart"
+            data={data}
+            isAnimated={false}
+            showLegend={false}
+            skipLinkText="Skip traffic chart"
+            xAxisOptions={{
+              allowLineWrap: false,
+              hide: true,
+              labelFormatter: formatDateLabel,
+            }}
+            yAxisOptions={{
+              fixedWidth: 36,
+              integersOnly: true,
+              labelFormatter: formatCompactNumber,
+            }}
+            tooltipOptions={{
+              titleFormatter: formatDateLabel,
+              valueFormatter: (value) =>
+                typeof value === "number"
+                  ? value.toLocaleString()
+                  : String(value),
+            }}
+          />
+        </div>
       </PolarisVizProvider>
+      <div className="geo-polaris-traffic-dates" aria-hidden="true">
+        {points.map((point, index) => (
+          <span
+            key={point.date}
+            style={{
+              left: `${
+                (index / Math.max(1, points.length - 1)) * 100
+              }%`,
+            }}
+          >
+            {formatDateLabel(point.date)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

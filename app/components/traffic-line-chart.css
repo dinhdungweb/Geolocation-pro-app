@@ -38,6 +38,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+.geo-polaris-traffic-plot {
+  width: 100%;
+  height: 190px;
+  min-width: 0;
+}
+
+.geo-polaris-traffic-dates {
+  position: relative;
+  height: 22px;
+  margin-right: 16px;
+  margin-left: 60px;
+  color: #616161;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.geo-polaris-traffic-dates span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 @media (max-width: 30em) {
   .geo-polaris-traffic-summary {
     gap: 12px;
