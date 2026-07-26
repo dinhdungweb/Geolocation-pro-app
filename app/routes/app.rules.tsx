@@ -31,7 +31,7 @@ import {
     Popover,
     ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon, EditIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon, EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { RuleStatusSwitch } from "../components/rule-status-switch";
 import { authenticate } from "../shopify.server";
@@ -457,6 +457,7 @@ export default function RulesPage() {
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deletingRule, setDeletingRule] = useState<RedirectRule | null>(null);
     const [ruleQuery, setRuleQuery] = useState("");
     const [matchTypeFilter, setMatchTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
@@ -645,6 +646,7 @@ export default function RulesPage() {
         shopify.toast.show(deleteFetcher.data.message, { isError: deleteFetcher.data.success === false });
         if (deleteFetcher.data.success) {
             setDeleteModalOpen(false);
+            setDeletingRule(null);
             clearSelection();
         }
     }, [clearSelection, deleteFetcher.data, deleteFetcher.state, shopify]);
@@ -797,16 +799,29 @@ export default function RulesPage() {
 
     const handleBulkDelete = useCallback(() => {
         if (selectedResources.length === 0) return;
+        setDeletingRule(null);
         setDeleteModalOpen(true);
     }, [selectedResources]);
 
     const handleConfirmBulkDelete = useCallback(() => {
-        if (selectedResources.length === 0) return;
+        const ruleIds = deletingRule ? [deletingRule.id] : selectedResources;
+        if (ruleIds.length === 0) return;
         const formData = new FormData();
         formData.append("intent", "delete");
-        formData.append("ids", selectedResources.join(","));
+        formData.append("ids", ruleIds.join(","));
         deleteFetcher.submit(formData, { method: "POST" });
-    }, [selectedResources, deleteFetcher]);
+    }, [deletingRule, selectedResources, deleteFetcher]);
+
+    const handleDeleteRule = useCallback((rule: RedirectRule) => {
+        setDeletingRule(rule);
+        setDeleteModalOpen(true);
+    }, []);
+
+    const handleCloseDeleteModal = useCallback(() => {
+        if (deleteFetcher.state !== "idle") return;
+        setDeleteModalOpen(false);
+        setDeletingRule(null);
+    }, [deleteFetcher.state]);
 
     const handleBulkSelect = (region: keyof typeof REGIONS | "ALL" | "CLEAR") => {
         if (region === "CLEAR") {
@@ -1031,14 +1046,26 @@ export default function RulesPage() {
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <div style={{ minWidth: "64px" }}>
-                    {rule.isActive && isPaidOnlyRule(rule) && !hasProPlan ? (
-                        <Badge tone="warning">Disabled (Free Plan)</Badge>
-                    ) : (
-                        <Badge tone={rule.isActive ? "success" : "warning"}>
-                            {rule.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                    )}
+                <div
+                    style={{ minWidth: "144px" }}
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <InlineStack gap="200" blockAlign="center" wrap={false}>
+                        {rule.isActive && isPaidOnlyRule(rule) && !hasProPlan ? (
+                            <Badge tone="warning">Disabled (Free Plan)</Badge>
+                        ) : (
+                            <Badge tone={rule.isActive ? "success" : "warning"}>
+                                {rule.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                        )}
+                        <RuleStatusSwitch
+                            checked={rule.isActive}
+                            label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
+                            loading={isThisRuleToggling}
+                            disabled={toggleInProgress || (!rule.isActive && isPaidOnlyRule(rule) && !hasProPlan)}
+                            onChange={() => handleToggle(rule)}
+                        />
+                    </InlineStack>
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
@@ -1067,13 +1094,15 @@ export default function RulesPage() {
                         >
                             Edit
                         </Button>
-                        <RuleStatusSwitch
-                            checked={rule.isActive}
-                            label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
-                            loading={isThisRuleToggling}
-                            disabled={toggleInProgress || (!rule.isActive && isPaidOnlyRule(rule) && !hasProPlan)}
-                            onChange={() => handleToggle(rule)}
-                        />
+                        <Button
+                            size="slim"
+                            variant="tertiary"
+                            tone="critical"
+                            icon={DeleteIcon}
+                            onClick={() => handleDeleteRule(rule)}
+                        >
+                            Delete
+                        </Button>
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
@@ -2245,15 +2274,17 @@ export default function RulesPage() {
 
             <Modal
                 open={deleteModalOpen}
-                onClose={() => setDeleteModalOpen(false)}
-                title="Delete selected rules?"
+                onClose={handleCloseDeleteModal}
+                title={deletingRule ? `Delete "${deletingRule.name}"?` : "Delete selected rules?"}
                 primaryAction={{
-                    content: `Delete ${selectedResources.length} rule${selectedResources.length === 1 ? "" : "s"}`,
+                    content: deletingRule
+                        ? "Delete rule"
+                        : `Delete ${selectedResources.length} rule${selectedResources.length === 1 ? "" : "s"}`,
                     destructive: true,
                     loading: deleteFetcher.state !== "idle",
                     onAction: handleConfirmBulkDelete,
                 }}
-                secondaryActions={[{ content: "Cancel", onAction: () => setDeleteModalOpen(false) }]}
+                secondaryActions={[{ content: "Cancel", onAction: handleCloseDeleteModal }]}
             >
                 <Modal.Section>
                     <BlockStack gap="300">
@@ -2261,7 +2292,9 @@ export default function RulesPage() {
                             <Banner tone="critical">{deleteFetcher.data.message}</Banner>
                         )}
                         <Text as="p">
-                            This action cannot be undone. The selected rules will stop affecting your storefront immediately.
+                            {deletingRule
+                                ? `"${deletingRule.name}" will stop affecting your storefront immediately. This action cannot be undone.`
+                                : "This action cannot be undone. The selected rules will stop affecting your storefront immediately."}
                         </Text>
                     </BlockStack>
                 </Modal.Section>

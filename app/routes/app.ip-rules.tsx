@@ -29,7 +29,7 @@ import {
     ActionList,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon, EditIcon } from "@shopify/polaris-icons";
+import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon, EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import { RuleStatusSwitch } from "../components/rule-status-switch";
 import prisma from "../db.server";
@@ -325,6 +325,7 @@ export default function IPRulesPage() {
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deletingRule, setDeletingRule] = useState<IPRule | null>(null);
     const [ruleQuery, setRuleQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [actionFilter, setActionFilter] = useState("all");
@@ -422,6 +423,7 @@ export default function IPRulesPage() {
         shopify.toast.show(deleteFetcher.data.message, { isError: deleteFetcher.data.success === false });
         if (deleteFetcher.data.success) {
             setDeleteModalOpen(false);
+            setDeletingRule(null);
             clearSelection();
         }
     }, [clearSelection, deleteFetcher.data, deleteFetcher.state, shopify]);
@@ -493,16 +495,30 @@ export default function IPRulesPage() {
 
     const handleBulkDelete = useCallback(() => {
         if (!hasProPlan || selectedResources.length === 0) return;
+        setDeletingRule(null);
         setDeleteModalOpen(true);
     }, [hasProPlan, selectedResources]);
 
     const handleConfirmBulkDelete = useCallback(() => {
-        if (!hasProPlan || selectedResources.length === 0) return;
+        const ruleIds = deletingRule ? [deletingRule.id] : selectedResources;
+        if (!hasProPlan || ruleIds.length === 0) return;
         const formData = new FormData();
         formData.append("intent", "delete");
-        formData.append("ids", selectedResources.join(","));
+        formData.append("ids", ruleIds.join(","));
         deleteFetcher.submit(formData, { method: "POST" });
-    }, [hasProPlan, selectedResources, deleteFetcher]);
+    }, [deletingRule, hasProPlan, selectedResources, deleteFetcher]);
+
+    const handleDeleteRule = useCallback((rule: IPRule) => {
+        if (!hasProPlan) return;
+        setDeletingRule(rule);
+        setDeleteModalOpen(true);
+    }, [hasProPlan]);
+
+    const handleCloseDeleteModal = useCallback(() => {
+        if (deleteFetcher.state !== "idle") return;
+        setDeleteModalOpen(false);
+        setDeletingRule(null);
+    }, [deleteFetcher.state]);
 
     // --- Export Rules ---
     const handleExportRules = useCallback((exportAll: boolean) => {
@@ -632,14 +648,26 @@ export default function IPRulesPage() {
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>
-                <div className="ip-rule-status-cell">
-                    {rule.isActive && !hasProPlan ? (
-                        <Badge tone="warning">Disabled (Free Plan)</Badge>
-                    ) : (
-                        <Badge tone={rule.isActive ? "success" : "warning"}>
-                            {rule.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                    )}
+                <div
+                    className="ip-rule-status-cell"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <InlineStack gap="200" blockAlign="center" wrap={false}>
+                        {rule.isActive && !hasProPlan ? (
+                            <Badge tone="warning">Disabled (Free Plan)</Badge>
+                        ) : (
+                            <Badge tone={rule.isActive ? "success" : "warning"}>
+                                {rule.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                        )}
+                        <RuleStatusSwitch
+                            checked={rule.isActive}
+                            label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
+                            loading={isThisRuleToggling}
+                            disabled={!hasProPlan || toggleInProgress}
+                            onChange={() => handleToggle(rule)}
+                        />
+                    </InlineStack>
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
@@ -658,13 +686,16 @@ export default function IPRulesPage() {
                         >
                             Edit
                         </Button>
-                        <RuleStatusSwitch
-                            checked={rule.isActive}
-                            label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
-                            loading={isThisRuleToggling}
-                            disabled={!hasProPlan || toggleInProgress}
-                            onChange={() => handleToggle(rule)}
-                        />
+                        <Button
+                            size="slim"
+                            variant="tertiary"
+                            tone="critical"
+                            icon={DeleteIcon}
+                            onClick={() => handleDeleteRule(rule)}
+                            disabled={!hasProPlan}
+                        >
+                            Delete
+                        </Button>
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
@@ -822,7 +853,7 @@ export default function IPRulesPage() {
                         min-width: 260px;
                     }
                     .ip-rule-status-cell {
-                        min-width: 80px;
+                        min-width: 144px;
                     }
                     .ip-rule-actions-cell {
                         display: flex;
@@ -1271,15 +1302,17 @@ export default function IPRulesPage() {
 
             <Modal
                 open={deleteModalOpen}
-                onClose={() => setDeleteModalOpen(false)}
-                title="Delete selected IP rules?"
+                onClose={handleCloseDeleteModal}
+                title={deletingRule ? `Delete "${deletingRule.name}"?` : "Delete selected IP rules?"}
                 primaryAction={{
-                    content: `Delete ${selectedResources.length} IP rule${selectedResources.length === 1 ? "" : "s"}`,
+                    content: deletingRule
+                        ? "Delete IP rule"
+                        : `Delete ${selectedResources.length} IP rule${selectedResources.length === 1 ? "" : "s"}`,
                     destructive: true,
                     loading: deleteFetcher.state !== "idle",
                     onAction: handleConfirmBulkDelete,
                 }}
-                secondaryActions={[{ content: "Cancel", onAction: () => setDeleteModalOpen(false) }]}
+                secondaryActions={[{ content: "Cancel", onAction: handleCloseDeleteModal }]}
             >
                 <Modal.Section>
                     <BlockStack gap="300">
@@ -1287,7 +1320,9 @@ export default function IPRulesPage() {
                             <Banner tone="critical">{deleteFetcher.data.message}</Banner>
                         )}
                         <Text as="p">
-                            This action cannot be undone. The selected IP rules will stop affecting your storefront immediately.
+                            {deletingRule
+                                ? `"${deletingRule.name}" will stop affecting your storefront immediately. This action cannot be undone.`
+                                : "This action cannot be undone. The selected IP rules will stop affecting your storefront immediately."}
                         </Text>
                     </BlockStack>
                 </Modal.Section>
