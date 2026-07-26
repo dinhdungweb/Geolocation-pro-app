@@ -45,7 +45,7 @@ export default function WorldTrafficMap({
   return (
     <WorldMap
       data={data}
-      size="responsive"
+      size="md"
       color="#1769e0"
       backgroundColor="transparent"
       borderColor="#ffffff"

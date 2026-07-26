@@ -977,7 +977,7 @@ export default function Index() {
           display: grid;
           place-items: center;
           width: 100%;
-          min-height: 210px;
+          min-height: 252px;
         }
         .geo-map-loading {
           width: 100%;
@@ -1000,9 +1000,6 @@ export default function Index() {
         }
         .geo-world-map .worldmap__figure-container svg {
           display: block;
-          width: min(100%, 620px);
-          height: auto;
-          max-height: 244px;
         }
         .geo-map-region:hover {
           fill-opacity: 1 !important;
@@ -1448,7 +1445,7 @@ export default function Index() {
             border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
           }
           .geo-world-map {
-            min-height: 180px;
+            min-height: 240px;
           }
           .geo-map-footer {
             align-items: flex-start;
