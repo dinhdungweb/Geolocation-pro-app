@@ -29,8 +29,9 @@ import {
     ActionList,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon, EditIcon, ToggleOnIcon, ToggleOffIcon } from "@shopify/polaris-icons";
+import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon, EditIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
+import { RuleStatusSwitch } from "../components/rule-status-switch";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { isBillingTestMode } from "../utils/billing-mode.server";
@@ -566,6 +567,9 @@ export default function IPRulesPage() {
 
     const rowMarkup = filteredRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
+        const toggleInProgress = fetcher.state !== "idle";
+        const togglingRuleId = fetcher.formData?.get("id")?.toString();
+        const isThisRuleToggling = toggleInProgress && togglingRuleId === rule.id;
         const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
         const conflictTooltip = ruleConflicts
             .slice(0, 3)
@@ -654,27 +658,13 @@ export default function IPRulesPage() {
                         >
                             Edit
                         </Button>
-                        {rule.isActive ? (
-                            <Button
-                                size="slim"
-                                variant="tertiary"
-                                icon={ToggleOffIcon}
-                                onClick={() => handleToggle(rule)}
-                                disabled={!hasProPlan}
-                            >
-                                Disable
-                            </Button>
-                        ) : (
-                            <Button
-                                size="slim"
-                                variant="tertiary"
-                                icon={ToggleOnIcon}
-                                onClick={() => handleToggle(rule)}
-                                disabled={!hasProPlan}
-                            >
-                                Enable
-                            </Button>
-                        )}
+                        <RuleStatusSwitch
+                            checked={rule.isActive}
+                            label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
+                            loading={isThisRuleToggling}
+                            disabled={!hasProPlan || toggleInProgress}
+                            onChange={() => handleToggle(rule)}
+                        />
                     </InlineStack>
                 </div>
             </IndexTable.Cell>

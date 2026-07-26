@@ -31,8 +31,9 @@ import {
     Popover,
     ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon, EditIcon, ToggleOnIcon, ToggleOffIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon, EditIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { RuleStatusSwitch } from "../components/rule-status-switch";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
@@ -1066,29 +1067,13 @@ export default function RulesPage() {
                         >
                             Edit
                         </Button>
-                        {rule.isActive ? (
-                            <Button
-                                size="slim"
-                                variant="tertiary"
-                                icon={ToggleOffIcon}
-                                onClick={() => handleToggle(rule)}
-                                loading={isThisRuleToggling}
-                                disabled={toggleInProgress}
-                            >
-                                Disable
-                            </Button>
-                        ) : (
-                            <Button
-                                size="slim"
-                                variant="tertiary"
-                                icon={ToggleOnIcon}
-                                onClick={() => handleToggle(rule)}
-                                loading={isThisRuleToggling}
-                                disabled={toggleInProgress || (isPaidOnlyRule(rule) && !hasProPlan)}
-                            >
-                                Enable
-                            </Button>
-                        )}
+                        <RuleStatusSwitch
+                            checked={rule.isActive}
+                            label={`${rule.isActive ? "Disable" : "Enable"} ${rule.name}`}
+                            loading={isThisRuleToggling}
+                            disabled={toggleInProgress || (!rule.isActive && isPaidOnlyRule(rule) && !hasProPlan)}
+                            onChange={() => handleToggle(rule)}
+                        />
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
