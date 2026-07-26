@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
@@ -25,9 +25,11 @@ import {
     ChoiceList,
     Icon,
     Tooltip,
+    Popover,
+    ActionList,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
+import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
@@ -322,6 +324,11 @@ export default function IPRulesPage() {
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [ruleQuery, setRuleQuery] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [actionFilter, setActionFilter] = useState("all");
+    const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+    const [actionPopoverOpen, setActionPopoverOpen] = useState(false);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -366,9 +373,50 @@ export default function IPRulesPage() {
         plural: "IP rules",
     };
 
-    const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
-        useIndexResourceState(rules);
     const conflictsByRuleId = conflictSummary?.byRuleId || {};
+    const filteredRules = useMemo(() => {
+        const normalizedQuery = ruleQuery.trim().toLowerCase();
+        return rules.filter((rule: IPRule) => {
+            if (statusFilter === "active" && !rule.isActive) return false;
+            if (statusFilter === "inactive" && rule.isActive) return false;
+            if (statusFilter === "conflict" && !(conflictsByRuleId[rule.id]?.length > 0)) return false;
+            if (actionFilter !== "all" && rule.ruleType !== actionFilter) return false;
+            if (!normalizedQuery) return true;
+            return [
+                rule.name,
+                rule.ipAddresses,
+                rule.targetUrl,
+                rule.ruleType,
+            ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+        });
+    }, [actionFilter, conflictsByRuleId, ruleQuery, rules, statusFilter]);
+    const hasRuleFilters =
+        ruleQuery.trim().length > 0 ||
+        statusFilter !== "all" ||
+        actionFilter !== "all";
+    const clearRuleFilters = useCallback(() => {
+        setRuleQuery("");
+        setStatusFilter("all");
+        setActionFilter("all");
+    }, []);
+    const statusViews = [
+        { label: "All", value: "all" },
+        { label: "Active", value: "active" },
+        { label: "Inactive", value: "inactive" },
+        { label: "Conflicts", value: "conflict" },
+    ];
+    const actionViews = [
+        { label: "All actions", value: "all" },
+        { label: "Block", value: "block" },
+        { label: "Redirect", value: "redirect" },
+    ];
+    const selectedStatusLabel =
+        statusViews.find((view) => view.value === statusFilter)?.label || "All";
+    const selectedActionLabel =
+        actionViews.find((view) => view.value === actionFilter)?.label || "All actions";
+
+    const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
+        useIndexResourceState(filteredRules);
     const conflictTotal = conflictSummary?.total || 0;
 
     useEffect(() => {
@@ -519,7 +567,7 @@ export default function IPRulesPage() {
         }] : []),
     ];
 
-    const rowMarkup = rules.map((rule: any, index: number) => {
+    const rowMarkup = filteredRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
         const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
         const conflictTooltip = ruleConflicts
@@ -663,6 +711,70 @@ export default function IPRulesPage() {
                         pointer-events: none;
                         user-select: none;
                     }
+                    .ip-rules-toolbar {
+                        align-items: center;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        display: flex;
+                        gap: 8px;
+                        min-height: 44px;
+                        padding: 6px 12px;
+                    }
+                    .ip-rules-search {
+                        align-items: center;
+                        border-radius: var(--p-border-radius-200, 8px);
+                        display: flex;
+                        flex: 1 1 320px;
+                        gap: 6px;
+                        min-width: 200px;
+                        padding: 4px 8px;
+                        transition: background-color 120ms ease, box-shadow 120ms ease;
+                    }
+                    .ip-rules-search:focus-within {
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                        box-shadow: inset 0 0 0 2px var(--p-color-border-focus, #005bd3);
+                    }
+                    .ip-rules-search-input {
+                        background: transparent;
+                        border: 0;
+                        color: var(--p-color-text, #303030);
+                        flex: 1 1 auto;
+                        font: inherit;
+                        line-height: 24px;
+                        min-width: 0;
+                        outline: 0;
+                        padding: 0;
+                    }
+                    .ip-rules-search-input::placeholder {
+                        color: var(--p-color-text-secondary, #616161);
+                    }
+                    .ip-rules-search-input::-webkit-search-cancel-button {
+                        display: none;
+                    }
+                    .ip-rules-search-icon,
+                    .ip-rules-search-clear {
+                        align-items: center;
+                        display: inline-flex;
+                        flex: 0 0 20px;
+                        height: 20px;
+                        justify-content: center;
+                        width: 20px;
+                    }
+                    .ip-rules-search-clear {
+                        background: transparent;
+                        border: 0;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        padding: 0;
+                    }
+                    .ip-rules-search-clear:hover {
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
+                    }
+                    .ip-rules-action-filter {
+                        border-left: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        flex: 0 0 auto;
+                        margin-left: auto;
+                        padding-left: 8px;
+                    }
                     .ip-rules-table-wrap {
                         width: 100%;
                         max-width: 100%;
@@ -714,6 +826,16 @@ export default function IPRulesPage() {
                     @media (max-width: 47.9975em) {
                         .ip-rules-page > div:first-of-type {
                             align-items: stretch !important;
+                        }
+                        .ip-rules-toolbar {
+                            flex-wrap: wrap;
+                        }
+                        .ip-rules-search {
+                            flex-basis: 100%;
+                            order: 3;
+                        }
+                        .ip-rules-action-filter {
+                            margin-left: auto;
                         }
                         .ip-rules-table-wrap .Polaris-IndexTable,
                         .ip-rules-table-wrap .Polaris-IndexTable__Table {
@@ -808,11 +930,115 @@ export default function IPRulesPage() {
                             {rules.length === 0 ? (
                                 emptyStateMarkup
                             ) : (
+                                <>
+                                <div className="ip-rules-toolbar">
+                                    <Popover
+                                        active={statusPopoverOpen}
+                                        activator={
+                                            <Button
+                                                size="slim"
+                                                variant="tertiary"
+                                                disclosure="select"
+                                                pressed={statusPopoverOpen}
+                                                onClick={() => setStatusPopoverOpen((open) => !open)}
+                                            >
+                                                {selectedStatusLabel}
+                                            </Button>
+                                        }
+                                        onClose={() => setStatusPopoverOpen(false)}
+                                        preferredAlignment="left"
+                                        autofocusTarget="first-node"
+                                    >
+                                        <ActionList
+                                            actionRole="menuitem"
+                                            items={statusViews.map((view) => ({
+                                                content: view.label,
+                                                active: statusFilter === view.value,
+                                                prefix: statusFilter === view.value
+                                                    ? <Icon source={CheckIcon} />
+                                                    : <span style={{ display: "block", width: "20px" }} />,
+                                                onAction: () => {
+                                                    setStatusFilter(view.value);
+                                                    setStatusPopoverOpen(false);
+                                                },
+                                            }))}
+                                        />
+                                    </Popover>
+                                    <div className="ip-rules-search">
+                                        <span className="ip-rules-search-icon" aria-hidden="true">
+                                            <Icon source={SearchIcon} tone="subdued" />
+                                        </span>
+                                        <input
+                                            className="ip-rules-search-input"
+                                            type="search"
+                                            aria-label="Search IP rules"
+                                            value={ruleQuery}
+                                            onChange={(event) => setRuleQuery(event.currentTarget.value)}
+                                            placeholder="Search name, IP address, URL"
+                                            autoComplete="off"
+                                        />
+                                        {ruleQuery && (
+                                            <button
+                                                className="ip-rules-search-clear"
+                                                type="button"
+                                                aria-label="Clear search"
+                                                onClick={() => setRuleQuery("")}
+                                            >
+                                                <Icon source={XIcon} tone="subdued" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="ip-rules-action-filter">
+                                        <Popover
+                                            active={actionPopoverOpen}
+                                            activator={
+                                                <Button
+                                                    size="slim"
+                                                    variant="tertiary"
+                                                    disclosure="down"
+                                                    pressed={actionPopoverOpen}
+                                                    onClick={() => setActionPopoverOpen((open) => !open)}
+                                                >
+                                                    {`Action: ${selectedActionLabel}`}
+                                                </Button>
+                                            }
+                                            onClose={() => setActionPopoverOpen(false)}
+                                            preferredAlignment="right"
+                                            autofocusTarget="first-node"
+                                        >
+                                            <ActionList
+                                                actionRole="menuitem"
+                                                items={actionViews.map((view) => ({
+                                                    content: view.label,
+                                                    active: actionFilter === view.value,
+                                                    prefix: actionFilter === view.value
+                                                        ? <Icon source={CheckIcon} />
+                                                        : <span style={{ display: "block", width: "20px" }} />,
+                                                    onAction: () => {
+                                                        setActionFilter(view.value);
+                                                        setActionPopoverOpen(false);
+                                                    },
+                                                }))}
+                                            />
+                                        </Popover>
+                                    </div>
+                                </div>
+                                {filteredRules.length === 0 ? (
+                                    <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                                        <BlockStack gap="300" inlineAlign="center">
+                                            <Text as="h3" variant="headingMd">No IP rules match these filters</Text>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                Change the search or filters to see more rules.
+                                            </Text>
+                                            {hasRuleFilters && <Button onClick={clearRuleFilters}>Clear filters</Button>}
+                                        </BlockStack>
+                                    </div>
+                                ) : (
                                 <div className="ip-rules-table-wrap">
                                     <IndexTable
                                         condensed={false}
                                         resourceName={resourceName}
-                                        itemCount={rules.length}
+                                        itemCount={filteredRules.length}
                                         selectedItemsCount={
                                             allResourcesSelected ? "All" : selectedResources.length
                                         }
@@ -830,6 +1056,8 @@ export default function IPRulesPage() {
                                         {rowMarkup}
                                     </IndexTable>
                                 </div>
+                                )}
+                                </>
                             )}
                         </Card>
                     </Layout.Section>

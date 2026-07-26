@@ -18,7 +18,7 @@ import {
     TextField,
     useBreakpoints,
 } from "@shopify/polaris";
-import { CalendarIcon } from "@shopify/polaris-icons";
+import { CalendarIcon, SearchIcon, XIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
@@ -847,18 +847,28 @@ export default function VisitorLogs() {
             <div className="visitor-log-filter-area">
                 <div className="visitor-log-filter-bar">
                     <div className="visitor-log-filter-search">
-                        <TextField
-                            label="Search visitor logs"
-                            labelHidden
-                            autoComplete="off"
-                            clearButton
-                            placeholder="Search IP, rule, path..."
-                            size="slim"
+                        <span className="visitor-log-filter-search-icon" aria-hidden="true">
+                            <Icon source={SearchIcon} tone="subdued" />
+                        </span>
+                        <input
+                            className="visitor-log-filter-search-input"
                             type="search"
+                            aria-label="Search visitor logs"
+                            placeholder="Search IP, rule, path..."
                             value={queryDraft}
-                            onChange={setQueryDraft}
-                            onClearButtonClick={() => setQueryDraft("")}
+                            onChange={(event) => setQueryDraft(event.currentTarget.value)}
+                            autoComplete="off"
                         />
+                        {queryDraft && (
+                            <button
+                                className="visitor-log-filter-search-clear"
+                                type="button"
+                                aria-label="Clear search"
+                                onClick={() => setQueryDraft("")}
+                            >
+                                <Icon source={XIcon} tone="subdued" />
+                            </button>
+                        )}
                     </div>
                     <div className="visitor-log-filter-date-wrap">
                     <Popover
@@ -870,6 +880,7 @@ export default function VisitorLogs() {
                                     icon={CalendarIcon}
                                     onClick={handleDateActivatorClick}
                                     size="slim"
+                                    variant="tertiary"
                                 >
                                     {dateRangeLabel}
                                 </Button>
@@ -990,7 +1001,7 @@ export default function VisitorLogs() {
                     </div>
                     {hasFilters && (
                         <div className="visitor-log-filter-clear">
-                            <Button onClick={clearFilters} size="slim">Clear</Button>
+                            <Button onClick={clearFilters} size="slim" variant="tertiary">Clear</Button>
                         </div>
                     )}
                 </div>
@@ -1135,14 +1146,6 @@ export default function VisitorLogs() {
                         flex: 1 1 260px;
                         min-width: 220px;
                         max-width: 520px;
-                    }
-                    .visitor-log-header .visitor-log-filter-area {
-                        flex: 0 1 auto;
-                        justify-items: end;
-                        margin-left: auto;
-                    }
-                    .visitor-log-header .visitor-log-filter-bar {
-                        justify-content: flex-end;
                     }
                     .visitor-log-filter-area {
                         --p-color-input-border: transparent;
@@ -1305,53 +1308,96 @@ export default function VisitorLogs() {
                         }
                     }
                     .visitor-log-filter-area {
-                        display: grid;
-                        gap: 8px;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
                     }
                     .visitor-log-filter-bar {
                         display: flex;
                         align-items: center;
                         flex-wrap: wrap;
                         gap: 8px;
+                        min-height: 44px;
+                        padding: 6px 12px;
                     }
                     .visitor-log-filter-search {
-                        width: 260px;
+                        align-items: center;
+                        border-radius: var(--p-border-radius-200, 8px);
+                        display: flex;
+                        flex: 1 1 280px;
+                        gap: 6px;
+                        min-width: 200px;
+                        padding: 4px 8px;
+                        transition: background-color 120ms ease, box-shadow 120ms ease;
                     }
-                    .visitor-log-filter-search .Polaris-TextField__Input,
-                    .visitor-log-filter-search .Polaris-TextField__Backdrop,
-                    .visitor-log-filter-clear .Polaris-Button {
-                        min-height: 32px;
+                    .visitor-log-filter-search:focus-within {
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                        box-shadow: inset 0 0 0 2px var(--p-color-border-focus, #005bd3);
+                    }
+                    .visitor-log-filter-search-input {
+                        background: transparent;
+                        border: 0;
+                        color: var(--p-color-text, #303030);
+                        flex: 1 1 auto;
+                        font: inherit;
+                        line-height: 24px;
+                        min-width: 0;
+                        outline: 0;
+                        padding: 0;
+                    }
+                    .visitor-log-filter-search-input::placeholder {
+                        color: var(--p-color-text-secondary, #616161);
+                    }
+                    .visitor-log-filter-search-input::-webkit-search-cancel-button {
+                        display: none;
+                    }
+                    .visitor-log-filter-search-icon,
+                    .visitor-log-filter-search-clear {
+                        align-items: center;
+                        display: inline-flex;
+                        flex: 0 0 20px;
+                        height: 20px;
+                        justify-content: center;
+                        width: 20px;
+                    }
+                    .visitor-log-filter-search-clear {
+                        background: transparent;
+                        border: 0;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        padding: 0;
+                    }
+                    .visitor-log-filter-search-clear:hover {
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
                     }
                     .visitor-log-filter-select {
-                        width: 148px;
-                        min-width: 148px;
+                        min-width: 132px;
                     }
-                    .visitor-log-filter-area .Polaris-TextField__Backdrop,
                     .visitor-log-filter-area .Polaris-Select__Backdrop {
                         border: none;
-                        background: var(--p-color-bg-fill, #ffffff);
-                        box-shadow: var(--p-shadow-button);
+                        background: transparent;
+                        box-shadow: none;
                     }
-                    .visitor-log-filter-area .Polaris-TextField:hover .Polaris-TextField__Backdrop,
                     .visitor-log-filter-area .Polaris-Select:hover .Polaris-Select__Backdrop {
-                        background: var(--p-color-bg-fill-hover, #fafafa);
-                        box-shadow: var(--p-shadow-button-hover);
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
+                        box-shadow: none;
                     }
                     .visitor-log-date-filter {
                         display: inline-flex;
                     }
                     .visitor-log-filter-date-wrap {
+                        border-left: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        margin-left: auto;
                         min-width: 0;
+                        padding-left: 8px;
                     }
                     .visitor-log-date-filter .Polaris-Button {
-                        background: var(--p-color-bg-fill, #ffffff);
+                        background: transparent;
                         border: none;
-                        box-shadow: var(--p-shadow-button);
+                        box-shadow: none;
                         min-height: 32px;
                     }
                     .visitor-log-date-filter .Polaris-Button:hover {
-                        background: var(--p-color-bg-fill-hover, #fafafa);
-                        box-shadow: var(--p-shadow-button-hover);
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
+                        box-shadow: none;
                     }
                     .visitor-log-date-popover {
                         width: min(716px, calc(100vw - 48px));
@@ -1476,14 +1522,6 @@ export default function VisitorLogs() {
                             min-width: 0;
                             max-width: none;
                         }
-                        .visitor-log-header .visitor-log-filter-area {
-                            width: 100%;
-                            justify-items: stretch;
-                            margin-left: 0;
-                        }
-                        .visitor-log-header .visitor-log-filter-bar {
-                            justify-content: flex-start;
-                        }
                         .visitor-log-pagination {
                             align-items: flex-start;
                             flex-direction: column;
@@ -1497,7 +1535,10 @@ export default function VisitorLogs() {
                             grid-column: 1 / -1;
                         }
                         .visitor-log-filter-date-wrap {
+                            border-left: 0;
                             grid-column: 1 / -1;
+                            margin-left: 0;
+                            padding-left: 0;
                             width: 100%;
                         }
                         .visitor-log-date-filter,
@@ -1569,15 +1610,14 @@ export default function VisitorLogs() {
                                         </Text>
                                     </BlockStack>
                                 </div>
+                            </div>
 
+                            <Card padding="0">
                                 <Suspense fallback={renderFilterControls(emptyFilterOptions)}>
                                     <Await resolve={visitorLogsData}>
                                         {(data) => renderFilterControls(data.filterOptions)}
                                     </Await>
                                 </Suspense>
-                            </div>
-
-                            <Card padding="0">
                                 <Suspense fallback={<VisitorLogsTableSkeleton />}>
                                     <Await resolve={visitorLogsData}>
                                         {(data) => renderLogsTable(data)}
