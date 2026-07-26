@@ -1,23 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
     Page,
-    Layout,
-    Card,
     Text,
     BlockStack,
     TextField,
     Select,
-    Checkbox,
     Banner,
-    Divider,
     InlineStack,
     Badge,
-    Box,
+    Button,
+    Icon,
 } from "@shopify/polaris";
+import {
+    CheckCircleIcon,
+    GlobeIcon,
+    LockIcon,
+    PaintBrushRoundIcon,
+    PersonIcon,
+    SettingsIcon,
+    ShieldCheckMarkIcon,
+    ShieldNoneIcon,
+    StoreIcon,
+} from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -173,6 +182,89 @@ function ColorPickerField({
     );
 }
 
+function SettingsPanel({
+    title,
+    description,
+    children,
+}: {
+    title?: string;
+    description?: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className="settings-flat-section">
+            {(title || description) && (
+                <header className="settings-flat-section-header">
+                    <BlockStack gap="100">
+                        {title ? (
+                            <Text as="h3" variant="headingSm">
+                                {title}
+                            </Text>
+                        ) : null}
+                        {description ? (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                                {description}
+                            </Text>
+                        ) : null}
+                    </BlockStack>
+                </header>
+            )}
+            <div className="settings-flat-section-body">{children}</div>
+        </section>
+    );
+}
+
+function SettingsRow({
+    label,
+    description,
+    children,
+    stacked = false,
+}: {
+    label: string;
+    description: string;
+    children: ReactNode;
+    stacked?: boolean;
+}) {
+    return (
+        <div className={`settings-form-row${stacked ? " is-stacked" : ""}`}>
+            <span className="settings-status-copy">
+                <strong>{label}</strong>
+                <span>{description}</span>
+            </span>
+            <div className="settings-form-control">{children}</div>
+        </div>
+    );
+}
+
+function SettingsToggle({
+    checked,
+    onChange,
+    disabled = false,
+    label,
+}: {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    disabled?: boolean;
+    label: string;
+}) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-label={label}
+            aria-checked={checked}
+            className={`settings-toggle${checked ? " is-checked" : ""}`}
+            disabled={disabled}
+            onClick={() => onChange(!checked)}
+        >
+            <span className="settings-toggle-track" aria-hidden="true">
+                <span className="settings-toggle-thumb" />
+            </span>
+            <span>{checked ? "Enabled" : "Disabled"}</span>
+        </button>
+    );
+}
+
 // Loader: Fetch settings for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, billing } = await authenticate.admin(request);
@@ -211,7 +303,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
     const isFreePlan = effectivePlan === FREE_PLAN;
 
-    return responseData({ settings, shop, isFreePlan });
+    return responseData({
+        settings,
+        shop,
+        isFreePlan,
+        currentPlan: effectivePlan,
+    });
 };
 
 // Action: Update settings
@@ -324,11 +421,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function SettingsPage() {
-    const { settings, isFreePlan } = useLoaderData<typeof loader>();
+    const { settings, shop, isFreePlan, currentPlan } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
+    const navigate = useNavigate();
     const shopify = useAppBridge();
     const [savedSnapshot, setSavedSnapshot] = useState<SettingsFormSnapshot>(() => getSettingsSnapshot(settings));
     const submittedSnapshotRef = useRef<SettingsFormSnapshot | null>(null);
+    const saveButtonRef = useRef<HTMLButtonElement>(null);
 
     // Form state
     const [isEnabled, setIsEnabled] = useState(settings.isEnabled);
@@ -353,6 +452,9 @@ export default function SettingsPage() {
     const [blockedSupportText, setBlockedSupportText] = useState(settings.blockedSupportText || "Contact support");
     const [blockedSupportUrl, setBlockedSupportUrl] = useState(settings.blockedSupportUrl || "");
     const [blockVpn, setBlockVpn] = useState(settings.blockVpn);
+    const [activeTab, setActiveTab] = useState<
+        "general" | "popup" | "blocked" | "visitor" | "security"
+    >("general");
 
     const isLoading = fetcher.state !== "idle";
     const currentSnapshot = useMemo<SettingsFormSnapshot>(() => ({
@@ -386,6 +488,26 @@ export default function SettingsPage() {
         blockedSupportUrl, blockVpn,
     ]);
     const hasUnsavedChanges = JSON.stringify(currentSnapshot) !== JSON.stringify(savedSnapshot);
+
+    useEffect(() => {
+        const saveButton = saveButtonRef.current;
+
+        if (isLoading) {
+            saveButton?.setAttribute("loading", "");
+            saveButton?.setAttribute("aria-busy", "true");
+        } else {
+            saveButton?.removeAttribute("loading");
+            saveButton?.removeAttribute("aria-busy");
+        }
+
+        shopify.loading(isLoading);
+
+        return () => {
+            if (isLoading) {
+                shopify.loading(false);
+            }
+        };
+    }, [isLoading, shopify]);
 
     useEffect(() => {
         if (fetcher.data?.success) {
@@ -495,6 +617,42 @@ export default function SettingsPage() {
         { label: "Top Bar", value: "top_bar" },
         { label: "Bottom Bar", value: "bottom_bar" },
     ];
+    const settingsTabs = [
+        {
+            id: "general" as const,
+            label: "General",
+            description: "App status and overview",
+            icon: SettingsIcon,
+        },
+        {
+            id: "popup" as const,
+            label: "Popup appearance",
+            description: "Template, content and colors",
+            icon: PaintBrushRoundIcon,
+        },
+        {
+            id: "blocked" as const,
+            label: "Blocked page",
+            description: "Block message and branding",
+            icon: ShieldNoneIcon,
+        },
+        {
+            id: "visitor" as const,
+            label: "Visitor controls",
+            description: "Bots, IPs and preferences",
+            icon: PersonIcon,
+        },
+        {
+            id: "security" as const,
+            label: "Security",
+            description: "VPN and proxy protection",
+            icon: LockIcon,
+        },
+    ];
+    const planLabel =
+        currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1);
+    const activeTabDetails =
+        settingsTabs.find((tab) => tab.id === activeTab) || settingsTabs[0];
     const previewMessage = popupMessage
         .replace("{country}", "US")
         .replace("{target}", "US Store");
@@ -560,14 +718,11 @@ export default function SettingsPage() {
         </div>
     );
     const previewMarkup = (
-        <Card>
+        <SettingsPanel
+            title="Popup preview"
+            description="Desktop preview using US and US Store as sample values."
+        >
             <BlockStack gap="400">
-                <BlockStack gap="100">
-                    <Text as="h2" variant="headingMd">Popup preview</Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                        A desktop-sized preview using US and US Store as sample values.
-                    </Text>
-                </BlockStack>
                 <div className="settings-browser-shell">
                     <div className="settings-browser-toolbar" aria-hidden="true">
                         <span className="settings-browser-dot" />
@@ -591,17 +746,14 @@ export default function SettingsPage() {
                     </Banner>
                 )}
             </BlockStack>
-        </Card>
+        </SettingsPanel>
     );
     const blockedPreviewMarkup = (
-        <Card>
+        <SettingsPanel
+            title="Blocked page preview"
+            description="Preview for visitors matched by a block rule."
+        >
             <BlockStack gap="400">
-                <BlockStack gap="100">
-                    <Text as="h2" variant="headingMd">Blocked page preview</Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                        Preview for visitors matched by a block rule.
-                    </Text>
-                </BlockStack>
                 <div className="settings-browser-shell">
                     <div className="settings-browser-toolbar" aria-hidden="true">
                         <span className="settings-browser-dot" />
@@ -637,7 +789,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
             </BlockStack>
-        </Card>
+        </SettingsPanel>
     );
 
     return (
@@ -648,7 +800,12 @@ export default function SettingsPage() {
         >
             <TitleBar title="Settings" />
             <ui-save-bar id="settings-save-bar">
-                <button variant="primary" onClick={handleSave} disabled={isLoading}>
+                <button
+                    ref={saveButtonRef}
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={isLoading}
+                >
                     {saveButtonText}
                 </button>
                 <button onClick={handleDiscard} disabled={isLoading}>
@@ -658,13 +815,340 @@ export default function SettingsPage() {
             <style>
                 {`
                     .settings-page-content {
-                        width: min(100%, 1320px);
-                        margin: 0 auto;
+                        width: 100%;
+                        margin: 0;
                         padding-bottom: 72px;
                     }
                     .settings-content-stack {
                         display: grid;
                         gap: 20px;
+                    }
+                    .settings-workspace {
+                        display: grid;
+                        grid-template-columns: minmax(0, 1fr) 280px;
+                        align-items: start;
+                        gap: 16px;
+                    }
+                    .settings-main-shell {
+                        display: grid;
+                        grid-template-columns: 210px minmax(0, 1fr);
+                        min-width: 0;
+                        overflow: hidden;
+                        border: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                        border-radius: 12px;
+                        background: var(--p-color-bg-surface, #ffffff);
+                        box-shadow: 0 1px 0 rgb(0 0 0 / 4%);
+                    }
+                    .settings-tab-list {
+                        display: grid;
+                        align-content: start;
+                        gap: 4px;
+                        padding: 12px;
+                        border-right: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                        background: var(--p-color-bg-surface-secondary, #fafafa);
+                    }
+                    .settings-tab {
+                        display: grid;
+                        grid-template-columns: 20px minmax(0, 1fr);
+                        align-items: start;
+                        gap: 9px;
+                        width: 100%;
+                        padding: 9px 10px;
+                        border: 0;
+                        border-radius: 8px;
+                        background: transparent;
+                        color: var(--p-color-text-secondary, #616161);
+                        font: inherit;
+                        text-align: left;
+                        cursor: pointer;
+                    }
+                    .settings-tab:hover {
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
+                        color: var(--p-color-text, #303030);
+                    }
+                    .settings-tab:focus-visible {
+                        outline: 2px solid var(--p-color-border-focus, #005bd3);
+                        outline-offset: 1px;
+                    }
+                    .settings-tab.is-active {
+                        background: var(--p-color-bg-surface-info, #eaf3ff);
+                        color: var(--p-color-text-info, #005bd3);
+                    }
+                    .settings-tab-icon {
+                        display: inline-flex;
+                        width: 20px;
+                        height: 20px;
+                    }
+                    .settings-tab-copy {
+                        display: grid;
+                        gap: 1px;
+                        min-width: 0;
+                    }
+                    .settings-tab-copy strong {
+                        color: inherit;
+                        font-size: 13px;
+                        line-height: 18px;
+                    }
+                    .settings-tab-copy span {
+                        color: var(--p-color-text-secondary, #707070);
+                        font-size: 11px;
+                        line-height: 15px;
+                    }
+                    .settings-tab-panel {
+                        min-width: 0;
+                        padding: 0;
+                    }
+                    .settings-tab-header {
+                        padding: 16px 20px;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                    }
+                    .settings-tab-body {
+                        display: grid;
+                        gap: 16px;
+                        padding: 20px;
+                    }
+                    .settings-flat-section {
+                        overflow: hidden;
+                        border: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                        border-radius: 10px;
+                        background: var(--p-color-bg-surface, #ffffff);
+                    }
+                    .settings-flat-section-header {
+                        padding: 14px 16px;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                    }
+                    .settings-flat-section-body {
+                        display: grid;
+                        gap: 0;
+                        padding: 0 16px;
+                    }
+                    .settings-flat-section-body > .Polaris-BlockStack {
+                        padding: 16px 0;
+                    }
+                    .settings-form-row {
+                        display: grid;
+                        grid-template-columns: minmax(180px, 1fr) minmax(240px, 360px);
+                        align-items: center;
+                        gap: 24px;
+                        min-height: 68px;
+                        padding: 12px 0;
+                    }
+                    .settings-form-row + .settings-form-row {
+                        border-top: 1px solid var(--p-color-border-secondary, #eeeeee);
+                    }
+                    .settings-form-row.is-stacked {
+                        grid-template-columns: 1fr;
+                        align-items: start;
+                        gap: 12px;
+                    }
+                    .settings-form-control {
+                        min-width: 0;
+                    }
+                    .settings-form-control textarea {
+                        field-sizing: content;
+                        min-height: 88px;
+                        overflow-y: hidden;
+                        resize: vertical;
+                    }
+                    .settings-duration-control {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .settings-duration-input {
+                        width: 80px;
+                        flex: 0 0 80px;
+                    }
+                    .settings-duration-unit {
+                        color: var(--p-color-text-secondary, #616161);
+                        font-size: 13px;
+                    }
+                    .settings-toggle {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 4px 0;
+                        border: 0;
+                        background: transparent;
+                        color: var(--p-color-text-secondary, #616161);
+                        font: inherit;
+                        font-size: 12px;
+                        cursor: pointer;
+                    }
+                    .settings-toggle:focus-visible {
+                        outline: 2px solid var(--p-color-border-focus, #005bd3);
+                        outline-offset: 2px;
+                        border-radius: 4px;
+                    }
+                    .settings-toggle:disabled {
+                        opacity: 0.5;
+                        cursor: not-allowed;
+                    }
+                    .settings-toggle-track {
+                        position: relative;
+                        display: inline-flex;
+                        width: 32px;
+                        height: 18px;
+                        flex: 0 0 32px;
+                        border-radius: 999px;
+                        background: var(--p-color-bg-fill-disabled, #b5b5b5);
+                        transition: background 120ms ease;
+                    }
+                    .settings-toggle.is-checked .settings-toggle-track {
+                        background: var(--p-color-bg-fill-success, #29845a);
+                    }
+                    .settings-toggle-thumb {
+                        position: absolute;
+                        top: 2px;
+                        left: 2px;
+                        width: 14px;
+                        height: 14px;
+                        border-radius: 50%;
+                        background: #ffffff;
+                        box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+                        transition: transform 120ms ease;
+                    }
+                    .settings-toggle.is-checked .settings-toggle-thumb {
+                        transform: translateX(14px);
+                    }
+                    .settings-status-row {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 16px;
+                        padding: 12px 0;
+                    }
+                    .settings-status-row + .settings-status-row {
+                        border-top: 1px solid var(--p-color-border-secondary, #eeeeee);
+                    }
+                    .settings-status-copy {
+                        display: grid;
+                        gap: 2px;
+                        min-width: 0;
+                    }
+                    .settings-status-copy strong {
+                        font-size: 13px;
+                        line-height: 18px;
+                    }
+                    .settings-status-copy span {
+                        color: var(--p-color-text-secondary, #616161);
+                        font-size: 12px;
+                        line-height: 17px;
+                    }
+                    .settings-side-column {
+                        display: grid;
+                        gap: 16px;
+                    }
+                    .settings-side-card {
+                        overflow: hidden;
+                        border: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                        border-radius: 12px;
+                        background: var(--p-color-bg-surface, #ffffff);
+                    }
+                    .settings-side-card-header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 10px;
+                        padding: 14px 16px;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                    }
+                    .settings-connected {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        color: var(--p-color-text-success, #29845a);
+                        font-size: 12px;
+                    }
+                    .settings-connected::before {
+                        width: 7px;
+                        height: 7px;
+                        border-radius: 50%;
+                        background: var(--p-color-bg-fill-success, #29845a);
+                        content: "";
+                    }
+                    .settings-side-card-body {
+                        display: grid;
+                        gap: 14px;
+                        padding: 16px;
+                    }
+                    .settings-store-identity {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        min-width: 0;
+                    }
+                    .settings-store-icon {
+                        display: grid;
+                        place-items: center;
+                        width: 36px;
+                        height: 36px;
+                        flex: 0 0 36px;
+                        border-radius: 9px;
+                        background: var(--p-color-bg-surface-success, #eaf8f1);
+                        color: var(--p-color-icon-success, #29845a);
+                    }
+                    .settings-store-copy {
+                        display: grid;
+                        min-width: 0;
+                    }
+                    .settings-store-copy strong,
+                    .settings-store-copy span {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .settings-store-copy span {
+                        color: var(--p-color-text-link, #005bd3);
+                        font-size: 12px;
+                    }
+                    .settings-detail-list {
+                        display: grid;
+                        gap: 10px;
+                    }
+                    .settings-detail-row {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 12px;
+                        color: var(--p-color-text-secondary, #616161);
+                        font-size: 12px;
+                    }
+                    .settings-detail-row strong {
+                        color: var(--p-color-text, #303030);
+                        font-weight: 600;
+                    }
+                    .settings-check-list {
+                        display: grid;
+                        gap: 14px;
+                    }
+                    .settings-check-item {
+                        display: grid;
+                        grid-template-columns: 20px minmax(0, 1fr);
+                        gap: 9px;
+                        align-items: start;
+                    }
+                    .settings-check-icon {
+                        display: inline-flex;
+                        width: 20px;
+                        height: 20px;
+                        color: var(--p-color-icon-success, #29845a);
+                    }
+                    .settings-check-icon.is-warning {
+                        color: var(--p-color-icon-caution, #b98900);
+                    }
+                    .settings-check-copy {
+                        display: grid;
+                        gap: 1px;
+                    }
+                    .settings-check-copy strong {
+                        font-size: 12px;
+                        line-height: 17px;
+                    }
+                    .settings-check-copy span {
+                        color: var(--p-color-text-secondary, #616161);
+                        font-size: 11px;
+                        line-height: 16px;
                     }
                     .settings-section-grid {
                         display: grid;
@@ -674,7 +1158,7 @@ export default function SettingsPage() {
                     }
                     .settings-secondary-grid {
                         display: grid;
-                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        grid-template-columns: minmax(0, 1fr);
                         gap: 20px;
                         align-items: stretch;
                     }
@@ -1008,9 +1492,57 @@ export default function SettingsPage() {
                             flex-basis: 180px;
                         }
                     }
+                    @media (max-width: 64em) {
+                        .settings-workspace {
+                            grid-template-columns: 1fr;
+                        }
+                        .settings-side-column {
+                            grid-template-columns: repeat(2, minmax(0, 1fr));
+                        }
+                    }
                     @media (max-width: 47.9975em) {
+                        .Polaris-Page:has(.settings-page-content) > .Polaris-Box {
+                            padding-inline: 0;
+                        }
                         .settings-page-content {
                             padding-bottom: 88px;
+                        }
+                        .settings-main-shell {
+                            grid-template-columns: 1fr;
+                        }
+                        .settings-tab-list {
+                            display: flex;
+                            overflow-x: auto;
+                            padding: 8px;
+                            border-right: 0;
+                            border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                            scrollbar-width: none;
+                        }
+                        .settings-tab-list::-webkit-scrollbar {
+                            display: none;
+                        }
+                        .settings-tab {
+                            width: auto;
+                            min-width: max-content;
+                            grid-template-columns: 18px auto;
+                            padding: 7px 9px;
+                        }
+                        .settings-tab-copy span {
+                            display: none;
+                        }
+                        .settings-tab-header {
+                            padding: 14px 16px;
+                        }
+                        .settings-tab-body {
+                            padding: 14px;
+                        }
+                        .settings-form-row {
+                            grid-template-columns: 1fr;
+                            align-items: start;
+                            gap: 10px;
+                        }
+                        .settings-side-column {
+                            grid-template-columns: 1fr;
                         }
                         .settings-section-grid {
                             grid-template-columns: 1fr;
@@ -1043,7 +1575,7 @@ export default function SettingsPage() {
                             tone="info"
                             action={{
                                 content: "View plans",
-                                url: "/app/pricing",
+                                onAction: () => navigate("/app/pricing"),
                             }}
                         >
                             <p>Upgrade to a paid plan to increase your visitor limit and unlock advanced protection features.</p>
@@ -1054,94 +1586,169 @@ export default function SettingsPage() {
                             <p>{fetcher.data.message || "Failed to save settings"}</p>
                         </Banner>
                     )}
-                    <Layout>
-                        <Layout.Section>
-                            <div className="settings-content-stack">
-                                        <Card>
-                                            <BlockStack gap="400">
-                                                <InlineStack align="space-between" blockAlign="center" gap="300">
-                                                    <BlockStack gap="100">
-                                                        <Text as="h2" variant="headingMd">Storefront status</Text>
-                                                        <Text as="p" variant="bodyMd" tone="subdued">
-                                                            This controls whether redirects, blocks, and popup rules run on your storefront.
-                                                        </Text>
-                                                    </BlockStack>
-                                                    <Badge tone={isEnabled ? "success" : "warning"}>
-                                                        {isEnabled ? "Enabled" : "Disabled"}
-                                                    </Badge>
-                                                </InlineStack>
-                                                <Checkbox
+                    <div className="settings-workspace">
+                        <div className="settings-main-shell">
+                            <nav
+                                className="settings-tab-list"
+                                aria-label="Settings sections"
+                            >
+                                {settingsTabs.map((tab) => (
+                                    <button
+                                        type="button"
+                                        key={tab.id}
+                                        className={`settings-tab${
+                                            activeTab === tab.id ? " is-active" : ""
+                                        }`}
+                                        aria-current={
+                                            activeTab === tab.id ? "page" : undefined
+                                        }
+                                        onClick={() => setActiveTab(tab.id)}
+                                    >
+                                        <span
+                                            className="settings-tab-icon"
+                                            aria-hidden="true"
+                                        >
+                                            <Icon source={tab.icon} />
+                                        </span>
+                                        <span className="settings-tab-copy">
+                                            <strong>{tab.label}</strong>
+                                            <span>{tab.description}</span>
+                                        </span>
+                                    </button>
+                                ))}
+                            </nav>
+
+                            <section
+                                className="settings-tab-panel"
+                                aria-labelledby={`settings-tab-${activeTab}`}
+                            >
+                                <header className="settings-tab-header">
+                                    <BlockStack gap="100">
+                                        <Text
+                                            as="h2"
+                                            variant="headingMd"
+                                            id={`settings-tab-${activeTab}`}
+                                        >
+                                            {activeTabDetails.label}
+                                        </Text>
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            {activeTabDetails.description}
+                                        </Text>
+                                    </BlockStack>
+                                </header>
+                                <div className="settings-tab-body">
+                                    {activeTab !== "general" && !isEnabled && (
+                                        <Banner tone="warning">
+                                            Enable Geolocation in General before configuring this section.
+                                        </Banner>
+                                    )}
+                                    {activeTab === "general" && (
+                                        <SettingsPanel
+                                            title="General"
+                                            description="Global storefront status and current configuration."
+                                        >
+                                            <SettingsRow
+                                                label="Enable app"
+                                                description="Turn redirects, blocks and popup rules on or off globally."
+                                            >
+                                                <SettingsToggle
                                                     label="Enable Geolocation"
                                                     checked={isEnabled}
                                                     onChange={setIsEnabled}
-                                                    helpText="The Shopify theme app embed must also be enabled in your current theme."
                                                 />
-                                                {!isEnabled && (
-                                                    <Banner tone="warning">
-                                                        <p>Geolocation is disabled. Visitor rules will not run until you enable it again.</p>
-                                                    </Banner>
-                                                )}
-                                                <div className="settings-summary-grid">
-                                                    <div className="settings-summary-item">
-                                                        <BlockStack gap="100">
-                                                            <Text as="p" variant="bodySm" tone="subdued">Popup template</Text>
-                                                            <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                                {templateOptions.find((option) => option.value === template)?.label || "Modal"}
-                                                            </Text>
-                                                        </BlockStack>
-                                                    </div>
-                                                    <div className="settings-summary-item">
-                                                        <BlockStack gap="100">
-                                                            <Text as="p" variant="bodySm" tone="subdued">Bot handling</Text>
-                                                            <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                                {excludeBots ? "Search bots excluded" : "Search bots included"}
-                                                            </Text>
-                                                        </BlockStack>
-                                                    </div>
-                                                    <div className="settings-summary-item">
-                                                        <BlockStack gap="100">
-                                                            <Text as="p" variant="bodySm" tone="subdued">Visitor preference</Text>
-                                                            <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                                                {cookieDuration || "7"} day cookie
-                                                            </Text>
-                                                        </BlockStack>
-                                                    </div>
-                                                </div>
-                                            </BlockStack>
-                                        </Card>
+                                            </SettingsRow>
+                                            <SettingsRow
+                                                label="Popup template"
+                                                description="The storefront layout used by rules in popup mode."
+                                            >
+                                                <Button
+                                                    variant="plain"
+                                                    onClick={() => setActiveTab("popup")}
+                                                >
+                                                    {templateOptions.find(
+                                                        (option) =>
+                                                            option.value === template,
+                                                    )?.label || "Modal"}
+                                                </Button>
+                                            </SettingsRow>
+                                            <SettingsRow
+                                                label="Bot handling"
+                                                description="Control whether search engine crawlers run through rules."
+                                            >
+                                                <Badge
+                                                    tone={
+                                                        excludeBots
+                                                            ? "success"
+                                                            : "warning"
+                                                    }
+                                                >
+                                                    {excludeBots
+                                                        ? "Bots excluded"
+                                                        : "Bots included"}
+                                                </Badge>
+                                            </SettingsRow>
+                                            <SettingsRow
+                                                label="Visitor preference"
+                                                description="How long popup choices are remembered."
+                                            >
+                                                <Text
+                                                    as="p"
+                                                    variant="bodySm"
+                                                    fontWeight="semibold"
+                                                >
+                                                    {cookieDuration || "7"} days
+                                                </Text>
+                                            </SettingsRow>
+                                        </SettingsPanel>
+                                    )}
 
-                                        {isEnabled && (
+                                        {activeTab === "popup" && isEnabled && (
                                             <div className="settings-section-grid">
-                                            <Card>
-                                                <BlockStack gap="400">
-                                                    <BlockStack gap="100">
-                                                        <Text as="h2" variant="headingMd">Popup appearance</Text>
-                                                        <Text as="p" variant="bodyMd" tone="subdued">
-                                                            Customize the prompt shown when a rule uses popup mode.
-                                                        </Text>
-                                                    </BlockStack>
+                                            <SettingsPanel
+                                                title="Popup content"
+                                                description="Customize the prompt shown by popup rules."
+                                            >
+                                                <SettingsRow
+                                                    label="Template design"
+                                                    description="Choose how the prompt appears on the storefront."
+                                                >
                                                     <Select
                                                         label="Template Design"
+                                                        labelHidden
                                                         options={templateOptions}
                                                         value={template}
                                                         onChange={setTemplate}
-                                                        helpText="Choose how the popup appears on the visitor's screen."
                                                     />
-                                                    <Divider />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Popup title"
+                                                    description="The heading visitors see first."
+                                                >
                                                     <TextField
                                                         label="Popup Title"
+                                                        labelHidden
                                                         value={popupTitle}
                                                         onChange={setPopupTitle}
                                                         autoComplete="off"
                                                     />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Popup message"
+                                                    description="Use {country} and {target} to insert dynamic values."
+                                                >
                                                     <TextField
                                                         label="Popup Message"
+                                                        labelHidden
                                                         value={popupMessage}
                                                         onChange={setPopupMessage}
-                                                        helpText="Use {country} for visitor's country and {target} for target store name"
-                                                        multiline={2}
+                                                        multiline={4}
                                                         autoComplete="off"
                                                     />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Button labels"
+                                                    description="Text for confirm and cancel actions."
+                                                >
                                                     <div className="settings-two-field-grid">
                                                         <TextField
                                                             label="Confirm Button Text"
@@ -1156,10 +1763,12 @@ export default function SettingsPage() {
                                                             autoComplete="off"
                                                         />
                                                     </div>
-                                                    <Divider />
-                                                    <Text as="h3" variant="headingSm">
-                                                        Colors
-                                                    </Text>
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Colors"
+                                                    description="Background, text and primary button colors."
+                                                    stacked
+                                                >
                                                     <div className="settings-color-grid">
                                                         <ColorPickerField
                                                             label="Background"
@@ -1180,46 +1789,64 @@ export default function SettingsPage() {
                                                             fallback="#007bff"
                                                         />
                                                     </div>
-                                                </BlockStack>
-                                            </Card>
+                                                </SettingsRow>
+                                            </SettingsPanel>
                                             {previewMarkup}
                                             </div>
 
                                         )}
 
-                                        {isEnabled && (
+                                        {activeTab === "blocked" && isEnabled && (
                                             <div className="settings-section-grid">
-                                            <Card>
-                                                <BlockStack gap="400">
-                                                    <BlockStack gap="100">
-                                                        <Text as="h2" variant="headingMd">Blocked page</Text>
-                                                        <Text as="p" variant="bodyMd" tone="subdued">
-                                                            Set the message visitors see when a block rule applies.
-                                                        </Text>
-                                                    </BlockStack>
+                                            <SettingsPanel
+                                                title="Blocked page content"
+                                                description="Set the message visitors see when a block rule applies."
+                                            >
+                                                <SettingsRow
+                                                    label="Blocked title"
+                                                    description="Primary heading on the access denied page."
+                                                >
                                                     <TextField
                                                         label="Blocked Title"
+                                                        labelHidden
                                                         value={blockedTitle}
                                                         onChange={setBlockedTitle}
                                                         placeholder="Access Denied"
                                                         autoComplete="off"
                                                     />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Blocked message"
+                                                    description="Explain why the visitor cannot access the storefront."
+                                                >
                                                     <TextField
                                                         label="Blocked Message"
+                                                        labelHidden
                                                         value={blockedMessage}
                                                         onChange={setBlockedMessage}
                                                         placeholder="We do not offer services in your country/region."
-                                                        multiline={2}
+                                                        multiline={4}
                                                         autoComplete="off"
                                                     />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Logo URL"
+                                                    description="Optional. Leave empty to use the default illustration."
+                                                >
                                                     <TextField
                                                         label="Logo URL"
+                                                        labelHidden
                                                         value={blockedLogoUrl}
                                                         onChange={setBlockedLogoUrl}
                                                         placeholder="https://your-store.com/logo.png"
-                                                        helpText="Optional. Leave empty to show the default alert icon."
                                                         autoComplete="off"
                                                     />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Colors"
+                                                    description="Background, text and accent colors."
+                                                    stacked
+                                                >
                                                     <div className="settings-color-grid">
                                                         <ColorPickerField
                                                             label="Background"
@@ -1240,6 +1867,11 @@ export default function SettingsPage() {
                                                             fallback="#2563eb"
                                                         />
                                                     </div>
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Support action"
+                                                    description="Optional button text and destination."
+                                                >
                                                     <div className="settings-two-field-grid">
                                                         <TextField
                                                             label="Support Button Text"
@@ -1253,88 +1885,254 @@ export default function SettingsPage() {
                                                             value={blockedSupportUrl}
                                                             onChange={setBlockedSupportUrl}
                                                             placeholder="mailto:support@example.com or /pages/contact"
-                                                            helpText="Optional. Hide the button by leaving this blank."
                                                             autoComplete="off"
                                                         />
                                                     </div>
-                                                </BlockStack>
-                                            </Card>
+                                                </SettingsRow>
+                                            </SettingsPanel>
                                             {blockedPreviewMarkup}
                                             </div>
                                         )}
 
-                                        {isEnabled && (
+                                        {activeTab === "visitor" && isEnabled && (
                                             <div className="settings-secondary-grid">
-                                            <Card>
-                                                <BlockStack gap="400">
-                                                    <BlockStack gap="100">
-                                                        <Text as="h2" variant="headingMd">Advanced settings</Text>
-                                                        <Text as="p" variant="bodyMd" tone="subdued">
-                                                            Fine-tune bot handling, test exclusions, and visitor memory.
-                                                        </Text>
-                                                    </BlockStack>
-                                                    <Checkbox
-                                                        label="Exclude Search Engine Bots"
+                                            <SettingsPanel
+                                                title="Visitor controls"
+                                                description="Fine-tune bot handling, test exclusions and visitor memory."
+                                            >
+                                                <SettingsRow
+                                                    label="Exclude search engine bots"
+                                                    description="Prevent Googlebot and other crawlers from running through rules."
+                                                >
+                                                    <SettingsToggle
+                                                        label="Exclude search engine bots"
                                                         checked={excludeBots}
                                                         onChange={setExcludeBots}
-                                                        helpText="Prevents redirecting Googlebot and other crawlers (recommended for SEO)"
                                                     />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Excluded IP addresses"
+                                                    description="Comma-separated IPs that should bypass redirects and blocks."
+                                                >
                                                     <TextField
                                                         label="Excluded IP Addresses"
+                                                        labelHidden
                                                         value={excludedIPs}
                                                         onChange={setExcludedIPs}
                                                         placeholder="192.168.1.1, 10.0.0.1"
-                                                        helpText="Comma-separated list of IP addresses to exclude from redirection"
                                                         autoComplete="off"
                                                     />
-                                                    <TextField
-                                                        label="Cookie Duration (days)"
-                                                        type="number"
-                                                        value={cookieDuration}
-                                                        onChange={setCookieDuration}
-                                                        helpText="How long to remember visitor's preference (only for rules using Popup mode)"
-                                                        autoComplete="off"
-                                                    />
-                                                </BlockStack>
-                                            </Card>
-
-                                            <Card>
-                                                <BlockStack gap="400">
-                                                    <InlineStack align="space-between">
-                                                        <Text as="h2" variant="headingMd">
-                                                            Anti-fraud protection
-                                                        </Text>
-                                                        {!isFreePlan ? (
-                                                            <Badge>Paid plan</Badge>
-                                                        ) : null}
-                                                    </InlineStack>
-                                                    <Text as="p" tone="subdued">Protect your store by instantly blocking connections from known VPNs, proxies, and Tor nodes.</Text>
-
-                                                    {isFreePlan ? (
-                                                        <Banner tone="warning">
-                                                            <p>Upgrade to a paid plan to enable advanced security checks.</p>
-                                                        </Banner>
-                                                    ) : null}
-
-                                                    <Checkbox
-                                                        label="Block VPNs, Proxies & Tor Exit Nodes"
-                                                        checked={blockVpn}
-                                                        onChange={setBlockVpn}
-                                                        disabled={isFreePlan}
-                                                        helpText="Overrides all rules to unconditionally block connections that mask their real location."
-                                                    />
-                                                </BlockStack>
-                                            </Card>
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Cookie duration"
+                                                    description="Days to remember a visitor's popup preference."
+                                                >
+                                                    <div className="settings-duration-control">
+                                                        <div className="settings-duration-input">
+                                                            <TextField
+                                                                label="Cookie Duration (days)"
+                                                                labelHidden
+                                                                type="number"
+                                                                value={cookieDuration}
+                                                                onChange={setCookieDuration}
+                                                                autoComplete="off"
+                                                            />
+                                                        </div>
+                                                        <span className="settings-duration-unit">
+                                                            days
+                                                        </span>
+                                                    </div>
+                                                </SettingsRow>
+                                            </SettingsPanel>
                                             </div>
                                         )}
 
-                            </div>
-                        </Layout.Section>
+                                        {activeTab === "security" && isEnabled && (
+                                            <div className="settings-secondary-grid">
+                                            <SettingsPanel
+                                                title="Anti-fraud protection"
+                                                description="Block connections that mask their real location."
+                                            >
+                                                    {isFreePlan ? (
+                                                        <div style={{ padding: "16px 0" }}>
+                                                        <Banner tone="warning">
+                                                            <p>Upgrade to a paid plan to enable advanced security checks.</p>
+                                                        </Banner>
+                                                        </div>
+                                                    ) : null}
+                                                <SettingsRow
+                                                    label="Block VPNs, proxies and Tor"
+                                                    description="Overrides other rules and blocks masked connections immediately."
+                                                >
+                                                    <SettingsToggle
+                                                        label="Block VPNs, proxies and Tor exit nodes"
+                                                        checked={blockVpn}
+                                                        onChange={setBlockVpn}
+                                                        disabled={isFreePlan}
+                                                    />
+                                                </SettingsRow>
+                                            </SettingsPanel>
+                                            </div>
+                                        )}
 
-                        <Layout.Section>
-                            <Box paddingBlockEnd="800" />
-                        </Layout.Section>
-                    </Layout>
+                                </div>
+                            </section>
+                        </div>
+
+                        <aside className="settings-side-column">
+                            <section className="settings-side-card">
+                                <header className="settings-side-card-header">
+                                    <Text as="h2" variant="headingSm">
+                                        Integration status
+                                    </Text>
+                                    <span className="settings-connected">
+                                        Connected
+                                    </span>
+                                </header>
+                                <div className="settings-side-card-body">
+                                    <div className="settings-store-identity">
+                                        <span
+                                            className="settings-store-icon"
+                                            aria-hidden="true"
+                                        >
+                                            <Icon source={StoreIcon} />
+                                        </span>
+                                        <span className="settings-store-copy">
+                                            <strong>Shopify store</strong>
+                                            <span title={shop}>{shop}</span>
+                                        </span>
+                                    </div>
+                                    <div className="settings-detail-list">
+                                        <div className="settings-detail-row">
+                                            <span>Plan</span>
+                                            <strong>{planLabel}</strong>
+                                        </div>
+                                        <div className="settings-detail-row">
+                                            <span>App status</span>
+                                            <Badge
+                                                tone={
+                                                    isEnabled
+                                                        ? "success"
+                                                        : "warning"
+                                                }
+                                            >
+                                                {isEnabled
+                                                    ? "Enabled"
+                                                    : "Disabled"}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        fullWidth
+                                        onClick={() => navigate("/app/pricing")}
+                                    >
+                                        Manage plan
+                                    </Button>
+                                </div>
+                            </section>
+
+                            <section className="settings-side-card">
+                                <header className="settings-side-card-header">
+                                    <InlineStack gap="200" blockAlign="center">
+                                        <span
+                                            className="settings-tab-icon"
+                                            aria-hidden="true"
+                                        >
+                                            <Icon source={ShieldCheckMarkIcon} />
+                                        </span>
+                                        <Text as="h2" variant="headingSm">
+                                            Current setup
+                                        </Text>
+                                    </InlineStack>
+                                </header>
+                                <div className="settings-side-card-body">
+                                    <div className="settings-check-list">
+                                        <div className="settings-check-item">
+                                            <span
+                                                className={`settings-check-icon${
+                                                    isEnabled
+                                                        ? ""
+                                                        : " is-warning"
+                                                }`}
+                                                aria-hidden="true"
+                                            >
+                                                <Icon
+                                                    source={
+                                                        isEnabled
+                                                            ? CheckCircleIcon
+                                                            : GlobeIcon
+                                                    }
+                                                />
+                                            </span>
+                                            <span className="settings-check-copy">
+                                                <strong>
+                                                    Storefront rules{" "}
+                                                    {isEnabled
+                                                        ? "enabled"
+                                                        : "paused"}
+                                                </strong>
+                                                <span>
+                                                    Redirects, blocks and
+                                                    popups follow the global
+                                                    app status.
+                                                </span>
+                                            </span>
+                                        </div>
+                                        <div className="settings-check-item">
+                                            <span
+                                                className="settings-check-icon"
+                                                aria-hidden="true"
+                                            >
+                                                <Icon source={CheckCircleIcon} />
+                                            </span>
+                                            <span className="settings-check-copy">
+                                                <strong>
+                                                    Search bots{" "}
+                                                    {excludeBots
+                                                        ? "excluded"
+                                                        : "included"}
+                                                </strong>
+                                                <span>
+                                                    Bot handling is configured
+                                                    under Visitor controls.
+                                                </span>
+                                            </span>
+                                        </div>
+                                        <div className="settings-check-item">
+                                            <span
+                                                className={`settings-check-icon${
+                                                    blockVpn
+                                                        ? ""
+                                                        : " is-warning"
+                                                }`}
+                                                aria-hidden="true"
+                                            >
+                                                <Icon
+                                                    source={
+                                                        blockVpn
+                                                            ? ShieldCheckMarkIcon
+                                                            : LockIcon
+                                                    }
+                                                />
+                                            </span>
+                                            <span className="settings-check-copy">
+                                                <strong>
+                                                    VPN protection{" "}
+                                                    {blockVpn
+                                                        ? "enabled"
+                                                        : "disabled"}
+                                                </strong>
+                                                <span>
+                                                    Available on paid plans
+                                                    from the Security tab.
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </aside>
+                    </div>
                 </BlockStack>
             </div>
         </Page>
