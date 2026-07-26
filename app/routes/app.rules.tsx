@@ -1099,7 +1099,6 @@ export default function RulesPage() {
                             <Button
                                 size="slim"
                                 variant="tertiary"
-                                tone="critical"
                                 icon={DeleteIcon}
                                 accessibilityLabel={`Delete ${rule.name}`}
                                 onClick={() => handleDeleteRule(rule)}

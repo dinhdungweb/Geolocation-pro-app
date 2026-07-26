@@ -691,7 +691,6 @@ export default function IPRulesPage() {
                             <Button
                                 size="slim"
                                 variant="tertiary"
-                                tone="critical"
                                 icon={DeleteIcon}
                                 accessibilityLabel={`Delete ${rule.name}`}
                                 onClick={() => handleDeleteRule(rule)}
