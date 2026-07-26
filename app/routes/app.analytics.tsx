@@ -455,6 +455,9 @@ export default function AnalyticsPage() {
   const {
     period,
     countries,
+    popupRules,
+    instantRedirects,
+    blockedCountries,
     rulePerformance,
     dailySeries,
     actionBreakdown,
@@ -495,8 +498,51 @@ export default function AnalyticsPage() {
       ),
     [normalizedQuery, rulePerformance, ruleTypeFilter],
   );
+  const filteredBlockedCountries = useMemo(
+    () =>
+      ruleTypeFilter === "redirect"
+        ? []
+        : blockedCountries.filter(
+            (item) =>
+              (countryFilter === "all" || item.code === countryFilter) &&
+              (!normalizedQuery ||
+                item.country.toLocaleLowerCase().includes(normalizedQuery) ||
+                item.code.toLocaleLowerCase().includes(normalizedQuery)),
+          ),
+    [blockedCountries, countryFilter, normalizedQuery, ruleTypeFilter],
+  );
+  const filteredInstantRedirects = useMemo(
+    () =>
+      ruleTypeFilter === "block"
+        ? []
+        : instantRedirects.filter(
+            (item) =>
+              !normalizedQuery ||
+              item.rule.toLocaleLowerCase().includes(normalizedQuery),
+          ),
+    [instantRedirects, normalizedQuery, ruleTypeFilter],
+  );
+  const filteredPopupRules = useMemo(
+    () =>
+      ruleTypeFilter === "block"
+        ? []
+        : popupRules.filter(
+            (item) =>
+              !normalizedQuery ||
+              item.rule.toLocaleLowerCase().includes(normalizedQuery),
+          ),
+    [normalizedQuery, popupRules, ruleTypeFilter],
+  );
   const topCountries = filteredCountries.slice(0, 5);
   const topRules = filteredRules.slice(0, 5);
+  const totalInstantRedirects = filteredInstantRedirects.reduce(
+    (sum, item) => sum + item.redirected,
+    0,
+  );
+  const totalPopupSeen = filteredPopupRules.reduce(
+    (sum, item) => sum + item.seen,
+    0,
+  );
   const totalActions = actionBreakdown.reduce(
     (sum, item) => sum + item.value,
     0,
@@ -681,6 +727,9 @@ export default function AnalyticsPage() {
             min-height: 0;
             padding: 6px 8px 4px;
           }
+          .analytics-v2-chart--trend {
+            padding: 22px 24px 18px;
+          }
           .analytics-v2-chart--donut {
             display: flex;
             align-items: center;
@@ -702,6 +751,14 @@ export default function AnalyticsPage() {
             width: 100%;
             min-height: 0;
             overflow: auto;
+          }
+          .analytics-v2-table-wrap.is-full {
+            max-height: 360px;
+          }
+          .analytics-v2-table-wrap.is-full .analytics-v2-table th {
+            position: sticky;
+            z-index: 1;
+            top: 0;
           }
           .analytics-v2-table {
             width: 100%;
@@ -726,6 +783,30 @@ export default function AnalyticsPage() {
           .analytics-v2-table tbody tr:last-child td {
             border-bottom: 0;
           }
+          .analytics-v2-data-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.7fr);
+            gap: 12px;
+          }
+          .analytics-v2-data-grid > :nth-child(1) {
+            grid-column: 1;
+            grid-row: 1;
+          }
+          .analytics-v2-data-grid > :nth-child(2) {
+            grid-column: 2;
+            grid-row: 1;
+          }
+          .analytics-v2-data-grid > :nth-child(3) {
+            grid-column: 2;
+            grid-row: 2;
+          }
+          .analytics-v2-data-grid > :nth-child(4) {
+            grid-column: 1;
+            grid-row: 2;
+          }
+          .analytics-v2 .analytics-v2-data-grid .analytics-empty {
+            min-height: 80px;
+          }
           .analytics-v2 .analytics-empty {
             display: grid;
             width: 100%;
@@ -737,14 +818,28 @@ export default function AnalyticsPage() {
             text-align: right;
             font-variant-numeric: tabular-nums;
           }
-          .analytics-v2-entity {
+          .analytics-v2-entity,
+          .analytics-v2 .analytics-entity {
             display: flex;
+            min-width: 0;
             align-items: center;
-            gap: 7px;
+            gap: 8px;
           }
-          .analytics-v2-entity img {
+          .analytics-v2-entity img,
+          .analytics-v2 .analytics-entity img {
+            flex: 0 0 auto;
             border-radius: 2px;
             object-fit: cover;
+          }
+          .analytics-v2 .analytics-country-fallback {
+            display: inline-flex;
+            width: 22px;
+            flex: 0 0 22px;
+            color: var(--p-color-icon-secondary, #8a8a8a);
+          }
+          .analytics-v2 .analytics-country-fallback .Polaris-Icon {
+            width: 16px;
+            height: 16px;
           }
           .analytics-v2-rule-type {
             display: inline-flex;
@@ -906,8 +1001,13 @@ export default function AnalyticsPage() {
               margin-left: 0;
             }
             .analytics-v2-chart-grid,
-            .analytics-v2-detail-grid {
+            .analytics-v2-detail-grid,
+            .analytics-v2-data-grid {
               grid-template-columns: 1fr;
+            }
+            .analytics-v2-data-grid > :nth-child(n) {
+              grid-column: auto;
+              grid-row: auto;
             }
             .analytics-v2-detail-grid > :last-child {
               grid-column: auto;
@@ -1083,7 +1183,7 @@ export default function AnalyticsPage() {
                 </div>
                 <Badge>{`Last ${period} days`}</Badge>
               </header>
-              <div className="analytics-v2-chart">
+              <div className="analytics-v2-chart analytics-v2-chart--trend">
                 <Suspense
                   fallback={
                     <SimpleLoadingSkeleton
@@ -1371,6 +1471,235 @@ export default function AnalyticsPage() {
             </div>
           </section>
         </Card>
+
+        <div className="analytics-v2-data-grid">
+        <Card padding="0">
+          <section className="analytics-v2-panel">
+            <header className="analytics-v2-panel-header">
+              <div className="analytics-v2-panel-title">
+                <Text as="h2" variant="headingSm">
+                  Country performance
+                </Text>
+                <span
+                  className="analytics-v2-info"
+                  title="All visits and actions grouped by country"
+                >
+                  i
+                </span>
+              </div>
+              <Badge>{`${filteredCountries.length} countries`}</Badge>
+            </header>
+            <div className="analytics-v2-table-wrap is-full">
+              <table className="analytics-v2-table">
+                <thead>
+                  <tr>
+                    <th>Country</th>
+                    <th className="is-number">Visits</th>
+                    <th className="is-number">Popup shown</th>
+                    <th className="is-number">Redirected</th>
+                    <th className="is-number">Blocked</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCountries.length > 0 ? (
+                    filteredCountries.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <CountryIdentity
+                            code={item.code}
+                            country={item.country}
+                          />
+                        </td>
+                        <td className="is-number">
+                          {item.visitors.toLocaleString()}
+                        </td>
+                        <td className="is-number">
+                          {item.popup.toLocaleString()}
+                        </td>
+                        <td className="is-number">
+                          {item.redirected.toLocaleString()}
+                        </td>
+                        <td className="is-number">
+                          {item.blocked.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <EmptyTableRow colSpan={5}>
+                      No matching country data
+                    </EmptyTableRow>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            </section>
+          </Card>
+
+          <Card padding="0">
+            <section className="analytics-v2-panel">
+              <header className="analytics-v2-panel-header">
+                <div className="analytics-v2-panel-title">
+                  <Text as="h2" variant="headingSm">
+                    Blocked traffic
+                  </Text>
+                </div>
+                <Badge
+                  tone={
+                    filteredBlockedCountries.length > 0
+                      ? "attention"
+                      : undefined
+                  }
+                >
+                  {filteredBlockedCountries
+                    .reduce((sum, item) => sum + item.blocked, 0)
+                    .toLocaleString()}
+                </Badge>
+              </header>
+              <div className="analytics-v2-table-wrap is-full">
+                <table className="analytics-v2-table">
+                  <thead>
+                    <tr>
+                      <th>Country</th>
+                      <th className="is-number">Blocked</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBlockedCountries.length > 0 ? (
+                      filteredBlockedCountries.map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <CountryIdentity
+                              code={item.code}
+                              country={item.country}
+                            />
+                          </td>
+                          <td className="is-number">
+                            {item.blocked.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <EmptyTableRow colSpan={2}>
+                        No matching blocked traffic
+                      </EmptyTableRow>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </Card>
+
+          <Card padding="0">
+            <section className="analytics-v2-panel">
+              <header className="analytics-v2-panel-header">
+                <div className="analytics-v2-panel-title">
+                  <Text as="h2" variant="headingSm">
+                    Instant redirects
+                  </Text>
+                </div>
+                <Badge tone={totalInstantRedirects > 0 ? "success" : undefined}>
+                  {totalInstantRedirects.toLocaleString()}
+                </Badge>
+              </header>
+              <div className="analytics-v2-table-wrap is-full">
+                <table className="analytics-v2-table">
+                  <thead>
+                    <tr>
+                      <th>Rule</th>
+                      <th className="is-number">Redirected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInstantRedirects.length > 0 ? (
+                      filteredInstantRedirects.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.rule}</td>
+                          <td className="is-number">
+                            {item.redirected.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <EmptyTableRow colSpan={2}>
+                        No matching instant redirects
+                      </EmptyTableRow>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </Card>
+
+          <Card padding="0">
+            <section className="analytics-v2-panel">
+            <header className="analytics-v2-panel-header">
+              <div className="analytics-v2-panel-title">
+                <Text as="h2" variant="headingSm">
+                  Popup interactions
+                </Text>
+                <span
+                  className="analytics-v2-info"
+                  title="Popup responses grouped by rule"
+                >
+                  i
+                </span>
+              </div>
+              <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>
+                {`${totalPopupSeen.toLocaleString()} shown`}
+              </Badge>
+            </header>
+            <div className="analytics-v2-table-wrap is-full">
+              <table className="analytics-v2-table">
+                <thead>
+                  <tr>
+                    <th>Rule</th>
+                    <th className="is-number">Shown</th>
+                    <th className="is-number">Accepted</th>
+                    <th className="is-number">Declined</th>
+                    <th className="is-number">Dismissed</th>
+                    <th className="is-number">Acceptance rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPopupRules.length > 0 ? (
+                    filteredPopupRules.map((item) => {
+                      const rate =
+                        item.seen > 0
+                          ? (item.clickedYes / item.seen) * 100
+                          : 0;
+
+                      return (
+                        <tr key={item.id}>
+                          <td>{item.rule}</td>
+                          <td className="is-number">
+                            {item.seen.toLocaleString()}
+                          </td>
+                          <td className="is-number">
+                            {item.clickedYes.toLocaleString()}
+                          </td>
+                          <td className="is-number">
+                            {item.clickedNo.toLocaleString()}
+                          </td>
+                          <td className="is-number">
+                            {item.dismissed.toLocaleString()}
+                          </td>
+                          <td className="is-number">
+                            {item.seen > 0 ? `${rate.toFixed(1)}%` : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <EmptyTableRow colSpan={6}>
+                      No matching popup interactions
+                    </EmptyTableRow>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            </section>
+          </Card>
+        </div>
 
         <footer className="analytics-v2-footer">
           <div className="analytics-v2-footer-copy">
