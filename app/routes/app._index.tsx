@@ -659,6 +659,9 @@ export default function Index() {
   const lastPermissionRefreshAt = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [chartDays, setChartDays] = useState<7 | 30>(30);
+  const [selectedMapCountryCode, setSelectedMapCountryCode] = useState<
+    string | null
+  >(null);
   const [expandedSetupStepIds, setExpandedSetupStepIds] = useState<
     Array<"embed" | "rule" | "logs">
   >([]);
@@ -1135,6 +1138,45 @@ export default function Index() {
           background: #ffffff;
           box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
         }
+        .geo-map-selection {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          z-index: 3;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          max-width: calc(100% - 132px);
+          padding: 6px 9px;
+          border: 1px solid var(--p-color-border-secondary, #e3e3e3);
+          border-radius: 8px;
+          background: rgb(255 255 255 / 94%);
+          box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+          pointer-events: none;
+        }
+        .geo-map-selection img {
+          width: 22px;
+          height: 15px;
+          flex: 0 0 auto;
+          border-radius: 2px;
+          object-fit: cover;
+          box-shadow: 0 0 0 1px rgb(0 0 0 / 8%);
+        }
+        .geo-map-selection-copy {
+          display: grid;
+          min-width: 0;
+          line-height: 16px;
+        }
+        .geo-map-selection-copy strong,
+        .geo-map-selection-copy span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .geo-map-selection-copy span {
+          color: var(--p-color-text-secondary, #616161);
+          font-size: var(--p-text-body-xs-font-size);
+        }
         .geo-map-control {
           display: grid;
           place-items: center;
@@ -1242,11 +1284,32 @@ export default function Index() {
         }
         .geo-country-row {
           display: grid;
-          grid-template-columns: minmax(110px, 1fr) 48px;
+          grid-template-columns: minmax(110px, 1fr) max-content;
           align-items: center;
           gap: 10px;
+          width: 100%;
           min-height: 38px;
           padding: 6px 12px;
+          border: 0;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          text-align: left;
+        }
+        button.geo-country-row {
+          cursor: pointer;
+        }
+        button.geo-country-row:hover {
+          background: var(--p-color-bg-surface-hover, #f7f7f7);
+        }
+        button.geo-country-row:focus-visible {
+          position: relative;
+          z-index: 1;
+          outline: 2px solid var(--p-color-border-focus, #005bd3);
+          outline-offset: -2px;
+        }
+        button.geo-country-row.is-selected {
+          background: var(--p-color-bg-surface-selected, #f1f7ff);
         }
         .geo-country-row + .geo-country-row {
           border-top: 1px solid var(--p-color-border-secondary, #f0f0f0);
@@ -1909,7 +1972,15 @@ export default function Index() {
                         <div className="geo-map-column">
                           <div className="geo-world-map">
                             <Suspense fallback={<div className="geo-map-loading" />}>
-                              <WorldTrafficMap countries={countryTraffic} />
+                              <WorldTrafficMap
+                                countries={countryTraffic}
+                                selectedCountry={
+                                  topCountries.find(
+                                    (item) =>
+                                      item.code === selectedMapCountryCode,
+                                  ) || null
+                                }
+                              />
                             </Suspense>
                           </div>
                           <div className="geo-map-footer">
@@ -1928,17 +1999,41 @@ export default function Index() {
                           </div>
                         </div>
                         <div className="geo-country-list">
-                          {topCountries.map((item) => (
+                          {topCountries.map((item) =>
+                            item.code === "OTHER" ? (
                             <div className="geo-country-row" key={item.code}>
                               <div className="geo-country-name">
-                                {item.code === "OTHER" ? (
-                                  <span
-                                    className="geo-country-other-icon"
-                                    aria-hidden="true"
-                                  >
-                                    <Icon source={GlobeIcon} />
-                                  </span>
-                                ) : (
+                                <span
+                                  className="geo-country-other-icon"
+                                  aria-hidden="true"
+                                >
+                                  <Icon source={GlobeIcon} />
+                                </span>
+                                <span>{item.country}</span>
+                              </div>
+                              <span className="geo-country-share">
+                                {item.actions.toLocaleString()} · {item.share}%
+                              </span>
+                            </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`geo-country-row${
+                                  selectedMapCountryCode === item.code
+                                    ? " is-selected"
+                                    : ""
+                                }`}
+                                key={item.code}
+                                aria-pressed={
+                                  selectedMapCountryCode === item.code
+                                }
+                                onClick={() =>
+                                  setSelectedMapCountryCode((current) =>
+                                    current === item.code ? null : item.code,
+                                  )
+                                }
+                              >
+                                <div className="geo-country-name">
                                   <img
                                     src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
                                     srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
@@ -1948,12 +2043,14 @@ export default function Index() {
                                     loading="lazy"
                                     decoding="async"
                                   />
-                                )}
-                                <span>{item.country}</span>
-                              </div>
-                              <span className="geo-country-share">{item.share}%</span>
-                            </div>
-                          ))}
+                                  <span>{item.country}</span>
+                                </div>
+                                <span className="geo-country-share">
+                                  {item.actions.toLocaleString()} · {item.share}%
+                                </span>
+                              </button>
+                            ),
+                          )}
                         </div>
                       </div>
                     ) : (

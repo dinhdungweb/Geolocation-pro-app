@@ -21,6 +21,12 @@ interface WorldTrafficMapProps {
     code: string;
     actions: number;
   }>;
+  selectedCountry?: {
+    code: string;
+    country: string;
+    actions: number;
+    share: number;
+  } | null;
 }
 
 interface Point {
@@ -30,6 +36,7 @@ interface Point {
 
 export default function WorldTrafficMap({
   countries,
+  selectedCountry,
 }: WorldTrafficMapProps) {
   const navigate = useNavigate();
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -162,12 +169,15 @@ export default function WorldTrafficMap({
   };
 
   const styleCountry = ({
+    countryCode,
     countryValue,
     minValue,
     maxValue,
   }: CountryContext) => {
     const hasTraffic =
       typeof countryValue === "number" && countryValue > 0;
+    const isSelected =
+      selectedCountry?.code === countryCode.toUpperCase();
     const intensity = hasTraffic
       ? maxValue === minValue
         ? 1
@@ -175,10 +185,14 @@ export default function WorldTrafficMap({
       : 0;
 
     return {
-      fill: hasTraffic ? "#1769e0" : "#dbeafe",
-      fillOpacity: hasTraffic ? 0.25 + Math.sqrt(intensity) * 0.75 : 1,
-      stroke: "#ffffff",
-      strokeWidth: 0.8,
+      fill: isSelected ? "#005bd3" : hasTraffic ? "#1769e0" : "#dbeafe",
+      fillOpacity: isSelected
+        ? 1
+        : hasTraffic
+          ? 0.25 + Math.sqrt(intensity) * 0.75
+          : 1,
+      stroke: isSelected ? "#003d8f" : "#ffffff",
+      strokeWidth: isSelected ? 2 : 0.8,
       strokeOpacity: 1,
       outline: "none",
       cursor: hasTraffic ? "pointer" : "default",
@@ -268,6 +282,24 @@ export default function WorldTrafficMap({
           ↺
         </button>
       </div>
+      {selectedCountry && (
+        <div className="geo-map-selection" aria-live="polite">
+          <img
+            src={`https://flagcdn.com/w40/${selectedCountry.code.toLowerCase()}.png`}
+            srcSet={`https://flagcdn.com/w80/${selectedCountry.code.toLowerCase()}.png 2x`}
+            width="22"
+            height="15"
+            alt=""
+          />
+          <span className="geo-map-selection-copy">
+            <strong>{selectedCountry.country}</strong>
+            <span>
+              {selectedCountry.actions.toLocaleString()} actions ·{" "}
+              {selectedCountry.share}%
+            </span>
+          </span>
+        </div>
+      )}
       <span className="geo-map-zoom-level" aria-live="polite">
         {Math.round(scale * 100)}%
       </span>
