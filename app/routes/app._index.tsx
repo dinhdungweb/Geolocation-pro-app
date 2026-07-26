@@ -975,13 +975,12 @@ export default function Index() {
         }
         .geo-world-map {
           width: 100%;
-          min-height: 0;
+          min-height: 268px;
         }
         .geo-map-interactive {
           position: relative;
           width: 100%;
-          height: auto;
-          aspect-ratio: 4 / 3;
+          height: 268px;
           overflow: hidden;
           background: #ffffff;
         }
@@ -1069,8 +1068,7 @@ export default function Index() {
         }
         .geo-map-loading {
           width: 100%;
-          height: auto;
-          aspect-ratio: 4 / 3;
+          height: 268px;
           background: linear-gradient(90deg, #eef5ff 0%, #dbeafe 50%, #eef5ff 100%);
           background-size: 200% 100%;
           animation: geo-map-shimmer 1.2s ease-in-out infinite;
@@ -1532,6 +1530,13 @@ export default function Index() {
           .geo-map-column {
             border-right: 0;
             border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
+          }
+          .geo-world-map {
+            min-height: 248px;
+          }
+          .geo-map-interactive,
+          .geo-map-loading {
+            height: 248px;
           }
           .geo-map-footer {
             align-items: flex-start;

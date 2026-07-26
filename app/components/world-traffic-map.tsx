@@ -10,10 +10,10 @@ import WorldMap, {
   type ISOCode,
 } from "react-svg-worldmap";
 
-const MIN_SCALE = 1;
+const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const INITIAL_SCALE = 1.2;
-const SCALE_STEP = 0.25;
+const SCALE_STEP = 0.1;
 
 interface WorldTrafficMapProps {
   countries: Array<{
@@ -82,10 +82,10 @@ export default function WorldTrafficMap({
 
   const changeScale = useCallback(
     (nextScale: number) => {
-      const clampedScale = Math.max(
-        MIN_SCALE,
-        Math.min(MAX_SCALE, nextScale),
-      );
+      const clampedScale =
+        Math.round(
+          Math.max(MIN_SCALE, Math.min(MAX_SCALE, nextScale)) * 100,
+        ) / 100;
 
       setScale(clampedScale);
       setPosition((current) => constrainPosition(current, clampedScale));
