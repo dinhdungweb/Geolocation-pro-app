@@ -1,3 +1,4 @@
+// Source for the minified Theme App Extension asset.
 (function() {
   'use strict';
 

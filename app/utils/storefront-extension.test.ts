@@ -10,7 +10,7 @@ const liquidPath = path.join(
   extensionRoot,
   "blocks/geolocation-popup.liquid",
 );
-const sourcePath = path.join(extensionRoot, "src/geolocation.js");
+const sourcePath = path.resolve(process.cwd(), "storefront/geolocation.js");
 const assetPath = path.join(extensionRoot, "assets/geolocation.js");
 
 describe("storefront geolocation extension", () => {

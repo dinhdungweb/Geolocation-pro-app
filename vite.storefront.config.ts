@@ -8,7 +8,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(
         process.cwd(),
-        "extensions/geolocation-popup/src/geolocation.js",
+        "storefront/geolocation.js",
       ),
       fileName: () => "geolocation.js",
       formats: ["iife"],
