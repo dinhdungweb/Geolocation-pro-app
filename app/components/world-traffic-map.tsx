@@ -12,7 +12,7 @@ import WorldMap, {
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
-const INITIAL_SCALE = 1.2;
+const INITIAL_SCALE = 1;
 const SCALE_STEP = 0.1;
 
 interface WorldTrafficMapProps {
