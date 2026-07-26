@@ -1,0 +1,46 @@
+.geo-polaris-traffic-chart {
+  min-width: 0;
+}
+
+.geo-polaris-traffic-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 28px;
+  padding: 0 4px 4px;
+  color: #616161;
+  font-size: 12px;
+}
+
+.geo-polaris-traffic-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.geo-polaris-traffic-summary i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.geo-polaris-traffic-summary .is-blue {
+  background: #1769e0;
+}
+
+.geo-polaris-traffic-summary .is-orange {
+  background: #ef6c00;
+}
+
+.geo-polaris-traffic-summary strong {
+  color: #303030;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 30em) {
+  .geo-polaris-traffic-summary {
+    gap: 12px;
+    overflow-x: auto;
+  }
+}
