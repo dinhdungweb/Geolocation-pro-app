@@ -603,6 +603,135 @@ function TrafficChart({
   );
 }
 
+const TRAFFIC_MAP_COORDINATES: Record<string, [number, number]> = {
+  AR: [181, 270],
+  AT: [324, 94],
+  AU: [531, 246],
+  BD: [434, 141],
+  BE: [311, 88],
+  BR: [196, 222],
+  CA: [111, 66],
+  CH: [315, 98],
+  CL: [164, 260],
+  CN: [445, 111],
+  CO: [160, 184],
+  CZ: [328, 91],
+  DE: [318, 88],
+  DK: [317, 78],
+  DZ: [309, 132],
+  EG: [348, 139],
+  ES: [296, 108],
+  FI: [340, 62],
+  FR: [306, 99],
+  GB: [294, 85],
+  GR: [337, 111],
+  ID: [466, 190],
+  IE: [286, 85],
+  IL: [348, 126],
+  IN: [415, 148],
+  IT: [322, 106],
+  JP: [518, 116],
+  KE: [356, 184],
+  KR: [495, 119],
+  MA: [295, 126],
+  MX: [116, 145],
+  MY: [449, 177],
+  NG: [327, 169],
+  NL: [312, 83],
+  NO: [320, 59],
+  NZ: [581, 266],
+  PE: [164, 210],
+  PH: [492, 158],
+  PK: [400, 130],
+  PL: [335, 86],
+  PT: [288, 108],
+  RO: [342, 98],
+  RU: [414, 67],
+  SA: [371, 145],
+  SE: [328, 64],
+  SG: [454, 183],
+  TH: [454, 157],
+  TR: [354, 110],
+  UA: [352, 88],
+  US: [112, 105],
+  VE: [170, 178],
+  VN: [466, 157],
+  ZA: [345, 235],
+};
+
+function WorldTrafficMap({
+  countries,
+}: {
+  countries: Array<{
+    code: string;
+    country: string;
+    visitors: number;
+    share: number;
+  }>;
+}) {
+  const mappedCountries = countries.filter(
+    (country) => TRAFFIC_MAP_COORDINATES[country.code],
+  );
+  const maxShare = Math.max(1, ...mappedCountries.map((country) => country.share));
+
+  return (
+    <div className="geo-world-map">
+      <svg
+        viewBox="0 0 640 310"
+        role="img"
+        aria-label="World map showing the countries with the most traffic"
+      >
+        <g className="geo-map-land" aria-hidden="true">
+          <path d="M41 76 68 54l46-20 43 5 34 18 11 20-18 17-20 3-15 22-24 5-12 26-24-9-12-22-27-13-15-18Z" />
+          <path d="m191 28 25-13 31 7 8 17-19 14-35-5Z" />
+          <path d="m112 143 21 5 18 15 9 1 4 12-14 3-12-12-17-7Z" />
+          <path d="m153 177 21-8 28 12 15 24-8 32-15 23-10 32-14-9-8-36-12-29-9-25Z" />
+          <path d="m283 82 14-14 25-7 21 8 15-4 16 13-9 17-20 3-10 18-24-6-6-16-22-4Z" />
+          <path d="m305 120 25-10 27 13 14 28-8 35-13 37-18 21-16-30-6-32-19-30Z" />
+          <path d="m354 76 39-24 58-10 62 12 47 23-12 18-31 7-19 18-37 1-25 17-28-5-21-25-28-9Z" />
+          <path d="m398 132 28-5 25 16 10 26-18 18-24-8-10-22Z" />
+          <path d="m480 139 20 3 13 20-7 24-14-8-3-20Z" />
+          <path d="m504 221 28-15 42 10 17 26-13 29-34 8-31-19Z" />
+          <path d="m577 257 11 6-3 20-9 8-5-13Z" />
+          <path d="m267 111 8-5 10 4-3 9-11 3Z" />
+          <path d="m375 113 20 4 10 14-9 10-15-8Z" />
+        </g>
+
+        <g className="geo-map-markers">
+          {mappedCountries.map((country) => {
+            const [cx, cy] = TRAFFIC_MAP_COORDINATES[country.code];
+            const intensity = country.share / maxShare;
+            const radius = 5 + intensity * 7;
+
+            return (
+              <g key={country.code}>
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={radius + 6}
+                  className="geo-map-marker-halo"
+                  opacity={0.1 + intensity * 0.16}
+                />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={radius}
+                  className="geo-map-marker"
+                  opacity={0.5 + intensity * 0.45}
+                >
+                  <title>
+                    {`${country.country}: ${country.visitors.toLocaleString()} visitors (${country.share}%)`}
+                  </title>
+                </circle>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 function DashboardPending() {
   return (
     <div className="geo-dashboard-pending" aria-label="Loading dashboard analytics">
@@ -902,7 +1031,7 @@ export default function Index() {
         }
         .geo-analytics-grid {
           display: grid;
-          grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
           align-items: stretch;
         }
@@ -940,18 +1069,82 @@ export default function Index() {
           flex: 1;
           min-width: 0;
         }
+        .geo-country-content {
+          display: grid;
+          grid-template-columns: minmax(0, 1.35fr) minmax(190px, 0.8fr);
+          min-height: 286px;
+        }
+        .geo-map-column {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-width: 0;
+          padding: 16px 14px 12px;
+          border-right: 1px solid var(--p-color-border-secondary, #ebebeb);
+        }
+        .geo-world-map {
+          display: grid;
+          place-items: center;
+          width: 100%;
+          min-height: 210px;
+        }
+        .geo-world-map svg {
+          display: block;
+          width: 100%;
+          height: auto;
+          max-height: 244px;
+        }
+        .geo-map-land {
+          fill: #dbeafe;
+          stroke: #c4ddff;
+          stroke-width: 1.5;
+          stroke-linejoin: round;
+        }
+        .geo-map-marker-halo,
+        .geo-map-marker {
+          fill: #1769e0;
+          pointer-events: none;
+        }
+        .geo-map-marker {
+          stroke: #fff;
+          stroke-width: 2;
+          pointer-events: auto;
+        }
+        .geo-map-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding-top: 4px;
+        }
+        .geo-map-legend {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          color: var(--p-color-text-secondary, #616161);
+          font-size: 11px;
+          white-space: nowrap;
+        }
+        .geo-map-legend-bar {
+          width: clamp(64px, 10vw, 112px);
+          height: 7px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #dbeafe 0%, #1769e0 100%);
+        }
         .geo-country-list {
           display: grid;
+          align-content: start;
           gap: 0;
-          padding: 4px 0;
+          padding: 8px 0;
         }
         .geo-country-row {
           display: grid;
-          grid-template-columns: minmax(120px, 1fr) minmax(90px, 1.2fr) 48px;
+          grid-template-columns: minmax(110px, 1fr) 48px;
           align-items: center;
           gap: 10px;
-          min-height: 43px;
-          padding: 6px 14px;
+          min-height: 44px;
+          padding: 6px 12px;
         }
         .geo-country-row + .geo-country-row {
           border-top: 1px solid var(--p-color-border-secondary, #f0f0f0);
@@ -974,19 +1167,6 @@ export default function Index() {
           text-overflow: ellipsis;
           white-space: nowrap;
           font-size: 13px;
-        }
-        .geo-country-bar {
-          height: 6px;
-          overflow: hidden;
-          border-radius: 999px;
-          background: var(--p-color-bg-surface-secondary, #f1f1f1);
-        }
-        .geo-country-bar span {
-          display: block;
-          height: 100%;
-          min-width: 2px;
-          border-radius: inherit;
-          background: #1769e0;
         }
         .geo-country-share {
           text-align: right;
@@ -1324,6 +1504,9 @@ export default function Index() {
           .geo-analytics-grid {
             grid-template-columns: 1fr;
           }
+          .geo-country-content {
+            grid-template-columns: minmax(0, 1.3fr) minmax(210px, 0.7fr);
+          }
           .geo-usage-strip {
             grid-template-columns: 1fr auto;
           }
@@ -1353,9 +1536,22 @@ export default function Index() {
           .geo-metric {
             min-height: 104px;
           }
+          .geo-country-content {
+            grid-template-columns: 1fr;
+          }
+          .geo-map-column {
+            border-right: 0;
+            border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
+          }
+          .geo-world-map {
+            min-height: 180px;
+          }
+          .geo-map-footer {
+            align-items: flex-start;
+          }
           .geo-country-row {
-            grid-template-columns: minmax(110px, 1fr) minmax(68px, 1fr) 42px;
-            gap: 7px;
+            grid-template-columns: minmax(110px, 1fr) 42px;
+            gap: 8px;
           }
           .geo-recent-row {
             grid-template-columns: 28px minmax(0, 1fr) auto;
@@ -1543,27 +1739,39 @@ export default function Index() {
                     action={<Badge>{`${totalCountries} countries`}</Badge>}
                   >
                     {topCountries.length > 0 ? (
-                      <div className="geo-country-list">
-                        {topCountries.map((item) => (
-                          <div className="geo-country-row" key={item.code}>
-                            <div className="geo-country-name">
-                              <img
-                                src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
-                                srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
-                                width="22"
-                                height="15"
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                              />
-                              <span>{item.country}</span>
+                      <div className="geo-country-content">
+                        <div className="geo-map-column">
+                          <WorldTrafficMap countries={topCountries} />
+                          <div className="geo-map-footer">
+                            <div className="geo-map-legend" aria-hidden="true">
+                              <span>Less</span>
+                              <span className="geo-map-legend-bar" />
+                              <span>More traffic</span>
                             </div>
-                            <div className="geo-country-bar" aria-hidden="true">
-                              <span style={{ width: `${Math.max(2, item.share)}%` }} />
-                            </div>
-                            <span className="geo-country-share">{item.share}%</span>
+                            <Button variant="plain" size="slim" url="/app/logs">
+                              View full report
+                            </Button>
                           </div>
-                        ))}
+                        </div>
+                        <div className="geo-country-list">
+                          {topCountries.map((item) => (
+                            <div className="geo-country-row" key={item.code}>
+                              <div className="geo-country-name">
+                                <img
+                                  src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
+                                  srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
+                                  width="22"
+                                  height="15"
+                                  alt=""
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                                <span>{item.country}</span>
+                              </div>
+                              <span className="geo-country-share">{item.share}%</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <div className="geo-empty">No country traffic yet</div>
