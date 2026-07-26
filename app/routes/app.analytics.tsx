@@ -754,6 +754,28 @@ export default function AnalyticsPage() {
           }
           .analytics-v2-table-wrap.is-full {
             max-height: 360px;
+            scrollbar-width: thin;
+            scrollbar-color: #c7c7c7 transparent;
+          }
+          .analytics-v2-table-wrap.is-full::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          .analytics-v2-table-wrap.is-full::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .analytics-v2-table-wrap.is-full::-webkit-scrollbar-thumb {
+            border: 2px solid transparent;
+            border-radius: 999px;
+            background: #c7c7c7;
+            background-clip: padding-box;
+          }
+          .analytics-v2-table-wrap.is-full::-webkit-scrollbar-thumb:hover {
+            background: #9e9e9e;
+            background-clip: padding-box;
+          }
+          .analytics-v2-table-wrap.is-full::-webkit-scrollbar-corner {
+            background: transparent;
           }
           .analytics-v2-table-wrap.is-full .analytics-v2-table th {
             position: sticky;
