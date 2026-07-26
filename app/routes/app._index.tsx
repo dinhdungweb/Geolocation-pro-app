@@ -50,7 +50,10 @@ import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { COUNTRY_MAP } from "../utils/countries";
-import { resolveCountryTrafficTotal } from "../utils/country-traffic";
+import {
+  resolveCountryActionTotal,
+  resolveCountryTrafficTotal,
+} from "../utils/country-traffic";
 import {
   getStableShopifyPlanFromBillingCheck,
   resolveEffectivePlan,
@@ -65,11 +68,6 @@ const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: str
   [FREE_PLAN]: { label: "Premium", actionContent: "Upgrade to Premium" },
   [PREMIUM_PLAN]: { label: "Plus", actionContent: "Upgrade to Plus" },
   [PLUS_PLAN]: { label: "Elite", actionContent: "Upgrade to Elite" },
-};
-
-const CUSTOM_PLAN_REQUEST_ACTION = {
-  content: "Request custom plan",
-  url: "/app/pricing",
 };
 
 const WorldTrafficMap = lazy(
@@ -101,18 +99,43 @@ function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function buildLastSevenDays() {
+function buildLastDays(days: number) {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  return Array.from({ length: 7 }, (_, index) => {
+  return Array.from({ length: days }, (_, index) => {
     const date = new Date(today);
-    date.setUTCDate(today.getUTCDate() - (6 - index));
+    date.setUTCDate(today.getUTCDate() - (days - 1 - index));
     return date;
   });
 }
 
-async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
+function formatChartPoints(
+  points: Array<{
+    date: string;
+    redirects: number;
+    blocked: number;
+  }>,
+  days: 7 | 30,
+) {
+  return points.slice(-days).map((point) => {
+    const date = new Date(`${point.date}T00:00:00.000Z`);
+    return {
+      ...point,
+      label: new Intl.DateTimeFormat("en", {
+        ...(days === 7
+          ? { weekday: "short" as const }
+          : { month: "short" as const, day: "numeric" as const }),
+        timeZone: "UTC",
+      }).format(date),
+    };
+  });
+}
+
+async function loadDashboardAnalytics(
+  shop: string,
+  thirtyDaysAgo: Date,
+) {
   const [countryStats, ruleStats, dailyStats, recentRules] = await Promise.all([
     prisma.analyticsCountry.groupBy({
       by: ["countryCode"],
@@ -184,12 +207,16 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
   const countryTraffic = countryStats
     .map((item) => ({
       code: item.countryCode,
-      visitors: resolveCountryTrafficTotal(item._sum),
+      actions: resolveCountryActionTotal(item._sum),
     }))
-    .filter((item) => item.code.length === 2 && item.visitors > 0)
-    .sort((left, right) => right.visitors - left.visitors);
-  const observedVisitors = countryTraffic.reduce(
-    (sum, item) => sum + item.visitors,
+    .filter((item) => item.code.length === 2 && item.actions > 0)
+    .sort((left, right) => right.actions - left.actions);
+  const totalCountryActions = countryTraffic.reduce(
+    (sum, item) => sum + item.actions,
+    0,
+  );
+  const observedVisitors = countryStats.reduce(
+    (sum, item) => sum + resolveCountryTrafficTotal(item._sum),
     0,
   );
 
@@ -209,26 +236,26 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
   const topCountries = topCountryTraffic.map((item) => ({
     code: item.code,
     country: COUNTRY_MAP[item.code] || item.code,
-    visitors: item.visitors,
-    share: observedVisitors > 0
-      ? Math.round((item.visitors / observedVisitors) * 1000) / 10
+    actions: item.actions,
+    share: totalCountryActions > 0
+      ? Math.round((item.actions / totalCountryActions) * 1000) / 10
       : 0,
   }));
   const otherCountryCount = Math.max(
     0,
     countryTraffic.length - topCountryTraffic.length,
   );
-  const otherCountryVisitors = countryTraffic
+  const otherCountryActions = countryTraffic
     .slice(topCountryTraffic.length)
-    .reduce((sum, item) => sum + item.visitors, 0);
+    .reduce((sum, item) => sum + item.actions, 0);
 
-  if (otherCountryCount > 0 && otherCountryVisitors > 0) {
+  if (otherCountryCount > 0 && otherCountryActions > 0) {
     topCountries.push({
       code: "OTHER",
       country: `Other (${otherCountryCount} countries)`,
-      visitors: otherCountryVisitors,
-      share: observedVisitors > 0
-        ? Math.round((otherCountryVisitors / observedVisitors) * 1000) / 10
+      actions: otherCountryActions,
+      share: totalCountryActions > 0
+        ? Math.round((otherCountryActions / totalCountryActions) * 1000) / 10
         : 0,
     });
   }
@@ -244,12 +271,8 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
     ]),
   );
 
-  const dailySeries = buildLastSevenDays().map((date) => ({
+  const dailySeries = buildLastDays(30).map((date) => ({
     date: dateKey(date),
-    label: new Intl.DateTimeFormat("en", {
-      weekday: "short",
-      timeZone: "UTC",
-    }).format(date),
     ...(dailyByDate.get(dateKey(date)) || {
       visitors: 0,
       redirects: 0,
@@ -378,7 +401,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       };
     },
   );
-
   const [
     [rulesCount, activeRulesCount, latestVisitorLog, appEmbedStatus],
     {
@@ -471,7 +493,7 @@ type MetricCardProps = {
   label: string;
   value: string;
   detail: string;
-  link?: { label: string; url: string };
+  link?: { label: string; onClick: () => void };
 };
 
 function MetricCard({
@@ -499,7 +521,7 @@ function MetricCard({
             <Button
               variant="plain"
               size="slim"
-              url={link.url}
+              onClick={link.onClick}
               icon={ArrowRightIcon}
             >
               {link.label}
@@ -634,6 +656,7 @@ export default function Index() {
   const revalidator = useRevalidator();
   const lastPermissionRefreshAt = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [chartDays, setChartDays] = useState<7 | 30>(30);
   const [expandedSetupStepIds, setExpandedSetupStepIds] = useState<
     Array<"embed" | "rule" | "logs">
   >([]);
@@ -673,9 +696,16 @@ export default function Index() {
   }, [appEmbedStatus.state, revalidator]);
 
   const isUnlimitedPlan = isUnlimitedUsage;
+  const rawUsagePercent = isUnlimitedPlan
+    ? 100
+    : Math.min(100, (currentUsage / Math.max(1, planLimit)) * 100);
   const usagePercent = isUnlimitedPlan
     ? 100
-    : Math.min(100, Math.round((currentUsage / Math.max(1, planLimit)) * 100));
+    : Math.round(rawUsagePercent);
+  const usagePercentLabel =
+    !isUnlimitedPlan && currentUsage > 0 && rawUsagePercent < 1
+      ? "<1%"
+      : `${usagePercent}%`;
   const isNearLimit = !isUnlimitedPlan && usagePercent >= 80;
   const isAtLimit = !isUnlimitedPlan && currentUsage >= planLimit;
   const isAppActive = stats.isEnabled && stats.mode !== "disabled";
@@ -687,11 +717,14 @@ export default function Index() {
     currentPlan !== FREE_PLAN &&
     currentPlan !== CUSTOM_PLAN &&
     !isUnlimitedPlan;
-  const usageBannerAction = upgradeTarget
-    ? { content: upgradeTarget.actionContent, url: "/app/pricing" }
-    : canRequestCustomPlan
-      ? CUSTOM_PLAN_REQUEST_ACTION
-      : { content: "View pricing", url: "/app/pricing" };
+  const usageBannerAction = {
+    content: upgradeTarget
+      ? upgradeTarget.actionContent
+      : canRequestCustomPlan
+        ? "Request custom plan"
+        : "View pricing",
+    onAction: () => navigate("/app/pricing"),
+  };
   const remainingVisitors = isUnlimitedPlan
     ? null
     : Math.max(0, planLimit - currentUsage);
@@ -999,6 +1032,41 @@ export default function Index() {
           display: flex;
           align-items: center;
           flex: 0 0 auto;
+        }
+        .geo-chart-range {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          color: var(--p-color-text-secondary, #616161);
+        }
+        .geo-chart-range select {
+          appearance: none;
+          width: auto;
+          height: 24px;
+          min-height: 24px;
+          padding: 2px 25px 2px 8px;
+          border: 0;
+          border-radius: 8px;
+          background: var(--p-color-bg-surface-secondary, #f1f1f1);
+          color: inherit;
+          font: inherit;
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: 20px;
+          cursor: pointer;
+        }
+        .geo-chart-range select:hover {
+          background: var(--p-color-bg-surface-secondary-hover, #e9e9e9);
+        }
+        .geo-chart-range select:focus-visible {
+          outline: 2px solid var(--p-color-border-focus, #005bd3);
+          outline-offset: 1px;
+        }
+        .geo-chart-range-icon {
+          position: absolute;
+          right: 6px;
+          width: 12px;
+          height: 12px;
+          pointer-events: none;
         }
         .geo-panel-body {
           flex: 1;
@@ -1658,10 +1726,14 @@ export default function Index() {
             <Button
               variant="tertiary"
               icon={QuestionCircleIcon}
-              url="/app/support"
+              onClick={() => navigate("/app/support")}
               accessibilityLabel="Open support"
             />
-            <Button variant="primary" icon={PlusIcon} url="/app/rules">
+            <Button
+              variant="primary"
+              icon={PlusIcon}
+              onClick={() => navigate("/app/rules")}
+            >
               Create rule
             </Button>
           </div>
@@ -1671,7 +1743,10 @@ export default function Index() {
           {!isAppActive && (
             <Banner
               tone="warning"
-              action={{ content: "Open settings", url: "/app/settings" }}
+              action={{
+                content: "Open settings",
+                onAction: () => navigate("/app/settings"),
+              }}
             >
               The app is paused. Enable it so redirects, popups, and blocks can run.
             </Banner>
@@ -1722,7 +1797,10 @@ export default function Index() {
                     label="Active geolocation rules"
                     value={stats.activeRules.toLocaleString()}
                     detail={`${stats.totalRules.toLocaleString()} rules total`}
-                    link={{ label: "View all rules", url: "/app/rules" }}
+                    link={{
+                      label: "View all rules",
+                      onClick: () => navigate("/app/rules"),
+                    }}
                   />
                   <MetricCard
                     icon={PersonIcon}
@@ -1761,7 +1839,7 @@ export default function Index() {
                             Plan usage
                           </Text>
                           <Text as="p" variant="headingXl">
-                            {isUnlimitedPlan ? "∞" : `${usagePercent}%`}
+                            {isUnlimitedPlan ? "∞" : usagePercentLabel}
                           </Text>
                         </div>
                         <Badge tone={isNearLimit ? "warning" : "success"}>
@@ -1770,7 +1848,7 @@ export default function Index() {
                       </div>
                       <div className="geo-plan-progress">
                         <ProgressBar
-                          progress={Math.min(100, usagePercent)}
+                          progress={rawUsagePercent}
                           tone={isAtLimit ? "highlight" : undefined}
                           size="small"
                         />
@@ -1804,7 +1882,7 @@ export default function Index() {
 
                 <div className="geo-analytics-grid">
                   <Panel
-                    title="Traffic by country"
+                    title="Actions by country"
                     action={<Badge>{`${totalCountries} countries`}</Badge>}
                   >
                     {topCountries.length > 0 ? (
@@ -1817,11 +1895,15 @@ export default function Index() {
                           </div>
                           <div className="geo-map-footer">
                             <div className="geo-map-legend" aria-hidden="true">
-                              <span>Less</span>
+                              <span>Fewer</span>
                               <span className="geo-map-legend-bar" />
-                              <span>More traffic</span>
+                              <span>More actions</span>
                             </div>
-                            <Button variant="plain" size="slim" url="/app/logs">
+                            <Button
+                              variant="plain"
+                              size="slim"
+                              onClick={() => navigate("/app/logs")}
+                            >
                               View full report
                             </Button>
                           </div>
@@ -1856,15 +1938,38 @@ export default function Index() {
                         </div>
                       </div>
                     ) : (
-                      <div className="geo-empty">No country traffic yet</div>
+                      <div className="geo-empty">No country actions yet</div>
                     )}
                   </Panel>
 
                   <Panel
                     title="Redirects vs blocked visits"
-                    action={<Badge>Last 7 days</Badge>}
+                    action={
+                      <label className="geo-chart-range">
+                        <select
+                          aria-label="Chart date range"
+                          value={chartDays}
+                          onChange={(event) =>
+                            setChartDays(
+                              event.currentTarget.value === "7" ? 7 : 30,
+                            )
+                          }
+                        >
+                          <option value={7}>Last 7 days</option>
+                          <option value={30}>Last 30 days</option>
+                        </select>
+                        <span
+                          className="geo-chart-range-icon"
+                          aria-hidden="true"
+                        >
+                          <Icon source={ChevronDownIcon} />
+                        </span>
+                      </label>
+                    }
                   >
-                    <DeferredTrafficChart points={dailySeries} />
+                    <DeferredTrafficChart
+                      points={formatChartPoints(dailySeries, chartDays)}
+                    />
                   </Panel>
                 </div>
 
@@ -1872,7 +1977,11 @@ export default function Index() {
                   <Panel
                     title="Recent rules"
                     action={
-                      <Button variant="plain" size="slim" url="/app/rules">
+                      <Button
+                        variant="plain"
+                        size="slim"
+                        onClick={() => navigate("/app/rules")}
+                      >
                         View all
                       </Button>
                     }
@@ -2145,7 +2254,11 @@ export default function Index() {
                                             </li>
                                           </ul>
                                           <InlineStack gap="200">
-                                            <Button url="/app/rules">
+                                            <Button
+                                              onClick={() =>
+                                                navigate("/app/rules")
+                                              }
+                                            >
                                               Create rule
                                             </Button>
                                           </InlineStack>
@@ -2177,7 +2290,11 @@ export default function Index() {
                                             </li>
                                           </ul>
                                           <InlineStack gap="200">
-                                            <Button url="/app/logs">
+                                            <Button
+                                              onClick={() =>
+                                                navigate("/app/logs")
+                                              }
+                                            >
                                               Check visitor logs
                                             </Button>
                                           </InlineStack>
@@ -2224,7 +2341,10 @@ export default function Index() {
                 <strong>Need help?</strong>
                 <span>Our support team is here for you.</span>
               </span>
-              <Button icon={ChatIcon} url="/app/support">
+              <Button
+                icon={ChatIcon}
+                onClick={() => navigate("/app/support")}
+              >
                 Contact support
               </Button>
             </div>

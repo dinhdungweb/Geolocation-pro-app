@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveCountryTrafficTotal } from "./country-traffic";
+import {
+  resolveCountryActionTotal,
+  resolveCountryTrafficTotal,
+} from "./country-traffic";
 
 describe("resolveCountryTrafficTotal", () => {
   it("uses the recorded visitor count when it is the strongest signal", () => {
@@ -42,5 +45,28 @@ describe("resolveCountryTrafficTotal", () => {
         popupShown: -2,
       }),
     ).toBe(0);
+  });
+});
+
+describe("resolveCountryActionTotal", () => {
+  it("adds popup, redirect, and block actions without counting visits", () => {
+    expect(
+      resolveCountryActionTotal({
+        visitors: 100,
+        popupShown: 3,
+        redirected: 2,
+        blocked: 4,
+      }),
+    ).toBe(9);
+  });
+
+  it("normalizes missing and negative action counters", () => {
+    expect(
+      resolveCountryActionTotal({
+        popupShown: null,
+        redirected: -3,
+        blocked: 2,
+      }),
+    ).toBe(2);
   });
 });

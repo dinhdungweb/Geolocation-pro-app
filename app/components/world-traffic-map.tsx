@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
+import { useNavigate } from "react-router";
 import WorldMap, {
   type CountryContext,
   type ISOCode,
@@ -18,7 +19,7 @@ const SCALE_STEP = 0.1;
 interface WorldTrafficMapProps {
   countries: Array<{
     code: string;
-    visitors: number;
+    actions: number;
   }>;
 }
 
@@ -30,6 +31,7 @@ interface Point {
 export default function WorldTrafficMap({
   countries,
 }: WorldTrafficMapProps) {
+  const navigate = useNavigate();
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -44,7 +46,7 @@ export default function WorldTrafficMap({
 
   const data = countries.map((country) => ({
     country: country.code.toLowerCase() as ISOCode,
-    value: country.visitors,
+    value: country.actions,
   }));
 
   const constrainPosition = useCallback(
@@ -189,7 +191,7 @@ export default function WorldTrafficMap({
       <div
         ref={viewportRef}
         className={`geo-map-viewport${isDragging ? " is-dragging" : ""}`}
-        aria-label="Interactive traffic map. Drag to move and use the controls to zoom."
+        aria-label="Interactive action map. Drag to move and use the controls to zoom."
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={finishPointerInteraction}
@@ -218,18 +220,18 @@ export default function WorldTrafficMap({
             frame={false}
             regionClassName="geo-map-region"
             styleFunction={styleCountry}
-            hrefFunction={({ countryCode, countryName, countryValue }) =>
-              typeof countryValue === "number" && countryValue > 0
-                ? {
-                    href: `/app/logs?country=${countryCode.toUpperCase()}`,
-                    "aria-label": `View visitor logs from ${countryName}`,
-                  }
-                : undefined
-            }
+            onClickFunction={({ countryCode, countryValue, event }) => {
+              if (typeof countryValue !== "number" || countryValue <= 0) {
+                return;
+              }
+
+              event.preventDefault();
+              navigate(`/app/logs?country=${countryCode.toUpperCase()}`);
+            }}
             tooltipTextFunction={({ countryName, countryValue }) =>
               typeof countryValue === "number"
-                ? `${countryName}: ${countryValue.toLocaleString()} visitors — click to view logs`
-                : `${countryName}: no traffic`
+                ? `${countryName}: ${countryValue.toLocaleString()} actions — click to view logs`
+                : `${countryName}: no actions`
             }
           />
         </div>

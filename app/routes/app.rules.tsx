@@ -1275,15 +1275,15 @@ export default function RulesPage() {
                     .rules-table-wrap {
                         width: 100%;
                         max-width: 100%;
-                        overflow-x: auto;
+                        overflow-x: hidden;
                         overflow-y: hidden;
-                        -webkit-overflow-scrolling: touch;
                         border-radius: var(--p-border-radius-200, 8px);
                     }
-                    .rules-table-wrap,
                     .rules-table-wrap .Polaris-IndexTable-ScrollContainer {
                         scrollbar-color: auto;
                         scrollbar-width: thin;
+                        -webkit-overflow-scrolling: touch;
+                        overscroll-behavior-x: contain;
                     }
                     .rules-page .Polaris-ShadowBevel {
                         --pc-shadow-bevel-border-radius-xs: var(--p-border-radius-200, 8px) !important;
@@ -1293,13 +1293,20 @@ export default function RulesPage() {
                         border-radius: inherit;
                     }
                     .rules-table-wrap .Polaris-IndexTable-ScrollContainer {
-                        overflow: visible !important;
+                        overflow-x: auto !important;
+                        overflow-y: hidden !important;
                         max-height: none;
+                    }
+                    .rules-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar {
+                        display: block;
                     }
                     .rules-table-wrap .Polaris-IndexTable__ScrollBarContainer {
                         display: none !important;
                     }
-                    .rules-table-wrap .Polaris-IndexTable,
+                    .rules-table-wrap .Polaris-IndexTable {
+                        width: 100%;
+                        min-width: 0;
+                    }
                     .rules-table-wrap .Polaris-IndexTable__Table {
                         width: 100%;
                         min-width: 1280px;
@@ -1323,7 +1330,6 @@ export default function RulesPage() {
                         .rules-index-target {
                             margin-left: auto;
                         }
-                        .rules-table-wrap .Polaris-IndexTable,
                         .rules-table-wrap .Polaris-IndexTable__Table {
                             min-width: 880px;
                         }

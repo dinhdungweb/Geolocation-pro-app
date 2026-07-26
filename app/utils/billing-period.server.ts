@@ -27,6 +27,7 @@ type BillingPeriodSettings = CustomPlanLimitSettings & {
 };
 
 const CACHE_REFRESH_BUFFER_MS = 60 * 1000;
+const ensuredCachedUsagePeriods = new Set<string>();
 
 export function getCalendarUsagePeriod(date = new Date()): UsagePeriod {
   const yearMonth = getYearMonth(date);
@@ -151,10 +152,14 @@ async function getBillableUsageCounts(shop: string, billingPeriodKey: string) {
 }
 
 async function getCarryForwardUsageCounts(shop: string, period: UsagePeriod) {
-  if (period.source !== "shopify" || !period.billingPeriodEnd) {
+  if (
+    !["shopify", "cached"].includes(period.source) ||
+    !period.billingPeriodEnd
+  ) {
     return null;
   }
 
+  const billingPeriodEndKeySuffix = `:${truncateToDay(period.billingPeriodEnd)}`;
   const legacyRows = await prisma.monthlyUsage.findMany({
     where: {
       shop,
@@ -162,6 +167,7 @@ async function getCarryForwardUsageCounts(shop: string, period: UsagePeriod) {
       OR: [
         { billingPeriodEnd: period.billingPeriodEnd },
         { billingPeriodKey: `calendar:${period.yearMonth}` },
+        { billingPeriodKey: { endsWith: billingPeriodEndKeySuffix } },
       ],
     },
     select: {
@@ -276,7 +282,12 @@ export function usagePeriodFromSubscription(
 }
 
 async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
-  if (period.source !== "shopify" || !period.billingPeriodEnd) return;
+  if (
+    !["shopify", "cached"].includes(period.source) ||
+    !period.billingPeriodEnd
+  ) {
+    return;
+  }
 
   const usageCounts = await getBillableUsageCounts(shop, period.key);
   const carryForwardCounts = await getCarryForwardUsageCounts(shop, period);
@@ -453,7 +464,15 @@ export async function getUsagePeriodForShop({
   }
 
   if (!forceRefresh && isCachedPeriodCurrent(settings, currentPlan)) {
-    return cachedUsagePeriod(settings)!;
+    const period = cachedUsagePeriod(settings)!;
+    const ensureKey = `${shop}:${period.key}`;
+
+    if (!ensuredCachedUsagePeriods.has(ensureKey)) {
+      await seedUsagePeriodRow(shop, period);
+      ensuredCachedUsagePeriods.add(ensureKey);
+    }
+
+    return period;
   }
 
   try {

@@ -24,3 +24,18 @@ export function resolveCountryTrafficTotal(
     nonNegative(counters.blocked),
   );
 }
+
+/**
+ * Counts every recorded storefront action. Unlike traffic totals, popup,
+ * redirect, and block events are separate user-visible actions and should be
+ * added together.
+ */
+export function resolveCountryActionTotal(
+  counters: CountryTrafficCounters,
+) {
+  return (
+    nonNegative(counters.popupShown) +
+    nonNegative(counters.redirected) +
+    nonNegative(counters.blocked)
+  );
+}

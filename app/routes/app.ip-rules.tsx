@@ -811,23 +811,30 @@ export default function IPRulesPage() {
                     .ip-rules-table-wrap {
                         width: 100%;
                         max-width: 100%;
-                        overflow-x: auto;
+                        overflow-x: hidden;
                         overflow-y: hidden;
-                        -webkit-overflow-scrolling: touch;
                     }
-                    .ip-rules-table-wrap,
                     .ip-rules-table-wrap .Polaris-IndexTable-ScrollContainer {
                         scrollbar-color: auto;
                         scrollbar-width: thin;
+                        -webkit-overflow-scrolling: touch;
+                        overscroll-behavior-x: contain;
                     }
                     .ip-rules-table-wrap .Polaris-IndexTable-ScrollContainer {
-                        overflow: visible !important;
+                        overflow-x: auto !important;
+                        overflow-y: hidden !important;
                         max-height: none;
+                    }
+                    .ip-rules-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar {
+                        display: block;
                     }
                     .ip-rules-table-wrap .Polaris-IndexTable__ScrollBarContainer {
                         display: none !important;
                     }
-                    .ip-rules-table-wrap .Polaris-IndexTable,
+                    .ip-rules-table-wrap .Polaris-IndexTable {
+                        width: 100%;
+                        min-width: 0;
+                    }
                     .ip-rules-table-wrap .Polaris-IndexTable__Table {
                         width: 100%;
                         min-width: 1120px;
@@ -871,7 +878,6 @@ export default function IPRulesPage() {
                         .ip-rules-action-filter {
                             margin-left: auto;
                         }
-                        .ip-rules-table-wrap .Polaris-IndexTable,
                         .ip-rules-table-wrap .Polaris-IndexTable__Table {
                             min-width: 760px;
                         }
