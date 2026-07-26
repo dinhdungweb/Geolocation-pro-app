@@ -1135,23 +1135,8 @@ export default function RulesPage() {
             <style>
                 {`
                     .country-selector-scroll {
-                        scrollbar-color: #8a8f93 transparent;
+                        scrollbar-color: auto;
                         scrollbar-width: thin;
-                    }
-                    .country-selector-scroll::-webkit-scrollbar {
-                        width: 8px;
-                    }
-                    .country-selector-scroll::-webkit-scrollbar-track {
-                        background: transparent;
-                        border-radius: 999px;
-                    }
-                    .country-selector-scroll::-webkit-scrollbar-thumb {
-                        background: #8a8f93;
-                        border: 2px solid #ffffff;
-                        border-radius: 999px;
-                    }
-                    .country-selector-scroll::-webkit-scrollbar-thumb:hover {
-                        background: #6d7175;
                     }
                     .conflict-details-summary {
                         align-items: center;
@@ -1270,6 +1255,11 @@ export default function RulesPage() {
                         overflow-y: hidden;
                         -webkit-overflow-scrolling: touch;
                         border-radius: var(--p-border-radius-200, 8px);
+                    }
+                    .rules-table-wrap,
+                    .rules-table-wrap .Polaris-IndexTable-ScrollContainer {
+                        scrollbar-color: auto;
+                        scrollbar-width: thin;
                     }
                     .rules-page .Polaris-ShadowBevel {
                         --pc-shadow-bevel-border-radius-xs: var(--p-border-radius-200, 8px) !important;

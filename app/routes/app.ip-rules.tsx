@@ -779,6 +779,11 @@ export default function IPRulesPage() {
                         overflow-y: hidden;
                         -webkit-overflow-scrolling: touch;
                     }
+                    .ip-rules-table-wrap,
+                    .ip-rules-table-wrap .Polaris-IndexTable-ScrollContainer {
+                        scrollbar-color: auto;
+                        scrollbar-width: thin;
+                    }
                     .ip-rules-table-wrap .Polaris-IndexTable-ScrollContainer {
                         overflow: visible !important;
                         max-height: none;

@@ -1250,35 +1250,8 @@ export default function VisitorLogs() {
                     .visitor-log-table-wrap,
                     .visitor-log-skeleton-table-wrap,
                     .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer {
-                        scrollbar-color: var(--p-color-border-emphasis, #b5b5b5) transparent;
+                        scrollbar-color: auto;
                         scrollbar-width: thin;
-                    }
-                    .visitor-log-table-wrap::-webkit-scrollbar,
-                    .visitor-log-skeleton-table-wrap::-webkit-scrollbar,
-                    .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar {
-                        width: 6px;
-                        height: 6px;
-                    }
-                    .visitor-log-table-wrap::-webkit-scrollbar-track,
-                    .visitor-log-skeleton-table-wrap::-webkit-scrollbar-track,
-                    .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar-track {
-                        background: transparent;
-                    }
-                    .visitor-log-table-wrap::-webkit-scrollbar-thumb,
-                    .visitor-log-skeleton-table-wrap::-webkit-scrollbar-thumb,
-                    .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar-thumb {
-                        background: var(--p-color-border-emphasis, #b5b5b5);
-                        border-radius: 999px;
-                    }
-                    .visitor-log-table-wrap::-webkit-scrollbar-thumb:hover,
-                    .visitor-log-skeleton-table-wrap::-webkit-scrollbar-thumb:hover,
-                    .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar-thumb:hover {
-                        background: var(--p-color-icon-secondary-hover, #616161);
-                    }
-                    .visitor-log-table-wrap::-webkit-scrollbar-corner,
-                    .visitor-log-skeleton-table-wrap::-webkit-scrollbar-corner,
-                    .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer::-webkit-scrollbar-corner {
-                        background: transparent;
                     }
                     .visitor-log-table-wrap .Polaris-IndexTable-ScrollContainer {
                         overflow: visible !important;
