@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-router";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
     Page,
@@ -491,8 +491,15 @@ export default function RulesPage() {
     const hasRequestedMarkets = useRef(false);
     const hasRequestedStateData = useRef(false);
     const shopify = useAppBridge();
-    const [modalOpen, setModalOpen] = useState(false);
-    const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const editorRuleParam = searchParams.get("rule");
+    const [modalOpen, setModalOpen] = useState(Boolean(editorRuleParam));
+    const [editingRule, setEditingRule] = useState<RedirectRule | null>(() =>
+        editorRuleParam && editorRuleParam !== "new"
+            ? rules.find((rule) => rule.id === editorRuleParam) || null
+            : null
+    );
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
@@ -534,23 +541,25 @@ export default function RulesPage() {
         ((_countryCode: string) => [] as string[]);
 
     useEffect(() => {
-        if (!modalOpen) return;
+        if (!editorRuleParam) {
+            setModalOpen(false);
+            setEditingRule(null);
+            return;
+        }
 
-        const previousOverflow = document.body.style.overflow;
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setModalOpen(false);
-                setEditingRule(null);
-            }
-        };
-        document.body.style.overflow = "hidden";
-        window.addEventListener("keydown", handleKeyDown);
+        const nextRule =
+            editorRuleParam === "new"
+                ? null
+                : rules.find((rule) => rule.id === editorRuleParam);
+        if (editorRuleParam !== "new" && !nextRule) {
+            shopify.toast.show("Rule not found", { isError: true });
+            navigate("/app/rules", { replace: true });
+            return;
+        }
 
-        return () => {
-            document.body.style.overflow = previousOverflow;
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [modalOpen]);
+        setEditingRule(nextRule || null);
+        setModalOpen(true);
+    }, [editorRuleParam, navigate, rules, shopify]);
 
     useEffect(() => {
         const needsStateData =
@@ -597,8 +606,9 @@ export default function RulesPage() {
         if (formFetcher.data.success) {
             setModalOpen(false);
             setEditingRule(null);
+            navigate("/app/rules");
         }
-    }, [formFetcher.data, formFetcher.state, shopify]);
+    }, [formFetcher.data, formFetcher.state, navigate, shopify]);
 
     useEffect(() => {
         if (importFetcher.state !== "idle" || !importFetcher.data?.message) return;
@@ -770,14 +780,12 @@ export default function RulesPage() {
     }, [editingRule, modalOpen, rules]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
-        setEditingRule(rule || null);
-        setModalOpen(true);
-    }, []);
+        navigate(`/app/rules?rule=${encodeURIComponent(rule?.id || "new")}`);
+    }, [navigate]);
 
     const handleCloseModal = useCallback(() => {
-        setModalOpen(false);
-        setEditingRule(null);
-    }, []);
+        navigate("/app/rules");
+    }, [navigate]);
 
     const handleSubmit = useCallback(() => {
         const formData = new FormData();
@@ -1180,8 +1188,11 @@ export default function RulesPage() {
     );
 
     return (
-        <Page fullWidth>
-            <TitleBar title="Geolocation Rules">
+        <Page
+            fullWidth
+            backAction={modalOpen ? { content: "Geolocation Rules", onAction: handleCloseModal } : undefined}
+        >
+            <TitleBar title={modalOpen ? (editingRule ? "Edit Rule" : "Add Rule") : "Geolocation Rules"}>
             </TitleBar>
             <style>
                 {`
@@ -1243,23 +1254,16 @@ export default function RulesPage() {
                     .rules-table-wrap .Polaris-IndexTable__TableCell--first {
                         box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
                     }
-                    .rule-drawer-backdrop {
-                        position: fixed;
-                        inset: 0;
-                        z-index: 519;
-                        background: rgba(17, 24, 39, 0.46);
-                    }
                     .rule-drawer {
-                        position: fixed;
-                        top: 0;
-                        right: 0;
-                        bottom: 0;
-                        z-index: 520;
                         display: grid;
-                        grid-template-rows: auto minmax(0, 1fr) auto;
-                        width: min(720px, 100vw);
+                        grid-template-rows: auto auto auto;
+                        width: min(960px, 100%);
+                        margin: 0 auto;
+                        overflow: hidden;
+                        border: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        border-radius: var(--p-border-radius-300, 12px);
                         background: var(--p-color-bg-surface, #ffffff);
-                        box-shadow: -12px 0 36px rgba(0, 0, 0, 0.18);
+                        box-shadow: var(--p-shadow-200, 0 1px 2px rgba(0, 0, 0, 0.08));
                     }
                     .rule-drawer-header,
                     .rule-drawer-footer {
@@ -1276,11 +1280,14 @@ export default function RulesPage() {
                     }
                     .rule-drawer-footer {
                         justify-content: flex-end;
+                        position: sticky;
+                        bottom: 0;
+                        z-index: 2;
+                        background: var(--p-color-bg-surface, #ffffff);
                         border-top-style: solid;
                         border-top-width: 1px;
                     }
                     .rule-drawer-body {
-                        overflow-y: auto;
                         padding: 20px;
                     }
                     .rule-drawer-section {
@@ -1303,11 +1310,15 @@ export default function RulesPage() {
                             min-width: 880px;
                         }
                         .rule-drawer {
-                            width: 100vw;
+                            width: 100%;
+                            border-right: 0;
+                            border-left: 0;
+                            border-radius: 0;
                         }
                     }
                 `}
             </style>
+            {!modalOpen && (
             <div className="rules-page">
                 <div style={{
                     display: 'flex',
@@ -1511,15 +1522,12 @@ export default function RulesPage() {
                 </Layout>
             </BlockStack>
             </div>
+            )}
 
-            {/* Add/Edit drawer */}
+            {/* Dedicated Add/Edit page */}
             {modalOpen && (
-                <>
-                <div className="rule-drawer-backdrop" onClick={handleCloseModal} aria-hidden="true" />
-                <aside
+                <div
                     className="rule-drawer"
-                    role="dialog"
-                    aria-modal="true"
                     aria-labelledby="rule-drawer-title"
                 >
                 <div className="rule-drawer-header">
@@ -2120,8 +2128,7 @@ export default function RulesPage() {
                         {editingRule ? "Save" : "Create"}
                     </Button>
                 </div>
-                </aside>
-                </>
+                </div>
             )}
 
             {/* Import Modal */}
