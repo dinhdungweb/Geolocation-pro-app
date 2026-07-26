@@ -22,6 +22,10 @@ import {
 } from "../utils/effective-plan.server";
 import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
 import { getStateName } from "../utils/states";
+import {
+    getThemeAppEmbedStatus,
+    getThemeEditorUrl,
+} from "../utils/theme-app-embed.server";
 import { 
     ArrowLeft, 
     ChevronLeft,
@@ -39,6 +43,26 @@ import {
     Gem,
     DollarSign
 } from "lucide-react";
+import {
+    FaAndroid,
+    FaApple,
+    FaChrome,
+    FaCircleQuestion,
+    FaDesktop,
+    FaEdge,
+    FaFirefoxBrowser,
+    FaGlobe,
+    FaInternetExplorer,
+    FaLinux,
+    FaMobileScreen,
+    FaOpera,
+    FaRobot,
+    FaSafari,
+    FaTabletScreenButton,
+    FaWindows,
+} from "react-icons/fa6";
+import type { IconType } from "react-icons";
+import { SiSamsung } from "react-icons/si";
 
 function getYearMonth(date = new Date()) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -143,6 +167,56 @@ function parseVisitorUserAgent(userAgentValue?: string | null) {
                         : "Unknown";
 
     return { browser, device, os, visitorType: isBot ? "Bot" : "User" };
+}
+
+function getVisitorDetailIcon(type: "device" | "os" | "browser", value: string): IconType {
+    if (!value || value === "Unknown") return FaCircleQuestion;
+
+    if (type === "device") {
+        if (value === "Mobile") return FaMobileScreen;
+        if (value === "Tablet") return FaTabletScreenButton;
+        if (value === "Bot") return FaRobot;
+        return FaDesktop;
+    }
+
+    if (type === "os") {
+        if (/^Windows/i.test(value)) return FaWindows;
+        if (/^(macOS|iOS)/i.test(value)) return FaApple;
+        if (/^Android/i.test(value)) return FaAndroid;
+        if (/^Linux/i.test(value)) return FaLinux;
+        if (/^ChromeOS/i.test(value)) return FaChrome;
+        return FaCircleQuestion;
+    }
+
+    if (/^Chrome/i.test(value)) return FaChrome;
+    if (/^Edge/i.test(value)) return FaEdge;
+    if (/^Firefox/i.test(value)) return FaFirefoxBrowser;
+    if (/^Safari/i.test(value)) return FaSafari;
+    if (/^Opera/i.test(value)) return FaOpera;
+    if (/^Samsung Internet/i.test(value)) return SiSamsung;
+    if (/^Internet Explorer/i.test(value)) return FaInternetExplorer;
+    return FaGlobe;
+}
+
+function VisitorDetailIcon({
+    label,
+    type,
+}: {
+    label: string;
+    type: "device" | "os" | "browser";
+}) {
+    const DetailIcon = getVisitorDetailIcon(type, label);
+
+    return (
+        <span
+            className="admin-log-user-agent-icon"
+            title={label}
+            aria-label={label}
+            tabIndex={0}
+        >
+            <DetailIcon aria-hidden="true" focusable="false" />
+        </span>
+    );
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -286,7 +360,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const shop = decodeURIComponent(params.shop ?? "");
     if (!shop) throw redirect("/admin");
 
-    const settings = await prisma.settings.findUnique({ where: { shop } });
+    const [settings, offlineSession] = await Promise.all([
+        prisma.settings.findUnique({ where: { shop } }),
+        prisma.session.findFirst({
+            where: { shop, isOnline: false },
+            select: {
+                accessToken: true,
+                scope: true,
+            },
+        }),
+    ]);
     const currentCalendarKey = `calendar:${getYearMonth()}`;
     const shopifyPlan = settings?.currentPlan || FREE_PLAN;
     const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
@@ -298,7 +381,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         ? currentCalendarKey
         : settings.billingPeriodKey || currentCalendarKey;
 
-    const [rules, logs, recentUsage, currentPeriodUsage, chargeAttempts] = await Promise.all([
+    const appEmbedStatusPromise = offlineSession?.accessToken
+        ? getThemeAppEmbedStatus({
+            shop,
+            accessToken: offlineSession.accessToken,
+            scopeString: offlineSession.scope,
+        })
+        : Promise.resolve({
+            state: "unavailable" as const,
+            label: "Status unavailable",
+            helpText: "No offline Shopify session is available for this shop.",
+            themeName: null,
+        });
+
+    const [rules, logs, recentUsage, currentPeriodUsage, chargeAttempts, appEmbedStatus] = await Promise.all([
         prisma.redirectRule.findMany({
             where: { shop },
             orderBy: { priority: "desc" },
@@ -307,7 +403,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 isActive: true, priority: true, countryCodes: true, ipAddresses: true,
                 stateCodes: true, marketHandles: true,
                 cityNames: true, cityCountryCode: true, cityRegionCode: true,
-                scheduleEnabled: true, createdAt: true,
+                targetUrl: true, scheduleEnabled: true, createdAt: true,
             },
         }),
         prisma.visitorLog.findMany({
@@ -316,7 +412,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             take: 100,
             select: {
                 id: true, ipAddress: true, countryCode: true, action: true,
-                regionCode: true, regionName: true,
+                regionCode: true, regionName: true, city: true,
                 ruleName: true, targetUrl: true, timestamp: true,
                 userAgent: true, path: true,
             },
@@ -342,6 +438,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             orderBy: { createdAt: "desc" },
             take: 100,
         }),
+        appEmbedStatusPromise,
     ]);
     const usageByKey = new Map<string, any>();
     (recentUsage as any[]).forEach((usage) => usageByKey.set(usage.billingPeriodKey, usage));
@@ -374,6 +471,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         currentPlan,
         shopifyPlan,
         isBillingOverridden,
+        appEmbedStatus,
+        themeEditorUrl: getThemeEditorUrl(shop),
         settings: settings ? {
             mode: settings.mode,
             template: settings.template,
@@ -505,7 +604,22 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
 };
 
 export default function AdminShopDetail() {
-    const { shop, settings, hasSettings, rules, logs, monthlyUsage, chargeAttempts, stats, hasProPlan, currentPlan, shopifyPlan, isBillingOverridden } = useLoaderData<typeof loader>();
+    const {
+        shop,
+        settings,
+        hasSettings,
+        rules,
+        logs,
+        monthlyUsage,
+        chargeAttempts,
+        stats,
+        hasProPlan,
+        currentPlan,
+        shopifyPlan,
+        isBillingOverridden,
+        appEmbedStatus,
+        themeEditorUrl,
+    } = useLoaderData<typeof loader>();
     const actionData = useActionData<any>();
     const navigation = useNavigation();
     const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
@@ -925,17 +1039,57 @@ export default function AdminShopDetail() {
                 }
                 td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: var(--ed-font-size-sm); color: #334155; }
                 .badge-v3 { padding: 5px 10px; border-radius: 8px; font-size: var(--ed-font-size-xs); font-weight: 500; display: inline-block; }
-                .ed-shop-logs-table-card table {
-                    min-width: 1120px;
-                }
-                .admin-log-user-agent-detail {
-                    max-width: 120px;
+                .admin-rule-target-url {
+                    display: block;
+                    max-width: 260px;
                     overflow: hidden;
+                    color: #475569;
+                    font-family: monospace;
+                    font-size: var(--ed-font-size-xs);
                     text-overflow: ellipsis;
                     white-space: nowrap;
-                    color: #64748b;
+                }
+                .admin-rule-target-missing {
+                    color: #dc2626;
                     font-size: var(--ed-font-size-xs);
-                    line-height: 1.4;
+                    font-weight: 600;
+                }
+                .admin-app-embed-value {
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+                .admin-app-embed-link {
+                    color: #2563eb;
+                    font-size: var(--ed-font-size-xs);
+                    font-weight: 600;
+                    text-decoration: none;
+                }
+                .admin-app-embed-link:hover {
+                    text-decoration: underline;
+                }
+                .ed-shop-logs-table-card table {
+                    min-width: 1180px;
+                }
+                .admin-log-user-agent-icon {
+                    display: inline-flex;
+                    width: 24px;
+                    height: 24px;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 6px;
+                    color: #64748b;
+                    cursor: help;
+                }
+                .admin-log-user-agent-icon:focus-visible {
+                    outline: 2px solid #2563eb;
+                    outline-offset: 1px;
+                }
+                .admin-log-user-agent-icon svg {
+                    width: 16px;
+                    height: 16px;
                 }
                 .admin-log-visitor-badge {
                     padding: 5px 10px;
@@ -1380,6 +1534,25 @@ export default function AdminShopDetail() {
                         App Configurations
                     </div>
                     <div className="ed-shop-card-body">
+                        <div className="info-item">
+                            <span className="label">Storefront App Embed</span>
+                            <span className="admin-app-embed-value">
+                                <span
+                                    className={`custom-plan-pill ${appEmbedStatus.state === "enabled" ? "enabled" : "disabled"}`}
+                                    title={appEmbedStatus.helpText}
+                                >
+                                    {appEmbedStatus.label.toUpperCase()}
+                                </span>
+                                <a
+                                    className="admin-app-embed-link"
+                                    href={themeEditorUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    Theme editor
+                                </a>
+                            </span>
+                        </div>
                         {!hasSettings ? (
                             <div style={{ padding: '24px', textAlign: 'center', color: '#f59e0b', fontSize: '13px', fontWeight: 600 }}>
                                 <ShieldAlert size={24} style={{ marginBottom: '12px', opacity: 0.5 }} />
@@ -1607,6 +1780,7 @@ export default function AdminShopDetail() {
                                 <th>Rule Name</th>
                                 <th>Match</th>
                                 <th>Action</th>
+                                <th>Target URL</th>
                                 <th>Status</th>
                                 <th>Priority</th>
                             </tr>
@@ -1624,6 +1798,19 @@ export default function AdminShopDetail() {
                                         </div>
                                     </td>
                                     <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : '#f2f6ee', color: r.ruleType === 'block' ? '#ef4444' : '#82b440' }}>{r.ruleType.toUpperCase()}</span></td>
+                                    <td>
+                                        {r.ruleType === 'redirect' ? (
+                                            r.targetUrl ? (
+                                                <span className="admin-rule-target-url" title={r.targetUrl}>
+                                                    {r.targetUrl}
+                                                </span>
+                                            ) : (
+                                                <span className="admin-rule-target-missing">Missing target</span>
+                                            )
+                                        ) : (
+                                            <span style={{ color: '#94a3b8' }}>—</span>
+                                        )}
+                                    </td>
                                     <td>{r.isActive ? <span style={{ color: '#10b981' }}>Active</span> : <span style={{ color: '#94a3b8' }}>Inactive</span>}</td>
                                     <td>{r.priority}</td>
                                 </tr>
@@ -1644,7 +1831,9 @@ export default function AdminShopDetail() {
                             <tr>
                                 <th>Time</th>
                                 <th>Visitor IP</th>
+                                <th>Country</th>
                                 <th>Region</th>
+                                <th>City</th>
                                 <th>Page Path</th>
                                 <th>Visitor</th>
                                 <th>Device</th>
@@ -1669,14 +1858,26 @@ export default function AdminShopDetail() {
                                     <tr key={l.id}>
                                         <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{formatDate(l.timestamp)}</td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {l.countryCode && <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />}
-                                                <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
-                                            </div>
+                                            <span style={{ fontFamily: 'monospace' }}>{l.ipAddress}</span>
+                                        </td>
+                                        <td>
+                                            {l.countryCode ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <img src={`https://flagcdn.com/w40/${l.countryCode.toLowerCase()}.png`} width="16" alt={l.countryCode} />
+                                                    <span>{l.countryCode}</span>
+                                                </div>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                            )}
                                         </td>
                                         <td>
                                             <span title={l.regionCode || ''} style={{ color: l.regionCode ? 'var(--text)' : 'var(--text-muted)' }}>
                                                 {l.regionName || '-'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style={{ color: l.city ? 'var(--text)' : 'var(--text-muted)' }}>
+                                                {l.city || '-'}
                                             </span>
                                         </td>
                                         <td>
@@ -1693,19 +1894,13 @@ export default function AdminShopDetail() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div className="admin-log-user-agent-detail" title={userAgentTitle}>
-                                                {userAgentDetails.device}
-                                            </div>
+                                            <VisitorDetailIcon label={userAgentDetails.device} type="device" />
                                         </td>
                                         <td>
-                                            <div className="admin-log-user-agent-detail" title={userAgentTitle}>
-                                                {userAgentDetails.os}
-                                            </div>
+                                            <VisitorDetailIcon label={userAgentDetails.os} type="os" />
                                         </td>
                                         <td>
-                                            <div className="admin-log-user-agent-detail" title={userAgentTitle}>
-                                                {userAgentDetails.browser}
-                                            </div>
+                                            <VisitorDetailIcon label={userAgentDetails.browser} type="browser" />
                                         </td>
                                         <td><span className="badge-v3" style={{ background: `${actionColor(l.action)}15`, color: actionColor(l.action) }}>{l.action.toUpperCase()}</span></td>
                                         <td style={{ color: 'var(--text-muted)' }}>{l.ruleName || '-'}</td>
