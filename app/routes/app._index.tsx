@@ -1168,7 +1168,7 @@ export default function Index() {
           display: grid;
           align-content: start;
           gap: 0;
-          padding: 8px 0;
+          padding: 0;
         }
         .geo-country-row {
           display: grid;
