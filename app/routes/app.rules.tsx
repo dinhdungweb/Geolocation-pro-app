@@ -470,6 +470,8 @@ export default function RulesPage() {
     const [formRuleType, setFormRuleType] = useState("redirect");
     const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
     // Scheduling State
+    const [scheduleSectionOpen, setScheduleSectionOpen] = useState(true);
+    const [pageTargetingSectionOpen, setPageTargetingSectionOpen] = useState(true);
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [startTime, setStartTime] = useState("09:00");
     const [endTime, setEndTime] = useState("17:00");
@@ -699,6 +701,8 @@ export default function RulesPage() {
         }
         setInputValue("");
         setStateInputValue("");
+        setScheduleSectionOpen(true);
+        setPageTargetingSectionOpen(true);
     }, [editingRule, modalOpen]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
@@ -1129,6 +1133,33 @@ export default function RulesPage() {
                     }
                     .conflict-details:not([open]) .conflict-details-icon {
                         transform: rotate(-90deg);
+                    }
+                    .rule-form-details {
+                        border-top: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        padding-top: 14px;
+                    }
+                    .rule-form-details-summary {
+                        align-items: center;
+                        cursor: pointer;
+                        display: flex;
+                        font-weight: 600;
+                        justify-content: space-between;
+                        list-style: none;
+                        padding: 2px 0;
+                    }
+                    .rule-form-details-summary::-webkit-details-marker {
+                        display: none;
+                    }
+                    .rule-form-details-icon {
+                        display: inline-flex;
+                        transition: transform 160ms ease;
+                        width: 20px;
+                    }
+                    .rule-form-details:not([open]) .rule-form-details-icon {
+                        transform: rotate(-90deg);
+                    }
+                    .rule-form-details-content {
+                        padding-top: 14px;
                     }
                     .rules-table-wrap {
                         width: 100%;
@@ -1838,16 +1869,28 @@ export default function RulesPage() {
                             autoComplete="off"
                         />
 
-                        <Text as="h3" variant="headingSm">Scheduling (Optional)</Text>
-                        <Checkbox
-                            label="Enable Scheduling"
-                            checked={scheduleEnabled}
-                            onChange={setScheduleEnabled}
-                            helpText="Limit this rule to specific days and times"
-                        />
-
-                        {scheduleEnabled && (
+                        <details
+                            className="rule-form-details"
+                            open={scheduleSectionOpen}
+                            onToggle={(event) => setScheduleSectionOpen(event.currentTarget.open)}
+                        >
+                            <summary className="rule-form-details-summary">
+                                <span>Scheduling (Optional)</span>
+                                <span className="rule-form-details-icon" aria-hidden="true">
+                                    <Icon source={ChevronDownIcon} tone="subdued" />
+                                </span>
+                            </summary>
+                            <div className="rule-form-details-content">
                             <BlockStack gap="400">
+                                <Checkbox
+                                    label="Enable Scheduling"
+                                    checked={scheduleEnabled}
+                                    onChange={setScheduleEnabled}
+                                    helpText="Limit this rule to specific days and times"
+                                />
+
+                                {scheduleEnabled && (
+                                <BlockStack gap="400">
                                 <FormLayout.Group>
                                     <TextField
                                         label="Start Time (HH:mm)"
@@ -1895,12 +1938,24 @@ export default function RulesPage() {
                                     selected={activeDays}
                                     onChange={setActiveDays}
                                 />
+                                </BlockStack>
+                                )}
                             </BlockStack>
-                        )}
+                            </div>
+                        </details>
 
-                        <Divider />
-                        <BlockStack gap="200">
-                            <Text as="h3" variant="headingSm">Page Targeting</Text>
+                        <details
+                            className="rule-form-details"
+                            open={pageTargetingSectionOpen}
+                            onToggle={(event) => setPageTargetingSectionOpen(event.currentTarget.open)}
+                        >
+                            <summary className="rule-form-details-summary">
+                                <span>Page Targeting</span>
+                                <span className="rule-form-details-icon" aria-hidden="true">
+                                    <Icon source={ChevronDownIcon} tone="subdued" />
+                                </span>
+                            </summary>
+                            <div className="rule-form-details-content">
                             <BlockStack gap="200">
                                 <Text as="p" variant="bodyMd">Apply to</Text>
                                 <RadioButton
@@ -1971,7 +2026,8 @@ export default function RulesPage() {
                                     autoComplete="off"
                                 />
                             )}
-                        </BlockStack>
+                            </div>
+                        </details>
                     </FormLayout>
                     </BlockStack>
                 </Modal.Section>
