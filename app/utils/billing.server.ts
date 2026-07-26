@@ -21,10 +21,12 @@ function usageChargeIdempotencyKey(
     billingPeriodKey: string,
     fromChargedVisitors: number,
     toChargedVisitors: number,
+    manualAdjustmentKey?: string | null,
 ) {
+    const baseKey = `${shop}:${billingPeriodKey}:${fromChargedVisitors}:${toChargedVisitors}`;
     return crypto
         .createHash("sha256")
-        .update(`${shop}:${billingPeriodKey}:${fromChargedVisitors}:${toChargedVisitors}`)
+        .update(manualAdjustmentKey ? `${baseKey}:manual:${manualAdjustmentKey}` : baseKey)
         .digest("hex");
 }
 
@@ -85,9 +87,15 @@ async function reconcilePendingChargeAttempt(shop: string, usagePeriod: {
             shop,
             billingPeriodKey: usagePeriod.key,
             chargedVisitors: { lt: attempt.toChargedVisitors },
+            ...(attempt.manualAdjustmentKey
+                ? { manualChargedVisitorsKey: attempt.manualAdjustmentKey }
+                : {}),
         },
         data: {
             chargedVisitors: attempt.toChargedVisitors,
+            ...(attempt.manualAdjustmentKey
+                ? { manualChargedVisitorsKey: null }
+                : {}),
             billingPeriodStart: usagePeriod.billingPeriodStart,
             billingPeriodEnd: usagePeriod.billingPeriodEnd,
             billingSubscriptionId: usagePeriod.billingSubscriptionId,
@@ -118,6 +126,7 @@ export async function chargeOverageUsageRecord({
     chargedVisitors,
     currentPlan,
     currentUsage,
+    manualAdjustmentKey,
     minimumChargeAmount = 1,
     planLimit,
     shop,
@@ -139,6 +148,7 @@ export async function chargeOverageUsageRecord({
     planLimit: number;
     currentUsage: number;
     chargedVisitors: number;
+    manualAdjustmentKey?: string | null;
     minimumChargeAmount?: number;
 }) {
     // Reconcile ANY unresolved attempts for this period before calculating new overages
@@ -197,6 +207,7 @@ export async function chargeOverageUsageRecord({
         usagePeriod.key,
         chargedVisitors,
         toChargedVisitors,
+        manualAdjustmentKey,
     );
 
     const existingAttempt = await prisma.usageChargeAttempt.findUnique({
@@ -226,6 +237,7 @@ export async function chargeOverageUsageRecord({
                 status: CHARGE_STATUS.PENDING,
                 error: null,
                 billingUsageLineItemId: subscriptionLineItemId,
+                manualAdjustmentKey: manualAdjustmentKey || null,
                 amount: chargeAmount,
             },
         });
@@ -240,6 +252,7 @@ export async function chargeOverageUsageRecord({
                 overageVisitors,
                 amount: chargeAmount,
                 idempotencyKey,
+                manualAdjustmentKey: manualAdjustmentKey || null,
                 status: CHARGE_STATUS.PENDING,
             },
         });
@@ -300,9 +313,15 @@ export async function chargeOverageUsageRecord({
                     shop,
                     billingPeriodKey: usagePeriod.key,
                     chargedVisitors,
+                    ...(manualAdjustmentKey
+                        ? { manualChargedVisitorsKey: manualAdjustmentKey }
+                        : {}),
                 },
                 data: {
                     chargedVisitors: toChargedVisitors,
+                    ...(manualAdjustmentKey
+                        ? { manualChargedVisitorsKey: null }
+                        : {}),
                     billingPeriodStart: usagePeriod.billingPeriodStart,
                     billingPeriodEnd: usagePeriod.billingPeriodEnd,
                     billingSubscriptionId: usagePeriod.billingSubscriptionId,
@@ -679,6 +698,7 @@ export async function checkAndChargeOverageBackground(shop: string) {
             chargedVisitors,
             currentPlan,
             currentUsage,
+            manualAdjustmentKey: monthlyUsage?.manualChargedVisitorsKey,
             planLimit,
             shop,
             usageLineItemId: usageLineItem.id,

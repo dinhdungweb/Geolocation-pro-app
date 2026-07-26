@@ -315,6 +315,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                             chargedVisitors: monthlyUsage.chargedVisitors,
                             currentPlan: activePlan,
                             currentUsage: monthlyUsage.totalVisitors,
+                            manualAdjustmentKey: monthlyUsage.manualChargedVisitorsKey,
                             minimumChargeAmount: 0.5,
                             planLimit,
                             shop,

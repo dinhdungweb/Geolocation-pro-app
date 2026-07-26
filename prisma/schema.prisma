@@ -149,21 +149,22 @@ model AnalyticsRule {
 }
 
 model MonthlyUsage {
-  id                     String    @id @default(uuid())
-  shop                   String
-  yearMonth              String
-  billingPeriodKey       String
-  billingPeriodStart     DateTime?
-  billingPeriodEnd       DateTime?
-  billingSubscriptionId  String?
-  billingUsageLineItemId String?
-  totalVisitors          Int       @default(0)
-  redirected             Int       @default(0)
-  blocked                Int       @default(0)
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  chargedVisitors        Int       @default(0)
-  popupShown             Int       @default(0)
+  id                       String    @id @default(uuid())
+  shop                     String
+  yearMonth                String
+  billingPeriodKey         String
+  billingPeriodStart       DateTime?
+  billingPeriodEnd         DateTime?
+  billingSubscriptionId    String?
+  billingUsageLineItemId   String?
+  totalVisitors            Int       @default(0)
+  redirected               Int       @default(0)
+  blocked                  Int       @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  chargedVisitors          Int       @default(0)
+  manualChargedVisitorsKey String?
+  popupShown               Int       @default(0)
 
   @@unique([shop, billingPeriodKey])
   @@index([shop])
@@ -183,6 +184,7 @@ model UsageChargeAttempt {
   amount                 Decimal  @db.Decimal(10, 2)
   idempotencyKey         String   @unique
   shopifyUsageRecordId   String?
+  manualAdjustmentKey    String?
   status                 String   @default("pending")
   error                  String?
   createdAt              DateTime @default(now())

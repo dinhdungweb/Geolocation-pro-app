@@ -176,12 +176,13 @@ async function getCarryForwardUsageCounts(shop: string, period: UsagePeriod) {
       blocked: true,
       popupShown: true,
       chargedVisitors: true,
+      manualChargedVisitorsKey: true,
     },
   });
 
   if (legacyRows.length === 0) return null;
 
-  return legacyRows.reduce(
+  const aggregate = legacyRows.reduce(
     (carry, row) => ({
       totalVisitors: Math.max(carry.totalVisitors, row.totalVisitors),
       redirected: Math.max(carry.redirected, row.redirected),
@@ -197,6 +198,13 @@ async function getCarryForwardUsageCounts(shop: string, period: UsagePeriod) {
       chargedVisitors: 0,
     },
   );
+  const manualRow = legacyRows.find((row) => Boolean(row.manualChargedVisitorsKey));
+
+  return {
+    ...aggregate,
+    chargedVisitors: manualRow?.chargedVisitors ?? aggregate.chargedVisitors,
+    manualChargedVisitorsKey: manualRow?.manualChargedVisitorsKey || null,
+  };
 }
 
 function inferBillingPeriodStart(
@@ -301,11 +309,19 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
   });
 
   if (existing) {
-    const nextChargedVisitors = Math.max(
-      existing.chargedVisitors,
-      period.chargedVisitors,
-      carryForwardCounts?.chargedVisitors || 0,
-    );
+    const manualChargedVisitorsKey =
+      existing.manualChargedVisitorsKey ||
+      carryForwardCounts?.manualChargedVisitorsKey ||
+      null;
+    const nextChargedVisitors = existing.manualChargedVisitorsKey
+      ? existing.chargedVisitors
+      : carryForwardCounts?.manualChargedVisitorsKey
+        ? carryForwardCounts.chargedVisitors
+        : Math.max(
+          existing.chargedVisitors,
+          period.chargedVisitors,
+          carryForwardCounts?.chargedVisitors || 0,
+        );
     await prisma.monthlyUsage.update({
       where: {
         shop_billingPeriodKey: {
@@ -319,6 +335,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
         blocked: Math.max(existing.blocked, usageCounts.blocked, carryForwardCounts?.blocked || 0),
         popupShown: Math.max(existing.popupShown || 0, usageCounts.popupShown, carryForwardCounts?.popupShown || 0),
         chargedVisitors: nextChargedVisitors,
+        manualChargedVisitorsKey,
         billingPeriodStart: period.billingPeriodStart,
         billingPeriodEnd: period.billingPeriodEnd,
         billingSubscriptionId: period.billingSubscriptionId,
@@ -328,7 +345,10 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
     return;
   }
 
-  const chargedVisitors = Math.max(period.chargedVisitors, carryForwardCounts?.chargedVisitors || 0);
+  const manualChargedVisitorsKey = carryForwardCounts?.manualChargedVisitorsKey || null;
+  const chargedVisitors = manualChargedVisitorsKey
+    ? carryForwardCounts!.chargedVisitors
+    : Math.max(period.chargedVisitors, carryForwardCounts?.chargedVisitors || 0);
   const totalVisitors = Math.max(usageCounts.totalVisitors, carryForwardCounts?.totalVisitors || 0);
   const redirected = Math.max(usageCounts.redirected, carryForwardCounts?.redirected || 0);
   const blocked = Math.max(usageCounts.blocked, carryForwardCounts?.blocked || 0);
@@ -351,6 +371,7 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
         blocked,
         popupShown,
         chargedVisitors,
+        manualChargedVisitorsKey,
       },
     });
   } catch (error: any) {

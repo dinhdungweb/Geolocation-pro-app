@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { data as responseData, redirect } from "react-router";
 import { Form, Link, useLoaderData, useActionData, useNavigation } from "react-router";
 import { useState, useEffect, useMemo } from "react";
+import { randomUUID } from "node:crypto";
 import { requireAdminAuth } from "../utils/admin.session.server";
 import prisma from "../db.server";
 import {
@@ -241,16 +242,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const billingPeriodKey = formData.get("billingPeriodKey") as string;
         const chargedVisitors = parseInt(formData.get("chargedVisitors") as string);
 
-        if (isNaN(chargedVisitors) || !billingPeriodKey) {
+        if (isNaN(chargedVisitors) || chargedVisitors < 0 || !billingPeriodKey) {
             return responseData({ success: false, error: "Invalid input" }, { status: 400 });
         }
 
         try {
             await prisma.monthlyUsage.update({
                 where: { shop_billingPeriodKey: { shop, billingPeriodKey } },
-                data: { chargedVisitors }
+                data: {
+                    chargedVisitors,
+                    manualChargedVisitorsKey: randomUUID(),
+                },
             });
-            return responseData({ success: true, message: "Usage adjusted successfully" });
+            return responseData({
+                success: true,
+                message: "Usage adjusted. The billing worker will use this value for the next charge.",
+            });
         } catch (e: any) {
             return responseData({ success: false, error: e.message }, { status: 500 });
         }
@@ -1326,7 +1333,7 @@ export default function AdminShopDetail() {
                         </div>
                         <div className="modal-body">
                             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
-                                Manually update the "Charged Visitors" counter for a specific billing period in our internal database.
+                                Set the charged visitor baseline for this billing period. The billing worker will preserve this value and charge any remaining eligible overage.
                             </p>
                             <Form method="post">
                                 <input type="hidden" name="intent" value="adjust_usage" />
@@ -1343,7 +1350,7 @@ export default function AdminShopDetail() {
                                 </div>
                                 <div className="billing-input-group">
                                     <label>Set Charged Visitors to:</label>
-                                    <input type="number" name="chargedVisitors" placeholder="0" className="billing-input" required />
+                                    <input type="number" min="0" name="chargedVisitors" placeholder="0" className="billing-input" required />
                                 </div>
                                 <div style={{ marginTop: '32px' }}>
                                     <button type="submit" className="primary-btn" style={{ background: '#1e293b' }} disabled={isSubmitting}>

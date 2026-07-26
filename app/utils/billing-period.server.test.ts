@@ -11,6 +11,9 @@ const prismaMock = vi.hoisted(() => ({
     findUnique: vi.fn(),
     update: vi.fn(),
   },
+  settings: {
+    upsert: vi.fn(),
+  },
 }));
 
 vi.mock("../db.server", () => ({
@@ -23,7 +26,10 @@ vi.mock("../shopify.server", () => ({
   },
 }));
 
-import { getUsagePeriodForShop } from "./billing-period.server";
+import {
+  getUsagePeriodForShop,
+  syncUsagePeriodForShop,
+} from "./billing-period.server";
 
 describe("getUsagePeriodForShop cached usage reconciliation", () => {
   beforeEach(() => {
@@ -38,6 +44,7 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
         blocked: 3,
         popupShown: 3,
         chargedVisitors: 0,
+        manualChargedVisitorsKey: null,
       },
     ]);
     prismaMock.monthlyUsage.create.mockResolvedValue({ id: "usage-row" });
@@ -86,5 +93,51 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
         blocked: 3,
       }),
     });
+  });
+
+  it("preserves an admin-adjusted charged visitor baseline during Shopify sync", async () => {
+    const billingPeriodEnd = new Date("2026-08-27T13:43:04.000Z");
+    const billingPeriodKey =
+      "shopify:gid://shopify/AppSubscription/current:gid://shopify/AppSubscriptionLineItem/current:2026-08-27";
+
+    prismaMock.monthlyUsage.findMany.mockResolvedValue([]);
+    prismaMock.monthlyUsage.findUnique.mockResolvedValue({
+      id: "usage-row",
+      shop: "manual-adjustment.myshopify.com",
+      yearMonth: "2026-08",
+      billingPeriodKey,
+      billingPeriodStart: new Date("2026-07-28T13:43:04.000Z"),
+      billingPeriodEnd,
+      billingSubscriptionId: "gid://shopify/AppSubscription/current",
+      billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/current",
+      totalVisitors: 8_249,
+      redirected: 0,
+      blocked: 0,
+      popupShown: 0,
+      chargedVisitors: 0,
+      manualChargedVisitorsKey: "manual-adjustment-key",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await syncUsagePeriodForShop("manual-adjustment.myshopify.com", "elite", {
+      key: billingPeriodKey,
+      yearMonth: "2026-08",
+      billingPeriodStart: new Date("2026-07-28T13:43:04.000Z"),
+      billingPeriodEnd,
+      billingSubscriptionId: "gid://shopify/AppSubscription/current",
+      billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/current",
+      chargedVisitors: 2_249,
+      source: "shopify",
+    });
+
+    expect(prismaMock.monthlyUsage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          chargedVisitors: 0,
+          manualChargedVisitorsKey: "manual-adjustment-key",
+        }),
+      }),
+    );
   });
 });
