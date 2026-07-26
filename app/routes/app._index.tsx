@@ -600,25 +600,27 @@ function DeferredTrafficChart({
 
   return (
     <div ref={containerRef} className="geo-chart-shell">
-      {shouldLoad ? (
-        <Suspense
-          fallback={
-            <div
-              className="geo-chart-loading"
-              role="status"
-              aria-label="Loading traffic chart"
-            />
-          }
-        >
-          <PolarisTrafficChart points={points} />
-        </Suspense>
-      ) : (
-        <div
-          className="geo-chart-loading"
-          role="status"
-          aria-label="Loading traffic chart"
-        />
-      )}
+      <div className="geo-chart-content">
+        {shouldLoad ? (
+          <Suspense
+            fallback={
+              <div
+                className="geo-chart-loading"
+                role="status"
+                aria-label="Loading traffic chart"
+              />
+            }
+          >
+            <PolarisTrafficChart points={points} />
+          </Suspense>
+        ) : (
+          <div
+            className="geo-chart-loading"
+            role="status"
+            aria-label="Loading traffic chart"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -1292,9 +1294,26 @@ export default function Index() {
           text-align: center;
         }
         .geo-chart-shell {
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
           min-width: 0;
+          height: 100%;
           min-height: 258px;
           padding: 8px 12px 6px;
+          box-sizing: border-box;
+        }
+        .geo-chart-content {
+          width: 100%;
+          height: 250px;
+          min-height: 0;
+          flex: 0 0 250px;
+          transform: translateY(24px);
+        }
+        @media (min-width: 769px) {
+          .geo-chart-content {
+            transform: translateY(32px);
+          }
         }
         .geo-chart-loading {
           width: 100%;
