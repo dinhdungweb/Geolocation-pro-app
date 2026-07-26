@@ -37,7 +37,7 @@ export default function WorldTrafficMap({
       strokeWidth: 0.8,
       strokeOpacity: 1,
       outline: "none",
-      cursor: hasTraffic ? "help" : "default",
+      cursor: hasTraffic ? "pointer" : "default",
       transition: "fill-opacity 120ms ease",
     };
   };
@@ -52,9 +52,17 @@ export default function WorldTrafficMap({
       frame={false}
       regionClassName="geo-map-region"
       styleFunction={styleCountry}
+      hrefFunction={({ countryCode, countryName, countryValue }) =>
+        typeof countryValue === "number" && countryValue > 0
+          ? {
+              href: `/app/logs?country=${countryCode.toUpperCase()}`,
+              "aria-label": `View visitor logs from ${countryName}`,
+            }
+          : undefined
+      }
       tooltipTextFunction={({ countryName, countryValue }) =>
         typeof countryValue === "number"
-          ? `${countryName}: ${countryValue.toLocaleString()} visitors`
+          ? `${countryName}: ${countryValue.toLocaleString()} visitors — click to view logs`
           : `${countryName}: no traffic`
       }
     />

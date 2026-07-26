@@ -1007,6 +1007,10 @@ export default function Index() {
         .geo-map-region:hover {
           fill-opacity: 1 !important;
         }
+        .geo-map-region.worldmap__region--hover {
+          stroke: #0b57c7 !important;
+          stroke-width: 2 !important;
+        }
         .geo-map-footer {
           display: flex;
           align-items: center;
