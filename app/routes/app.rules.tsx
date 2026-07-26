@@ -28,6 +28,8 @@ import {
     Banner,
     Tooltip,
     Pagination,
+    IndexFilters,
+    useSetIndexFiltersMode,
 } from "@shopify/polaris";
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
@@ -560,6 +562,7 @@ export default function RulesPage() {
     const [expandedStateCountries, setExpandedStateCountries] = useState<string[]>([]);
 
     const { smUp } = useBreakpoints();
+    const { mode: indexFiltersMode, setMode: setIndexFiltersMode } = useSetIndexFiltersMode();
     const resourceName = {
         singular: "rule",
         plural: "rules",
@@ -607,6 +610,73 @@ export default function RulesPage() {
         setMatchTypeFilter("all");
         setStatusFilter("all");
     }, []);
+    const ruleFilterDefinitions = [
+        {
+            key: "targetType",
+            label: "Target type",
+            filter: (
+                <ChoiceList
+                    title="Target type"
+                    titleHidden
+                    choices={[
+                        { label: "Country", value: "country" },
+                        { label: "State/Region", value: "state" },
+                        { label: "Shopify Market", value: "market" },
+                    ]}
+                    selected={matchTypeFilter === "all" ? [] : [matchTypeFilter]}
+                    onChange={(selected) => setMatchTypeFilter(selected[0] || "all")}
+                />
+            ),
+            shortcut: true,
+        },
+        {
+            key: "status",
+            label: "Status",
+            filter: (
+                <ChoiceList
+                    title="Status"
+                    titleHidden
+                    choices={[
+                        { label: "Active", value: "active" },
+                        { label: "Inactive", value: "inactive" },
+                        { label: "Has conflict", value: "conflict" },
+                    ]}
+                    selected={statusFilter === "all" ? [] : [statusFilter]}
+                    onChange={(selected) => setStatusFilter(selected[0] || "all")}
+                />
+            ),
+            shortcut: true,
+        },
+    ];
+    const appliedRuleFilters: Array<{
+        key: string;
+        label: string;
+        onRemove: (key: string) => void;
+    }> = [];
+    if (matchTypeFilter !== "all") {
+        const targetTypeLabels: Record<string, string> = {
+            country: "Country",
+            state: "State/Region",
+            market: "Shopify Market",
+        };
+        appliedRuleFilters.push({
+            key: "targetType",
+            label: `Target type: ${targetTypeLabels[matchTypeFilter] || matchTypeFilter}`,
+            onRemove: () => setMatchTypeFilter("all"),
+        });
+    }
+    if (statusFilter !== "all") {
+        const statusLabels: Record<string, string> = {
+            active: "Active",
+            inactive: "Inactive",
+            conflict: "Has conflict",
+        };
+        appliedRuleFilters.push({
+            key: "status",
+            label: `Status: ${statusLabels[statusFilter] || statusFilter}`,
+            onRemove: () => setStatusFilter("all"),
+        });
+    }
 
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(paginatedRules);
@@ -1331,49 +1401,31 @@ export default function RulesPage() {
                                 emptyStateMarkup
                             ) : (
                                 <>
-                                    <div style={{
-                                        display: "grid",
-                                        gridTemplateColumns: smUp ? "minmax(280px, 1fr) 180px 180px" : "1fr",
-                                        gap: "12px",
-                                        padding: "16px",
-                                    }}>
-                                        <TextField
-                                            label="Search rules"
-                                            labelHidden
-                                            value={ruleQuery}
-                                            onChange={setRuleQuery}
-                                            placeholder="Search name, target, URL..."
-                                            prefix={<Icon source={SearchIcon} tone="subdued" />}
-                                            clearButton
-                                            onClearButtonClick={() => setRuleQuery("")}
-                                            autoComplete="off"
-                                        />
-                                        <Select
-                                            label="Target type"
-                                            labelHidden
-                                            value={matchTypeFilter}
-                                            onChange={setMatchTypeFilter}
-                                            options={[
-                                                { label: "All target types", value: "all" },
-                                                { label: "Country", value: "country" },
-                                                { label: "State/Region", value: "state" },
-                                                { label: "Shopify Market", value: "market" },
-                                            ]}
-                                        />
-                                        <Select
-                                            label="Rule status"
-                                            labelHidden
-                                            value={statusFilter}
-                                            onChange={setStatusFilter}
-                                            options={[
-                                                { label: "All statuses", value: "all" },
-                                                { label: "Active", value: "active" },
-                                                { label: "Inactive", value: "inactive" },
-                                                { label: "Has conflict", value: "conflict" },
-                                            ]}
-                                        />
-                                    </div>
-                                    <Divider />
+                                    <IndexFilters
+                                        tabs={[
+                                            {
+                                                content: "All",
+                                                id: "all-rules",
+                                                isLocked: true,
+                                            },
+                                        ]}
+                                        selected={0}
+                                        onSelect={() => undefined}
+                                        queryValue={ruleQuery}
+                                        queryPlaceholder="Search rules"
+                                        onQueryChange={setRuleQuery}
+                                        onQueryClear={() => setRuleQuery("")}
+                                        filters={ruleFilterDefinitions}
+                                        appliedFilters={appliedRuleFilters}
+                                        onClearAll={clearRuleFilters}
+                                        mode={indexFiltersMode}
+                                        setMode={setIndexFiltersMode}
+                                        canCreateNewView={false}
+                                        disableKeyboardShortcuts
+                                        disableStickyMode
+                                        filteringAccessibilityLabel="Search and filter"
+                                        filteringAccessibilityTooltip="Search and filter rules"
+                                    />
                                     {filteredRules.length === 0 ? (
                                         <div style={{ padding: "40px 20px", textAlign: "center" }}>
                                             <BlockStack gap="300" inlineAlign="center">
