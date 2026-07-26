@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
-import { useLoaderData, useRevalidator } from "react-router";
+import { Await, useLoaderData, useRevalidator } from "react-router";
 import {
   Page,
   Card,
@@ -34,7 +34,6 @@ import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
-import { getShopIdentity } from "../utils/shop-identity.server";
 import { getThemeAppEmbedStatus } from "../utils/theme-app-embed.server";
 
 // Helper to get country name (simplified version of the one in app.rules.tsx)
@@ -51,6 +50,84 @@ interface VisitsDataItem {
   popup: number;
   redirected: string;
   blocked: number;
+}
+
+async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
+  const [countryStats, ruleStats] = await Promise.all([
+    prisma.analyticsCountry.groupBy({
+      by: ["countryCode"],
+      where: {
+        shop,
+        date: { gte: thirtyDaysAgo },
+      },
+      _sum: {
+        visitors: true,
+        popupShown: true,
+        redirected: true,
+        blocked: true,
+      },
+      orderBy: {
+        _sum: {
+          visitors: "desc",
+        },
+      },
+    }),
+    prisma.analyticsRule.groupBy({
+      by: ["ruleName", "ruleId"],
+      where: {
+        shop,
+        date: { gte: thirtyDaysAgo },
+      },
+      _sum: {
+        seen: true,
+        clickedYes: true,
+        clickedNo: true,
+        dismissed: true,
+        autoRedirected: true,
+      },
+    }),
+  ]);
+
+  const blockStats = [...countryStats]
+    .filter((item) => (item._sum.blocked || 0) > 0)
+    .sort((left, right) => (right._sum.blocked || 0) - (left._sum.blocked || 0));
+  const visitsData: VisitsDataItem[] = countryStats.map((stat) => ({
+    id: stat.countryCode,
+    country: COUNTRY_MAP[stat.countryCode] || stat.countryCode,
+    code: stat.countryCode,
+    visitors: (stat._sum.visitors || 0).toLocaleString(),
+    popup: stat._sum.popupShown || 0,
+    redirected: (stat._sum.redirected || 0).toLocaleString(),
+    blocked: stat._sum.blocked || 0,
+  }));
+  const popupsData = ruleStats.map((stat) => ({
+    id: stat.ruleId,
+    rule: stat.ruleName || "Unknown Rule",
+    seen: stat._sum.seen || 0,
+    clickedYes: stat._sum.clickedYes || 0,
+    clickedNo: stat._sum.clickedNo || 0,
+    dismissed: stat._sum.dismissed || 0,
+  }));
+  const autoRedirectsData = ruleStats
+    .map((stat) => ({
+      id: stat.ruleId,
+      rule: stat.ruleName || "Unknown Rule",
+      autoRedirected: stat._sum.autoRedirected || 0,
+    }))
+    .filter((item) => item.autoRedirected > 0);
+  const blocksData = blockStats.map((stat) => ({
+    id: stat.countryCode,
+    block: COUNTRY_MAP[stat.countryCode] || stat.countryCode,
+    blocked: stat._sum.blocked || 0,
+  }));
+
+  return {
+    totalCountries: countryStats.length,
+    visitsData,
+    popupsData,
+    autoRedirectsData,
+    blocksData,
+  };
 }
 
 const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: string }> = {
@@ -98,48 +175,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderBy: { timestamp: "desc" },
       select: { id: true },
     }),
-    prisma.analyticsCountry.groupBy({
-      by: ['countryCode'],
-      where: {
-        shop,
-        date: { gte: thirtyDaysAgo }
-      },
-      _sum: {
-        visitors: true,
-        popupShown: true,
-        redirected: true,
-        blocked: true,
-      },
-      orderBy: {
-        _sum: {
-          visitors: "desc",
-        },
-      },
-    }),
-    prisma.analyticsRule.groupBy({
-      by: ['ruleName', 'ruleId'],
-      where: {
-        shop,
-        date: { gte: thirtyDaysAgo }
-      },
-      _sum: {
-        seen: true,
-        clickedYes: true,
-        clickedNo: true,
-        dismissed: true,
-        autoRedirected: true,
-      }
-    }),
-    getShopIdentity({
-      shop,
-      accessToken,
-    }),
     getThemeAppEmbedStatus({
       shop,
       accessToken,
       scopeString: session.scope,
     }),
   ]);
+  const analytics = loadDashboardAnalytics(shop, thirtyDaysAgo);
 
   const settingsAndBillingPromise = Promise.all([
     prisma.settings.upsert({
@@ -184,9 +226,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       rulesCount,
       activeRulesCount,
       latestVisitorLog,
-      countryStats,
-      ruleStats,
-      shopIdentity,
       appEmbedStatus,
     ],
     {
@@ -233,50 +272,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   const hasVisitorLogs = Boolean(latestVisitorLog);
-  const totalCountries = Array.isArray(countryStats) ? countryStats.length : 0;
-  const totalRedirected = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.redirected || 0), 0) : 0;
-  const totalBlocked = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.blocked || 0), 0) : 0;
-  const blockStats = Array.isArray(countryStats)
-    ? [...countryStats]
-      .filter((item: any) => (item._sum.blocked || 0) > 0)
-      .sort((left: any, right: any) => (right._sum.blocked || 0) - (left._sum.blocked || 0))
-    : [];
-
-  // Process visits data
-  const visitsData: VisitsDataItem[] = Array.isArray(countryStats) ? (countryStats as any[]).map((stat: any) => ({
-    id: stat.countryCode,
-    country: COUNTRY_MAP[stat.countryCode] || stat.countryCode,
-    code: stat.countryCode,
-    visitors: (stat._sum.visitors || 0).toLocaleString(),
-    popup: stat._sum.popupShown || 0,
-    redirected: (stat._sum.redirected || 0).toLocaleString(),
-    blocked: stat._sum.blocked || 0,
-  })) : [];
-
-  // Process Popups Data (for Banners and Popups table)
-  const popupsData = Array.isArray(ruleStats) ? ruleStats.map((stat: any) => ({
-    id: stat.ruleId,
-    rule: stat.ruleName || 'Unknown Rule',
-    seen: stat._sum.seen || 0,
-    clickedYes: stat._sum.clickedYes || 0,
-    clickedNo: stat._sum.clickedNo || 0,
-    dismissed: stat._sum.dismissed || 0,
-  })) : [];
-
-  // Process Auto Redirects Data (for Instant Redirects table)
-  const autoRedirectsData = Array.isArray(ruleStats) ? ruleStats.map((stat: any) => ({
-    id: stat.ruleId,
-    rule: stat.ruleName || 'Unknown Rule',
-    autoRedirected: stat._sum.autoRedirected || 0,
-  })).filter((item: any) => item.autoRedirected > 0) : [];
-
-  // Process Blocks Data
-  const blocksData = Array.isArray(blockStats) ? blockStats.map((stat: any) => ({
-    id: stat.countryCode,
-    block: COUNTRY_MAP[stat.countryCode] || stat.countryCode,
-    blocked: stat._sum.blocked || 0
-  })) : [];
-
   return responseData({
     shop,
     onboardingInstallAt: settings.onboardingInstallAt.toISOString(),
@@ -298,17 +293,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       hasVisitorLogs,
       visitorLogs: hasVisitorLogs ? 1 : 0,
       mode: settings?.mode || "disabled",
-      totalRedirected: totalRedirected.toLocaleString(),
-      totalBlocked: totalBlocked.toLocaleString(),
       isEnabled: settings?.isEnabled !== false,
     },
-    totalCountries,
-    shopIdentity,
     appEmbedStatus,
-    visitsData,
-    popupsData,
-    autoRedirectsData,
-    blocksData,
+    analytics,
   }, {
     headers: {
       "Server-Timing": `geo-home;dur=${(performance.now() - loaderStartedAt).toFixed(1)}`,
@@ -318,8 +306,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 
 
+function DashboardAnalyticsPending() {
+  return (
+    <Card>
+      <BlockStack gap="200">
+        <Text as="h3" variant="headingMd">Loading traffic analytics…</Text>
+        <Text as="p" variant="bodySm" tone="subdued">
+          Your app status and usage are ready. The 30-day reports are loading separately.
+        </Text>
+      </BlockStack>
+    </Card>
+  );
+}
+
 export default function Index() {
-  const { shop, onboardingInstallAt, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, shopIdentity, appEmbedStatus, visitsData, popupsData, autoRedirectsData, blocksData, totalCountries } = useLoaderData<typeof loader>();
+  const { shop, onboardingInstallAt, currentPlan, planDisplayName, planLimit, isUnlimitedUsage, currentUsage, usagePeriod, stats, appEmbedStatus, analytics } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const [setupDismissed, setSetupDismissed] = useState<boolean | null>(null);
   const [setupCollapsed, setSetupCollapsed] = useState(false);
@@ -457,9 +458,6 @@ export default function Index() {
   ];
   const activeSetupStep = activeSetupStepId || setupSteps.find((step) => !step.completed)?.id || "logs";
   const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
-  const totalBlockedActions = blocksData.reduce((sum: number, item: any) => sum + Number(item.blocked || 0), 0);
-  const totalPopupSeen = popupsData.reduce((sum: number, item: any) => sum + Number(item.seen || 0), 0);
-  const totalAutoRedirected = autoRedirectsData.reduce((sum: number, item: any) => sum + Number(item.autoRedirected || 0), 0);
   const isAppActive = stats.isEnabled && stats.mode !== "disabled";
   const remainingVisitors = isUnlimitedPlan ? null : Math.max(0, planLimit - currentUsage);
 
@@ -492,7 +490,7 @@ export default function Index() {
           .dashboard-page > .Polaris-BlockStack > * {
             order: 4;
           }
-          .dashboard-page > .Polaris-BlockStack > .dashboard-welcome {
+          .dashboard-page > .Polaris-BlockStack > .dashboard-shell {
             order: 1;
           }
           .dashboard-page > .Polaris-BlockStack > :has(.dashboard-app-embed-status) {
@@ -948,18 +946,7 @@ export default function Index() {
       <div className="dashboard-page" style={{ paddingBottom: '32px' }}>
       <BlockStack gap="500">
 
-        <div className="dashboard-welcome">
-          <BlockStack gap="100">
-            <Text as="h1" variant="headingLg">
-              Welcome, {shopIdentity.ownerName}
-            </Text>
-            <Text as="p" variant="bodyMd" tone="subdued">
-              {shopIdentity.shopName} dashboard overview
-            </Text>
-          </BlockStack>
-        </div>
-
-        {setupDismissed === true && <Card padding="0">
+        {(setupDismissed === true || completedSetupSteps === setupSteps.length) && <Card padding="0">
           <div className="dashboard-app-embed-status">
             <Text as="p" variant="bodyMd">
               <strong>Geo: Redirect</strong>{" "}
@@ -975,7 +962,7 @@ export default function Index() {
           </div>
         </Card>}
 
-        {setupDismissed === false && (
+        {setupDismissed === false && completedSetupSteps < setupSteps.length && (
           <Card padding="0">
             <div className="setup-guide-card">
               <BlockStack gap="400">
@@ -1166,6 +1153,22 @@ export default function Index() {
 
           </div>
 
+          <Suspense fallback={<DashboardAnalyticsPending />}>
+          <Await
+            resolve={analytics}
+            errorElement={
+              <Banner tone="warning">
+                Traffic analytics could not be loaded. App status and usage are still available.
+              </Banner>
+            }
+          >
+          {({ visitsData, popupsData, autoRedirectsData, blocksData, totalCountries }) => {
+            const totalBlockedActions = blocksData.reduce((sum, item) => sum + Number(item.blocked || 0), 0);
+            const totalPopupSeen = popupsData.reduce((sum, item) => sum + Number(item.seen || 0), 0);
+            const totalAutoRedirected = autoRedirectsData.reduce((sum, item) => sum + Number(item.autoRedirected || 0), 0);
+
+            return (
+            <>
           <div className="dashboard-content-grid">
             <div className="dashboard-card-frame">
               <Card padding="0">
@@ -1384,6 +1387,11 @@ export default function Index() {
               </div>
             </div>
           </Card>
+            </>
+            );
+          }}
+          </Await>
+          </Suspense>
         </div>
         <div aria-hidden="true" style={{ height: '8px' }} />
       </BlockStack>

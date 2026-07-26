@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -8,6 +8,7 @@ import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { EmbeddedAppProviders } from "../components/embedded-app-providers";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
+import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -967,6 +968,7 @@ export default function App() {
   const { apiKey, shop } = useLoaderData<typeof loader>();
   const location = useLocation();
   const navigation = useNavigation();
+  const routeNavigationStartedAt = useRef<number | null>(null);
   const isNavigatingToAppRoute =
     navigation.state !== "idle" &&
     navigation.location?.pathname.startsWith("/app") &&
@@ -978,6 +980,24 @@ export default function App() {
   useEffect(() => {
     installShopifyInvalidSessionFetchRetry();
   }, []);
+
+  useEffect(() => observeWebVitals(() => window.location.pathname), []);
+
+  useEffect(() => {
+    if (navigation.state !== "idle") {
+      routeNavigationStartedAt.current ??= performance.now();
+      return;
+    }
+
+    if (routeNavigationStartedAt.current !== null) {
+      reportWebVital({
+        name: "ROUTE",
+        path: location.pathname,
+        value: performance.now() - routeNavigationStartedAt.current,
+      });
+      routeNavigationStartedAt.current = null;
+    }
+  }, [location.pathname, navigation.state]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

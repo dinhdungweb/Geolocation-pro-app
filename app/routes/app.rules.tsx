@@ -27,6 +27,7 @@ import {
     Divider,
     Banner,
     Tooltip,
+    Pagination,
 } from "@shopify/polaris";
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
@@ -40,6 +41,7 @@ import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
+import { placeRuleIds } from "../utils/rule-placement";
 
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -77,6 +79,7 @@ const REGIONS: Record<string, string[]> = {
     "Other": ["AQ", "BV", "CC", "CX", "HM", "IO", "TF", "UM"]
 };
 const ALL_REGION_COUNTRY_CODES = Array.from(new Set(Object.values(REGIONS).flat()));
+const RULES_PER_PAGE = 20;
 
 interface RedirectRule {
     id: string;
@@ -133,6 +136,37 @@ function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConfli
             return merged;
         },
         { total: 0, byRuleId: {} as Record<string, any[]> },
+    );
+}
+
+async function applyRulePlacement({
+    shop,
+    matchType,
+    ruleId,
+    placement,
+}: {
+    shop: string;
+    matchType: string;
+    ruleId: string;
+    placement: string;
+}) {
+    const orderedRules = await prisma.redirectRule.findMany({
+        where: { shop, matchType },
+        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+        select: { id: true },
+    });
+    const reorderedIds = placeRuleIds(
+        orderedRules.map((rule) => rule.id),
+        ruleId,
+        placement,
+    );
+    await prisma.$transaction(
+        reorderedIds.map((id, index) =>
+            prisma.redirectRule.update({
+                where: { id, shop },
+                data: { priority: (reorderedIds.length - index) * 10 },
+            }),
+        ),
     );
 }
 
@@ -209,7 +243,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (!validateUrl(targetUrl)) {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
-            const priority = parseInt(formData.get("priority") as string) || 0;
+            const priorityPlacement = (formData.get("priorityPlacement") as string) || "first";
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
             const daysOfWeek = formData.get("daysOfWeek") as string;
@@ -233,7 +267,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return responseData({ success: false, message: "Select at least one state/region" }, { status: 400 });
             }
  
-            await prisma.redirectRule.create({
+            const createdRule = await prisma.redirectRule.create({
                 data: {
                     shop,
                     name,
@@ -241,7 +275,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     marketHandles: matchType === "market" ? marketHandles : "",
                     marketCountryCodes: matchType === "market" ? marketCountryCodes : "",
                     targetUrl,
-                    priority,
+                    priority: 0,
                     isActive: true,
                     ruleType,
                     redirectMode,
@@ -255,6 +289,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pageTargetingType,
                     pagePaths,
                 },
+            });
+            await applyRulePlacement({
+                shop,
+                matchType,
+                ruleId: createdRule.id,
+                placement: priorityPlacement,
             });
             invalidateStorefrontConfigCache(shop);
             return responseData({ success: true, message: "Rule created successfully" });
@@ -272,7 +312,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (!validateUrl(targetUrl)) {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
-            const priority = parseInt(formData.get("priority") as string) || 0;
+            const priorityPlacement = (formData.get("priorityPlacement") as string) || "first";
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
             const daysOfWeek = formData.get("daysOfWeek") as string;
@@ -306,7 +346,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     matchType,
                     stateCodes: matchType === "state" ? stateCodes : "",
                     targetUrl,
-                    priority,
                     ruleType,
                     redirectMode,
                     scheduleEnabled,
@@ -317,6 +356,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     pageTargetingType,
                     pagePaths,
                 },
+            });
+            await applyRulePlacement({
+                shop,
+                matchType,
+                ruleId: id,
+                placement: priorityPlacement,
             });
             invalidateStorefrontConfigCache(shop);
             return responseData({ success: true, message: "Rule updated successfully" });
@@ -455,6 +500,7 @@ export default function RulesPage() {
     const [ruleQuery, setRuleQuery] = useState("");
     const [matchTypeFilter, setMatchTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -463,7 +509,7 @@ export default function RulesPage() {
     const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
     const [selectedStates, setSelectedStates] = useState<string[]>([]);
     const [formTargetUrl, setFormTargetUrl] = useState("");
-    const [formPriority, setFormPriority] = useState("0");
+    const [priorityPlacement, setPriorityPlacement] = useState("first");
     const [formRuleType, setFormRuleType] = useState("redirect");
     const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
     // Scheduling State
@@ -486,6 +532,25 @@ export default function RulesPage() {
     const getStatesForCountry =
         stateData?.getStatesForCountry ||
         ((_countryCode: string) => [] as string[]);
+
+    useEffect(() => {
+        if (!modalOpen) return;
+
+        const previousOverflow = document.body.style.overflow;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setModalOpen(false);
+                setEditingRule(null);
+            }
+        };
+        document.body.style.overflow = "hidden";
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [modalOpen]);
 
     useEffect(() => {
         const needsStateData =
@@ -579,6 +644,17 @@ export default function RulesPage() {
             ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
         });
     }, [conflictSummary?.byRuleId, matchTypeFilter, ruleQuery, rules, statusFilter]);
+    const totalPages = Math.max(1, Math.ceil(filteredRules.length / RULES_PER_PAGE));
+    const paginatedRules = useMemo(
+        () => filteredRules.slice((currentPage - 1) * RULES_PER_PAGE, currentPage * RULES_PER_PAGE),
+        [currentPage, filteredRules],
+    );
+    useEffect(() => {
+        setCurrentPage((page) => Math.min(page, totalPages));
+    }, [totalPages]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [matchTypeFilter, ruleQuery, statusFilter]);
     const hasRuleFilters =
         ruleQuery.trim().length > 0 ||
         matchTypeFilter !== "all" ||
@@ -590,7 +666,7 @@ export default function RulesPage() {
     }, []);
 
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
-        useIndexResourceState(filteredRules);
+        useIndexResourceState(paginatedRules);
     const conflictsByRuleId = conflictSummary?.byRuleId || {};
     const conflictTotal = conflictSummary?.total || 0;
 
@@ -651,7 +727,13 @@ export default function RulesPage() {
             setSelectedMarkets((editingRule.marketHandles || "").split(",").map(c => c.trim()).filter(Boolean));
             setSelectedStates((editingRule.stateCodes || "").split(",").map(c => c.trim()).filter(Boolean));
             setFormTargetUrl(editingRule.targetUrl);
-            setFormPriority(editingRule.priority.toString());
+            const peers = rules
+                .filter((rule) => rule.matchType === editingRule.matchType)
+                .sort((left, right) => right.priority - left.priority);
+            const currentIndex = peers.findIndex((rule) => rule.id === editingRule.id);
+            setPriorityPlacement(
+                currentIndex > 0 ? `after:${peers[currentIndex - 1].id}` : "first",
+            );
             setFormRuleType(editingRule.ruleType || "redirect");
             setFormRedirectMode(editingRule.redirectMode || "popup");
             setScheduleEnabled(editingRule.scheduleEnabled || false);
@@ -670,7 +752,7 @@ export default function RulesPage() {
             setSelectedMarkets([]);
             setSelectedStates([]);
             setFormTargetUrl("");
-            setFormPriority("0");
+            setPriorityPlacement("first");
             setFormRuleType("redirect");
             setFormRedirectMode("auto_redirect");
             setScheduleEnabled(false);
@@ -685,7 +767,7 @@ export default function RulesPage() {
         }
         setInputValue("");
         setStateInputValue("");
-    }, [editingRule, modalOpen]);
+    }, [editingRule, modalOpen, rules]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
         setEditingRule(rule || null);
@@ -716,7 +798,7 @@ export default function RulesPage() {
                 : editingRule?.marketCountryCodes || "",
         );
         formData.append("targetUrl", formTargetUrl);
-        formData.append("priority", formPriority);
+        formData.append("priorityPlacement", priorityPlacement);
         formData.append("ruleType", formRuleType);
         formData.append("redirectMode", formRedirectMode);
         formData.append("scheduleEnabled", scheduleEnabled.toString());
@@ -729,7 +811,7 @@ export default function RulesPage() {
 
         formFetcher.submit(formData, { method: "POST" });
     }, [
-        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, marketCountryCodesByHandle, formTargetUrl, formPriority,
+        editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, marketCountryCodesByHandle, formTargetUrl, priorityPlacement,
         formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
         pageTargetingType, pagePaths,
         formFetcher
@@ -911,8 +993,30 @@ export default function RulesPage() {
     const selectedTargetCount = formMatchType === "market" ? selectedMarkets.length : (formMatchType === "state" ? selectedStates.length : selectedCountries.length);
     const isPaidOnlyRule = (rule: any) =>
         rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
+    const priorityPeers = rules
+        .filter((rule) => rule.matchType === formMatchType && rule.id !== editingRule?.id)
+        .sort((left, right) => right.priority - left.priority);
+    const priorityOptions = [
+        { label: "Run before all other rules", value: "first" },
+        ...priorityPeers.map((rule) => ({
+            label: `Run after “${rule.name}”`,
+            value: `after:${rule.id}`,
+        })),
+        ...(priorityPeers.length > 0 ? [{ label: "Run last", value: "last" }] : []),
+    ];
+    useEffect(() => {
+        if (priorityOptions.some((option) => option.value === priorityPlacement)) return;
+        setPriorityPlacement("first");
+    }, [priorityOptions, priorityPlacement]);
+    const getRuleOrderLabel = (rule: RedirectRule) => {
+        const peers = rules
+            .filter((candidate) => candidate.matchType === rule.matchType)
+            .sort((left, right) => right.priority - left.priority);
+        const index = peers.findIndex((candidate) => candidate.id === rule.id);
+        return index <= 0 ? "Runs first" : `After ${peers[index - 1].name}`;
+    };
 
-    const rowMarkup = filteredRules.map((rule: any, index: number) => {
+    const rowMarkup = paginatedRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
         const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
         const conflictTooltip = ruleConflicts
@@ -1002,7 +1106,9 @@ export default function RulesPage() {
                     )}
                 </div>
             </IndexTable.Cell>
-            <IndexTable.Cell>{rule.priority}</IndexTable.Cell>
+            <IndexTable.Cell>
+                <Text as="span" variant="bodySm">{getRuleOrderLabel(rule)}</Text>
+            </IndexTable.Cell>
             <IndexTable.Cell>
                 <div
                     onClick={(e) => e.stopPropagation()}
@@ -1137,10 +1243,67 @@ export default function RulesPage() {
                     .rules-table-wrap .Polaris-IndexTable__TableCell--first {
                         box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
                     }
+                    .rule-drawer-backdrop {
+                        position: fixed;
+                        inset: 0;
+                        z-index: 519;
+                        background: rgba(17, 24, 39, 0.46);
+                    }
+                    .rule-drawer {
+                        position: fixed;
+                        top: 0;
+                        right: 0;
+                        bottom: 0;
+                        z-index: 520;
+                        display: grid;
+                        grid-template-rows: auto minmax(0, 1fr) auto;
+                        width: min(720px, 100vw);
+                        background: var(--p-color-bg-surface, #ffffff);
+                        box-shadow: -12px 0 36px rgba(0, 0, 0, 0.18);
+                    }
+                    .rule-drawer-header,
+                    .rule-drawer-footer {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 16px;
+                        padding: 16px 20px;
+                        border-color: var(--p-color-border-secondary, #ebebeb);
+                    }
+                    .rule-drawer-header {
+                        border-bottom-style: solid;
+                        border-bottom-width: 1px;
+                    }
+                    .rule-drawer-footer {
+                        justify-content: flex-end;
+                        border-top-style: solid;
+                        border-top-width: 1px;
+                    }
+                    .rule-drawer-body {
+                        overflow-y: auto;
+                        padding: 20px;
+                    }
+                    .rule-drawer-section {
+                        border: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        border-radius: 10px;
+                        background: var(--p-color-bg-surface, #ffffff);
+                    }
+                    .rule-drawer-section > summary {
+                        cursor: pointer;
+                        padding: 14px 16px;
+                        font-weight: 650;
+                        list-style-position: inside;
+                    }
+                    .rule-drawer-section-content {
+                        padding: 4px 16px 16px;
+                    }
                     @media (max-width: 47.9975em) {
                         .rules-table-wrap .Polaris-IndexTable,
                         .rules-table-wrap .Polaris-IndexTable__Table {
                             min-width: 880px;
+                        }
+                        .rule-drawer {
+                            width: 100vw;
                         }
                     }
                 `}
@@ -1309,7 +1472,7 @@ export default function RulesPage() {
                                             <IndexTable
                                                 condensed={false}
                                                 resourceName={resourceName}
-                                                itemCount={filteredRules.length}
+                                                itemCount={paginatedRules.length}
                                                 selectedItemsCount={
                                                     allResourcesSelected ? "All" : selectedResources.length
                                                 }
@@ -1321,13 +1484,24 @@ export default function RulesPage() {
                                                     { title: "Target URL" },
                                                     { title: "Status" },
                                                     { title: "Method" },
-                                                    { title: "Priority" },
+                                                    { title: "Runs" },
                                                     { title: "Actions", alignment: "end" },
                                                 ]}
                                                 promotedBulkActions={promotedBulkActions}
                                             >
                                                 {rowMarkup}
                                             </IndexTable>
+                                            {totalPages > 1 && (
+                                                <div style={{ padding: "16px", display: "flex", justifyContent: "center" }}>
+                                                    <Pagination
+                                                        hasPrevious={currentPage > 1}
+                                                        onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                                                        hasNext={currentPage < totalPages}
+                                                        onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                                                        label={`Page ${currentPage} of ${totalPages}`}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </>
@@ -1338,25 +1512,23 @@ export default function RulesPage() {
             </BlockStack>
             </div>
 
-            {/* Add/Edit Modal */}
-            <Modal
-                open={modalOpen}
-                onClose={handleCloseModal}
-                title={editingRule ? "Edit Rule" : "Add New Rule"}
-                primaryAction={{
-                    content: editingRule ? "Save" : "Create",
-                    onAction: handleSubmit,
-                    loading: formFetcher.state !== "idle",
-                    disabled: formFetcher.state !== "idle" || selectedTargetCount === 0 || !formName || (formRuleType === "redirect" && !formTargetUrl),
-                }}
-                secondaryActions={[
-                    {
-                        content: "Cancel",
-                        onAction: handleCloseModal,
-                    },
-                ]}
-            >
-                <Modal.Section>
+            {/* Add/Edit drawer */}
+            {modalOpen && (
+                <>
+                <div className="rule-drawer-backdrop" onClick={handleCloseModal} aria-hidden="true" />
+                <aside
+                    className="rule-drawer"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="rule-drawer-title"
+                >
+                <div className="rule-drawer-header">
+                    <Text id="rule-drawer-title" as="h2" variant="headingLg">
+                        {editingRule ? "Edit Rule" : "Add New Rule"}
+                    </Text>
+                    <Button onClick={handleCloseModal}>Close</Button>
+                </div>
+                <div className="rule-drawer-body">
                     <BlockStack gap="400">
                     {formFetcher.state === "idle" && formFetcher.data?.success === false && (
                         <Banner tone="critical">{formFetcher.data.message}</Banner>
@@ -1781,24 +1953,26 @@ export default function RulesPage() {
                                 />
                             </BlockStack>
                         )}
-                        <TextField
-                            label="Priority"
-                            type="number"
-                            value={formPriority}
-                            onChange={setFormPriority}
-                            helpText="Higher priority rules are checked first"
-                            autoComplete="off"
+                        <Select
+                            label="Rule order"
+                            value={priorityPlacement}
+                            onChange={setPriorityPlacement}
+                            options={priorityOptions}
+                            helpText="Rules with the same target type are evaluated from top to bottom."
                         />
 
-                        <Text as="h3" variant="headingSm">Scheduling (Optional)</Text>
-                        <Checkbox
-                            label="Enable Scheduling"
-                            checked={scheduleEnabled}
-                            onChange={setScheduleEnabled}
-                            helpText="Limit this rule to specific days and times"
-                        />
+                        <details className="rule-drawer-section">
+                        <summary>Schedule (optional){scheduleEnabled ? " — enabled" : ""}</summary>
+                        <div className="rule-drawer-section-content">
+                        <BlockStack gap="400">
+                            <Checkbox
+                                label="Enable Scheduling"
+                                checked={scheduleEnabled}
+                                onChange={setScheduleEnabled}
+                                helpText="Limit this rule to specific days and times"
+                            />
 
-                        {scheduleEnabled && (
+                            {scheduleEnabled && (
                             <BlockStack gap="400">
                                 <FormLayout.Group>
                                     <TextField
@@ -1848,11 +2022,17 @@ export default function RulesPage() {
                                     onChange={setActiveDays}
                                 />
                             </BlockStack>
-                        )}
+                            )}
+                        </BlockStack>
+                        </div>
+                        </details>
 
-                        <Divider />
-                        <BlockStack gap="200">
-                            <Text as="h3" variant="headingSm">Page Targeting</Text>
+                        <details className="rule-drawer-section">
+                        <summary>
+                            Page targeting{pageTargetingType[0] === "all" ? " — all pages" : " — customized"}
+                        </summary>
+                        <div className="rule-drawer-section-content">
+                        <BlockStack gap="300">
                             <BlockStack gap="200">
                                 <Text as="p" variant="bodyMd">Apply to</Text>
                                 <RadioButton
@@ -1924,10 +2104,25 @@ export default function RulesPage() {
                                 />
                             )}
                         </BlockStack>
+                        </div>
+                        </details>
                     </FormLayout>
                     </BlockStack>
-                </Modal.Section>
-            </Modal>
+                </div>
+                <div className="rule-drawer-footer">
+                    <Button onClick={handleCloseModal}>Cancel</Button>
+                    <Button
+                        variant="primary"
+                        onClick={handleSubmit}
+                        loading={formFetcher.state !== "idle"}
+                        disabled={formFetcher.state !== "idle" || selectedTargetCount === 0 || !formName || (formRuleType === "redirect" && !formTargetUrl)}
+                    >
+                        {editingRule ? "Save" : "Create"}
+                    </Button>
+                </div>
+                </aside>
+                </>
+            )}
 
             {/* Import Modal */}
             <Modal
