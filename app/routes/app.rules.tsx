@@ -1111,6 +1111,25 @@ export default function RulesPage() {
                     .country-selector-scroll::-webkit-scrollbar-thumb:hover {
                         background: #6d7175;
                     }
+                    .conflict-details-summary {
+                        align-items: center;
+                        cursor: pointer;
+                        display: inline-flex;
+                        font-weight: 600;
+                        gap: 6px;
+                        list-style: none;
+                    }
+                    .conflict-details-summary::-webkit-details-marker {
+                        display: none;
+                    }
+                    .conflict-details-icon {
+                        display: inline-flex;
+                        transition: transform 160ms ease;
+                        width: 20px;
+                    }
+                    .conflict-details:not([open]) .conflict-details-icon {
+                        transform: rotate(-90deg);
+                    }
                     .rules-table-wrap {
                         width: 100%;
                         max-width: 100%;
@@ -1222,8 +1241,13 @@ export default function RulesPage() {
                     <Banner tone="warning" title={`${conflictTotal} potential rule conflict${conflictTotal === 1 ? "" : "s"} found`}>
                         <BlockStack gap="200">
                             <p>Active rules with overlapping countries or markets, pages, schedules, and the same priority can conflict. Open the marked rules and adjust priority or targeting.</p>
-                            <details>
-                            <summary style={{ cursor: "pointer", fontWeight: 600 }}>View conflict details</summary>
+                            <details className="conflict-details">
+                            <summary className="conflict-details-summary">
+                                <span className="conflict-details-icon" aria-hidden="true">
+                                    <Icon source={ChevronDownIcon} tone="subdued" />
+                                </span>
+                                <span>View conflict details</span>
+                            </summary>
                             <div style={{ marginTop: "12px" }}>
                             <Divider />
                             <ul style={{ paddingLeft: '20px', margin: '12px 0 0', listStyleType: 'disc' }}>
