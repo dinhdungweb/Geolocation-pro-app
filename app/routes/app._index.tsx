@@ -3,7 +3,6 @@ import type { FormEvent, ReactNode } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import {
   Await,
-  Link,
   data as responseData,
   useLoaderData,
   useNavigate,
@@ -12,9 +11,11 @@ import {
 import {
   Badge,
   Banner,
+  BlockStack,
   Button,
   Card,
   Icon,
+  InlineStack,
   Page,
   ProgressBar,
   Text,
@@ -22,13 +23,15 @@ import {
 import {
   ArrowRightIcon,
   ChartLineIcon,
-  CheckCircleIcon,
+  ChatIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   GlobeIcon,
   PersonIcon,
   PlusIcon,
   QuestionCircleIcon,
   SearchIcon,
-  SettingsIcon,
   ShieldCheckMarkIcon,
 } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
@@ -583,7 +586,7 @@ function DashboardPending() {
   return (
     <div className="geo-dashboard-pending" aria-label="Loading dashboard analytics">
       <div className="geo-metrics-grid">
-        {Array.from({ length: 4 }).map((_, index) => (
+        {Array.from({ length: 5 }).map((_, index) => (
           <div key={index} className="geo-skeleton geo-skeleton-metric" />
         ))}
       </div>
@@ -612,6 +615,10 @@ export default function Index() {
   const revalidator = useRevalidator();
   const lastPermissionRefreshAt = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedSetupStepIds, setExpandedSetupStepIds] = useState<
+    Array<"embed" | "rule" | "logs">
+  >([]);
+  const [setupDismissed, setSetupDismissed] = useState(false);
 
   useEffect(() => {
     if (appEmbedStatus.state !== "missing_scope") return;
@@ -684,39 +691,74 @@ export default function Index() {
     navigate(query ? `/app/logs?q=${encodeURIComponent(query)}` : "/app/logs");
   };
 
-  const quickSteps = [
+  const setupSteps: Array<{
+    id: "embed" | "rule" | "logs";
+    title: string;
+    completed: boolean;
+    status: string;
+    statusTone: "success" | "warning" | "attention";
+  }> = [
     {
-      label: "Enable the storefront app embed",
-      detail: "Allow rules to run on your live theme",
+      id: "embed",
+      title: "Enable app embed",
       completed: appEmbedStatus.state === "enabled",
-      url: "",
+      status: appEmbedStatus.label,
+      statusTone:
+        appEmbedStatus.state === "enabled"
+          ? "success"
+          : appEmbedStatus.state === "missing_scope"
+            ? "warning"
+            : "attention",
     },
     {
-      label: "Create your first geolocation rule",
-      detail: "Redirect, block, or show a location popup",
-      completed: stats.totalRules > 0,
-      url: "/app/rules",
-    },
-    {
-      label: "Keep at least one rule active",
-      detail: "Active rules can protect and localize traffic",
+      id: "rule",
+      title: "Create rule",
       completed: stats.activeRules > 0,
-      url: "/app/rules",
+      status:
+        stats.activeRules > 0
+          ? `${stats.activeRules} active`
+          : stats.totalRules > 0
+            ? "Inactive"
+            : "Pending",
+      statusTone:
+        stats.activeRules > 0
+          ? "success"
+          : stats.totalRules > 0
+            ? "warning"
+            : "attention",
     },
     {
-      label: "Review visitor logs",
-      detail: "Verify recent redirects and blocked visits",
+      id: "logs",
+      title: "Check visitor logs",
       completed: stats.hasVisitorLogs,
-      url: "/app/logs",
-    },
-    {
-      label: "Review app settings",
-      detail: "Confirm mode, messaging, and visitor controls",
-      completed: isAppActive,
-      url: "/app/settings",
+      status: stats.hasVisitorLogs ? "Available" : "No logs yet",
+      statusTone: stats.hasVisitorLogs ? "success" : "attention",
     },
   ];
-  const completedQuickSteps = quickSteps.filter((step) => step.completed).length;
+  const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
+  const isSetupComplete = completedSetupSteps === setupSteps.length;
+  const setupDismissedKey = `geo_dashboard_setup_dismissed:${shop}`;
+
+  useEffect(() => {
+    try {
+      if (!isSetupComplete) {
+        localStorage.removeItem(setupDismissedKey);
+        setSetupDismissed(false);
+        return;
+      }
+
+      setSetupDismissed(localStorage.getItem(setupDismissedKey) === "true");
+    } catch {
+      setSetupDismissed(false);
+    }
+  }, [isSetupComplete, setupDismissedKey]);
+
+  const handleFinishSetup = () => {
+    setSetupDismissed(true);
+    try {
+      localStorage.setItem(setupDismissedKey, "true");
+    } catch {}
+  };
 
   return (
     <Page fullWidth>
@@ -727,6 +769,8 @@ export default function Index() {
           gap: 16px;
           padding-bottom: 32px;
           min-width: 0;
+          font-size: var(--p-text-body-md-font-size);
+          line-height: var(--p-text-body-md-font-line-height);
         }
         .geo-home,
         .geo-home * {
@@ -787,7 +831,8 @@ export default function Index() {
           background: var(--p-color-bg-surface, #ffffff);
           color: var(--p-color-text, #303030);
           font: inherit;
-          font-size: 13px;
+          font-size: var(--p-text-body-md-font-size);
+          line-height: var(--p-text-body-md-font-line-height);
           outline: none;
         }
         .geo-home-search input:focus {
@@ -800,7 +845,7 @@ export default function Index() {
         }
         .geo-metrics-grid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 12px;
         }
         .geo-metric {
@@ -851,30 +896,51 @@ export default function Index() {
           justify-self: start;
           min-height: 20px;
         }
-        .geo-usage-strip {
+        .geo-plan-metric {
           display: grid;
-          grid-template-columns: minmax(210px, auto) minmax(240px, 1fr) auto;
-          align-items: center;
-          gap: 20px;
-          padding: 13px 16px;
+          align-content: start;
+          gap: 8px;
+          min-height: 122px;
+          padding: 16px;
+          background: var(--p-color-bg-surface-info, #f2f7ff);
+          box-shadow: inset 0 3px 0 var(--p-color-border-info, #2c6ecb);
         }
-        .geo-usage-title {
+        .geo-plan-metric.is-warning {
+          background: var(--p-color-bg-surface-caution, #fff8e6);
+          box-shadow: inset 0 3px 0 var(--p-color-border-caution, #b98900);
+        }
+        .geo-plan-metric.is-critical {
+          background: var(--p-color-bg-surface-critical, #fff2f0);
+          box-shadow: inset 0 3px 0 var(--p-color-border-critical, #c70a24);
+        }
+        .geo-plan-header {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
+          justify-content: space-between;
           gap: 8px;
           min-width: 0;
         }
-        .geo-usage-progress {
+        .geo-plan-copy {
           display: grid;
-          gap: 6px;
+          gap: 4px;
           min-width: 0;
         }
-        .geo-usage-numbers {
+        .geo-plan-progress {
+          min-width: 0;
+        }
+        .geo-plan-meta {
           display: flex;
           justify-content: space-between;
           gap: 12px;
-          font-size: 12px;
+          font-size: var(--p-text-body-xs-font-size);
+          line-height: var(--p-text-body-xs-font-line-height);
           color: var(--p-color-text-secondary, #616161);
+        }
+        .geo-plan-meta span {
+          min-width: 0;
+        }
+        .geo-plan-meta span:last-child {
+          text-align: right;
         }
         .geo-analytics-grid {
           display: grid;
@@ -887,6 +953,9 @@ export default function Index() {
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(270px, 0.9fr);
           gap: 12px;
           align-items: stretch;
+        }
+        .geo-lower-grid > :last-child {
+          order: -1;
         }
         .geo-analytics-grid > .Polaris-ShadowBevel,
         .geo-lower-grid > .Polaris-ShadowBevel {
@@ -915,6 +984,8 @@ export default function Index() {
         .geo-panel-body {
           flex: 1;
           min-width: 0;
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: var(--p-text-body-sm-font-line-height);
         }
         .geo-country-content {
           display: grid;
@@ -1018,8 +1089,8 @@ export default function Index() {
           border-radius: 6px;
           background: rgb(255 255 255 / 88%);
           color: var(--p-color-text-secondary, #616161);
-          font-size: 10px;
-          line-height: 16px;
+          font-size: var(--p-text-body-xs-font-size);
+          line-height: var(--p-text-body-xs-font-line-height);
           pointer-events: none;
         }
         .geo-map-loading {
@@ -1064,7 +1135,8 @@ export default function Index() {
           gap: 8px;
           min-width: 0;
           color: var(--p-color-text-secondary, #616161);
-          font-size: 11px;
+          font-size: var(--p-text-body-xs-font-size);
+          line-height: var(--p-text-body-xs-font-line-height);
           white-space: nowrap;
         }
         .geo-map-legend-bar {
@@ -1107,11 +1179,11 @@ export default function Index() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: 13px;
         }
         .geo-country-share {
           text-align: right;
-          font-size: 12px;
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: var(--p-text-body-sm-font-line-height);
           color: var(--p-color-text-secondary, #616161);
           font-variant-numeric: tabular-nums;
         }
@@ -1187,23 +1259,25 @@ export default function Index() {
           white-space: nowrap;
         }
         .geo-rule-name strong {
-          font-size: 13px;
           font-weight: 600;
         }
         .geo-rule-name span {
-          font-size: 11px;
+          font-size: var(--p-text-body-xs-font-size);
+          line-height: var(--p-text-body-xs-font-line-height);
           color: var(--p-color-text-secondary, #616161);
         }
         .geo-rule-actions {
           min-width: 56px;
           text-align: right;
-          font-size: 12px;
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: var(--p-text-body-sm-font-line-height);
           font-variant-numeric: tabular-nums;
         }
         .geo-top-table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 12px;
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: var(--p-text-body-sm-font-line-height);
         }
         .geo-top-table th,
         .geo-top-table td {
@@ -1232,59 +1306,116 @@ export default function Index() {
           white-space: nowrap;
           font-weight: 600;
         }
-        .geo-quick-start {
-          display: grid;
-          padding: 5px 0;
+        .setup-guide-card {
+          padding: 16px;
         }
-        .geo-quick-progress {
-          width: 120px;
-        }
-        .geo-quick-step {
+        .setup-guide-steps {
           display: grid;
-          grid-template-columns: 20px minmax(0, 1fr);
-          gap: 8px;
-          padding: 7px 12px;
+          gap: 6px;
+        }
+        .setup-guide-step {
+          border-radius: 8px;
+        }
+        .setup-guide-step.is-active {
+          background: var(--p-color-bg-surface-secondary, #f3f3f3);
+        }
+        .setup-guide-step-header {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 24px minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          border: 0;
+          background: transparent;
           color: inherit;
           font: inherit;
-          text-decoration: none;
+          text-align: left;
+          cursor: pointer;
         }
-        .geo-quick-step:hover {
-          background: var(--p-color-bg-surface-hover, #f7f7f7);
+        .setup-guide-step-meta {
+          display: inline-flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 6px;
+          min-width: 0;
         }
-        .geo-quick-marker {
+        .setup-guide-step-meta > .Polaris-Badge {
+          width: fit-content;
+          max-width: 100%;
+        }
+        .setup-guide-step-meta > .Polaris-Icon {
+          flex: 0 0 auto;
+          width: 16px;
+          height: 16px;
+        }
+        .setup-guide-step-marker {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          border: 1px dashed var(--p-color-border-emphasis, #8a8a8a);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .setup-guide-step-marker.is-complete {
+          border: 0;
+          background: var(--p-color-bg-fill-inverse, #303030);
+          color: #ffffff;
+        }
+        .setup-guide-step-marker .Polaris-Icon {
+          width: 14px;
+          height: 14px;
+        }
+        .setup-guide-step-marker.is-complete .Polaris-Icon svg {
+          fill: #ffffff;
+        }
+        .setup-guide-step-body {
+          padding: 0 12px 14px 46px;
+        }
+        .setup-guide-list {
+          margin: 0;
+          padding-left: 18px;
+          color: var(--p-color-text-secondary, #616161);
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: var(--p-text-body-sm-font-line-height);
+        }
+        .setup-guide-list li + li {
+          margin-top: 4px;
+        }
+        .setup-complete-status {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+          padding: 12px 14px;
+        }
+        .setup-complete-copy {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+        }
+        .setup-complete-icon {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 18px;
-          height: 18px;
-          margin-top: 1px;
-          border-radius: 50%;
-          background: var(--p-color-bg-fill-secondary, #8a8a8a);
-          color: #ffffff;
-          font-size: 10px;
-          font-weight: 700;
+          flex: 0 0 auto;
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          background: var(--p-color-bg-surface-success, #e6f5eb);
+          color: var(--p-color-icon-success, #29845a);
         }
-        .geo-quick-marker.is-complete {
-          background: var(--p-color-bg-fill-success, #29845a);
+        .setup-complete-icon .Polaris-Icon {
+          width: 20px;
+          height: 20px;
         }
-        .geo-quick-marker .Polaris-Icon {
-          width: 12px;
-          height: 12px;
-        }
-        .geo-quick-marker .Polaris-Icon__Svg {
-          fill: #ffffff;
-        }
-        .geo-quick-copy {
+        .setup-complete-text {
           display: grid;
-          gap: 1px;
-        }
-        .geo-quick-copy strong {
-          font-size: 12px;
-          font-weight: 600;
-        }
-        .geo-quick-copy span {
-          font-size: 11px;
-          color: var(--p-color-text-secondary, #616161);
+          gap: 2px;
+          min-width: 0;
         }
         .geo-footer {
           display: grid;
@@ -1302,7 +1433,7 @@ export default function Index() {
           min-width: 0;
         }
         .geo-footer-help {
-          justify-content: flex-end;
+          justify-content: space-between;
         }
         .geo-footer-icon {
           display: inline-flex;
@@ -1335,10 +1466,12 @@ export default function Index() {
           white-space: nowrap;
         }
         .geo-footer-copy strong {
-          font-size: 12px;
+          font-size: var(--p-text-body-sm-font-size);
+          line-height: var(--p-text-body-sm-font-line-height);
         }
         .geo-footer-copy span {
-          font-size: 11px;
+          font-size: var(--p-text-body-xs-font-size);
+          line-height: var(--p-text-body-xs-font-line-height);
           color: var(--p-color-text-secondary, #616161);
         }
         .geo-dashboard-pending {
@@ -1374,13 +1507,10 @@ export default function Index() {
         }
         @media (max-width: 72em) {
           .geo-metrics-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
           }
           .geo-lower-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-          .geo-lower-grid > :last-child {
-            grid-column: 1 / -1;
           }
         }
         @media (max-width: 56em) {
@@ -1401,12 +1531,8 @@ export default function Index() {
           .geo-country-content {
             grid-template-columns: minmax(0, 1.3fr) minmax(210px, 0.7fr);
           }
-          .geo-usage-strip {
-            grid-template-columns: 1fr auto;
-          }
-          .geo-usage-progress {
-            grid-column: 1 / -1;
-            grid-row: 2;
+          .geo-metrics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
         @media (max-width: 40em) {
@@ -1423,9 +1549,6 @@ export default function Index() {
           .geo-metrics-grid,
           .geo-lower-grid {
             grid-template-columns: 1fr;
-          }
-          .geo-lower-grid > :last-child {
-            grid-column: auto;
           }
           .geo-metric {
             min-height: 104px;
@@ -1456,6 +1579,15 @@ export default function Index() {
           }
           .geo-recent-row .geo-rule-actions {
             display: none;
+          }
+          .setup-guide-step-header {
+            gap: 8px;
+            padding-right: 8px;
+            padding-left: 8px;
+          }
+          .setup-guide-step-body {
+            padding-right: 8px;
+            padding-left: 42px;
           }
           .geo-footer {
             grid-template-columns: 1fr;
@@ -1585,47 +1717,62 @@ export default function Index() {
                     value={totals.blocked.toLocaleString()}
                     detail="Blocked visits in the last 30 days"
                   />
-                </div>
-
-                <Card padding="0">
-                  <div className="geo-usage-strip">
-                    <div className="geo-usage-title">
-                      <Badge tone={isNearLimit ? "warning" : "success"}>
-                        {formatPlanLabel(planDisplayName || currentPlan)}
-                      </Badge>
-                      <div>
-                        <Text as="p" variant="bodySm" fontWeight="semibold">
-                          Plan usage
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {billingPeriodEndLabel
-                            ? `Resets ${billingPeriodEndLabel}`
-                            : "Current billing period"}
-                        </Text>
+                  <Card padding="0">
+                    <div
+                      className={`geo-plan-metric${
+                        isAtLimit
+                          ? " is-critical"
+                          : isNearLimit
+                            ? " is-warning"
+                            : ""
+                      }`}
+                    >
+                      <div className="geo-plan-header">
+                        <div className="geo-plan-copy">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Plan usage
+                          </Text>
+                          <Text as="p" variant="headingXl">
+                            {isUnlimitedPlan ? "∞" : `${usagePercent}%`}
+                          </Text>
+                        </div>
+                        <Badge tone={isNearLimit ? "warning" : "success"}>
+                          {formatPlanLabel(planDisplayName || currentPlan)}
+                        </Badge>
                       </div>
-                    </div>
-                    <div className="geo-usage-progress">
-                      <div className="geo-usage-numbers">
+                      <div className="geo-plan-progress">
+                        <ProgressBar
+                          progress={Math.min(100, usagePercent)}
+                          tone={isAtLimit ? "highlight" : undefined}
+                          size="small"
+                        />
+                      </div>
+                      <div className="geo-plan-meta">
                         <span>
-                          {currentUsage.toLocaleString()} / {isUnlimitedPlan
+                          {currentUsage.toLocaleString()} /{" "}
+                          {isUnlimitedPlan
                             ? "Unlimited"
-                            : planLimit.toLocaleString()} visitors
+                            : planLimit.toLocaleString()}{" "}
+                          visitors
                         </span>
-                        <span>{isUnlimitedPlan ? "Unlimited" : `${usagePercent}%`}</span>
+                        <span>
+                          {remainingVisitors === null
+                            ? "No monthly limit"
+                            : `${remainingVisitors.toLocaleString()} remaining`}
+                        </span>
                       </div>
-                      <ProgressBar
-                        progress={Math.min(100, usagePercent)}
-                        tone={isAtLimit ? "highlight" : undefined}
-                        size="small"
-                      />
+                      <Text
+                        as="p"
+                        variant="bodyXs"
+                        tone={isNearLimit ? "caution" : "subdued"}
+                      >
+                        {billingPeriodEndLabel
+                          ? `Resets ${billingPeriodEndLabel}`
+                          : "Current billing period"}
+                      </Text>
                     </div>
-                    <Text as="p" variant="bodySm" tone={isNearLimit ? "caution" : "subdued"}>
-                      {remainingVisitors === null
-                        ? "No monthly limit"
-                        : `${remainingVisitors.toLocaleString()} remaining`}
-                    </Text>
-                  </div>
-                </Card>
+                  </Card>
+                </div>
 
                 <div className="geo-analytics-grid">
                   <Panel
@@ -1777,68 +1924,238 @@ export default function Index() {
                     )}
                   </Panel>
 
-                  <Panel
-                    title="Quick start"
-                    action={
-                      <div className="geo-quick-progress">
-                        <ProgressBar
-                          progress={(completedQuickSteps / quickSteps.length) * 100}
-                          size="small"
-                        />
+                  {setupDismissed ? (
+                    <Panel
+                      title="Storefront status"
+                      action={<Badge tone="success">Setup complete</Badge>}
+                    >
+                      <div className="setup-complete-status">
+                        <div className="setup-complete-copy">
+                          <span
+                            className="setup-complete-icon"
+                            aria-hidden="true"
+                          >
+                            <Icon source={ShieldCheckMarkIcon} />
+                          </span>
+                          <div className="setup-complete-text">
+                            <Text
+                              as="p"
+                              variant="bodySm"
+                              fontWeight="semibold"
+                            >
+                              Geo: Redirect
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {appEmbedStatus.state === "enabled"
+                                ? "Enabled in your live theme"
+                                : "Not enabled in your live theme"}
+                            </Text>
+                          </div>
+                        </div>
+                        {appEmbedStatus.state === "enabled" ? (
+                          <Badge tone="success">Enabled</Badge>
+                        ) : (
+                          <Button onClick={handleOpenThemeEditor}>Enable</Button>
+                        )}
                       </div>
-                    }
-                  >
-                    <div className="geo-quick-start">
-                      {quickSteps.map((step, index) => {
-                        const content = (
-                          <>
-                            <span
-                              className={`geo-quick-marker${step.completed ? " is-complete" : ""}`}
-                              aria-hidden="true"
+                    </Panel>
+                  ) : (
+                    <Panel
+                      title="Setup guide"
+                      action={
+                        <InlineStack gap="200" blockAlign="center">
+                          <Badge>
+                            {`${completedSetupSteps} / ${setupSteps.length} completed`}
+                          </Badge>
+                          {isSetupComplete && (
+                            <Button
+                              size="slim"
+                              variant="primary"
+                              onClick={handleFinishSetup}
                             >
-                              {step.completed ? (
-                                <Icon source={CheckCircleIcon} />
-                              ) : (
-                                index + 1
-                              )}
-                            </span>
-                            <span className="geo-quick-copy">
-                              <strong>{step.label}</strong>
-                              <span>{step.detail}</span>
-                            </span>
-                          </>
-                        );
+                              Finish
+                            </Button>
+                          )}
+                        </InlineStack>
+                      }
+                    >
+                    <div className="setup-guide-card">
+                      <BlockStack gap="400">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Get started with the app in just a few simple steps.
+                        </Text>
 
-                        if (step.completed) {
-                          return (
-                            <div className="geo-quick-step" key={step.label}>
-                              {content}
-                            </div>
-                          );
-                        }
+                        <div className="setup-guide-steps">
+                          {setupSteps.map((step) => {
+                            const isActive = expandedSetupStepIds.includes(
+                              step.id,
+                            );
 
-                        if (!step.url) {
-                          return (
-                            <button
-                              type="button"
-                              className="geo-quick-step"
-                              key={step.label}
-                              onClick={handleOpenThemeEditor}
-                              style={{ border: 0, background: "transparent", textAlign: "left", width: "100%", cursor: "pointer" }}
-                            >
-                              {content}
-                            </button>
-                          );
-                        }
+                            return (
+                              <div
+                                key={step.id}
+                                className={`setup-guide-step ${isActive ? "is-active" : ""}`}
+                              >
+                                <button
+                                  type="button"
+                                  className="setup-guide-step-header"
+                                  aria-expanded={isActive}
+                                  onClick={() =>
+                                    setExpandedSetupStepIds((expandedIds) =>
+                                      expandedIds.includes(step.id)
+                                        ? expandedIds.filter(
+                                            (stepId) => stepId !== step.id,
+                                          )
+                                        : [...expandedIds, step.id],
+                                    )
+                                  }
+                                >
+                                  <span
+                                    className={`setup-guide-step-marker ${step.completed ? "is-complete" : ""}`}
+                                    aria-hidden="true"
+                                  >
+                                    {step.completed && (
+                                      <Icon source={CheckIcon} tone="base" />
+                                    )}
+                                  </span>
+                                  <Text
+                                    as="span"
+                                    variant="bodySm"
+                                    fontWeight="semibold"
+                                  >
+                                    {step.title}
+                                  </Text>
+                                  <span className="setup-guide-step-meta">
+                                    <Badge tone={step.statusTone}>
+                                      {step.status}
+                                    </Badge>
+                                    <Icon
+                                      source={
+                                        isActive
+                                          ? ChevronUpIcon
+                                          : ChevronDownIcon
+                                      }
+                                      tone="subdued"
+                                    />
+                                  </span>
+                                </button>
 
-                        return (
-                          <Link className="geo-quick-step" to={step.url} key={step.label}>
-                            {content}
-                          </Link>
-                        );
-                      })}
+                                {isActive && (
+                                  <div className="setup-guide-step-body">
+                                      {step.id === "embed" && (
+                                        <BlockStack gap="300">
+                                          {appEmbedStatus.state ===
+                                            "missing_scope" && (
+                                            <Banner tone="warning">
+                                              The app needs read_themes
+                                              permission to read your current
+                                              theme and show this status.
+                                            </Banner>
+                                          )}
+                                          <Text
+                                            as="p"
+                                            variant="bodySm"
+                                            tone="subdued"
+                                          >
+                                            {appEmbedStatus.helpText}
+                                          </Text>
+                                          <ul className="setup-guide-list">
+                                            <li>
+                                              Click &quot;Enable app
+                                              embed&quot; below.
+                                            </li>
+                                            <li>
+                                              Open App embeds in the theme
+                                              customizer.
+                                            </li>
+                                            <li>
+                                              Enable &quot;Geolocation&quot;,
+                                              click Save, then reload this
+                                              dashboard.
+                                            </li>
+                                          </ul>
+                                          <InlineStack gap="200">
+                                            <Button
+                                              onClick={handleOpenThemeEditor}
+                                            >
+                                              Enable app embed
+                                            </Button>
+                                          </InlineStack>
+                                        </BlockStack>
+                                      )}
+
+                                      {step.id === "rule" && (
+                                        <BlockStack gap="300">
+                                          <Text
+                                            as="p"
+                                            variant="bodySm"
+                                            tone="subdued"
+                                          >
+                                            Create at least one redirect,
+                                            block, or popup rule so the
+                                            storefront script has an action to
+                                            run.
+                                          </Text>
+                                          <ul className="setup-guide-list">
+                                            <li>
+                                              Select the countries, markets,
+                                              states, or IPs you want to
+                                              target.
+                                            </li>
+                                            <li>
+                                              Choose Redirect, Block, or Popup
+                                              and keep the rule active.
+                                            </li>
+                                          </ul>
+                                          <InlineStack gap="200">
+                                            <Button url="/app/rules">
+                                              Create rule
+                                            </Button>
+                                          </InlineStack>
+                                        </BlockStack>
+                                      )}
+
+                                      {step.id === "logs" && (
+                                        <BlockStack gap="300">
+                                          <Text
+                                            as="p"
+                                            variant="bodySm"
+                                            tone="subdued"
+                                          >
+                                            Open visitor logs after testing
+                                            the storefront to confirm visits,
+                                            redirects, blocks, and popups are
+                                            being recorded.
+                                          </Text>
+                                          <ul className="setup-guide-list">
+                                            <li>
+                                              Use an incognito window or clear
+                                              the geolocation choice cookie
+                                              before testing.
+                                            </li>
+                                            <li>
+                                              Reload the storefront, then
+                                              check the latest visitor log
+                                              entries.
+                                            </li>
+                                          </ul>
+                                          <InlineStack gap="200">
+                                            <Button url="/app/logs">
+                                              Check visitor logs
+                                            </Button>
+                                          </InlineStack>
+                                        </BlockStack>
+                                      )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </BlockStack>
                     </div>
-                  </Panel>
+                    </Panel>
+                  )}
                 </div>
               </>
             )}
@@ -1860,7 +2177,7 @@ export default function Index() {
                 <span>
                   {isAppActive && appEmbedStatus.state === "enabled"
                     ? "Geo: Redirect is active on your live storefront."
-                    : "Complete Quick start to activate storefront protection."}
+                    : "Complete the Setup guide to activate storefront protection."}
                 </span>
               </span>
             </div>
@@ -1870,7 +2187,7 @@ export default function Index() {
                 <strong>Need help?</strong>
                 <span>Our support team is here for you.</span>
               </span>
-              <Button icon={SettingsIcon} url="/app/support">
+              <Button icon={ChatIcon} url="/app/support">
                 Contact support
               </Button>
             </div>
