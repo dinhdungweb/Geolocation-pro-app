@@ -211,7 +211,7 @@ export default function WorldTrafficMap({
         >
           <WorldMap
             data={data}
-            size="xl"
+            size="xxl"
             color="#1769e0"
             backgroundColor="transparent"
             borderColor="#ffffff"
