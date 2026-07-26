@@ -28,10 +28,11 @@ import {
     Banner,
     Tooltip,
     Pagination,
-    IndexFilters,
-    useSetIndexFiltersMode,
+    Filters,
+    Popover,
+    ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -461,6 +462,8 @@ export default function RulesPage() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+    const [ruleViewPopoverOpen, setRuleViewPopoverOpen] = useState(false);
+    const [ruleFiltersOpen, setRuleFiltersOpen] = useState(false);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -562,7 +565,6 @@ export default function RulesPage() {
     const [expandedStateCountries, setExpandedStateCountries] = useState<string[]>([]);
 
     const { smUp } = useBreakpoints();
-    const { mode: indexFiltersMode, setMode: setIndexFiltersMode } = useSetIndexFiltersMode();
     const resourceName = {
         singular: "rule",
         plural: "rules",
@@ -677,6 +679,18 @@ export default function RulesPage() {
             onRemove: () => setStatusFilter("all"),
         });
     }
+    const ruleViews = [
+        { label: "All", value: "all" },
+        { label: "Active", value: "active" },
+        { label: "Inactive", value: "inactive" },
+        { label: "Conflicts", value: "conflict" },
+    ];
+    const selectedRuleViewLabel =
+        ruleViews.find((view) => view.value === statusFilter)?.label || "All";
+    const selectRuleView = (value: string) => {
+        setStatusFilter(value);
+        setRuleViewPopoverOpen(false);
+    };
 
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(paginatedRules);
@@ -1243,6 +1257,17 @@ export default function RulesPage() {
                     .rule-form-details-content {
                         padding-top: 14px;
                     }
+                    .rules-index-toolbar {
+                        align-items: center;
+                        border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        display: flex;
+                        gap: 4px;
+                        min-height: 44px;
+                        padding: 6px 12px;
+                    }
+                    .rules-index-filters {
+                        border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
+                    }
                     .rules-table-wrap {
                         width: 100%;
                         max-width: 100%;
@@ -1401,31 +1426,67 @@ export default function RulesPage() {
                                 emptyStateMarkup
                             ) : (
                                 <>
-                                    <IndexFilters
-                                        tabs={[
-                                            {
-                                                content: "All",
-                                                id: "all-rules",
-                                                isLocked: true,
-                                            },
-                                        ]}
-                                        selected={0}
-                                        onSelect={() => undefined}
-                                        queryValue={ruleQuery}
-                                        queryPlaceholder="Search rules"
-                                        onQueryChange={setRuleQuery}
-                                        onQueryClear={() => setRuleQuery("")}
-                                        filters={ruleFilterDefinitions}
-                                        appliedFilters={appliedRuleFilters}
-                                        onClearAll={clearRuleFilters}
-                                        mode={indexFiltersMode}
-                                        setMode={setIndexFiltersMode}
-                                        canCreateNewView={false}
-                                        disableKeyboardShortcuts
-                                        disableStickyMode
-                                        filteringAccessibilityLabel="Search and filter"
-                                        filteringAccessibilityTooltip="Search and filter rules"
-                                    />
+                                    {ruleFiltersOpen ? (
+                                        <div className="rules-index-filters">
+                                            <Filters
+                                                queryValue={ruleQuery}
+                                                queryPlaceholder="Search rules"
+                                                onQueryChange={setRuleQuery}
+                                                onQueryClear={() => setRuleQuery("")}
+                                                filters={ruleFilterDefinitions}
+                                                appliedFilters={appliedRuleFilters}
+                                                onClearAll={clearRuleFilters}
+                                                borderlessQueryField
+                                            >
+                                                <Button
+                                                    icon={XIcon}
+                                                    variant="tertiary"
+                                                    accessibilityLabel="Close search and filter"
+                                                    onClick={() => setRuleFiltersOpen(false)}
+                                                />
+                                            </Filters>
+                                        </div>
+                                    ) : (
+                                        <div className="rules-index-toolbar">
+                                            <Popover
+                                                active={ruleViewPopoverOpen}
+                                                activator={
+                                                    <Button
+                                                        size="slim"
+                                                        variant="tertiary"
+                                                        disclosure="select"
+                                                        pressed={ruleViewPopoverOpen}
+                                                        onClick={() => setRuleViewPopoverOpen((open) => !open)}
+                                                    >
+                                                        {selectedRuleViewLabel}
+                                                    </Button>
+                                                }
+                                                onClose={() => setRuleViewPopoverOpen(false)}
+                                                preferredAlignment="left"
+                                                autofocusTarget="first-node"
+                                            >
+                                                <ActionList
+                                                    actionRole="menuitem"
+                                                    items={ruleViews.map((view) => ({
+                                                        content: view.label,
+                                                        active: statusFilter === view.value,
+                                                        prefix: statusFilter === view.value
+                                                            ? <Icon source={CheckIcon} />
+                                                            : <span style={{ display: "block", width: "20px" }} />,
+                                                        onAction: () => selectRuleView(view.value),
+                                                    }))}
+                                                />
+                                            </Popover>
+                                            <Button
+                                                size="slim"
+                                                variant="tertiary"
+                                                icon={SearchIcon}
+                                                onClick={() => setRuleFiltersOpen(true)}
+                                            >
+                                                Search and filter
+                                            </Button>
+                                        </div>
+                                    )}
                                     {filteredRules.length === 0 ? (
                                         <div style={{ padding: "40px 20px", textAlign: "center" }}>
                                             <BlockStack gap="300" inlineAlign="center">
