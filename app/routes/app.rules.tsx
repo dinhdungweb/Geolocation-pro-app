@@ -1561,14 +1561,14 @@ export default function RulesPage() {
                                             const selectedInRegion = matchingCountryCodes.filter(c => selectedCountries.includes(c)).length;
 
                                             return (
-                                                <div key={regionName} style={{ marginBottom: '4px' }}>
+                                                <div key={regionName} style={{ marginBottom: '1px' }}>
                                                     <div
                                                         style={{
                                                             display: 'grid',
                                                             gridTemplateColumns: '24px minmax(0, 1fr) auto',
                                                             alignItems: 'center',
                                                             gap: '8px',
-                                                            padding: '6px 8px',
+                                                            padding: '3px 8px',
                                                             borderRadius: '6px',
                                                             background: isExpanded ? '#f6f6f7' : 'transparent',
                                                         }}
@@ -1687,14 +1687,14 @@ export default function RulesPage() {
                                             const selectedInCountry = matchingStateCodes.filter(s => selectedStates.includes(s)).length;
 
                                             return (
-                                                <div key={countryCode} style={{ marginBottom: '4px' }}>
+                                                <div key={countryCode} style={{ marginBottom: '1px' }}>
                                                     <div
                                                         style={{
                                                             display: 'grid',
                                                             gridTemplateColumns: '24px minmax(0, 1fr) auto',
                                                             alignItems: 'center',
                                                             gap: '8px',
-                                                            padding: '6px 8px',
+                                                            padding: '3px 8px',
                                                             borderRadius: '6px',
                                                             background: isExpanded ? '#f6f6f7' : 'transparent',
                                                         }}
