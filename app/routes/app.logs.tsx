@@ -910,6 +910,8 @@ export default function VisitorLogs() {
                                     icon={CalendarIcon}
                                     onClick={handleDateActivatorClick}
                                     size="slim"
+                                    fullWidth
+                                    textAlign="start"
                                     variant="tertiary"
                                 >
                                     {dateRangeLabel}
