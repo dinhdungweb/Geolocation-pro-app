@@ -47,6 +47,7 @@ import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { COUNTRY_MAP } from "../utils/countries";
+import { resolveCountryTrafficTotal } from "../utils/country-traffic";
 import {
   getStableShopifyPlanFromBillingCheck,
   resolveEffectivePlan,
@@ -174,30 +175,38 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
     }),
   ]);
 
-  const totals = countryStats.reduce(
+  const countryTraffic = countryStats
+    .map((item) => ({
+      code: item.countryCode,
+      visitors: resolveCountryTrafficTotal(item._sum),
+    }))
+    .filter((item) => item.code.length === 2 && item.visitors > 0)
+    .sort((left, right) => right.visitors - left.visitors);
+  const observedVisitors = countryTraffic.reduce(
+    (sum, item) => sum + item.visitors,
+    0,
+  );
+
+  const actionTotals = countryStats.reduce(
     (result, item) => ({
-      visitors: result.visitors + (item._sum.visitors || 0),
       redirects: result.redirects + (item._sum.redirected || 0),
       blocked: result.blocked + (item._sum.blocked || 0),
     }),
-    { visitors: 0, redirects: 0, blocked: 0 },
+    { redirects: 0, blocked: 0 },
   );
+  const totals = {
+    visitors: observedVisitors,
+    ...actionTotals,
+  };
 
-  const topCountries = countryStats.slice(0, 6).map((item) => ({
-    code: item.countryCode,
-    country: COUNTRY_MAP[item.countryCode] || item.countryCode,
-    visitors: item._sum.visitors || 0,
-    share: totals.visitors > 0
-      ? Math.round(((item._sum.visitors || 0) / totals.visitors) * 1000) / 10
+  const topCountries = countryTraffic.slice(0, 6).map((item) => ({
+    code: item.code,
+    country: COUNTRY_MAP[item.code] || item.code,
+    visitors: item.visitors,
+    share: observedVisitors > 0
+      ? Math.round((item.visitors / observedVisitors) * 1000) / 10
       : 0,
   }));
-
-  const countryTraffic = countryStats
-    .filter((item) => item.countryCode.length === 2 && (item._sum.visitors || 0) > 0)
-    .map((item) => ({
-      code: item.countryCode,
-      visitors: item._sum.visitors || 0,
-    }));
 
   const dailyByDate = new Map(
     dailyStats.map((item) => [
@@ -262,7 +271,7 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
   );
 
   return {
-    totalCountries: countryStats.length,
+    totalCountries: countryTraffic.length,
     totals,
     topCountries,
     countryTraffic,
