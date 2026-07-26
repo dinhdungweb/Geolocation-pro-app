@@ -28,11 +28,10 @@ import {
     Banner,
     Tooltip,
     Pagination,
-    Filters,
     Popover,
     ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -463,7 +462,6 @@ export default function RulesPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
     const [ruleViewPopoverOpen, setRuleViewPopoverOpen] = useState(false);
-    const [ruleFiltersOpen, setRuleFiltersOpen] = useState(false);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -612,73 +610,6 @@ export default function RulesPage() {
         setMatchTypeFilter("all");
         setStatusFilter("all");
     }, []);
-    const ruleFilterDefinitions = [
-        {
-            key: "targetType",
-            label: "Target type",
-            filter: (
-                <ChoiceList
-                    title="Target type"
-                    titleHidden
-                    choices={[
-                        { label: "Country", value: "country" },
-                        { label: "State/Region", value: "state" },
-                        { label: "Shopify Market", value: "market" },
-                    ]}
-                    selected={matchTypeFilter === "all" ? [] : [matchTypeFilter]}
-                    onChange={(selected) => setMatchTypeFilter(selected[0] || "all")}
-                />
-            ),
-            shortcut: true,
-        },
-        {
-            key: "status",
-            label: "Status",
-            filter: (
-                <ChoiceList
-                    title="Status"
-                    titleHidden
-                    choices={[
-                        { label: "Active", value: "active" },
-                        { label: "Inactive", value: "inactive" },
-                        { label: "Has conflict", value: "conflict" },
-                    ]}
-                    selected={statusFilter === "all" ? [] : [statusFilter]}
-                    onChange={(selected) => setStatusFilter(selected[0] || "all")}
-                />
-            ),
-            shortcut: true,
-        },
-    ];
-    const appliedRuleFilters: Array<{
-        key: string;
-        label: string;
-        onRemove: (key: string) => void;
-    }> = [];
-    if (matchTypeFilter !== "all") {
-        const targetTypeLabels: Record<string, string> = {
-            country: "Country",
-            state: "State/Region",
-            market: "Shopify Market",
-        };
-        appliedRuleFilters.push({
-            key: "targetType",
-            label: `Target type: ${targetTypeLabels[matchTypeFilter] || matchTypeFilter}`,
-            onRemove: () => setMatchTypeFilter("all"),
-        });
-    }
-    if (statusFilter !== "all") {
-        const statusLabels: Record<string, string> = {
-            active: "Active",
-            inactive: "Inactive",
-            conflict: "Has conflict",
-        };
-        appliedRuleFilters.push({
-            key: "status",
-            label: `Status: ${statusLabels[statusFilter] || statusFilter}`,
-            onRemove: () => setStatusFilter("all"),
-        });
-    }
     const ruleViews = [
         { label: "All", value: "all" },
         { label: "Active", value: "active" },
@@ -1261,12 +1192,17 @@ export default function RulesPage() {
                         align-items: center;
                         border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
                         display: flex;
-                        gap: 4px;
+                        gap: 8px;
                         min-height: 44px;
                         padding: 6px 12px;
                     }
-                    .rules-index-filters {
-                        border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
+                    .rules-index-search {
+                        flex: 1 1 320px;
+                        min-width: 200px;
+                    }
+                    .rules-index-target {
+                        flex: 0 0 190px;
+                        margin-left: auto;
                     }
                     .rules-table-wrap {
                         width: 100%;
@@ -1308,6 +1244,16 @@ export default function RulesPage() {
                         box-shadow: 1px 0 0 var(--p-color-border-secondary, #ebebeb);
                     }
                     @media (max-width: 47.9975em) {
+                        .rules-index-toolbar {
+                            flex-wrap: wrap;
+                        }
+                        .rules-index-search {
+                            flex-basis: calc(100% - 88px);
+                        }
+                        .rules-index-target {
+                            flex-basis: 100%;
+                            margin-left: 0;
+                        }
                         .rules-table-wrap .Polaris-IndexTable,
                         .rules-table-wrap .Polaris-IndexTable__Table {
                             min-width: 880px;
@@ -1426,67 +1372,64 @@ export default function RulesPage() {
                                 emptyStateMarkup
                             ) : (
                                 <>
-                                    {ruleFiltersOpen ? (
-                                        <div className="rules-index-filters">
-                                            <Filters
-                                                queryValue={ruleQuery}
-                                                queryPlaceholder="Search rules"
-                                                onQueryChange={setRuleQuery}
-                                                onQueryClear={() => setRuleQuery("")}
-                                                filters={ruleFilterDefinitions}
-                                                appliedFilters={appliedRuleFilters}
-                                                onClearAll={clearRuleFilters}
-                                                borderlessQueryField
-                                            >
+                                    <div className="rules-index-toolbar">
+                                        <Popover
+                                            active={ruleViewPopoverOpen}
+                                            activator={
                                                 <Button
-                                                    icon={XIcon}
+                                                    size="slim"
                                                     variant="tertiary"
-                                                    accessibilityLabel="Close search and filter"
-                                                    onClick={() => setRuleFiltersOpen(false)}
-                                                />
-                                            </Filters>
+                                                    disclosure="select"
+                                                    pressed={ruleViewPopoverOpen}
+                                                    onClick={() => setRuleViewPopoverOpen((open) => !open)}
+                                                >
+                                                    {selectedRuleViewLabel}
+                                                </Button>
+                                            }
+                                            onClose={() => setRuleViewPopoverOpen(false)}
+                                            preferredAlignment="left"
+                                            autofocusTarget="first-node"
+                                        >
+                                            <ActionList
+                                                actionRole="menuitem"
+                                                items={ruleViews.map((view) => ({
+                                                    content: view.label,
+                                                    active: statusFilter === view.value,
+                                                    prefix: statusFilter === view.value
+                                                        ? <Icon source={CheckIcon} />
+                                                        : <span style={{ display: "block", width: "20px" }} />,
+                                                    onAction: () => selectRuleView(view.value),
+                                                }))}
+                                            />
+                                        </Popover>
+                                        <div className="rules-index-search">
+                                            <TextField
+                                                label="Search rules"
+                                                labelHidden
+                                                value={ruleQuery}
+                                                onChange={setRuleQuery}
+                                                placeholder="Search rules"
+                                                prefix={<Icon source={SearchIcon} tone="subdued" />}
+                                                clearButton
+                                                onClearButtonClick={() => setRuleQuery("")}
+                                                autoComplete="off"
+                                            />
                                         </div>
-                                    ) : (
-                                        <div className="rules-index-toolbar">
-                                            <Popover
-                                                active={ruleViewPopoverOpen}
-                                                activator={
-                                                    <Button
-                                                        size="slim"
-                                                        variant="tertiary"
-                                                        disclosure="select"
-                                                        pressed={ruleViewPopoverOpen}
-                                                        onClick={() => setRuleViewPopoverOpen((open) => !open)}
-                                                    >
-                                                        {selectedRuleViewLabel}
-                                                    </Button>
-                                                }
-                                                onClose={() => setRuleViewPopoverOpen(false)}
-                                                preferredAlignment="left"
-                                                autofocusTarget="first-node"
-                                            >
-                                                <ActionList
-                                                    actionRole="menuitem"
-                                                    items={ruleViews.map((view) => ({
-                                                        content: view.label,
-                                                        active: statusFilter === view.value,
-                                                        prefix: statusFilter === view.value
-                                                            ? <Icon source={CheckIcon} />
-                                                            : <span style={{ display: "block", width: "20px" }} />,
-                                                        onAction: () => selectRuleView(view.value),
-                                                    }))}
-                                                />
-                                            </Popover>
-                                            <Button
-                                                size="slim"
-                                                variant="tertiary"
-                                                icon={SearchIcon}
-                                                onClick={() => setRuleFiltersOpen(true)}
-                                            >
-                                                Search and filter
-                                            </Button>
+                                        <div className="rules-index-target">
+                                            <Select
+                                                label="Target type"
+                                                labelHidden
+                                                value={matchTypeFilter}
+                                                onChange={setMatchTypeFilter}
+                                                options={[
+                                                    { label: "All target types", value: "all" },
+                                                    { label: "Country", value: "country" },
+                                                    { label: "State/Region", value: "state" },
+                                                    { label: "Shopify Market", value: "market" },
+                                                ]}
+                                            />
                                         </div>
-                                    )}
+                                    </div>
                                     {filteredRules.length === 0 ? (
                                         <div style={{ padding: "40px 20px", textAlign: "center" }}>
                                             <BlockStack gap="300" inlineAlign="center">
