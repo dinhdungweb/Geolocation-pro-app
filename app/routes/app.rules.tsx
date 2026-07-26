@@ -458,6 +458,7 @@ export default function RulesPage() {
     const [matchTypeFilter, setMatchTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
+    const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -525,7 +526,9 @@ export default function RulesPage() {
     }, [formMatchType, markets.length, marketsFetcher, rules]);
 
     useEffect(() => {
-        if (fetcher.state !== "idle" || !fetcher.data?.message) return;
+        if (fetcher.state !== "idle") return;
+        setTogglingRuleId(null);
+        if (!fetcher.data?.message) return;
         shopify.toast.show(fetcher.data.message, {
             isError: fetcher.data.success === false,
         });
@@ -759,6 +762,7 @@ export default function RulesPage() {
             formData.append("intent", "toggle");
             formData.append("id", rule.id);
             formData.append("isActive", rule.isActive.toString());
+            setTogglingRuleId(rule.id);
             fetcher.submit(formData, { method: "POST" });
         },
         [fetcher]
@@ -931,6 +935,8 @@ export default function RulesPage() {
         rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
     const rowMarkup = paginatedRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
+        const toggleInProgress = fetcher.state !== "idle";
+        const isThisRuleToggling = toggleInProgress && togglingRuleId === rule.id;
         const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
         const conflictTooltip = ruleConflicts
             .slice(0, 3)
@@ -1030,14 +1036,20 @@ export default function RulesPage() {
                             Edit
                         </Button>
                         {rule.isActive ? (
-                            <Button size="slim" onClick={() => handleToggle(rule)}>
+                            <Button
+                                size="slim"
+                                onClick={() => handleToggle(rule)}
+                                loading={isThisRuleToggling}
+                                disabled={toggleInProgress}
+                            >
                                 Disable
                             </Button>
                         ) : (
                             <Button
                                 size="slim"
                                 onClick={() => handleToggle(rule)}
-                                disabled={isPaidOnlyRule(rule) && !hasProPlan}
+                                loading={isThisRuleToggling}
+                                disabled={toggleInProgress || (isPaidOnlyRule(rule) && !hasProPlan)}
                             >
                                 Enable
                             </Button>
