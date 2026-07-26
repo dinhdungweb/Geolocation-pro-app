@@ -34,7 +34,7 @@ import {
   SearchIcon,
   ShieldCheckMarkIcon,
 } from "@shopify/polaris-icons";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import {
   CUSTOM_PLAN,
@@ -71,6 +71,8 @@ const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: str
   [PREMIUM_PLAN]: { label: "Plus", actionContent: "Upgrade to Plus" },
   [PLUS_PLAN]: { label: "Elite", actionContent: "Upgrade to Elite" },
 };
+const REVIEW_URL =
+  "https://apps.shopify.com/geo-redirect-country-block?#modal-show=WriteReviewModal";
 
 const WorldTrafficMap = lazy(
   () => import("../components/world-traffic-map"),
@@ -665,6 +667,7 @@ export default function Index() {
   } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
+  const shopify = useAppBridge();
   const lastPermissionRefreshAt = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [chartDays, setChartDays] = useState<7 | 30>(30);
@@ -672,8 +675,9 @@ export default function Index() {
     string | null
   >(null);
   const [expandedSetupStepIds, setExpandedSetupStepIds] = useState<
-    Array<"embed" | "rule" | "logs">
+    Array<"embed" | "rule" | "logs" | "confirm">
   >([]);
+  const [setupConfirmed, setSetupConfirmed] = useState<boolean | null>(null);
   const [setupDismissed, setSetupDismissed] = useState(false);
 
   useEffect(() => {
@@ -758,7 +762,7 @@ export default function Index() {
   };
 
   const setupSteps: Array<{
-    id: "embed" | "rule" | "logs";
+    id: "embed" | "rule" | "logs" | "confirm";
     title: string;
     completed: boolean;
     status: string;
@@ -800,12 +804,32 @@ export default function Index() {
       status: stats.hasVisitorLogs ? "Available" : "No logs yet",
       statusTone: stats.hasVisitorLogs ? "success" : "attention",
     },
+    {
+      id: "confirm",
+      title: "Confirm setup",
+      completed: setupConfirmed === true,
+      status: setupConfirmed ? "Confirmed" : "Pending",
+      statusTone: setupConfirmed ? "success" : "attention",
+    },
   ];
   const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
   const isSetupComplete = completedSetupSteps === setupSteps.length;
+  const setupConfirmedKey = `geo_dashboard_setup_confirmed:${shop}`;
   const setupDismissedKey = `geo_dashboard_setup_dismissed:${shop}`;
 
   useEffect(() => {
+    try {
+      setSetupConfirmed(
+        localStorage.getItem(setupConfirmedKey) === "true",
+      );
+    } catch {
+      setSetupConfirmed(false);
+    }
+  }, [setupConfirmedKey]);
+
+  useEffect(() => {
+    if (setupConfirmed === null) return;
+
     try {
       if (!isSetupComplete) {
         localStorage.removeItem(setupDismissedKey);
@@ -817,7 +841,28 @@ export default function Index() {
     } catch {
       setSetupDismissed(false);
     }
-  }, [isSetupComplete, setupDismissedKey]);
+  }, [isSetupComplete, setupConfirmed, setupDismissedKey]);
+
+  const handleConfirmSetup = async () => {
+    setSetupConfirmed(true);
+    try {
+      localStorage.setItem(setupConfirmedKey, "true");
+    } catch {}
+
+    try {
+      if (
+        shopify.reviews &&
+        typeof shopify.reviews.request === "function"
+      ) {
+        await shopify.reviews.request();
+        return;
+      }
+    } catch {
+      // Fall back to the Shopify App Store review page below.
+    }
+
+    window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
+  };
 
   const handleFinishSetup = () => {
     setSetupDismissed(true);
@@ -2421,6 +2466,50 @@ export default function Index() {
                                               }
                                             >
                                               Check visitor logs
+                                            </Button>
+                                          </InlineStack>
+                                        </BlockStack>
+                                      )}
+
+                                      {step.id === "confirm" && (
+                                        <BlockStack gap="300">
+                                          <Text
+                                            as="p"
+                                            variant="bodySm"
+                                            tone="subdued"
+                                          >
+                                            Confirm your store once the app
+                                            embed, rules, and visitor logs look
+                                            correct.
+                                          </Text>
+                                          <ul className="setup-guide-list">
+                                            <li>
+                                              Test the storefront in an
+                                              incognito window.
+                                            </li>
+                                            <li>
+                                              Confirm the expected redirect,
+                                              block, or popup action runs.
+                                            </li>
+                                          </ul>
+                                          <InlineStack gap="200">
+                                            <Button
+                                              variant="primary"
+                                              onClick={handleConfirmSetup}
+                                              disabled={
+                                                setupConfirmed === true
+                                              }
+                                            >
+                                              {setupConfirmed
+                                                ? "Setup confirmed"
+                                                : "Yes, it’s working"}
+                                            </Button>
+                                            <Button
+                                              onClick={() =>
+                                                navigate("/app/support")
+                                              }
+                                            >
+                                              Contact support
                                             </Button>
                                           </InlineStack>
                                         </BlockStack>

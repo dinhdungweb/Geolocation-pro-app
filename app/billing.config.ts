@@ -28,7 +28,7 @@ export const PLAN_LIMITS = {
     [FREE_PLAN]: 100,
     [PREMIUM_PLAN]: 1000,
     [PLUS_PLAN]: 2500,
-    [ELITE_PLAN]: 6000,
+    [ELITE_PLAN]: 7000,
     [UNLIMITED_PLAN]: Number.MAX_SAFE_INTEGER,
     [CUSTOM_PLAN]: Number.MAX_SAFE_INTEGER,
 };
