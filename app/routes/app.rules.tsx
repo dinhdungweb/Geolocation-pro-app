@@ -31,7 +31,7 @@ import {
     Popover,
     ActionList,
 } from "@shopify/polaris";
-import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon } from "@shopify/polaris-icons";
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -462,6 +462,7 @@ export default function RulesPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
     const [ruleViewPopoverOpen, setRuleViewPopoverOpen] = useState(false);
+    const [targetFilterPopoverOpen, setTargetFilterPopoverOpen] = useState(false);
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -621,6 +622,18 @@ export default function RulesPage() {
     const selectRuleView = (value: string) => {
         setStatusFilter(value);
         setRuleViewPopoverOpen(false);
+    };
+    const targetTypeViews = [
+        { label: "All targets", value: "all" },
+        { label: "Country", value: "country" },
+        { label: "State/Region", value: "state" },
+        { label: "Shopify Market", value: "market" },
+    ];
+    const selectedTargetTypeLabel =
+        targetTypeViews.find((view) => view.value === matchTypeFilter)?.label || "All targets";
+    const selectTargetType = (value: string) => {
+        setMatchTypeFilter(value);
+        setTargetFilterPopoverOpen(false);
     };
 
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
@@ -1197,12 +1210,60 @@ export default function RulesPage() {
                         padding: 6px 12px;
                     }
                     .rules-index-search {
+                        align-items: center;
+                        border-radius: var(--p-border-radius-200, 8px);
+                        display: flex;
                         flex: 1 1 320px;
+                        gap: 6px;
                         min-width: 200px;
+                        padding: 4px 8px;
+                        transition: background-color 120ms ease, box-shadow 120ms ease;
+                    }
+                    .rules-index-search:focus-within {
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                        box-shadow: inset 0 0 0 2px var(--p-color-border-focus, #005bd3);
+                    }
+                    .rules-index-search-input {
+                        background: transparent;
+                        border: 0;
+                        color: var(--p-color-text, #303030);
+                        flex: 1 1 auto;
+                        font: inherit;
+                        line-height: 24px;
+                        min-width: 0;
+                        outline: 0;
+                        padding: 0;
+                    }
+                    .rules-index-search-input::placeholder {
+                        color: var(--p-color-text-secondary, #616161);
+                    }
+                    .rules-index-search-input::-webkit-search-cancel-button {
+                        display: none;
+                    }
+                    .rules-index-search-icon,
+                    .rules-index-search-clear {
+                        align-items: center;
+                        display: inline-flex;
+                        flex: 0 0 20px;
+                        height: 20px;
+                        justify-content: center;
+                        width: 20px;
+                    }
+                    .rules-index-search-clear {
+                        background: transparent;
+                        border: 0;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        padding: 0;
+                    }
+                    .rules-index-search-clear:hover {
+                        background: var(--p-color-bg-surface-hover, #f1f1f1);
                     }
                     .rules-index-target {
-                        flex: 0 0 190px;
+                        border-left: 1px solid var(--p-color-border-secondary, #ebebeb);
+                        flex: 0 0 auto;
                         margin-left: auto;
+                        padding-left: 8px;
                     }
                     .rules-table-wrap {
                         width: 100%;
@@ -1248,11 +1309,11 @@ export default function RulesPage() {
                             flex-wrap: wrap;
                         }
                         .rules-index-search {
-                            flex-basis: calc(100% - 88px);
+                            flex-basis: 100%;
+                            order: 3;
                         }
                         .rules-index-target {
-                            flex-basis: 100%;
-                            margin-left: 0;
+                            margin-left: auto;
                         }
                         .rules-table-wrap .Polaris-IndexTable,
                         .rules-table-wrap .Polaris-IndexTable__Table {
@@ -1403,31 +1464,59 @@ export default function RulesPage() {
                                             />
                                         </Popover>
                                         <div className="rules-index-search">
-                                            <TextField
-                                                label="Search rules"
-                                                labelHidden
+                                            <span className="rules-index-search-icon" aria-hidden="true">
+                                                <Icon source={SearchIcon} tone="subdued" />
+                                            </span>
+                                            <input
+                                                className="rules-index-search-input"
+                                                type="search"
+                                                aria-label="Search rules"
                                                 value={ruleQuery}
-                                                onChange={setRuleQuery}
+                                                onChange={(event) => setRuleQuery(event.currentTarget.value)}
                                                 placeholder="Search rules"
-                                                prefix={<Icon source={SearchIcon} tone="subdued" />}
-                                                clearButton
-                                                onClearButtonClick={() => setRuleQuery("")}
                                                 autoComplete="off"
                                             />
+                                            {ruleQuery && (
+                                                <button
+                                                    className="rules-index-search-clear"
+                                                    type="button"
+                                                    aria-label="Clear search"
+                                                    onClick={() => setRuleQuery("")}
+                                                >
+                                                    <Icon source={XIcon} tone="subdued" />
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="rules-index-target">
-                                            <Select
-                                                label="Target type"
-                                                labelHidden
-                                                value={matchTypeFilter}
-                                                onChange={setMatchTypeFilter}
-                                                options={[
-                                                    { label: "All target types", value: "all" },
-                                                    { label: "Country", value: "country" },
-                                                    { label: "State/Region", value: "state" },
-                                                    { label: "Shopify Market", value: "market" },
-                                                ]}
-                                            />
+                                            <Popover
+                                                active={targetFilterPopoverOpen}
+                                                activator={
+                                                    <Button
+                                                        size="slim"
+                                                        variant="tertiary"
+                                                        disclosure="down"
+                                                        pressed={targetFilterPopoverOpen}
+                                                        onClick={() => setTargetFilterPopoverOpen((open) => !open)}
+                                                    >
+                                                        {`Target: ${selectedTargetTypeLabel}`}
+                                                    </Button>
+                                                }
+                                                onClose={() => setTargetFilterPopoverOpen(false)}
+                                                preferredAlignment="right"
+                                                autofocusTarget="first-node"
+                                            >
+                                                <ActionList
+                                                    actionRole="menuitem"
+                                                    items={targetTypeViews.map((view) => ({
+                                                        content: view.label,
+                                                        active: matchTypeFilter === view.value,
+                                                        prefix: matchTypeFilter === view.value
+                                                            ? <Icon source={CheckIcon} />
+                                                            : <span style={{ display: "block", width: "20px" }} />,
+                                                        onAction: () => selectTargetType(view.value),
+                                                    }))}
+                                                />
+                                            </Popover>
                                         </div>
                                     </div>
                                     {filteredRules.length === 0 ? (
