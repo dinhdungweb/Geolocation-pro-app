@@ -677,25 +677,27 @@ export default function IPRulesPage() {
                     className="ip-rule-actions-cell"
                 >
                     <InlineStack gap="200" wrap={false}>
-                        <Button
-                            size="slim"
-                            variant="tertiary"
-                            icon={EditIcon}
-                            onClick={() => handleOpenModal(rule)}
-                            disabled={!hasProPlan}
-                        >
-                            Edit
-                        </Button>
-                        <Button
-                            size="slim"
-                            variant="tertiary"
-                            tone="critical"
-                            icon={DeleteIcon}
-                            onClick={() => handleDeleteRule(rule)}
-                            disabled={!hasProPlan}
-                        >
-                            Delete
-                        </Button>
+                        <Tooltip content="Edit IP rule">
+                            <Button
+                                size="slim"
+                                variant="tertiary"
+                                icon={EditIcon}
+                                accessibilityLabel={`Edit ${rule.name}`}
+                                onClick={() => handleOpenModal(rule)}
+                                disabled={!hasProPlan}
+                            />
+                        </Tooltip>
+                        <Tooltip content="Delete IP rule">
+                            <Button
+                                size="slim"
+                                variant="tertiary"
+                                tone="critical"
+                                icon={DeleteIcon}
+                                accessibilityLabel={`Delete ${rule.name}`}
+                                onClick={() => handleDeleteRule(rule)}
+                                disabled={!hasProPlan}
+                            />
+                        </Tooltip>
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
@@ -858,7 +860,7 @@ export default function IPRulesPage() {
                     .ip-rule-actions-cell {
                         display: flex;
                         justify-content: flex-end;
-                        min-width: 124px;
+                        min-width: 72px;
                     }
                     @media (max-width: 47.9975em) {
                         .ip-rules-page > div:first-of-type {

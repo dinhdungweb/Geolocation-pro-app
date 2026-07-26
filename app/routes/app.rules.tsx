@@ -1083,26 +1083,28 @@ export default function RulesPage() {
             <IndexTable.Cell>
                 <div
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: "flex", justifyContent: "flex-end", minWidth: "124px" }}
+                    style={{ display: "flex", justifyContent: "flex-end", minWidth: "72px" }}
                 >
                     <InlineStack gap="200" wrap={false}>
-                        <Button
-                            size="slim"
-                            variant="tertiary"
-                            icon={EditIcon}
-                            onClick={() => handleOpenModal(rule)}
-                        >
-                            Edit
-                        </Button>
-                        <Button
-                            size="slim"
-                            variant="tertiary"
-                            tone="critical"
-                            icon={DeleteIcon}
-                            onClick={() => handleDeleteRule(rule)}
-                        >
-                            Delete
-                        </Button>
+                        <Tooltip content="Edit rule">
+                            <Button
+                                size="slim"
+                                variant="tertiary"
+                                icon={EditIcon}
+                                accessibilityLabel={`Edit ${rule.name}`}
+                                onClick={() => handleOpenModal(rule)}
+                            />
+                        </Tooltip>
+                        <Tooltip content="Delete rule">
+                            <Button
+                                size="slim"
+                                variant="tertiary"
+                                tone="critical"
+                                icon={DeleteIcon}
+                                accessibilityLabel={`Delete ${rule.name}`}
+                                onClick={() => handleDeleteRule(rule)}
+                            />
+                        </Tooltip>
                     </InlineStack>
                 </div>
             </IndexTable.Cell>
