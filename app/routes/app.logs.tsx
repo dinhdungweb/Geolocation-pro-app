@@ -1156,9 +1156,6 @@ export default function VisitorLogs() {
                     </IndexTable>
                 </div>
                 <div className="visitor-log-pagination">
-                    <Text as="p" variant="bodySm" tone="subdued">
-                        Latest logs are shown first.
-                    </Text>
                     <Pagination
                         hasPrevious={page > 1}
                         onPrevious={() => handlePreviousPage(page)}
