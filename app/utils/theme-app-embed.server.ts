@@ -1,6 +1,9 @@
 import { apiVersion } from "../shopify.server";
+import { createExpiringAsyncCache } from "./expiring-async-cache.server";
 
 const APP_EMBED_BLOCK_HANDLE = "geolocation-popup";
+const THEME_STATUS_TIMEOUT_MS = 8_000;
+const themeStatusCache = createExpiringAsyncCache<AppEmbedStatus>();
 
 export type AppEmbedStatusState = "enabled" | "disabled" | "missing_scope" | "unavailable";
 
@@ -23,7 +26,7 @@ function hasSessionScope(scopeString: string | null | undefined, requiredScope: 
     .includes(requiredScope);
 }
 
-export async function getThemeAppEmbedStatus({
+async function loadThemeAppEmbedStatus({
   shop,
   accessToken,
   scopeString,
@@ -38,11 +41,12 @@ export async function getThemeAppEmbedStatus({
     "X-Shopify-Access-Token": accessToken,
     Accept: "application/json",
   };
+  const signal = AbortSignal.timeout(THEME_STATUS_TIMEOUT_MS);
 
   try {
     const themesResponse = await fetch(
       `https://${shop}/admin/api/${apiVersion}/themes.json?role=main`,
-      { headers },
+      { headers, signal },
     );
 
     if (themesResponse.status === 401 || themesResponse.status === 403) {
@@ -76,7 +80,7 @@ export async function getThemeAppEmbedStatus({
 
     const assetResponse = await fetch(
       `https://${shop}/admin/api/${apiVersion}/themes/${mainTheme.id}/assets.json?asset[key]=config%2Fsettings_data.json`,
-      { headers },
+      { headers, signal },
     );
 
     if (assetResponse.status === 401 || assetResponse.status === 403) {
@@ -141,4 +145,26 @@ export async function getThemeAppEmbedStatus({
       themeName: null,
     };
   }
+}
+
+function themeStatusTtl(status: AppEmbedStatus) {
+  if (status.state === "enabled") return 5 * 60_000;
+  if (status.state === "disabled") return 10_000;
+  return 2_000;
+}
+
+export function getThemeAppEmbedStatus(args: {
+  shop: string;
+  accessToken: string;
+  scopeString: string | null | undefined;
+}) {
+  return themeStatusCache.get(
+    args.shop,
+    () => loadThemeAppEmbedStatus(args),
+    themeStatusTtl,
+  );
+}
+
+export function invalidateThemeAppEmbedStatusCache(shop?: string) {
+  themeStatusCache.invalidate(shop);
 }

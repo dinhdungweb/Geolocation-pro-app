@@ -4,6 +4,9 @@ import db from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { enqueueShopCleanupJob } from "../utils/cleanup.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { invalidateShopifyMarketsCache } from "../utils/shopify-markets.server";
+import { invalidateShopIdentityCache } from "../utils/shop-identity.server";
+import { invalidateThemeAppEmbedStatusCache } from "../utils/theme-app-embed.server";
 
 function webhookMeta(request: Request) {
   return {
@@ -22,6 +25,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     console.log(`Received ${topic} webhook for ${shop}`);
     invalidateStorefrontConfigCache(shop);
+    invalidateThemeAppEmbedStatusCache(shop);
+    invalidateShopifyMarketsCache(shop);
+    invalidateShopIdentityCache(shop);
 
     stage = "enqueue_cleanup";
     await enqueueShopCleanupJob(shop, "app_uninstalled");

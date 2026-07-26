@@ -1,3 +1,5 @@
+import { createExpiringAsyncCache } from "./expiring-async-cache.server";
+
 export interface ShopifyMarketOption {
   id: string;
   numericId: string;
@@ -17,12 +19,14 @@ type AdminGraphqlClient = {
   graphql: (query: string, options?: Record<string, unknown>) => Promise<Response>;
 };
 
+const marketsCache = createExpiringAsyncCache<ShopifyMarketsResult>();
+
 function numericIdFromGid(id: string) {
   const match = id.match(/\/(\d+)$/);
   return match?.[1] || id;
 }
 
-export async function getShopifyMarkets(
+async function loadShopifyMarkets(
   admin: AdminGraphqlClient,
 ): Promise<ShopifyMarketsResult> {
   try {
@@ -87,4 +91,19 @@ export async function getShopifyMarkets(
     const message = error?.message || "Unable to load Shopify Markets.";
     return { markets: [], error: message };
   }
+}
+
+export function getShopifyMarkets(
+  admin: AdminGraphqlClient,
+  shop: string,
+) {
+  return marketsCache.get(
+    shop,
+    () => loadShopifyMarkets(admin),
+    (result) => result.error ? 10_000 : 5 * 60_000,
+  );
+}
+
+export function invalidateShopifyMarketsCache(shop?: string) {
+  marketsCache.invalidate(shop);
 }

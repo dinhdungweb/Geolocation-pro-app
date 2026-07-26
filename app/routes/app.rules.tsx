@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
@@ -33,7 +33,7 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
-import { getShopifyMarkets } from "../utils/shopify-markets.server";
+import type { ShopifyMarketOption, ShopifyMarketsResult } from "../utils/shopify-markets.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getStableShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
@@ -42,7 +42,8 @@ import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cach
 import { normalizePagePathPatterns } from "../utils/page-targeting";
 
 import { COUNTRY_MAP } from "../utils/countries";
-import { STATE_MAP, STATE_COUNTRY_LABELS, COUNTRIES_WITH_STATES, getStateName, getStatesForCountry } from "../utils/states";
+
+type StateDataModule = typeof import("../utils/states");
 
 const REGIONS: Record<string, string[]> = {
     "North America": ["CA", "US", "MX", "BM", "GL", "PM"],
@@ -137,20 +138,19 @@ function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConfli
 
 // Loader: Fetch all rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session, billing, admin } = await authenticate.admin(request);
+    const loaderStartedAt = performance.now();
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const accessToken = session.accessToken || "";
 
-    let rules = await prisma.redirectRule.findMany({
-        where: {
-            shop,
-            matchType: { in: ["country", "market", "state"] },
-        },
-        orderBy: { priority: "desc" },
-    });
-
-    // Check for active subscription
-    const [billingConfig, settings, appEmbedStatus] = await Promise.all([
+    const [rules, billingConfig, settings, appEmbedStatus] = await Promise.all([
+        prisma.redirectRule.findMany({
+            where: {
+                shop,
+                matchType: { in: ["country", "market", "state"] },
+            },
+            orderBy: { priority: "desc" },
+        }),
         checkBillingWithFallback(billing, isBillingTestMode()),
         prisma.settings.findUnique({ where: { shop } }),
         getThemeAppEmbedStatus({
@@ -160,38 +160,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }),
     ]);
     const hasProPlan = isPaidBillingConfig(billingConfig, settings);
-    const marketsResult = await getShopifyMarkets(admin);
-    const marketCountriesByHandle = new Map(
-        marketsResult.markets.map((market) => [market.handle, market.countryCodes] as const),
-    );
-    const marketRuleBackfills = rules
-        .filter((rule) => rule.matchType === "market" && !rule.marketCountryCodes)
-        .map((rule) => {
-            const countryCodes = Array.from(new Set(
-                (rule.marketHandles || "")
-                    .split(",")
-                    .map((handle) => handle.trim())
-                    .filter(Boolean)
-                    .flatMap((handle) => marketCountriesByHandle.get(handle) || []),
-            ));
-            return { rule, countryCodes };
-        })
-        .filter((item) => item.countryCodes.length > 0);
-
-    if (marketRuleBackfills.length > 0) {
-        await Promise.all(
-            marketRuleBackfills.map(({ rule, countryCodes }) =>
-                prisma.redirectRule.update({
-                    where: { id: rule.id },
-                    data: { marketCountryCodes: countryCodes.join(",") },
-                }),
-            ),
-        );
-        rules = rules.map((rule) => {
-            const backfill = marketRuleBackfills.find((item) => item.rule.id === rule.id);
-            return backfill ? { ...rule, marketCountryCodes: backfill.countryCodes.join(",") } : rule;
-        });
-    }
 
     const conflictSummary = mergeConflictSummaries(
         detectRuleConflicts(rules, "country"),
@@ -205,10 +173,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         shop,
         hasProPlan,
         conflictSummary,
-        markets: marketsResult.markets,
-        marketsError: marketsResult.error,
+        markets: [] as ShopifyMarketOption[],
+        marketsError: null as string | null,
         appEmbedStatus,
         themeEditorUrl: getThemeEditorUrl(shop),
+    }, {
+        headers: {
+            "Server-Timing": `geo-rules;dur=${(performance.now() - loaderStartedAt).toFixed(1)}`,
+        },
     });
 };
 
@@ -457,11 +429,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function RulesPage() {
-    const { rules, hasProPlan, conflictSummary, markets, marketsError, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
+    const {
+        rules,
+        hasProPlan,
+        conflictSummary,
+        markets: initialMarkets,
+        marketsError: initialMarketsError,
+        appEmbedStatus,
+        themeEditorUrl,
+    } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const formFetcher = useFetcher<typeof action>();
     const importFetcher = useFetcher<typeof action>();
     const deleteFetcher = useFetcher<typeof action>();
+    const marketsFetcher = useFetcher<ShopifyMarketsResult>();
+    const hasRequestedMarkets = useRef(false);
+    const hasRequestedStateData = useRef(false);
     const shopify = useAppBridge();
     const [modalOpen, setModalOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
@@ -469,6 +452,9 @@ export default function RulesPage() {
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [ruleQuery, setRuleQuery] = useState("");
+    const [matchTypeFilter, setMatchTypeFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("all");
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -488,6 +474,50 @@ export default function RulesPage() {
     const [timezone, setTimezone] = useState("Asia/Ho_Chi_Minh");
     const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
     const [pagePaths, setPagePaths] = useState("");
+    const [stateData, setStateData] = useState<StateDataModule | null>(null);
+    const markets = marketsFetcher.data?.markets || initialMarkets;
+    const marketsError = marketsFetcher.data?.error || initialMarketsError;
+    const STATE_MAP = stateData?.STATE_MAP || ({} as StateDataModule["STATE_MAP"]);
+    const STATE_COUNTRY_LABELS =
+        stateData?.STATE_COUNTRY_LABELS ||
+        ({} as StateDataModule["STATE_COUNTRY_LABELS"]);
+    const COUNTRIES_WITH_STATES = stateData?.COUNTRIES_WITH_STATES || [];
+    const getStateName = stateData?.getStateName || ((code: string) => code);
+    const getStatesForCountry =
+        stateData?.getStatesForCountry ||
+        ((_countryCode: string) => [] as string[]);
+
+    useEffect(() => {
+        const needsStateData =
+            formMatchType === "state" ||
+            rules.some((rule) => rule.matchType === "state");
+        if (!needsStateData || stateData || hasRequestedStateData.current) return;
+
+        hasRequestedStateData.current = true;
+        import("../utils/states")
+            .then(setStateData)
+            .catch((error) => {
+                hasRequestedStateData.current = false;
+                console.error("[Rules] Failed to load state/region data", error);
+            });
+    }, [formMatchType, rules, stateData]);
+
+    useEffect(() => {
+        const needsMarkets =
+            formMatchType === "market" ||
+            rules.some((rule) => rule.matchType === "market");
+        if (
+            !needsMarkets ||
+            markets.length > 0 ||
+            marketsFetcher.state !== "idle" ||
+            hasRequestedMarkets.current
+        ) {
+            return;
+        }
+
+        hasRequestedMarkets.current = true;
+        marketsFetcher.load("/app/rules-markets");
+    }, [formMatchType, markets.length, marketsFetcher, rules]);
 
     useEffect(() => {
         if (fetcher.state !== "idle" || !fetcher.data?.message) return;
@@ -527,8 +557,40 @@ export default function RulesPage() {
         plural: "rules",
     };
 
+    const filteredRules = useMemo(() => {
+        const normalizedQuery = ruleQuery.trim().toLowerCase();
+        return rules.filter((rule) => {
+            if (matchTypeFilter !== "all" && rule.matchType !== matchTypeFilter) {
+                return false;
+            }
+            if (statusFilter === "active" && !rule.isActive) return false;
+            if (statusFilter === "inactive" && rule.isActive) return false;
+            if (statusFilter === "conflict" && !(conflictSummary?.byRuleId?.[rule.id]?.length > 0)) {
+                return false;
+            }
+            if (!normalizedQuery) return true;
+
+            return [
+                rule.name,
+                rule.targetUrl,
+                rule.countryCodes,
+                rule.marketHandles,
+                rule.stateCodes,
+            ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+        });
+    }, [conflictSummary?.byRuleId, matchTypeFilter, ruleQuery, rules, statusFilter]);
+    const hasRuleFilters =
+        ruleQuery.trim().length > 0 ||
+        matchTypeFilter !== "all" ||
+        statusFilter !== "all";
+    const clearRuleFilters = useCallback(() => {
+        setRuleQuery("");
+        setMatchTypeFilter("all");
+        setStatusFilter("all");
+    }, []);
+
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
-        useIndexResourceState(rules);
+        useIndexResourceState(filteredRules);
     const conflictsByRuleId = conflictSummary?.byRuleId || {};
     const conflictTotal = conflictSummary?.total || 0;
 
@@ -850,7 +912,7 @@ export default function RulesPage() {
     const isPaidOnlyRule = (rule: any) =>
         rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || (rule.pageTargetingType || "all") !== "all";
 
-    const rowMarkup = rules.map((rule: any, index: number) => {
+    const rowMarkup = filteredRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
         const conflictTone = ruleConflicts.some((item: any) => item.severity === "critical") ? "critical" : "warning";
         const conflictTooltip = ruleConflicts
@@ -1147,9 +1209,11 @@ export default function RulesPage() {
                     <Banner tone="warning" title={`${conflictTotal} potential rule conflict${conflictTotal === 1 ? "" : "s"} found`}>
                         <BlockStack gap="200">
                             <p>Active rules with overlapping countries or markets, pages, schedules, and the same priority can conflict. Open the marked rules and adjust priority or targeting.</p>
+                            <details>
+                            <summary style={{ cursor: "pointer", fontWeight: 600 }}>View conflict details</summary>
+                            <div style={{ marginTop: "12px" }}>
                             <Divider />
-                            <Text as="p" variant="bodyMd" fontWeight="semibold">Detailed conflicts:</Text>
-                            <ul style={{ paddingLeft: '20px', margin: 0, listStyleType: 'disc' }}>
+                            <ul style={{ paddingLeft: '20px', margin: '12px 0 0', listStyleType: 'disc' }}>
                                 {getUniqueConflicts().map((c, idx) => {
                                     const parts = c.scope.split(";").map(s => s.trim());
                                     const targetScope = parts[0] || "";
@@ -1175,6 +1239,8 @@ export default function RulesPage() {
                                     );
                                 })}
                             </ul>
+                            </div>
+                            </details>
                         </BlockStack>
                     </Banner>
                 )}
@@ -1184,30 +1250,87 @@ export default function RulesPage() {
                             {rules.length === 0 ? (
                                 emptyStateMarkup
                             ) : (
-                                <div className="rules-table-wrap">
-                                    <IndexTable
-                                        condensed={false}
-                                        resourceName={resourceName}
-                                        itemCount={rules.length}
-                                        selectedItemsCount={
-                                            allResourcesSelected ? "All" : selectedResources.length
-                                        }
-                                        onSelectionChange={handleSelectionChange}
-                                        headings={[
-                                            { title: "Name" },
-                                            { title: "Type" },
-                                            { title: "Target" },
-                                            { title: "Target URL" },
-                                            { title: "Status" },
-                                            { title: "Method" },
-                                            { title: "Priority" },
-                                            { title: "Actions", alignment: "end" },
-                                        ]}
-                                        promotedBulkActions={promotedBulkActions}
-                                    >
-                                        {rowMarkup}
-                                    </IndexTable>
-                                </div>
+                                <>
+                                    <div style={{
+                                        display: "grid",
+                                        gridTemplateColumns: smUp ? "minmax(280px, 1fr) 180px 180px" : "1fr",
+                                        gap: "12px",
+                                        padding: "16px",
+                                    }}>
+                                        <TextField
+                                            label="Search rules"
+                                            labelHidden
+                                            value={ruleQuery}
+                                            onChange={setRuleQuery}
+                                            placeholder="Search name, target, URL..."
+                                            prefix={<Icon source={SearchIcon} tone="subdued" />}
+                                            clearButton
+                                            onClearButtonClick={() => setRuleQuery("")}
+                                            autoComplete="off"
+                                        />
+                                        <Select
+                                            label="Target type"
+                                            labelHidden
+                                            value={matchTypeFilter}
+                                            onChange={setMatchTypeFilter}
+                                            options={[
+                                                { label: "All target types", value: "all" },
+                                                { label: "Country", value: "country" },
+                                                { label: "State/Region", value: "state" },
+                                                { label: "Shopify Market", value: "market" },
+                                            ]}
+                                        />
+                                        <Select
+                                            label="Rule status"
+                                            labelHidden
+                                            value={statusFilter}
+                                            onChange={setStatusFilter}
+                                            options={[
+                                                { label: "All statuses", value: "all" },
+                                                { label: "Active", value: "active" },
+                                                { label: "Inactive", value: "inactive" },
+                                                { label: "Has conflict", value: "conflict" },
+                                            ]}
+                                        />
+                                    </div>
+                                    <Divider />
+                                    {filteredRules.length === 0 ? (
+                                        <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                                            <BlockStack gap="300" inlineAlign="center">
+                                                <Text as="h3" variant="headingMd">No rules match these filters</Text>
+                                                <Text as="p" variant="bodyMd" tone="subdued">
+                                                    Change the search or filters to see more rules.
+                                                </Text>
+                                                {hasRuleFilters && <Button onClick={clearRuleFilters}>Clear filters</Button>}
+                                            </BlockStack>
+                                        </div>
+                                    ) : (
+                                        <div className="rules-table-wrap">
+                                            <IndexTable
+                                                condensed={false}
+                                                resourceName={resourceName}
+                                                itemCount={filteredRules.length}
+                                                selectedItemsCount={
+                                                    allResourcesSelected ? "All" : selectedResources.length
+                                                }
+                                                onSelectionChange={handleSelectionChange}
+                                                headings={[
+                                                    { title: "Name" },
+                                                    { title: "Type" },
+                                                    { title: "Target" },
+                                                    { title: "Target URL" },
+                                                    { title: "Status" },
+                                                    { title: "Method" },
+                                                    { title: "Priority" },
+                                                    { title: "Actions", alignment: "end" },
+                                                ]}
+                                                promotedBulkActions={promotedBulkActions}
+                                            >
+                                                {rowMarkup}
+                                            </IndexTable>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </Card>
                     </Layout.Section>
@@ -1428,6 +1551,11 @@ export default function RulesPage() {
 
                             {formMatchType === "state" && (
                                 <BlockStack gap="300">
+                                    {!stateData && (
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Loading states and regions...
+                                        </Text>
+                                    )}
 
                                     <InlineStack align="space-between" blockAlign="center">
                                         <Text as="p" variant="bodySm" fontWeight="semibold">States/Regions</Text>
@@ -1451,12 +1579,13 @@ export default function RulesPage() {
                                             value={stateInputValue}
                                             onChange={setStateInputValue}
                                             prefix={<Icon source={SearchIcon} />}
+                                            disabled={!stateData}
                                             autoComplete="off"
                                         />
 
                                         <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
-                                            <Button onClick={() => handleStateBulkSelect("ALL")}>Select All</Button>
-                                            <Button onClick={() => handleStateBulkSelect("CLEAR")}>Clear All</Button>
+                                            <Button disabled={!stateData} onClick={() => handleStateBulkSelect("ALL")}>Select All</Button>
+                                            <Button disabled={!stateData} onClick={() => handleStateBulkSelect("CLEAR")}>Clear All</Button>
                                         </div>
                                     </div>
 
@@ -1563,7 +1692,11 @@ export default function RulesPage() {
                                             {`${selectedMarkets.length} selected`}
                                         </Badge>
                                     </InlineStack>
-                                    {markets.length > 0 ? (
+                                    {marketsFetcher.state !== "idle" ? (
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                            Loading Shopify Markets...
+                                        </Text>
+                                    ) : markets.length > 0 ? (
                                         <>
                                             <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
                                                 <Button onClick={() => setSelectedMarkets(markets.map((market: any) => market.handle))}>Select All</Button>

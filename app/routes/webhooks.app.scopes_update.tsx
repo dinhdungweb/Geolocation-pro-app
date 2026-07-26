@@ -1,6 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { invalidateShopifyMarketsCache } from "../utils/shopify-markets.server";
+import { invalidateThemeAppEmbedStatusCache } from "../utils/theme-app-embed.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { payload, session, topic, shop } = await authenticate.webhook(request);
@@ -17,5 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             },
         });
     }
+    invalidateThemeAppEmbedStatusCache(shop);
+    invalidateShopifyMarketsCache(shop);
     return new Response();
 };

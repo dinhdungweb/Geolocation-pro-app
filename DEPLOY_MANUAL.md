@@ -127,6 +127,15 @@ server {
     listen [::]:80;
     server_name app.example.com;
 
+    location /assets/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;

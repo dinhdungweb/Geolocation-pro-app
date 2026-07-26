@@ -4,5 +4,7 @@
 }
 
 your-domain.com {
+    @versionedAssets path /assets/*
+    header @versionedAssets Cache-Control "public, max-age=31536000, immutable"
     reverse_proxy web:3000
 }

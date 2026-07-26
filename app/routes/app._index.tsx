@@ -16,7 +16,7 @@ import {
 } from "@shopify/polaris";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
-import { apiVersion, authenticate } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
   FREE_PLAN,
@@ -34,6 +34,8 @@ import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { getShopIdentity } from "../utils/shop-identity.server";
+import { getThemeAppEmbedStatus } from "../utils/theme-app-embed.server";
 
 // Helper to get country name (simplified version of the one in app.rules.tsx)
 //Ideally this should be shared, but for now we put it here or rely on code.
@@ -58,202 +60,7 @@ const STANDARD_PLAN_UPGRADES: Record<string, { label: string; actionContent: str
 };
 
 const CUSTOM_PLAN_REQUEST_ACTION = { content: "Request custom plan", url: "/app/pricing" };
-const APP_EMBED_BLOCK_HANDLE = "geolocation-popup";
 const SETUP_DISMISSED_KEY = "geo_dashboard_setup_dismissed";
-
-type AppEmbedStatusState = "enabled" | "disabled" | "missing_scope" | "unavailable";
-
-interface AppEmbedStatus {
-  state: AppEmbedStatusState;
-  label: string;
-  helpText: string;
-  themeName: string | null;
-}
-
-interface ShopIdentity {
-  ownerName: string;
-  shopName: string;
-}
-
-function hasSessionScope(scopeString: string | null | undefined, requiredScope: string) {
-  return (scopeString || "")
-    .split(",")
-    .map((scope) => scope.trim())
-    .includes(requiredScope);
-}
-
-function formatShopFallbackName(shop: string) {
-  return shop
-    .replace(".myshopify.com", "")
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ") || "there";
-}
-
-async function getShopIdentity({
-  shop,
-  accessToken,
-}: {
-  shop: string;
-  accessToken: string;
-}): Promise<ShopIdentity> {
-  const fallbackName = formatShopFallbackName(shop);
-
-  try {
-    const response = await fetch(
-      `https://${shop}/admin/api/${apiVersion}/shop.json?fields=name,shop_owner`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          Accept: "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Shop request failed with ${response.status}`);
-    }
-
-    const data = await response.json() as {
-      shop?: {
-        name?: string | null;
-        shop_owner?: string | null;
-      };
-    };
-
-    return {
-      ownerName: data.shop?.shop_owner || data.shop?.name || fallbackName,
-      shopName: data.shop?.name || fallbackName,
-    };
-  } catch (error) {
-    console.error("[Dashboard] Failed to read shop identity:", error);
-    return {
-      ownerName: fallbackName,
-      shopName: fallbackName,
-    };
-  }
-}
-
-async function getThemeAppEmbedStatus({
-  shop,
-  accessToken,
-  scopeString,
-}: {
-  shop: string;
-  accessToken: string;
-  scopeString: string | null | undefined;
-}): Promise<AppEmbedStatus> {
-  const sessionHasThemeScope = hasSessionScope(scopeString, "read_themes");
-
-  const headers = {
-    "X-Shopify-Access-Token": accessToken,
-    Accept: "application/json",
-  };
-
-  try {
-    const themesResponse = await fetch(
-      `https://${shop}/admin/api/${apiVersion}/themes.json?role=main`,
-      { headers },
-    );
-
-    if (themesResponse.status === 401 || themesResponse.status === 403) {
-      return {
-        state: "missing_scope",
-        label: "Permission needed",
-        helpText: sessionHasThemeScope
-          ? "Shopify did not allow theme access. Reapprove the app permissions, then reload this page."
-          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
-        themeName: null,
-      };
-    }
-
-    if (!themesResponse.ok) {
-      throw new Error(`Theme list request failed with ${themesResponse.status}`);
-    }
-
-    const themesData = await themesResponse.json() as {
-      themes?: Array<{ id: number | string; name?: string; role?: string }>;
-    };
-    const mainTheme = themesData.themes?.find((theme) => theme.role === "main") || themesData.themes?.[0];
-
-    if (!mainTheme?.id) {
-      return {
-        state: "unavailable",
-        label: "Status unavailable",
-        helpText: "The current theme could not be found. Open the theme editor and confirm the app embed manually.",
-        themeName: null,
-      };
-    }
-
-    const assetResponse = await fetch(
-      `https://${shop}/admin/api/${apiVersion}/themes/${mainTheme.id}/assets.json?asset[key]=config%2Fsettings_data.json`,
-      { headers },
-    );
-
-    if (assetResponse.status === 401 || assetResponse.status === 403) {
-      return {
-        state: "missing_scope",
-        label: "Permission needed",
-        helpText: sessionHasThemeScope
-          ? "Shopify did not allow theme asset access. Reapprove the app permissions, then reload this page."
-          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
-        themeName: mainTheme.name || null,
-      };
-    }
-
-    if (!assetResponse.ok) {
-      throw new Error(`Theme asset request failed with ${assetResponse.status}`);
-    }
-
-    const assetData = await assetResponse.json() as { asset?: { value?: string } };
-    const settingsValue = assetData.asset?.value;
-
-    if (!settingsValue) {
-      return {
-        state: "disabled",
-        label: "Not enabled",
-        helpText: "The current theme does not include the app embed yet. Enable it in the theme editor and save.",
-        themeName: mainTheme.name || null,
-      };
-    }
-
-    const settingsData = JSON.parse(settingsValue) as {
-      current?: { blocks?: Record<string, { type?: unknown; disabled?: unknown }> };
-    };
-    const blocks = settingsData.current?.blocks && typeof settingsData.current.blocks === "object"
-      ? Object.values(settingsData.current.blocks)
-      : [];
-    const appEmbedBlock = blocks.find((block) => {
-      const blockType = typeof block.type === "string" ? block.type : "";
-      return blockType.includes(`/blocks/${APP_EMBED_BLOCK_HANDLE}/`) || blockType.includes(APP_EMBED_BLOCK_HANDLE);
-    });
-
-    if (appEmbedBlock && appEmbedBlock.disabled !== true) {
-      return {
-        state: "enabled",
-        label: "Enabled",
-        helpText: `The app embed is enabled in ${mainTheme.name || "the current theme"}.`,
-        themeName: mainTheme.name || null,
-      };
-    }
-
-    return {
-      state: "disabled",
-      label: "Not enabled",
-      helpText: "The app embed is not enabled in the current theme. Enable it in the theme editor and save.",
-      themeName: mainTheme.name || null,
-    };
-  } catch (error) {
-    console.error("[Dashboard] Failed to read theme app embed status:", error);
-    return {
-      state: "unavailable",
-      label: "Status unavailable",
-      helpText: "Theme status could not be checked right now. You can still open the theme editor and verify the app embed manually.",
-      themeName: null,
-    };
-  }
-}
 
 function formatPlanLabel(planName: string) {
   if (!planName) return "current";
@@ -275,6 +82,7 @@ function formatUsagePeriodEnd(value: string | null) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const loaderStartedAt = performance.now();
   const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
   const accessToken = session.accessToken || "";
@@ -282,18 +90,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [
-    rulesCount,
-    activeRulesCount,
-    latestVisitorLog,
-    settings,
-    billingConfig,
-    countryStats,
-    blockStats,
-    ruleStats,
-    shopIdentity,
-    appEmbedStatus,
-  ] = await Promise.all([
+  const dashboardDataPromise = Promise.all([
     prisma.redirectRule.count({ where: { shop } }),
     prisma.redirectRule.count({ where: { shop, isActive: true } }),
     prisma.visitorLog.findFirst({
@@ -301,12 +98,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderBy: { timestamp: "desc" },
       select: { id: true },
     }),
-    prisma.settings.upsert({
-      where: { shop },
-      update: {},
-      create: { shop },
-    }),
-    checkBillingWithFallback(billing, isBillingTestMode()),
     prisma.analyticsCountry.groupBy({
       by: ['countryCode'],
       where: {
@@ -322,22 +113,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderBy: {
         _sum: {
           visitors: "desc",
-        },
-      },
-    }),
-    prisma.analyticsCountry.groupBy({
-      by: ['countryCode'],
-      where: {
-        shop,
-        date: { gte: thirtyDaysAgo },
-        blocked: { gt: 0 },
-      },
-      _sum: {
-        blocked: true,
-      },
-      orderBy: {
-        _sum: {
-          blocked: "desc",
         },
       },
     }),
@@ -366,25 +141,66 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }),
   ]);
 
-  const shopifyPlan = getStableShopifyPlanFromBillingCheck(
-    billingConfig,
-    settings.currentPlan,
-  );
-  const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
-    settings,
-    shopifyPlan,
+  const settingsAndBillingPromise = Promise.all([
+    prisma.settings.upsert({
+      where: { shop },
+      update: {},
+      create: { shop },
+    }),
+    checkBillingWithFallback(billing, isBillingTestMode()),
+  ]);
+
+  const planAndUsagePromise = settingsAndBillingPromise.then(async ([settings, billingConfig]) => {
+    const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+      billingConfig,
+      settings.currentPlan,
+    );
+    const { effectivePlan: currentPlan, isBillingOverridden } = resolveEffectivePlan({
+      settings,
+      shopifyPlan,
+    });
+    const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
+    const monthlyUsage = await prisma.monthlyUsage.findUnique({
+      where: {
+        shop_billingPeriodKey: {
+          shop,
+          billingPeriodKey: usagePeriod.key,
+        },
+      },
+    });
+
+    return {
+      settings,
+      shopifyPlan,
+      currentPlan,
+      isBillingOverridden,
+      usagePeriod,
+      monthlyUsage,
+    };
   });
+
+  const [
+    [
+      rulesCount,
+      activeRulesCount,
+      latestVisitorLog,
+      countryStats,
+      ruleStats,
+      shopIdentity,
+      appEmbedStatus,
+    ],
+    {
+      settings,
+      shopifyPlan,
+      currentPlan,
+      isBillingOverridden,
+      usagePeriod,
+      monthlyUsage,
+    },
+  ] = await Promise.all([dashboardDataPromise, planAndUsagePromise]);
+
   const planLimit = getPlanLimit(currentPlan, settings);
   const planDisplayName = currentPlan === CUSTOM_PLAN ? settings.customPlanName : currentPlan;
-  const usagePeriod = await getUsagePeriodForShop({ shop, currentPlan, settings });
-  const monthlyUsage = await prisma.monthlyUsage.findUnique({
-    where: {
-      shop_billingPeriodKey: {
-        shop,
-        billingPeriodKey: usagePeriod.key,
-      },
-    },
-  });
   const currentUsage = monthlyUsage?.totalVisitors || 0;
   const chargedVisitors = monthlyUsage?.chargedVisitors || 0;
   const isUnlimitedUsage =
@@ -420,9 +236,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const totalCountries = Array.isArray(countryStats) ? countryStats.length : 0;
   const totalRedirected = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.redirected || 0), 0) : 0;
   const totalBlocked = Array.isArray(countryStats) ? (countryStats as any[]).reduce((sum: number, item: any) => sum + (item._sum.blocked || 0), 0) : 0;
+  const blockStats = Array.isArray(countryStats)
+    ? [...countryStats]
+      .filter((item: any) => (item._sum.blocked || 0) > 0)
+      .sort((left: any, right: any) => (right._sum.blocked || 0) - (left._sum.blocked || 0))
+    : [];
 
   // Process visits data
-  const visitsData: VisitsDataItem[] = Array.isArray(countryStats) ? (countryStats as any[]).map((stat: any, index: number) => ({
+  const visitsData: VisitsDataItem[] = Array.isArray(countryStats) ? (countryStats as any[]).map((stat: any) => ({
     id: stat.countryCode,
     country: COUNTRY_MAP[stat.countryCode] || stat.countryCode,
     code: stat.countryCode,
@@ -488,6 +309,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     popupsData,
     autoRedirectsData,
     blocksData,
+  }, {
+    headers: {
+      "Server-Timing": `geo-home;dur=${(performance.now() - loaderStartedAt).toFixed(1)}`,
+    },
   });
 };
 
@@ -499,7 +324,7 @@ export default function Index() {
   const [setupDismissed, setSetupDismissed] = useState<boolean | null>(null);
   const [setupCollapsed, setSetupCollapsed] = useState(false);
   const [activeSetupStepId, setActiveSetupStepId] = useState<string | null>(null);
-  const hasScheduledPermissionRefresh = useRef(false);
+  const lastPermissionRefreshAt = useRef(0);
   const installKey = `${shop}:${onboardingInstallAt}`;
   const setupDismissedKey = `${SETUP_DISMISSED_KEY}:${installKey}`;
 
@@ -513,48 +338,39 @@ export default function Index() {
   }, [setupDismissedKey]);
 
   useEffect(() => {
-    if (appEmbedStatus.state !== "missing_scope") {
-      hasScheduledPermissionRefresh.current = false;
-      return;
-    }
+    if (appEmbedStatus.state !== "missing_scope") return;
 
-    const refreshDelays = [0, 1000, 2500, 5000, 9000, 13000];
-    const refreshTimers: number[] = [];
-
-    const schedulePermissionRefresh = () => {
-      if (hasScheduledPermissionRefresh.current) return;
-      hasScheduledPermissionRefresh.current = true;
-
-      for (const delay of refreshDelays) {
-        const timer = window.setTimeout(() => {
-          if (document.visibilityState === "visible") {
-            revalidator.revalidate();
-          }
-        }, delay);
-        refreshTimers.push(timer);
+    const refreshPermissionStatus = () => {
+      const now = Date.now();
+      if (
+        document.visibilityState !== "visible" ||
+        revalidator.state !== "idle" ||
+        now - lastPermissionRefreshAt.current < 3_000
+      ) {
+        return;
       }
+      lastPermissionRefreshAt.current = now;
+      revalidator.revalidate();
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        schedulePermissionRefresh();
+        refreshPermissionStatus();
       }
     };
 
-    window.addEventListener("focus", schedulePermissionRefresh);
-    window.addEventListener("pageshow", schedulePermissionRefresh);
+    const initialRefreshTimer = window.setTimeout(refreshPermissionStatus, 2_500);
+    window.addEventListener("focus", refreshPermissionStatus);
+    window.addEventListener("pageshow", refreshPermissionStatus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    schedulePermissionRefresh();
 
     return () => {
-      window.removeEventListener("focus", schedulePermissionRefresh);
-      window.removeEventListener("pageshow", schedulePermissionRefresh);
+      window.clearTimeout(initialRefreshTimer);
+      window.removeEventListener("focus", refreshPermissionStatus);
+      window.removeEventListener("pageshow", refreshPermissionStatus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      for (const timer of refreshTimers) {
-        window.clearTimeout(timer);
-      }
     };
-  }, [appEmbedStatus.state, revalidator]);
+  }, [appEmbedStatus.state, revalidator.state, revalidator.revalidate]);
 
   // Calculate usage percentage
   const isUnlimitedPlan = isUnlimitedUsage;
