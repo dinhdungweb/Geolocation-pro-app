@@ -20,6 +20,7 @@ import {
 } from "@shopify/polaris";
 import { CalendarIcon, SearchIcon, XIcon, FilterIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import prisma from "../db.server";
@@ -453,36 +454,11 @@ async function getVisitorLogFilterOptions(
 
 function VisitorLogsTableSkeleton() {
     return (
-        <div className="visitor-log-skeleton" aria-busy="true" aria-label="Loading visitor logs">
-            <div className="visitor-log-skeleton-table-wrap">
-                <table className="visitor-log-skeleton-table">
-                    <thead>
-                        <tr>
-                            {logTableHeadings.map((heading) => (
-                                <th key={heading.title}>{heading.title}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {Array.from({ length: 8 }).map((_, rowIndex) => (
-                            <tr key={rowIndex}>
-                                {logTableHeadings.map((heading, columnIndex) => (
-                                    <td key={heading.title}>
-                                        <span
-                                            className={`visitor-log-skeleton-line visitor-log-skeleton-line-${(columnIndex % 4) + 1}`}
-                                        />
-                                    </td>
-                                ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            <div className="visitor-log-pagination visitor-log-skeleton-pagination">
-                <span className="visitor-log-skeleton-line visitor-log-skeleton-line-meta" />
-                <span className="visitor-log-skeleton-pager" />
-            </div>
-        </div>
+        <SimpleLoadingSkeleton
+            label="Loading visitor logs"
+            minHeight={320}
+            rows={6}
+        />
     );
 }
 

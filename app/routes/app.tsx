@@ -2,10 +2,11 @@ import { useEffect, useRef } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { NavMenu } from "@shopify/app-bridge-react";
+import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { EmbeddedAppProviders } from "../components/embedded-app-providers";
+import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
@@ -964,6 +965,24 @@ function getPendingShellForPath(pathname: string) {
   return null;
 }
 
+function NavigationLoadingIndicator() {
+  const navigation = useNavigation();
+  const shopify = useAppBridge();
+  const isLoading = navigation.state !== "idle";
+
+  useEffect(() => {
+    shopify.loading(isLoading);
+
+    return () => {
+      if (isLoading) {
+        shopify.loading(false);
+      }
+    };
+  }, [isLoading, shopify]);
+
+  return null;
+}
+
 export default function App() {
   const { apiKey, shop } = useLoaderData<typeof loader>();
   const location = useLocation();
@@ -973,9 +992,6 @@ export default function App() {
     navigation.state !== "idle" &&
     navigation.location?.pathname.startsWith("/app") &&
     location.pathname !== navigation.location.pathname;
-  const pendingShell = isNavigatingToAppRoute && navigation.location
-    ? getPendingShellForPath(navigation.location.pathname)
-    : null;
 
   useEffect(() => {
     installShopifyInvalidSessionFetchRetry();
@@ -1080,6 +1096,7 @@ export default function App() {
 
   return (
     <EmbeddedAppProviders apiKey={apiKey}>
+      <NavigationLoadingIndicator />
       <style>
         {`
           @media (max-width: 30em) {
@@ -1144,7 +1161,15 @@ export default function App() {
         <Link to="/app/support">Support</Link>
       </NavMenu>
       <div className="app-route-frame">
-        {pendingShell || <Outlet />}
+        {isNavigatingToAppRoute ? (
+          <SimpleLoadingSkeleton
+            label="Loading page"
+            minHeight={520}
+            rows={5}
+          />
+        ) : (
+          <Outlet />
+        )}
       </div>
     </EmbeddedAppProviders>
   );

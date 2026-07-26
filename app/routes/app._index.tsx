@@ -35,6 +35,7 @@ import {
   ShieldCheckMarkIcon,
 } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import {
   CUSTOM_PLAN,
   FREE_PLAN,
@@ -641,17 +642,11 @@ function DeferredTrafficChart({
 
 function DashboardPending() {
   return (
-    <div className="geo-dashboard-pending" aria-label="Loading dashboard analytics">
-      <div className="geo-metrics-grid">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="geo-skeleton geo-skeleton-metric" />
-        ))}
-      </div>
-      <div className="geo-analytics-grid">
-        <div className="geo-skeleton geo-skeleton-panel" />
-        <div className="geo-skeleton geo-skeleton-panel" />
-      </div>
-    </div>
+    <SimpleLoadingSkeleton
+      label="Loading dashboard analytics"
+      minHeight={420}
+      rows={3}
+    />
   );
 }
 
