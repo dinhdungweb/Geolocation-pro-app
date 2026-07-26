@@ -1453,6 +1453,12 @@ export default function VisitorLogs() {
                     .visitor-log-filter-popover .visitor-log-date-filter .Polaris-Button {
                         width: 100%;
                     }
+                    .visitor-log-filter-popover .visitor-log-date-filter .Polaris-Button.Polaris-Button--disclosure {
+                        justify-content: flex-start;
+                    }
+                    .visitor-log-filter-popover .visitor-log-date-filter .Polaris-Button > .Polaris-Button__Icon:last-child {
+                        margin-left: auto;
+                    }
                     .visitor-log-filter-popover-footer {
                         align-items: center;
                         border-top: 1px solid var(--p-color-border-secondary, #ebebeb);
