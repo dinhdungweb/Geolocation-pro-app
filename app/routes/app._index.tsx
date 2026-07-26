@@ -72,6 +72,9 @@ const CUSTOM_PLAN_REQUEST_ACTION = {
 const WorldTrafficMap = lazy(
   () => import("../components/world-traffic-map"),
 );
+const PolarisTrafficChart = lazy(
+  () => import("../components/traffic-line-chart"),
+);
 
 function formatPlanLabel(planName: string) {
   if (!planName) return "Current";
@@ -516,7 +519,7 @@ function Panel({
   );
 }
 
-function TrafficChart({
+function DeferredTrafficChart({
   points,
 }: {
   points: Array<{
@@ -526,99 +529,52 @@ function TrafficChart({
     blocked: number;
   }>;
 }) {
-  const width = 720;
-  const height = 238;
-  const left = 42;
-  const right = 14;
-  const top = 18;
-  const bottom = 34;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
-  const maxValue = Math.max(
-    1,
-    ...points.flatMap((point) => [point.redirects, point.blocked]),
-  );
-  const niceMax = Math.max(5, Math.ceil(maxValue / 5) * 5);
-  const toPoints = (key: "redirects" | "blocked") =>
-    points
-      .map((point, index) => {
-        const x =
-          left +
-          (points.length <= 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
-        const y = top + plotHeight - (point[key] / niceMax) * plotHeight;
-        return `${x},${y}`;
-      })
-      .join(" ");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (!("IntersectionObserver" in window)) {
+      setShouldLoad(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setShouldLoad(true);
+        observer.disconnect();
+      },
+      { rootMargin: "240px 0px" },
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="geo-chart">
-      <div className="geo-chart-legend" aria-hidden="true">
-        <span><i className="is-blue" />Redirects</span>
-        <span><i className="is-orange" />Blocked visits</span>
-      </div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="Redirects and blocked visits over the last seven days"
-      >
-        {[0, 1, 2, 3, 4].map((step) => {
-          const y = top + (plotHeight / 4) * step;
-          const label = Math.round(niceMax - (niceMax / 4) * step);
-
-          return (
-            <g key={step}>
-              <line
-                x1={left}
-                x2={width - right}
-                y1={y}
-                y2={y}
-                className="geo-chart-grid"
-              />
-              <text x={left - 8} y={y + 4} className="geo-chart-axis" textAnchor="end">
-                {label.toLocaleString()}
-              </text>
-            </g>
-          );
-        })}
-        <polyline
-          points={toPoints("redirects")}
-          className="geo-chart-line is-blue"
+    <div ref={containerRef} className="geo-chart-shell">
+      {shouldLoad ? (
+        <Suspense
+          fallback={
+            <div
+              className="geo-chart-loading"
+              role="status"
+              aria-label="Loading traffic chart"
+            />
+          }
+        >
+          <PolarisTrafficChart points={points} />
+        </Suspense>
+      ) : (
+        <div
+          className="geo-chart-loading"
+          role="status"
+          aria-label="Loading traffic chart"
         />
-        <polyline
-          points={toPoints("blocked")}
-          className="geo-chart-line is-orange"
-        />
-        {points.map((point, index) => {
-          const x =
-            left +
-            (points.length <= 1
-              ? plotWidth / 2
-              : (index / (points.length - 1)) * plotWidth);
-          const redirectY =
-            top + plotHeight - (point.redirects / niceMax) * plotHeight;
-          const blockedY =
-            top + plotHeight - (point.blocked / niceMax) * plotHeight;
-
-          return (
-            <g key={point.date}>
-              <circle cx={x} cy={redirectY} r="3.5" className="geo-chart-dot is-blue">
-                <title>{`${point.label}: ${point.redirects.toLocaleString()} redirects`}</title>
-              </circle>
-              <circle cx={x} cy={blockedY} r="3.5" className="geo-chart-dot is-orange">
-                <title>{`${point.label}: ${point.blocked.toLocaleString()} blocked`}</title>
-              </circle>
-              <text
-                x={x}
-                y={height - 10}
-                textAnchor="middle"
-                className="geo-chart-axis"
-              >
-                {point.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+      )}
     </div>
   );
 }
@@ -1167,73 +1123,23 @@ export default function Index() {
           color: var(--p-color-text-secondary, #616161);
           text-align: center;
         }
-        .geo-chart {
-          display: grid;
-          gap: 4px;
-          padding: 10px 12px 6px;
+        .geo-chart-shell {
           min-width: 0;
+          min-height: 258px;
+          padding: 8px 12px 6px;
         }
-        .geo-chart-legend {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 0 2px;
-          font-size: 12px;
-          color: var(--p-color-text-secondary, #616161);
-        }
-        .geo-chart-legend span {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .geo-chart-legend i {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-        }
-        .geo-chart-legend .is-blue {
-          background: #1769e0;
-        }
-        .geo-chart-legend .is-orange {
-          background: #ef6c00;
-        }
-        .geo-chart svg {
-          display: block;
+        .geo-chart-loading {
           width: 100%;
-          height: auto;
-          min-height: 210px;
-          overflow: visible;
-        }
-        .geo-chart-grid {
-          stroke: #e7e7e7;
-          stroke-width: 1;
-          stroke-dasharray: 3 3;
-        }
-        .geo-chart-axis {
-          fill: #767676;
-          font-size: 11px;
-        }
-        .geo-chart-line {
-          fill: none;
-          stroke-width: 2.5;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-        }
-        .geo-chart-line.is-blue {
-          stroke: #1769e0;
-        }
-        .geo-chart-line.is-orange {
-          stroke: #ef6c00;
-        }
-        .geo-chart-dot {
-          stroke: #ffffff;
-          stroke-width: 2;
-        }
-        .geo-chart-dot.is-blue {
-          fill: #1769e0;
-        }
-        .geo-chart-dot.is-orange {
-          fill: #ef6c00;
+          min-height: 244px;
+          border-radius: 6px;
+          background: linear-gradient(
+            90deg,
+            #f3f3f3 0%,
+            #fafafa 50%,
+            #f3f3f3 100%
+          );
+          background-size: 200% 100%;
+          animation: geo-map-shimmer 1.2s ease-in-out infinite;
         }
         .geo-list {
           display: grid;
@@ -1551,12 +1457,6 @@ export default function Index() {
           .geo-recent-row .geo-rule-actions {
             display: none;
           }
-          .geo-chart {
-            overflow-x: auto;
-          }
-          .geo-chart svg {
-            width: 620px;
-          }
           .geo-footer {
             grid-template-columns: 1fr;
           }
@@ -1780,7 +1680,7 @@ export default function Index() {
                     title="Redirects vs blocked visits"
                     action={<Badge>Last 7 days</Badge>}
                   >
-                    <TrafficChart points={dailySeries} />
+                    <DeferredTrafficChart points={dailySeries} />
                   </Panel>
                 </div>
 
