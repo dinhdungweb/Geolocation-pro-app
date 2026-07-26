@@ -205,7 +205,8 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
     ...actionTotals,
   };
 
-  const topCountries = countryTraffic.slice(0, 6).map((item) => ({
+  const topCountryTraffic = countryTraffic.slice(0, 6);
+  const topCountries = topCountryTraffic.map((item) => ({
     code: item.code,
     country: COUNTRY_MAP[item.code] || item.code,
     visitors: item.visitors,
@@ -213,6 +214,24 @@ async function loadDashboardAnalytics(shop: string, thirtyDaysAgo: Date) {
       ? Math.round((item.visitors / observedVisitors) * 1000) / 10
       : 0,
   }));
+  const otherCountryCount = Math.max(
+    0,
+    countryTraffic.length - topCountryTraffic.length,
+  );
+  const otherCountryVisitors = countryTraffic
+    .slice(topCountryTraffic.length)
+    .reduce((sum, item) => sum + item.visitors, 0);
+
+  if (otherCountryCount > 0 && otherCountryVisitors > 0) {
+    topCountries.push({
+      code: "OTHER",
+      country: `Other (${otherCountryCount} countries)`,
+      visitors: otherCountryVisitors,
+      share: observedVisitors > 0
+        ? Math.round((otherCountryVisitors / observedVisitors) * 1000) / 10
+        : 0,
+    });
+  }
 
   const dailyByDate = new Map(
     dailyStats.map((item) => [
@@ -1156,7 +1175,7 @@ export default function Index() {
           grid-template-columns: minmax(110px, 1fr) 48px;
           align-items: center;
           gap: 10px;
-          min-height: 44px;
+          min-height: 38px;
           padding: 6px 12px;
         }
         .geo-country-row + .geo-country-row {
@@ -1174,6 +1193,15 @@ export default function Index() {
           border-radius: 2px;
           object-fit: cover;
           box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+        }
+        .geo-country-other-icon {
+          display: inline-flex;
+          width: 22px;
+          height: 22px;
+          flex: 0 0 22px;
+          align-items: center;
+          justify-content: center;
+          color: var(--p-color-icon-secondary, #616161);
         }
         .geo-country-name span {
           overflow: hidden;
@@ -1802,15 +1830,24 @@ export default function Index() {
                           {topCountries.map((item) => (
                             <div className="geo-country-row" key={item.code}>
                               <div className="geo-country-name">
-                                <img
-                                  src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
-                                  srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
-                                  width="22"
-                                  height="15"
-                                  alt=""
-                                  loading="lazy"
-                                  decoding="async"
-                                />
+                                {item.code === "OTHER" ? (
+                                  <span
+                                    className="geo-country-other-icon"
+                                    aria-hidden="true"
+                                  >
+                                    <Icon source={GlobeIcon} />
+                                  </span>
+                                ) : (
+                                  <img
+                                    src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
+                                    srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
+                                    width="22"
+                                    height="15"
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                )}
                                 <span>{item.country}</span>
                               </div>
                               <span className="geo-country-share">{item.share}%</span>
