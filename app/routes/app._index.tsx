@@ -232,7 +232,7 @@ async function loadDashboardAnalytics(
     ...actionTotals,
   };
 
-  const topCountryTraffic = countryTraffic.slice(0, 6);
+  const topCountryTraffic = countryTraffic.slice(0, 7);
   const topCountries = topCountryTraffic.map((item) => ({
     code: item.code,
     country: COUNTRY_MAP[item.code] || item.code,
