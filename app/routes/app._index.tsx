@@ -974,10 +974,98 @@ export default function Index() {
           border-right: 1px solid var(--p-color-border-secondary, #ebebeb);
         }
         .geo-world-map {
+          width: 100%;
+          min-height: 268px;
+        }
+        .geo-map-interactive {
+          position: relative;
+          width: 100%;
+          height: 268px;
+          overflow: hidden;
+          border-radius: 8px;
+          background: #ffffff;
+        }
+        .geo-map-viewport {
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          cursor: grab;
+          touch-action: none;
+          user-select: none;
+        }
+        .geo-map-viewport.is-dragging {
+          cursor: grabbing;
+        }
+        .geo-map-canvas {
           display: grid;
           place-items: center;
           width: 100%;
-          min-height: 252px;
+          height: 100%;
+          transform-origin: center;
+          transition: transform 160ms ease-out;
+          will-change: transform;
+        }
+        .geo-map-viewport.is-dragging .geo-map-canvas {
+          transition: none;
+        }
+        .geo-map-controls {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          z-index: 3;
+          display: flex;
+          overflow: hidden;
+          border: 1px solid var(--p-color-border, #c9cccf);
+          border-radius: 8px;
+          background: #ffffff;
+          box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+        }
+        .geo-map-control {
+          display: grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          padding: 0;
+          border: 0;
+          border-right: 1px solid var(--p-color-border-secondary, #ebebeb);
+          background: transparent;
+          color: var(--p-color-text, #303030);
+          font: inherit;
+          font-size: 18px;
+          line-height: 1;
+          cursor: pointer;
+        }
+        .geo-map-control:last-child {
+          border-right: 0;
+        }
+        .geo-map-control:hover:not(:disabled) {
+          background: var(--p-color-bg-surface-hover, #f7f7f7);
+        }
+        .geo-map-control:focus-visible {
+          position: relative;
+          z-index: 1;
+          outline: 2px solid var(--p-color-border-focus, #005bd3);
+          outline-offset: -2px;
+        }
+        .geo-map-control:disabled {
+          color: var(--p-color-text-disabled, #b5b5b5);
+          cursor: default;
+        }
+        .geo-map-control-reset {
+          font-size: 16px;
+        }
+        .geo-map-zoom-level {
+          position: absolute;
+          right: 10px;
+          bottom: 8px;
+          z-index: 2;
+          padding: 2px 6px;
+          border-radius: 6px;
+          background: rgb(255 255 255 / 88%);
+          color: var(--p-color-text-secondary, #616161);
+          font-size: 10px;
+          line-height: 16px;
+          pointer-events: none;
         }
         .geo-map-loading {
           width: 100%;
@@ -990,6 +1078,7 @@ export default function Index() {
         .geo-world-map .worldmap__wrapper {
           width: 100%;
           min-width: 0;
+          pointer-events: auto;
         }
         .geo-world-map .worldmap__figure-container {
           display: flex;
@@ -1445,7 +1534,10 @@ export default function Index() {
             border-bottom: 1px solid var(--p-color-border-secondary, #ebebeb);
           }
           .geo-world-map {
-            min-height: 240px;
+            min-height: 248px;
+          }
+          .geo-map-interactive {
+            height: 248px;
           }
           .geo-map-footer {
             align-items: flex-start;
