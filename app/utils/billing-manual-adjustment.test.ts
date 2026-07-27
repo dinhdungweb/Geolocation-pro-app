@@ -36,7 +36,7 @@ describe("manual billing adjustments", () => {
     prismaMock.monthlyUsage.updateMany.mockResolvedValue({ count: 1 });
   });
 
-  it("uses a unique manual adjustment key and clears it after charging", async () => {
+  it("uses a unique manual adjustment key and preserves it after charging", async () => {
     const admin = {
       graphql: vi.fn().mockResolvedValue({
         json: async () => ({
@@ -86,8 +86,10 @@ describe("manual billing adjustments", () => {
       }),
       data: expect.objectContaining({
         chargedVisitors: 1_000,
-        manualChargedVisitorsKey: null,
       }),
     });
+    expect(
+      prismaMock.monthlyUsage.updateMany.mock.calls[0]?.[0]?.data,
+    ).not.toHaveProperty("manualChargedVisitorsKey");
   });
 });

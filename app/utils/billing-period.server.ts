@@ -309,19 +309,41 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod) {
   });
 
   if (existing) {
+    // Builds deployed before 2026-07-27 cleared the manual key after Shopify
+    // accepted a usage charge. The next sync then imported Shopify's cumulative
+    // history and added the pre-adjustment charges back. Recover the latest
+    // logical total from the charge attempt and keep manual mode for this period.
+    const recoveredManualAttempt = existing.manualChargedVisitorsKey
+      ? null
+      : await prisma.usageChargeAttempt.findFirst({
+        where: {
+          shop,
+          billingPeriodKey: period.key,
+          manualAdjustmentKey: { not: null },
+          status: { in: ["succeeded", "shopify_charged", "db_update_failed"] },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          manualAdjustmentKey: true,
+          toChargedVisitors: true,
+        },
+      });
     const manualChargedVisitorsKey =
       existing.manualChargedVisitorsKey ||
+      recoveredManualAttempt?.manualAdjustmentKey ||
       carryForwardCounts?.manualChargedVisitorsKey ||
       null;
     const nextChargedVisitors = existing.manualChargedVisitorsKey
       ? existing.chargedVisitors
-      : carryForwardCounts?.manualChargedVisitorsKey
-        ? carryForwardCounts.chargedVisitors
-        : Math.max(
-          existing.chargedVisitors,
-          period.chargedVisitors,
-          carryForwardCounts?.chargedVisitors || 0,
-        );
+      : recoveredManualAttempt?.manualAdjustmentKey
+        ? recoveredManualAttempt.toChargedVisitors
+        : carryForwardCounts?.manualChargedVisitorsKey
+          ? carryForwardCounts.chargedVisitors
+          : Math.max(
+            existing.chargedVisitors,
+            period.chargedVisitors,
+            carryForwardCounts?.chargedVisitors || 0,
+          );
     await prisma.monthlyUsage.update({
       where: {
         shop_billingPeriodKey: {

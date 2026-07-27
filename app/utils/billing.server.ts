@@ -93,9 +93,6 @@ async function reconcilePendingChargeAttempt(shop: string, usagePeriod: {
         },
         data: {
             chargedVisitors: attempt.toChargedVisitors,
-            ...(attempt.manualAdjustmentKey
-                ? { manualChargedVisitorsKey: null }
-                : {}),
             billingPeriodStart: usagePeriod.billingPeriodStart,
             billingPeriodEnd: usagePeriod.billingPeriodEnd,
             billingSubscriptionId: usagePeriod.billingSubscriptionId,
@@ -319,9 +316,6 @@ export async function chargeOverageUsageRecord({
                 },
                 data: {
                     chargedVisitors: toChargedVisitors,
-                    ...(manualAdjustmentKey
-                        ? { manualChargedVisitorsKey: null }
-                        : {}),
                     billingPeriodStart: usagePeriod.billingPeriodStart,
                     billingPeriodEnd: usagePeriod.billingPeriodEnd,
                     billingSubscriptionId: usagePeriod.billingSubscriptionId,
