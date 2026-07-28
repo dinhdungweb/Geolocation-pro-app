@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../app/db.server";
 import { authenticate } from "../../app/shopify.server";
@@ -40,15 +41,31 @@ function adminWithActiveSubscriptions(
   };
 }
 
-function webhookRequest(topic: string, shop: string) {
+function webhookRequest(
+  topic: string,
+  shop: string,
+  options: { validHmac?: boolean } = {},
+) {
+  const body = JSON.stringify({ id: 123, myshopify_domain: shop });
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "x-shopify-api-version": "2026-04",
+    "x-shopify-shop-domain": shop,
+    "x-shopify-topic": topic,
+    "x-shopify-webhook-id": `webhook-${topic}`,
+  };
+
+  if (options.validHmac) {
+    headers["x-shopify-hmac-sha256"] = crypto
+      .createHmac("sha256", process.env.SHOPIFY_API_SECRET || "")
+      .update(body)
+      .digest("base64");
+  }
+
   return new Request("https://app.test/webhooks", {
+    body,
+    headers,
     method: "POST",
-    headers: {
-      "x-shopify-api-version": "2026-04",
-      "x-shopify-shop-domain": shop,
-      "x-shopify-topic": topic,
-      "x-shopify-webhook-id": `webhook-${topic}`,
-    },
   });
 }
 
@@ -112,15 +129,13 @@ afterEach(async () => {
 describe("Shopify webhook cleanup integration", () => {
   it("deactivates an uninstalled shop and completes background cleanup", async () => {
     await seedShop(uninstallShop);
-    webhookAuth.mockResolvedValue({
-      shop: uninstallShop,
-      topic: "APP_UNINSTALLED",
-    } as never);
 
     const response = await uninstallAction({
       context: {},
       params: {},
-      request: webhookRequest("APP_UNINSTALLED", uninstallShop),
+      request: webhookRequest("APP_UNINSTALLED", uninstallShop, {
+        validHmac: true,
+      }),
     } as never);
 
     expect(response.status).toBe(200);
@@ -178,9 +193,8 @@ describe("Shopify webhook cleanup integration", () => {
     ).toMatchObject({ reason: "shop_redact", status: "completed" });
   });
 
-  it("returns Shopify authentication failures without mutating the shop", async () => {
+  it("rejects an invalid uninstall HMAC without mutating the shop", async () => {
     await seedShop(uninstallShop);
-    webhookAuth.mockRejectedValue(new Response("Invalid webhook", { status: 401 }));
 
     const response = await uninstallAction({
       context: {},

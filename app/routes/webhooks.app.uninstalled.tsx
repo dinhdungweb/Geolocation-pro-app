@@ -1,5 +1,4 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { enqueueShopCleanupJob } from "../utils/cleanup.server";
@@ -7,6 +6,7 @@ import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cach
 import { invalidateShopifyMarketsCache } from "../utils/shopify-markets.server";
 import { invalidateShopIdentityCache } from "../utils/shop-identity.server";
 import { invalidateThemeAppEmbedStatusCache } from "../utils/theme-app-embed.server";
+import { authenticateUninstallWebhook } from "../utils/uninstall-webhook-auth.server";
 
 function webhookMeta(request: Request) {
   return {
@@ -21,7 +21,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   let stage = "authenticate";
 
   try {
-    const { shop, topic } = await authenticate.webhook(request);
+    // APP_UNINSTALLED revokes the shop's tokens. Verify the webhook without
+    // loading the offline session, otherwise authentication can try to refresh
+    // a revoked token before this handler can delete the session.
+    const { shop, topic } = await authenticateUninstallWebhook(request);
 
     console.log(`Received ${topic} webhook for ${shop}`);
     invalidateStorefrontConfigCache(shop);
