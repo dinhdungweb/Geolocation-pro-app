@@ -42,7 +42,6 @@ import { COUNTRY_MAP } from "../utils/countries";
 import { getStateName } from "../utils/states";
 import {
   hasOrderScope,
-  hasWriteOrderScope,
   syncRecentOrderRisks,
 } from "../utils/order-risk.server";
 import {
@@ -54,23 +53,10 @@ import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
 export { shopifyBoundaryHeaders as headers };
 
 const PAGE_SIZE = 25;
-const RISK_WEIGHT: Record<string, number> = {
-  NONE: 0,
-  PENDING: 1,
-  LOW: 2,
-  MEDIUM: 3,
-  HIGH: 4,
-};
 
 function normalizeFilter(value: string | null, fallback: string) {
   const normalized = String(value || "").trim();
   return normalized || fallback;
-}
-
-function effectiveRisk(appRisk: string, shopifyRisk: string) {
-  return (RISK_WEIGHT[appRisk] || 0) >= (RISK_WEIGHT[shopifyRisk] || 0)
-    ? appRisk
-    : shopifyRisk;
 }
 
 function decryptRiskSignals(value: string | null | undefined) {
@@ -87,7 +73,7 @@ function riskWhere(risk: string) {
     return {};
   }
   return {
-    OR: [{ appRiskLevel: risk }, { shopifyRiskLevel: risk }],
+    shopifyRiskLevel: risk,
   };
 }
 
@@ -176,7 +162,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     totalRecent,
     highRisk,
     needsReview,
-    protectedOrders,
+    shopifyFlagged,
     scope,
   ] = await Promise.all([
     prisma.orderRiskRecord.findMany({
@@ -193,23 +179,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       where: {
         shop: session.shop,
         orderCreatedAt: { gte: periodStart },
-        OR: [{ appRiskLevel: "HIGH" }, { shopifyRiskLevel: "HIGH" }],
+        shopifyRiskLevel: "HIGH",
       },
     }),
     prisma.orderRiskRecord.count({
       where: {
         shop: session.shop,
         reviewStatus: "open",
-        OR: [
-          { appRiskLevel: { in: ["HIGH", "MEDIUM"] } },
-          { shopifyRiskLevel: { in: ["HIGH", "MEDIUM"] } },
-        ],
+        shopifyRiskLevel: { in: ["HIGH", "MEDIUM"] },
       },
     }),
     prisma.orderRiskRecord.count({
       where: {
         shop: session.shop,
-        assessmentSyncedAt: { not: null },
+        shopifyRiskLevel: { in: ["LOW", "MEDIUM", "HIGH"] },
       },
     }),
     getGrantedScopes(
@@ -221,11 +204,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return responseData({
     filters: { page, query, reviewStatus, risk },
     hasOrderAccess: hasOrderScope(scope),
-    hasWriteOrderAccess: hasWriteOrderScope(scope),
     metrics: {
       highRisk,
       needsReview,
-      protectedOrders,
+      shopifyFlagged,
       totalRecent,
     },
     records: records.map((record) => {
@@ -292,7 +274,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const result = await syncRecentOrderRisks({
         admin: offline.admin,
         limit: 25,
-        publishAssessment: hasWriteOrderScope(grantedScopes),
+        publishAssessment: false,
         shop: session.shop,
       });
       return responseData({
@@ -356,6 +338,23 @@ function riskLabel(level: string) {
   return `${level.charAt(0)}${level.slice(1).toLowerCase()}`;
 }
 
+function formatMoney(amount: number, currencyCode: string) {
+  const normalizedCurrency = String(currencyCode || "").toUpperCase();
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: normalizedCurrency,
+      currencyDisplay: "narrowSymbol",
+    }).format(amount);
+  } catch {
+    return amount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+}
+
 function formatLocation(record: {
   ipCity: string | null;
   ipCountryCode: string | null;
@@ -394,7 +393,6 @@ export default function OrderRiskPage() {
   const {
     filters,
     hasOrderAccess,
-    hasWriteOrderAccess,
     metrics,
     records,
     shop,
@@ -437,9 +435,9 @@ export default function OrderRiskPage() {
       tone: "purple",
     },
     {
-      label: "Assessments published",
-      value: metrics.protectedOrders,
-      detail: "Risk assessments sent to Shopify",
+      label: "Shopify flagged",
+      value: metrics.shopifyFlagged,
+      detail: "Orders with Shopify risk findings",
       icon: ShieldCheckMarkIcon,
       tone: "green",
     },
@@ -517,10 +515,7 @@ export default function OrderRiskPage() {
   );
 
   const rows = records.map((record, index) => {
-    const overallRisk = effectiveRisk(
-      record.appRiskLevel,
-      record.shopifyRiskLevel,
-    );
+    const overallRisk = record.shopifyRiskLevel;
     const signals = record.riskSignals as Array<{
       code?: string;
       label?: string;
@@ -566,25 +561,19 @@ export default function OrderRiskPage() {
           </BlockStack>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Text as="span">
-            {record.totalAmount.toLocaleString(undefined, {
-              style: "currency",
-              currency: record.currencyCode,
-              currencyDisplay: "code",
-              maximumFractionDigits: 0,
-            })}
-          </Text>
+          <span
+            className="order-risk-money"
+            title={`${record.totalAmount.toLocaleString()} ${record.currencyCode}`}
+          >
+            {formatMoney(record.totalAmount, record.currencyCode)}
+          </span>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <BlockStack gap="100">
+          <span className="order-risk-badge">
             <Badge tone={riskTone(overallRisk)}>
               {riskLabel(overallRisk)}
             </Badge>
-            <Text as="span" variant="bodyXs" tone="subdued">
-              Shopify: {riskLabel(record.shopifyRiskLevel)} · Geo:{" "}
-              {record.appRiskScore}/100
-            </Text>
-          </BlockStack>
+          </span>
         </IndexTable.Cell>
         <IndexTable.Cell>
           {signals.length > 0 ? (
@@ -818,6 +807,29 @@ export default function OrderRiskPage() {
             font-size: 12px;
             overflow-wrap: anywhere;
           }
+          .order-risk-money {
+            display: block;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            text-align: right;
+            white-space: nowrap;
+          }
+          .order-risk-assessment {
+            align-items: flex-start;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+          }
+          .order-risk-badge {
+            align-self: flex-start;
+            display: inline-flex;
+            flex: 0 0 auto;
+            max-width: max-content;
+            width: auto;
+          }
+          .order-risk-badge .Polaris-Badge {
+            width: auto !important;
+          }
           .order-risk-clear-signal {
             align-items: center;
             color: var(--p-color-text-success, #0c5132);
@@ -890,13 +902,6 @@ export default function OrderRiskPage() {
             <p>
               Approve the app&apos;s updated order and protected customer data
               permissions before syncing orders.
-            </p>
-          </Banner>
-        ) : !hasWriteOrderAccess ? (
-          <Banner tone="info" title="Read-only risk monitoring">
-            <p>
-              Order monitoring is available, but write_orders must be approved
-              before Geo: Redirect can publish its assessment to Shopify.
             </p>
           </Banner>
         ) : null}
@@ -1046,9 +1051,9 @@ export default function OrderRiskPage() {
               { title: "Order" },
               { title: "IP address" },
               { title: "Location" },
-              { title: "Order total" },
+              { title: "Order total", alignment: "end" },
               { title: "Risk assessment" },
-              { title: "Risk signals" },
+              { title: "IP context" },
               { title: "Review status" },
               { title: "Action" },
             ]}

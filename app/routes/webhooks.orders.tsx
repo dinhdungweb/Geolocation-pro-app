@@ -3,7 +3,6 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
 import {
   getOrderIdFromWebhookPayload,
-  hasWriteOrderScope,
   syncOrderRisk,
 } from "../utils/order-risk.server";
 
@@ -46,7 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await syncOrderRisk({
       admin: adminContext.admin,
       orderId,
-      publishAssessment: hasWriteOrderScope(adminContext.session.scope),
+      publishAssessment: false,
       shop,
     });
 
