@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { enqueueShopCleanupJob } from "../utils/cleanup.server";
+import { hashProtectedData } from "../utils/secret-crypto.server";
 
 function responseData<T>(payload: T, init?: ResponseInit) {
     return Response.json(payload, init);
@@ -28,7 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let stage = "authenticate";
 
     try {
-        const { topic, shop } = await authenticate.webhook(request);
+        const { payload, topic, shop } = await authenticate.webhook(request);
 
         console.log(`[GDPR] Received ${topic} webhook for ${shop}`);
 
@@ -42,10 +43,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             case "CUSTOMERS_REDACT":
             case "customers/redact":
-                // This app doesn't directly link data to Shopify customer IDs,
-                // but VisitorLog contains IP addresses which are PII.
-                // No customer-specific data to redact since we don't store customer IDs.
-                console.log(`[GDPR] Customer Redact Request received from ${shop}. No customer-linked data stored.`);
+                // Order risk records avoid names, email, phone and address fields.
+                // Shopify supplies orders_to_redact when linked order metadata must go.
+                {
+                    const orderIds = Array.isArray((payload as any)?.orders_to_redact)
+                        ? (payload as any).orders_to_redact.map((id: unknown) => String(id))
+                        : [];
+                    if (orderIds.length > 0) {
+                        const storedOrderIds = [
+                            ...orderIds,
+                            ...orderIds.map((id: string) => hashProtectedData(id)),
+                        ];
+                        await prisma.orderRiskRecord.deleteMany({
+                            where: {
+                                shop,
+                                legacyOrderId: { in: storedOrderIds },
+                            },
+                        });
+                    }
+                    console.log(
+                        `[GDPR] Customer Redact Request received from ${shop}. Redacted ${orderIds.length} linked order(s).`,
+                    );
+                }
                 break;
 
             case "SHOP_REDACT":

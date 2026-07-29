@@ -3,6 +3,7 @@ import prisma from "../db.server";
 
 // Retention periods
 const LOG_RETENTION_DAYS = Number.parseInt(process.env.LOG_RETENTION_DAYS || "7", 10);
+const ORDER_RISK_RETENTION_DAYS = Number.parseInt(process.env.ORDER_RISK_RETENTION_DAYS || "60", 10);
 const BILLABLE_EVENT_RETENTION_DAYS = Number.parseInt(process.env.BILLABLE_EVENT_RETENTION_DAYS || "35", 10); // Must exceed max billing period (~30d) + buffer
 const FAILED_ANALYTICS_QUEUE_RETENTION_DAYS = 7;
 const DELETE_BATCH_SIZE = Number.parseInt(process.env.CLEANUP_DELETE_BATCH_SIZE || "10000", 10);
@@ -65,6 +66,19 @@ async function deleteBillableUsageEventBatch(cutoff: Date) {
             FROM "BillableUsageEvent"
             WHERE "createdAt" < ${cutoff}
             ORDER BY "createdAt" ASC
+            LIMIT ${deleteBatchSize()}
+        )
+    `;
+}
+
+async function deleteOrderRiskRecordBatch(cutoff: Date) {
+    return prisma.$executeRaw`
+        DELETE FROM "OrderRiskRecord"
+        WHERE "id" IN (
+            SELECT "id"
+            FROM "OrderRiskRecord"
+            WHERE "orderCreatedAt" < ${cutoff}
+            ORDER BY "orderCreatedAt" ASC
             LIMIT ${deleteBatchSize()}
         )
     `;
@@ -214,6 +228,7 @@ async function cleanupShopData(shop: string, reason: ShopCleanupReason) {
     await prisma.analyticsRule.deleteMany({ where: { shop } });
     await prisma.monthlyUsage.deleteMany({ where: { shop } });
     await prisma.usageChargeAttempt.deleteMany({ where: { shop } });
+    await prisma.orderRiskRecord.deleteMany({ where: { shop } });
 
     const deletedBillableEvents = await deleteInBatches(() => deleteShopBillableUsageEventBatch(shop));
     const deletedBillableActionEvents = await deleteInBatches(() => deleteShopBillableUsageActionEventBatch(shop));
@@ -312,11 +327,15 @@ export async function cleanupOldLogs() {
         const billableCutoff = new Date();
         billableCutoff.setDate(billableCutoff.getDate() - BILLABLE_EVENT_RETENTION_DAYS);
 
+        const orderRiskCutoff = new Date();
+        orderRiskCutoff.setDate(orderRiskCutoff.getDate() - ORDER_RISK_RETENTION_DAYS);
+
         const failedAnalyticsQueueCutoff = new Date();
         failedAnalyticsQueueCutoff.setDate(failedAnalyticsQueueCutoff.getDate() - FAILED_ANALYTICS_QUEUE_RETENTION_DAYS);
 
-        const [deletedLogs, deletedBillableEvents, deletedBillableActionEvents, deletedFailedAnalyticsQueue] = await Promise.all([
+        const [deletedLogs, deletedOrderRiskRecords, deletedBillableEvents, deletedBillableActionEvents, deletedFailedAnalyticsQueue] = await Promise.all([
             deleteInBatches(() => deleteVisitorLogBatch(logCutoff)),
+            deleteInBatches(() => deleteOrderRiskRecordBatch(orderRiskCutoff)),
             deleteInBatches(() => deleteBillableUsageEventBatch(billableCutoff)),
             deleteInBatches(() => deleteBillableUsageActionEventBatch(billableCutoff)),
             deleteInBatches(() => deleteFailedAnalyticsQueueBatch(failedAnalyticsQueueCutoff)),
@@ -326,6 +345,9 @@ export async function cleanupOldLogs() {
 
         if (deletedLogs > 0) {
             console.log(`[Cleanup] Deleted ${deletedLogs} visitor logs older than ${LOG_RETENTION_DAYS} days`);
+        }
+        if (deletedOrderRiskRecords > 0) {
+            console.log(`[Cleanup] Deleted ${deletedOrderRiskRecords} order risk records older than ${ORDER_RISK_RETENTION_DAYS} days`);
         }
         if (deletedBillableEvents > 0) {
             console.log(`[Cleanup] Deleted ${deletedBillableEvents} billable events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);

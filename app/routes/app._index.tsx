@@ -360,6 +360,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderBy: { timestamp: "desc" },
       select: { id: true },
     }),
+    prisma.orderRiskRecord.count({
+      where: {
+        shop,
+        reviewStatus: "open",
+        OR: [
+          { appRiskLevel: { in: ["HIGH", "MEDIUM"] } },
+          { shopifyRiskLevel: { in: ["HIGH", "MEDIUM"] } },
+        ],
+      },
+    }),
     getThemeAppEmbedStatus({
       shop,
       accessToken,
@@ -417,7 +427,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   );
   const [
-    [rulesCount, activeRulesCount, latestVisitorLog, appEmbedStatus],
+    [rulesCount, activeRulesCount, latestVisitorLog, openOrderRiskCount, appEmbedStatus],
     {
       settings,
       shopifyPlan,
@@ -491,6 +501,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         totalRules: rulesCount,
         activeRules: activeRulesCount,
         hasVisitorLogs,
+        openOrderRiskCount,
         mode: settings.mode || "disabled",
         isEnabled: settings.isEnabled !== false,
       },
@@ -1910,6 +1921,18 @@ export default function Index() {
               {isAtLimit
                 ? `You have reached the ${formatPlanLabel(planDisplayName || currentPlan)} plan limit.`
                 : `You have used ${usagePercent}% of the ${formatPlanLabel(planDisplayName || currentPlan)} plan limit.`}
+            </Banner>
+          )}
+          {stats.openOrderRiskCount > 0 && (
+            <Banner
+              tone="warning"
+              action={{
+                content: "Review orders",
+                onAction: () => navigate("/app/order-risk"),
+              }}
+            >
+              {stats.openOrderRiskCount.toLocaleString()} order
+              {stats.openOrderRiskCount === 1 ? "" : "s"} need risk review.
             </Banner>
           )}
         </div>

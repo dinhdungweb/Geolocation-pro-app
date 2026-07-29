@@ -1096,6 +1096,12 @@ export default function AnalyticsPage() {
               />
             </div>
             <Button
+              icon={ShieldCheckMarkIcon}
+              onClick={() => navigate("/app/order-risk")}
+            >
+              Order risk
+            </Button>
+            <Button
               variant="primary"
               icon={PlusIcon}
               onClick={() => navigate("/app/rules")}

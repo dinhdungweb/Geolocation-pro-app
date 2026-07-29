@@ -53,3 +53,23 @@ export function decryptSecret(value: string | null | undefined) {
     decipher.final(),
   ]).toString("utf8");
 }
+
+export function encryptProtectedData(value: string): string {
+  const encrypted = encryptSecret(value);
+  if (!encrypted) {
+    throw new Error("Protected data cannot be empty");
+  }
+  return encrypted;
+}
+
+export function decryptProtectedData(value: string | null | undefined) {
+  return decryptSecret(value);
+}
+
+export function hashProtectedData(value: string) {
+  if (!value) return "";
+  return crypto
+    .createHmac("sha256", getKey())
+    .update(value)
+    .digest("hex");
+}

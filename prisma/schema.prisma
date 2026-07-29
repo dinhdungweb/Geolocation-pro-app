@@ -277,6 +277,48 @@ model VisitorLog {
   @@index([timestamp])
 }
 
+model OrderRiskRecord {
+  id                     String    @id @default(uuid())
+  shop                   String
+  orderGid               String
+  legacyOrderId          String?
+  legacyOrderIdEncrypted String?
+  orderName              String
+  orderNameHash          String?
+  orderCreatedAt         DateTime
+  processedAt            DateTime?
+  totalAmount            Decimal   @default(0) @db.Decimal(12, 2)
+  totalAmountEncrypted   String?
+  currencyCode           String    @default("USD")
+  financialStatus        String?
+  fulfillmentStatus      String?
+  clientIp               String?
+  clientIpHash           String?
+  ipCountryCode          String?
+  ipRegionCode           String?
+  ipRegionName           String?
+  ipCity                 String?
+  lastVisitorAction      String?
+  lastRuleName           String?
+  shopifyRiskLevel       String    @default("NONE")
+  shopifyRecommendation  String    @default("NONE")
+  appRiskLevel           String    @default("NONE")
+  appRiskScore           Int       @default(0)
+  riskSignals            String
+  reviewStatus           String    @default("open")
+  assessmentFingerprint  String?
+  assessmentSyncedAt     DateTime?
+  assessmentError        String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([shop, orderGid])
+  @@index([shop, orderCreatedAt])
+  @@index([shop, appRiskLevel, orderCreatedAt])
+  @@index([shop, reviewStatus, orderCreatedAt])
+  @@index([shop, clientIpHash, orderCreatedAt])
+}
+
 model StorefrontAnalyticsEventQueue {
   id            String    @id @default(uuid())
   shop          String

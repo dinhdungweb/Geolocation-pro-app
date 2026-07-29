@@ -1154,6 +1154,7 @@ export default function App() {
           Home
         </Link>
         <Link to="/app/analytics">Analytics</Link>
+        <Link to="/app/order-risk">Order Risk</Link>
         <Link to="/app/rules">Geolocation Rules</Link>
         <Link to="/app/ip-rules">IP Rules</Link>
         <Link to="/app/settings">Settings</Link>
