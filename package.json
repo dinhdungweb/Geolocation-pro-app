@@ -58,6 +58,7 @@
     "react-router": "7.18.1",
     "react-svg-worldmap": "^2.0.2",
     "resend": "6.12.2",
+    "shaders": "^3.0.445",
     "tar": "7.5.22"
   },
   "devDependencies": {
