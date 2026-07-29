@@ -18,10 +18,13 @@ import {
   Card,
   Icon,
   IndexTable,
+  InlineStack,
+  Modal,
   Page,
   Pagination,
   Popover,
   Text,
+  Tooltip,
 } from "@shopify/polaris";
 import {
   AlertTriangleIcon,
@@ -29,6 +32,7 @@ import {
   CheckCircleIcon,
   ClipboardChecklistIcon,
   FilterIcon,
+  LockIcon,
   OrderIcon,
   SearchIcon,
   ShieldCheckMarkIcon,
@@ -38,7 +42,14 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 
 import prisma from "../db.server";
 import { authenticate, unauthenticated } from "../shopify.server";
+import { isBillingTestMode } from "../utils/billing-mode.server";
+import { checkBillingWithFallback } from "../utils/billing.server";
 import { COUNTRY_MAP } from "../utils/countries";
+import {
+  getStableShopifyPlanFromBillingCheck,
+  hasPaidPlanAccess,
+  resolveEffectivePlan,
+} from "../utils/effective-plan.server";
 import { getStateName } from "../utils/states";
 import {
   hasOrderScope,
@@ -49,10 +60,32 @@ import {
   hashProtectedData,
 } from "../utils/secret-crypto.server";
 import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
 export { shopifyBoundaryHeaders as headers };
 
 const PAGE_SIZE = 25;
+
+function normalizeIPAddresses(value: unknown) {
+  if (typeof value !== "string") return [];
+  return value
+    .split(/[\n,]+/)
+    .map((ip) => ip.trim())
+    .filter(Boolean);
+}
+
+function hasPaidBillingConfig(billingConfig: any, settings: any) {
+  const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+    billingConfig,
+    settings?.currentPlan,
+  );
+  const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
+  return (
+    hasPaidPlanAccess(effectivePlan) ||
+    billingConfig.hasActivePayment ||
+    billingConfig.appSubscriptions.length > 0
+  );
+}
 
 function normalizeFilter(value: string | null, fallback: string) {
   const normalized = String(value || "").trim();
@@ -162,6 +195,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     totalRecent,
     highRisk,
     needsReview,
+    activeIpBlockRules,
     shopifyFlagged,
     scope,
   ] = await Promise.all([
@@ -189,6 +223,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         shopifyRiskLevel: { in: ["HIGH", "MEDIUM"] },
       },
     }),
+    prisma.redirectRule.findMany({
+      where: {
+        shop: session.shop,
+        matchType: "ip",
+        ruleType: "block",
+        isActive: true,
+      },
+      select: { ipAddresses: true },
+    }),
     prisma.orderRiskRecord.count({
       where: {
         shop: session.shop,
@@ -200,6 +243,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       await getOfflineScope(session.shop, session.scope),
     ),
   ]);
+  const blockedIps = new Set(
+    activeIpBlockRules.flatMap((rule) =>
+      normalizeIPAddresses(rule.ipAddresses),
+    ),
+  );
 
   return responseData({
     filters: { page, query, reviewStatus, risk },
@@ -211,6 +259,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       totalRecent,
     },
     records: records.map((record) => {
+      const clientIp = decryptProtectedData(record.clientIp);
       const ipRegionCode = decryptProtectedData(record.ipRegionCode);
       const storedRegionName = decryptProtectedData(record.ipRegionName);
       const mappedRegionName = ipRegionCode
@@ -219,7 +268,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       return {
         ...record,
-        clientIp: decryptProtectedData(record.clientIp),
+        clientIp,
         financialStatus: decryptProtectedData(record.financialStatus),
         fulfillmentStatus: decryptProtectedData(record.fulfillmentStatus),
         ipCity: decryptProtectedData(record.ipCity),
@@ -231,6 +280,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         legacyOrderId:
           decryptProtectedData(record.legacyOrderIdEncrypted) ||
           record.legacyOrderId,
+        isIpBlocked: Boolean(clientIp && blockedIps.has(clientIp)),
         orderName: decryptProtectedData(record.orderName),
         createdAt: record.createdAt.toISOString(),
         orderCreatedAt: record.orderCreatedAt.toISOString(),
@@ -250,7 +300,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { billing, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
 
@@ -319,6 +369,80 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           ? "Order marked as reviewed."
           : "Order returned to the review queue.",
     });
+  }
+
+  if (intent === "block_ip") {
+    try {
+      const id = String(formData.get("id") || "");
+      const [billingConfig, settings, record] = await Promise.all([
+        checkBillingWithFallback(billing, isBillingTestMode()),
+        prisma.settings.findUnique({ where: { shop: session.shop } }),
+        prisma.orderRiskRecord.findFirst({
+          where: { id, shop: session.shop },
+          select: { clientIp: true },
+        }),
+      ]);
+
+      if (!hasPaidBillingConfig(billingConfig, settings)) {
+        return responseData(
+          { error: "IP blocking is available on paid plans only." },
+          { status: 403 },
+        );
+      }
+
+      const clientIp = decryptProtectedData(record?.clientIp);
+      if (!clientIp) {
+        return responseData(
+          { error: "This order does not have an IP address to block." },
+          { status: 400 },
+        );
+      }
+
+      const existingRules = await prisma.redirectRule.findMany({
+        where: {
+          shop: session.shop,
+          matchType: "ip",
+          ruleType: "block",
+          isActive: true,
+        },
+        select: { ipAddresses: true },
+      });
+      const alreadyBlocked = existingRules.some((rule) =>
+        normalizeIPAddresses(rule.ipAddresses).includes(clientIp),
+      );
+
+      if (alreadyBlocked) {
+        return responseData({ message: `${clientIp} is already blocked.` });
+      }
+
+      await prisma.redirectRule.create({
+        data: {
+          shop: session.shop,
+          name: "Blocked from Order Risk",
+          ipAddresses: clientIp,
+          matchType: "ip",
+          countryCodes: "",
+          targetUrl: "",
+          priority: 0,
+          isActive: true,
+          ruleType: "block",
+          redirectMode: "auto_redirect",
+          pageTargetingType: "all",
+          pagePaths: null,
+        },
+      });
+      invalidateStorefrontConfigCache(session.shop);
+
+      return responseData({
+        message: `${clientIp} was added to IP Rules and blocked.`,
+      });
+    } catch (error) {
+      console.error("[OrderRisk] Failed to block order IP:", error);
+      return responseData(
+        { error: "The IP address could not be blocked. Please try again." },
+        { status: 500 },
+      );
+    }
   }
 
   return responseData({ error: "Unsupported action." }, { status: 400 });
@@ -409,9 +533,16 @@ export default function OrderRiskPage() {
   const [reviewStatus, setReviewStatus] = useState(filters.reviewStatus);
   const [reviewPopoverOpen, setReviewPopoverOpen] = useState(false);
   const [riskPopoverOpen, setRiskPopoverOpen] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<{
+    id: string;
+    ip: string;
+  } | null>(null);
   const isSyncing =
     navigation.state !== "idle" &&
     navigation.formData?.get("intent") === "sync_orders";
+  const isBlockingIp =
+    navigation.state !== "idle" &&
+    navigation.formData?.get("intent") === "block_ip";
   const metricsList = [
     {
       label: "Orders · 30 days",
@@ -468,6 +599,7 @@ export default function OrderRiskPage() {
   useEffect(() => {
     if (!actionData || !("message" in actionData) || !actionData.message) return;
     shopify.toast.show(actionData.message);
+    setBlockTarget(null);
   }, [actionData, shopify]);
 
   const applyFilters = (next: {
@@ -574,6 +706,30 @@ export default function OrderRiskPage() {
               {riskLabel(overallRisk)}
             </Badge>
           </span>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <Tooltip
+            content={
+              record.isIpBlocked
+                ? "IP already blocked"
+                : record.clientIp
+                  ? "Block IP address"
+                  : "IP address unavailable"
+            }
+          >
+            <Button
+              size="slim"
+              variant="tertiary"
+              icon={LockIcon}
+              accessibilityLabel={
+                record.isIpBlocked ? "IP already blocked" : "Block IP address"
+              }
+              disabled={!record.clientIp || record.isIpBlocked}
+              onClick={() =>
+                setBlockTarget({ id: record.id, ip: record.clientIp })
+              }
+            />
+          </Tooltip>
         </IndexTable.Cell>
         <IndexTable.Cell>
           {signals.length > 0 ? (
@@ -811,8 +967,18 @@ export default function OrderRiskPage() {
             display: block;
             font-variant-numeric: tabular-nums;
             font-weight: 600;
+            margin-right: 16px;
             text-align: right;
             white-space: nowrap;
+          }
+          .order-risk-table-card th:nth-child(4),
+          .order-risk-table-card td:nth-child(4) {
+            min-width: 136px;
+            padding-right: 20px;
+          }
+          .order-risk-table-card th:nth-child(5),
+          .order-risk-table-card td:nth-child(5) {
+            min-width: 144px;
           }
           .order-risk-assessment {
             align-items: flex-start;
@@ -1053,6 +1219,7 @@ export default function OrderRiskPage() {
               { title: "Location" },
               { title: "Order total", alignment: "end" },
               { title: "Risk assessment" },
+              { title: "IP control" },
               { title: "IP context" },
               { title: "Review status" },
               { title: "Action" },
@@ -1083,6 +1250,48 @@ export default function OrderRiskPage() {
             </div>
           ) : null}
         </div>
+
+        <Modal
+          open={Boolean(blockTarget)}
+          onClose={() => {
+            if (!isBlockingIp) setBlockTarget(null);
+          }}
+          title="Block this IP address?"
+        >
+          <Modal.Section>
+            <BlockStack gap="400">
+              <Text as="p">
+                This creates an active IP blocking rule for{" "}
+                <strong>{blockTarget?.ip}</strong>. Future storefront requests
+                from this IP will be blocked.
+              </Text>
+              <InlineStack align="end" gap="200">
+                <Button
+                  onClick={() => setBlockTarget(null)}
+                  disabled={isBlockingIp}
+                >
+                  Cancel
+                </Button>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="block_ip" />
+                  <input
+                    type="hidden"
+                    name="id"
+                    value={blockTarget?.id || ""}
+                  />
+                  <Button
+                    submit
+                    variant="primary"
+                    tone="critical"
+                    loading={isBlockingIp}
+                  >
+                    Block IP
+                  </Button>
+                </Form>
+              </InlineStack>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
       </div>
     </Page>
   );
