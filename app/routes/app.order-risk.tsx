@@ -26,6 +26,7 @@ import {
 import {
   AlertTriangleIcon,
   CheckIcon,
+  CheckCircleIcon,
   ClipboardChecklistIcon,
   FilterIcon,
   OrderIcon,
@@ -37,6 +38,8 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 
 import prisma from "../db.server";
 import { authenticate, unauthenticated } from "../shopify.server";
+import { COUNTRY_MAP } from "../utils/countries";
+import { getStateName } from "../utils/states";
 import {
   hasOrderScope,
   hasWriteOrderScope,
@@ -225,29 +228,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       protectedOrders,
       totalRecent,
     },
-    records: records.map((record) => ({
-      ...record,
-      clientIp: decryptProtectedData(record.clientIp),
-      financialStatus: decryptProtectedData(record.financialStatus),
-      fulfillmentStatus: decryptProtectedData(record.fulfillmentStatus),
-      ipCity: decryptProtectedData(record.ipCity),
-      ipCountryCode: decryptProtectedData(record.ipCountryCode),
-      ipRegionCode: decryptProtectedData(record.ipRegionCode),
-      ipRegionName: decryptProtectedData(record.ipRegionName),
-      legacyOrderId:
-        decryptProtectedData(record.legacyOrderIdEncrypted) ||
-        record.legacyOrderId,
-      orderName: decryptProtectedData(record.orderName),
-      createdAt: record.createdAt.toISOString(),
-      orderCreatedAt: record.orderCreatedAt.toISOString(),
-      processedAt: record.processedAt?.toISOString() || null,
-      riskSignals: decryptRiskSignals(record.riskSignals),
-      totalAmount: Number(
-        decryptProtectedData(record.totalAmountEncrypted) ||
-          record.totalAmount,
-      ),
-      updatedAt: record.updatedAt.toISOString(),
-    })),
+    records: records.map((record) => {
+      const ipRegionCode = decryptProtectedData(record.ipRegionCode);
+      const storedRegionName = decryptProtectedData(record.ipRegionName);
+      const mappedRegionName = ipRegionCode
+        ? getStateName(ipRegionCode)
+        : "";
+
+      return {
+        ...record,
+        clientIp: decryptProtectedData(record.clientIp),
+        financialStatus: decryptProtectedData(record.financialStatus),
+        fulfillmentStatus: decryptProtectedData(record.fulfillmentStatus),
+        ipCity: decryptProtectedData(record.ipCity),
+        ipCountryCode: decryptProtectedData(record.ipCountryCode),
+        ipRegionCode,
+        ipRegionName:
+          storedRegionName ||
+          (mappedRegionName !== ipRegionCode ? mappedRegionName : ""),
+        legacyOrderId:
+          decryptProtectedData(record.legacyOrderIdEncrypted) ||
+          record.legacyOrderId,
+        orderName: decryptProtectedData(record.orderName),
+        createdAt: record.createdAt.toISOString(),
+        orderCreatedAt: record.orderCreatedAt.toISOString(),
+        processedAt: record.processedAt?.toISOString() || null,
+        riskSignals: decryptRiskSignals(record.riskSignals),
+        totalAmount: Number(
+          decryptProtectedData(record.totalAmountEncrypted) ||
+            record.totalAmount,
+        ),
+        updatedAt: record.updatedAt.toISOString(),
+      };
+    }),
     shop: session.shop,
     total,
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
@@ -334,7 +347,34 @@ function riskTone(level: string) {
   if (level === "MEDIUM") return "warning" as const;
   if (level === "LOW") return "info" as const;
   if (level === "PENDING") return "attention" as const;
-  return undefined;
+  return "success" as const;
+}
+
+function riskLabel(level: string) {
+  if (level === "NONE") return "No risk";
+  if (level === "PENDING") return "Pending";
+  return `${level.charAt(0)}${level.slice(1).toLowerCase()}`;
+}
+
+function formatLocation(record: {
+  ipCity: string | null;
+  ipCountryCode: string | null;
+  ipRegionCode: string | null;
+  ipRegionName: string | null;
+}) {
+  const countryCode = String(record.ipCountryCode || "").toUpperCase();
+  const values = [
+    record.ipCity,
+    record.ipRegionName || record.ipRegionCode,
+    COUNTRY_MAP[countryCode] || countryCode,
+  ].filter((value): value is string => Boolean(value));
+  const uniqueValues = values.filter(
+    (value, index) =>
+      values.findIndex(
+        (candidate) => candidate.toLowerCase() === value.toLowerCase(),
+      ) === index,
+  );
+  return uniqueValues.join(", ") || "Unknown location";
 }
 
 function formatDate(value: string) {
@@ -405,8 +445,8 @@ export default function OrderRiskPage() {
     },
   ];
   const reviewViews = [
-    { label: "All", value: "all" },
-    { label: "Open", value: "open" },
+    { label: "All orders", value: "all" },
+    { label: "Not reviewed", value: "open" },
     { label: "Reviewed", value: "reviewed" },
   ];
   const riskViews = [
@@ -418,7 +458,8 @@ export default function OrderRiskPage() {
     { label: "No risk found", value: "NONE" },
   ];
   const selectedReviewLabel =
-    reviewViews.find((view) => view.value === reviewStatus)?.label || "All";
+    reviewViews.find((view) => view.value === reviewStatus)?.label ||
+    "All orders";
 
   useEffect(() => {
     setQuery(filters.query);
@@ -486,15 +527,22 @@ export default function OrderRiskPage() {
       detail?: string;
     }>;
     const orderUrl = adminOrderUrl(shop, record.legacyOrderId);
+    const requiresReview =
+      overallRisk === "HIGH" || overallRisk === "MEDIUM";
 
     return (
       <IndexTable.Row id={record.id} key={record.id} position={index}>
         <IndexTable.Cell>
-          <BlockStack gap="100">
+          <div className="order-risk-order">
             {orderUrl ? (
-              <Button variant="plain" url={orderUrl} target="_blank">
+              <a
+                className="order-risk-order-link"
+                href={orderUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {record.orderName}
-              </Button>
+              </a>
             ) : (
               <Text as="span" fontWeight="semibold">
                 {record.orderName}
@@ -503,15 +551,17 @@ export default function OrderRiskPage() {
             <Text as="span" variant="bodyXs" tone="subdued">
               {formatDate(record.orderCreatedAt)}
             </Text>
-          </BlockStack>
+          </div>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <span className="order-risk-ip">
+            {record.clientIp || "Unavailable"}
+          </span>
         </IndexTable.Cell>
         <IndexTable.Cell>
           <BlockStack gap="100">
-            <Text as="span">{record.clientIp || "Unavailable"}</Text>
-            <Text as="span" variant="bodyXs" tone="subdued">
-              {[record.ipCity, record.ipRegionCode, record.ipCountryCode]
-                .filter(Boolean)
-                .join(", ") || "Unknown location"}
+            <Text as="span" fontWeight="medium">
+              {formatLocation(record)}
             </Text>
           </BlockStack>
         </IndexTable.Cell>
@@ -520,39 +570,54 @@ export default function OrderRiskPage() {
             {record.totalAmount.toLocaleString(undefined, {
               style: "currency",
               currency: record.currencyCode,
+              currencyDisplay: "code",
+              maximumFractionDigits: 0,
             })}
           </Text>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Badge tone={riskTone(overallRisk)}>
-            {overallRisk === "NONE" ? "No risk found" : overallRisk}
-          </Badge>
-        </IndexTable.Cell>
-        <IndexTable.Cell>
           <BlockStack gap="100">
-            <Text as="span" variant="bodySm">
-              Shopify: {record.shopifyRiskLevel}
-            </Text>
+            <Badge tone={riskTone(overallRisk)}>
+              {riskLabel(overallRisk)}
+            </Badge>
             <Text as="span" variant="bodyXs" tone="subdued">
-              Geo score: {record.appRiskScore}/100
+              Shopify: {riskLabel(record.shopifyRiskLevel)} · Geo:{" "}
+              {record.appRiskScore}/100
             </Text>
           </BlockStack>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <div className="order-risk-signals">
-            {signals.length > 0
-              ? signals
-                  .slice(0, 2)
-                  .map((signal) => signal.label || signal.code)
-                  .filter(Boolean)
-                  .join(" · ")
-              : "No Geo signals"}
-            {signals.length > 2 ? ` +${signals.length - 2}` : ""}
-          </div>
+          {signals.length > 0 ? (
+            <div className="order-risk-signals">
+              {signals
+                .slice(0, 2)
+                .map((signal) => signal.label || signal.code)
+                .filter(Boolean)
+                .join(" · ")}
+              {signals.length > 2 ? ` +${signals.length - 2}` : ""}
+            </div>
+          ) : (
+            <span className="order-risk-clear-signal">
+              <Icon source={CheckCircleIcon} tone="success" />
+              No suspicious signals
+            </span>
+          )}
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Badge tone={record.reviewStatus === "reviewed" ? "success" : "attention"}>
-            {record.reviewStatus === "reviewed" ? "Reviewed" : "Open"}
+          <Badge
+            tone={
+              record.reviewStatus === "reviewed"
+                ? "success"
+                : requiresReview
+                  ? "attention"
+                  : undefined
+            }
+          >
+            {record.reviewStatus === "reviewed"
+              ? "Reviewed"
+              : requiresReview
+                ? "Needs review"
+                : "Not reviewed"}
           </Badge>
         </IndexTable.Cell>
         <IndexTable.Cell>
@@ -565,7 +630,9 @@ export default function OrderRiskPage() {
               value={record.reviewStatus === "reviewed" ? "open" : "reviewed"}
             />
             <Button size="slim" submit>
-              {record.reviewStatus === "reviewed" ? "Reopen" : "Review"}
+              {record.reviewStatus === "reviewed"
+                ? "Reopen"
+                : "Mark reviewed"}
             </Button>
           </Form>
         </IndexTable.Cell>
@@ -724,6 +791,46 @@ export default function OrderRiskPage() {
             color: var(--p-color-text-secondary, #616161);
             font-size: 12px;
             line-height: 16px;
+          }
+          .order-risk-order {
+            align-items: flex-start;
+            display: grid;
+            gap: 4px;
+            justify-items: start;
+            text-align: left;
+            width: 100%;
+          }
+          .order-risk-order-link {
+            color: var(--p-color-text-link, #005bd3);
+            display: inline-block;
+            font-weight: 600;
+            margin: 0;
+            padding: 0;
+            text-align: left;
+            text-decoration: none;
+          }
+          .order-risk-order-link:hover {
+            text-decoration: underline;
+          }
+          .order-risk-ip {
+            color: var(--p-color-text, #303030);
+            font-family: var(--p-font-family-mono, ui-monospace, monospace);
+            font-size: 12px;
+            overflow-wrap: anywhere;
+          }
+          .order-risk-clear-signal {
+            align-items: center;
+            color: var(--p-color-text-success, #0c5132);
+            display: inline-flex;
+            font-size: 12px;
+            gap: 5px;
+            line-height: 16px;
+            white-space: nowrap;
+          }
+          .order-risk-clear-signal .Polaris-Icon {
+            height: 16px;
+            margin: 0;
+            width: 16px;
           }
           .order-risk-pagination {
             display: flex;
@@ -937,12 +1044,12 @@ export default function OrderRiskPage() {
             selectable={false}
             headings={[
               { title: "Order" },
-              { title: "IP & location" },
-              { title: "Total" },
-              { title: "Risk" },
-              { title: "Sources" },
-              { title: "Signals" },
-              { title: "Status" },
+              { title: "IP address" },
+              { title: "Location" },
+              { title: "Order total" },
+              { title: "Risk assessment" },
+              { title: "Risk signals" },
+              { title: "Review status" },
               { title: "Action" },
             ]}
             emptyState={
