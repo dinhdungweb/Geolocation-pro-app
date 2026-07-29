@@ -150,7 +150,7 @@ async function getGrantedScopes(
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, billing, session } = await authenticate.admin(request);
   const url = new URL(request.url);
   const query = normalizeFilter(url.searchParams.get("q"), "");
   const protectedQueryHash = query ? hashProtectedData(query) : "";
@@ -198,6 +198,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     activeIpBlockRules,
     shopifyFlagged,
     scope,
+    settings,
+    billingConfig,
   ] = await Promise.all([
     prisma.orderRiskRecord.findMany({
       where,
@@ -242,6 +244,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       admin,
       await getOfflineScope(session.shop, session.scope),
     ),
+    prisma.settings.findUnique({ where: { shop: session.shop } }),
+    checkBillingWithFallback(billing, isBillingTestMode()),
   ]);
   const blockedIps = new Set(
     activeIpBlockRules.flatMap((rule) =>
@@ -252,6 +256,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return responseData({
     filters: { page, query, reviewStatus, risk },
     hasOrderAccess: hasOrderScope(scope),
+    hasPaidPlan: hasPaidBillingConfig(billingConfig, settings),
     metrics: {
       highRisk,
       needsReview,
@@ -517,6 +522,7 @@ export default function OrderRiskPage() {
   const {
     filters,
     hasOrderAccess,
+    hasPaidPlan,
     metrics,
     records,
     shop,
@@ -712,6 +718,8 @@ export default function OrderRiskPage() {
             content={
               record.isIpBlocked
                 ? "IP already blocked"
+                : !hasPaidPlan
+                  ? "Upgrade to a paid plan to block IPs"
                 : record.clientIp
                   ? "Block IP address"
                   : "IP address unavailable"
@@ -722,12 +730,23 @@ export default function OrderRiskPage() {
               variant="tertiary"
               icon={LockIcon}
               accessibilityLabel={
-                record.isIpBlocked ? "IP already blocked" : "Block IP address"
+                record.isIpBlocked
+                  ? "IP already blocked"
+                  : !hasPaidPlan
+                    ? "Upgrade to block IP address"
+                    : "Block IP address"
               }
               disabled={!record.clientIp || record.isIpBlocked}
-              onClick={() =>
-                setBlockTarget({ id: record.id, ip: record.clientIp })
-              }
+              onClick={() => {
+                if (!hasPaidPlan) {
+                  shopify.toast.show(
+                    "Upgrade to a paid plan to use IP blocking.",
+                  );
+                  navigate("/app/pricing");
+                  return;
+                }
+                setBlockTarget({ id: record.id, ip: record.clientIp });
+              }}
             />
           </Tooltip>
         </IndexTable.Cell>
@@ -967,14 +986,14 @@ export default function OrderRiskPage() {
             display: block;
             font-variant-numeric: tabular-nums;
             font-weight: 600;
-            margin-right: 16px;
             text-align: right;
             white-space: nowrap;
           }
           .order-risk-table-card th:nth-child(4),
           .order-risk-table-card td:nth-child(4) {
             min-width: 136px;
-            padding-right: 20px;
+            padding-right: 24px;
+            text-align: right;
           }
           .order-risk-table-card th:nth-child(5),
           .order-risk-table-card td:nth-child(5) {
