@@ -578,20 +578,57 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: {
         id: { in: ids },
         shop: session.shop,
+        reviewStatus: { not: "reviewed" },
       },
       data: { reviewStatus: "reviewed" },
     });
     if (updated.count === 0) {
-      return responseData(
-        { error: "No matching order risk records were found." },
-        { status: 404 },
-      );
+      return responseData({
+        message: "All selected orders are already reviewed.",
+      });
     }
 
     return responseData({
       message: `${updated.count} selected order${
         updated.count === 1 ? "" : "s"
       } marked as reviewed.`,
+    });
+  }
+
+  if (intent === "bulk_reopen_reviews") {
+    const ids = Array.from(
+      new Set(
+        formData
+          .getAll("ids")
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 100);
+    if (ids.length === 0) {
+      return responseData(
+        { error: "Select at least one reviewed order to reopen." },
+        { status: 400 },
+      );
+    }
+
+    const updated = await prisma.orderRiskRecord.updateMany({
+      where: {
+        id: { in: ids },
+        shop: session.shop,
+        reviewStatus: "reviewed",
+      },
+      data: { reviewStatus: "open" },
+    });
+    if (updated.count === 0) {
+      return responseData({
+        message: "All selected orders are already open for review.",
+      });
+    }
+
+    return responseData({
+      message: `${updated.count} selected order${
+        updated.count === 1 ? "" : "s"
+      } reopened for review.`,
     });
   }
 
@@ -898,6 +935,12 @@ export default function OrderRiskPage() {
   const selectedRecords = records.filter((record) =>
     selectedResources.includes(record.id),
   );
+  const selectedUnreviewedRecords = selectedRecords.filter(
+    (record) => record.reviewStatus !== "reviewed",
+  );
+  const selectedReviewedRecords = selectedRecords.filter(
+    (record) => record.reviewStatus === "reviewed",
+  );
   const selectedBlockableRecords = selectedRecords.filter(
     (record) => record.clientIp && !record.isIpBlocked,
   );
@@ -1129,11 +1172,30 @@ export default function OrderRiskPage() {
     applyFilters({ risk: value });
   };
 
-  const submitBulkAction = (intent: "bulk_block_ips" | "bulk_mark_reviewed") => {
+  const submitBulkAction = (
+    intent:
+      | "bulk_block_ips"
+      | "bulk_mark_reviewed"
+      | "bulk_reopen_reviews",
+  ) => {
     if (selectedResources.length === 0 || isBulkActionRunning) return;
+    const ids =
+      intent === "bulk_mark_reviewed"
+        ? selectedUnreviewedRecords.map((record) => record.id)
+        : intent === "bulk_reopen_reviews"
+          ? selectedReviewedRecords.map((record) => record.id)
+        : selectedResources;
+    if (ids.length === 0) {
+      shopify.toast.show(
+        intent === "bulk_reopen_reviews"
+          ? "All selected orders are already open for review."
+          : "All selected orders are already reviewed.",
+      );
+      return;
+    }
     const formData = new FormData();
     formData.append("intent", intent);
-    for (const id of selectedResources) formData.append("ids", id);
+    for (const id of ids) formData.append("ids", id);
     bulkActionFetcher.submit(formData, { method: "post" });
   };
 
@@ -1154,11 +1216,24 @@ export default function OrderRiskPage() {
   };
 
   const promotedBulkActions = [
-    {
-      content: "Mark reviewed",
-      disabled: isBulkActionRunning,
-      onAction: () => submitBulkAction("bulk_mark_reviewed"),
-    },
+    ...(selectedUnreviewedRecords.length > 0
+      ? [
+          {
+            content: "Mark reviewed",
+            disabled: isBulkActionRunning,
+            onAction: () => submitBulkAction("bulk_mark_reviewed"),
+          },
+        ]
+      : []),
+    ...(selectedReviewedRecords.length > 0
+      ? [
+          {
+            content: "Reopen",
+            disabled: isBulkActionRunning,
+            onAction: () => submitBulkAction("bulk_reopen_reviews"),
+          },
+        ]
+      : []),
     {
       content: "Block IPs",
       disabled: isBulkActionRunning,
@@ -1193,11 +1268,15 @@ export default function OrderRiskPage() {
       <IndexTable.Row
         id={record.id}
         key={record.id}
+        onClick={() => undefined}
         position={index}
         selected={selectedResources.includes(record.id)}
       >
         <IndexTable.Cell>
-          <div className="order-risk-order">
+          <div
+            className="order-risk-order"
+            onClick={(event) => event.stopPropagation()}
+          >
             {orderUrl ? (
               <a
                 className="order-risk-order-link"
@@ -1286,7 +1365,10 @@ export default function OrderRiskPage() {
           </Badge>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <div className="order-risk-actions">
+          <div
+            className="order-risk-actions"
+            onClick={(event) => event.stopPropagation()}
+          >
             <Form method="post">
               <input type="hidden" name="intent" value="set_review_status" />
               <input type="hidden" name="id" value={record.id} />
@@ -1526,6 +1608,47 @@ export default function OrderRiskPage() {
             border-radius: 12px;
             background: var(--p-color-bg-surface, #fff);
           }
+          .order-risk-table-card table {
+            min-width: 1280px;
+            table-layout: fixed;
+            width: 100%;
+          }
+          .order-risk-table-card th:nth-child(1),
+          .order-risk-table-card td:nth-child(1) {
+            width: 3.5%;
+          }
+          .order-risk-table-card th:nth-child(2),
+          .order-risk-table-card td:nth-child(2) {
+            width: 11%;
+          }
+          .order-risk-table-card th:nth-child(3),
+          .order-risk-table-card td:nth-child(3) {
+            width: 10%;
+          }
+          .order-risk-table-card th:nth-child(4),
+          .order-risk-table-card td:nth-child(4) {
+            width: 21%;
+          }
+          .order-risk-table-card th:nth-child(5),
+          .order-risk-table-card td:nth-child(5) {
+            width: 10%;
+          }
+          .order-risk-table-card th:nth-child(6),
+          .order-risk-table-card td:nth-child(6) {
+            width: 12%;
+          }
+          .order-risk-table-card th:nth-child(7),
+          .order-risk-table-card td:nth-child(7) {
+            width: 15%;
+          }
+          .order-risk-table-card th:nth-child(8),
+          .order-risk-table-card td:nth-child(8) {
+            width: 9%;
+          }
+          .order-risk-table-card th:nth-child(9),
+          .order-risk-table-card td:nth-child(9) {
+            width: 8.5%;
+          }
           .order-risk-signals {
             max-width: 260px;
             color: var(--p-color-text-secondary, #616161);
@@ -1565,15 +1688,10 @@ export default function OrderRiskPage() {
             text-align: right;
             white-space: nowrap;
           }
-          .order-risk-table-card th:nth-child(4),
-          .order-risk-table-card td:nth-child(4) {
-            min-width: 136px;
-            padding-right: 24px;
-            text-align: right;
-          }
           .order-risk-table-card th:nth-child(5),
           .order-risk-table-card td:nth-child(5) {
-            min-width: 144px;
+            padding-right: 24px;
+            text-align: right;
           }
           .order-risk-assessment {
             align-items: flex-start;
@@ -1605,12 +1723,11 @@ export default function OrderRiskPage() {
           }
           .order-risk-table-card th:last-child,
           .order-risk-table-card td:last-child {
-            min-width: 144px;
             text-align: right;
           }
           .order-risk-detail-list {
             display: grid;
-            gap: 14px;
+            gap: 8px;
             list-style: none;
             margin: 0;
             padding: 0;
@@ -1618,25 +1735,25 @@ export default function OrderRiskPage() {
           .order-risk-detail-item {
             align-items: flex-start;
             display: grid;
-            gap: 10px;
-            grid-template-columns: 20px minmax(0, 1fr);
+            gap: 8px;
+            grid-template-columns: 18px minmax(0, 1fr);
           }
           .order-risk-detail-item .Polaris-Icon {
-            height: 18px;
+            height: 16px;
             margin: 1px 0 0;
-            width: 18px;
+            width: 16px;
           }
           .order-risk-detail-copy {
             color: var(--p-color-text, #303030);
-            font-size: 14px;
-            line-height: 20px;
+            font-size: 13px;
+            line-height: 18px;
           }
           .order-risk-detail-note {
             border-top: 1px solid var(--p-color-border-secondary, #e1e3e5);
             color: var(--p-color-text-secondary, #616161);
             font-size: 13px;
             line-height: 18px;
-            padding-top: 14px;
+            padding-top: 10px;
           }
           .order-risk-clear-signal {
             align-items: center;
@@ -1902,7 +2019,7 @@ export default function OrderRiskPage() {
           title="About this order"
         >
           <Modal.Section>
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <BlockStack gap="100">
                 <Text as="p" variant="headingSm">
                   {riskDetailTarget?.orderName || "Order"}
@@ -1911,7 +2028,7 @@ export default function OrderRiskPage() {
                   Shopify fraud analysis with additional Geo IP context
                 </Text>
               </BlockStack>
-              <BlockStack gap="300">
+              <BlockStack gap="200">
                 <BlockStack gap="100">
                   <Text as="h3" variant="headingSm">
                     Shopify fraud analysis
@@ -1969,7 +2086,7 @@ export default function OrderRiskPage() {
                   </ul>
                 )}
               </BlockStack>
-              <BlockStack gap="300">
+              <BlockStack gap="200">
                 <Text as="h3" variant="headingSm">
                   Geo risk analysis
                 </Text>

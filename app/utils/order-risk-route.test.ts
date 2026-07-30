@@ -212,11 +212,41 @@ describe("Order Risk Shopify detail API", () => {
       where: {
         id: { in: ["risk-record-1", "risk-record-2"] },
         shop: "risk-test.myshopify.com",
+        reviewStatus: { not: "reviewed" },
       },
       data: { reviewStatus: "reviewed" },
     });
     expect(response.data).toEqual({
       message: "2 selected orders marked as reviewed.",
+    });
+  });
+
+  it("reopens only reviewed records from the authenticated shop", async () => {
+    mocks.updateOrderRiskRecords.mockResolvedValue({ count: 1 });
+    const formData = new FormData();
+    formData.set("intent", "bulk_reopen_reviews");
+    formData.append("ids", "risk-record-1");
+    formData.append("ids", "risk-record-2");
+
+    const response = await action({
+      context: {},
+      params: {},
+      request: new Request("https://app.test/app/order-risk", {
+        method: "POST",
+        body: formData,
+      }),
+    } as never);
+
+    expect(mocks.updateOrderRiskRecords).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["risk-record-1", "risk-record-2"] },
+        shop: "risk-test.myshopify.com",
+        reviewStatus: "reviewed",
+      },
+      data: { reviewStatus: "open" },
+    });
+    expect(response.data).toEqual({
+      message: "1 selected order reopened for review.",
     });
   });
 
