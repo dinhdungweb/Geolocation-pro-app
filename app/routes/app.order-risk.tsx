@@ -1615,13 +1615,20 @@ export default function OrderRiskPage() {
             table-layout: fixed;
             width: 100%;
           }
-          .order-risk-table-card th:nth-child(1),
-          .order-risk-table-card td:nth-child(1) {
-            width: 44px;
+          .order-risk-table-card .Polaris-IndexTable__TableHeading--first,
+          .order-risk-table-card .Polaris-IndexTable__TableCell--first {
+            box-sizing: border-box;
+            padding-left: 12px !important;
+            padding-right: 0 !important;
+            width: 36px !important;
           }
           .order-risk-table-card th:nth-child(2),
           .order-risk-table-card td:nth-child(2) {
             width: 11%;
+          }
+          .order-risk-table-card .Polaris-IndexTable__TableHeading--second,
+          .order-risk-table-card .Polaris-IndexTable__TableCell--first + .Polaris-IndexTable__TableCell {
+            padding-left: 4px !important;
           }
           .order-risk-table-card th:nth-child(3),
           .order-risk-table-card td:nth-child(3) {
