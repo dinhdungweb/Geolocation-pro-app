@@ -1297,7 +1297,10 @@ export default function OrderRiskPage() {
           </div>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <span className="order-risk-ip">
+          <span
+            className="order-risk-ip"
+            title={record.clientIp || "Unavailable"}
+          >
             {record.clientIp || "Unavailable"}
           </span>
         </IndexTable.Cell>
@@ -1676,9 +1679,13 @@ export default function OrderRiskPage() {
           }
           .order-risk-ip {
             color: var(--p-color-text, #303030);
+            display: block;
             font-family: var(--p-font-family-mono, ui-monospace, monospace);
             font-size: 12px;
-            overflow-wrap: anywhere;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
           .order-risk-money {
             display: block;
