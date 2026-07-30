@@ -1342,7 +1342,6 @@ export default function OrderRiskPage() {
             </div>
           ) : (
             <span className="order-risk-clear-signal">
-              <Icon source={CheckCircleIcon} tone="success" />
               No suspicious signals
             </span>
           )}
@@ -1723,6 +1722,8 @@ export default function OrderRiskPage() {
           }
           .order-risk-table-card th:last-child,
           .order-risk-table-card td:last-child {
+            box-sizing: border-box;
+            padding-right: 20px;
             text-align: right;
           }
           .order-risk-detail-list {
@@ -1757,17 +1758,11 @@ export default function OrderRiskPage() {
           }
           .order-risk-clear-signal {
             align-items: center;
-            color: var(--p-color-text-success, #0c5132);
+            color: var(--p-color-text, #303030);
             display: inline-flex;
             font-size: 12px;
-            gap: 5px;
             line-height: 16px;
             white-space: nowrap;
-          }
-          .order-risk-clear-signal .Polaris-Icon {
-            height: 16px;
-            margin: 0;
-            width: 16px;
           }
           .order-risk-pagination {
             display: flex;
