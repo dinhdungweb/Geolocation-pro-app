@@ -128,6 +128,12 @@ describe("order risk synchronization", () => {
 
     expect(prismaMock.orderRiskRecord.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: {
+          shop_orderGid: {
+            shop: "risk-test.myshopify.com",
+            orderGid: hashProtectedData("gid://shopify/Order/123"),
+          },
+        },
         create: expect.objectContaining({
           appRiskLevel: "MEDIUM",
           appRiskScore: 35,

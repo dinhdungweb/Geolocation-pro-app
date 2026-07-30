@@ -500,7 +500,7 @@ export async function syncOrderRisk({
     where: {
       shop_orderGid: {
         shop,
-        orderGid: normalizedOrderId,
+        orderGid: orderRecordKey,
       },
     },
     update: {

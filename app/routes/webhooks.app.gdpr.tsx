@@ -5,8 +5,8 @@ import { FREE_PLAN } from "../billing.config";
 import { enqueueShopCleanupJob } from "../utils/cleanup.server";
 import { hashProtectedData } from "../utils/secret-crypto.server";
 
-function responseData<T>(payload: T, init?: ResponseInit) {
-    return Response.json(payload, init);
+function responseData<T>(payload: T, status = 200) {
+    return Response.json(payload, { status });
 }
 
 function webhookMeta(request: Request) {
@@ -68,12 +68,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 break;
 
             case "SHOP_REDACT":
-            case "shop/redact":
+            case "shop/redact": {
                 console.log(`[GDPR] Shop Redact Request received for ${shop}. Queueing cleanup job...`);
                 stage = "enqueue_cleanup";
                 await enqueueShopCleanupJob(shop, "shop_redact");
                 stage = "quick_cleanup";
-                await Promise.allSettled([
+                const cleanupResults = await Promise.allSettled([
                     prisma.session.deleteMany({ where: { shop } }),
                     prisma.settings.updateMany({
                         where: { shop },
@@ -90,17 +90,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         },
                     }),
                 ]);
+                const cleanupFailures = cleanupResults.filter(
+                    (result) => result.status === "rejected",
+                );
+                if (cleanupFailures.length > 0) {
+                    console.error(
+                        `[GDPR] ${cleanupFailures.length} quick cleanup step(s) failed for ${shop}; queued cleanup will retry:`,
+                        cleanupFailures,
+                    );
+                }
                 console.log(`[GDPR] Queued cleanup job for ${shop}`);
                 break;
+            }
 
             default:
                 console.log(`[GDPR] Unhandled topic: ${topic}`);
         }
 
-        return responseData({ success: true }, { status: 200 });
+        return responseData({ success: true });
     } catch (error) {
         console.error(`[GDPR] Webhook failed during ${stage}:`, webhookMeta(request), error);
         if (error instanceof Response) return error;
-        return responseData({ success: false }, { status: 500 });
+        return responseData({ success: false }, 500);
     }
 };
