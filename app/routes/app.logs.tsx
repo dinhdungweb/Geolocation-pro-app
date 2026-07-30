@@ -1,11 +1,22 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { Await, useLoaderData, useNavigation, useSearchParams } from "react-router";
+import { isIP } from "node:net";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import {
+    Await,
+    Form,
+    data as responseData,
+    useActionData,
+    useLoaderData,
+    useNavigate,
+    useNavigation,
+    useSearchParams,
+} from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
     Page,
     Layout,
     Card,
     IndexTable,
+    InlineStack,
     Badge,
     Text,
     Pagination,
@@ -16,11 +27,14 @@ import {
     Popover,
     Select,
     TextField,
+    Modal,
+    Tooltip,
     useBreakpoints,
 } from "@shopify/polaris";
 import {
     CalendarIcon,
     FilterIcon,
+    LockIcon,
     SearchIcon,
     XIcon,
 } from "@shopify/polaris-icons";
@@ -44,11 +58,19 @@ import {
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 import { SiSamsung } from "react-icons/si";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import prisma from "../db.server";
+import { isBillingTestMode } from "../utils/billing-mode.server";
+import { checkBillingWithFallback } from "../utils/billing.server";
+import {
+    getStableShopifyPlanFromBillingCheck,
+    hasPaidPlanAccess,
+    resolveEffectivePlan,
+} from "../utils/effective-plan.server";
+import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
 
 const LazyDatePicker = lazy(async () => {
@@ -125,6 +147,7 @@ const logTableHeadings: [{ title: string }, ...Array<{ title: string }>] = [
     { title: "Device" },
     { title: "OS" },
     { title: "Browser" },
+    { title: "IP control" },
 ];
 
 const datePresetOptions: Array<{ label: string; value: DateRangePreset }> = [
@@ -143,6 +166,27 @@ const DATE_SCOPE_PARAM = "dateScope";
 const DATE_SCOPE_ALL = "all";
 const DEFAULT_LOG_WINDOW_DAYS = 30;
 const LOGS_PAGE_SIZE = 50;
+
+function normalizeIPAddresses(value: unknown) {
+    if (typeof value !== "string") return [];
+    return value
+        .split(/[\n,]+/)
+        .map((ip) => ip.trim())
+        .filter(Boolean);
+}
+
+function hasPaidBillingConfig(billingConfig: any, settings: any) {
+    const shopifyPlan = getStableShopifyPlanFromBillingCheck(
+        billingConfig,
+        settings?.currentPlan,
+    );
+    const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
+    return (
+        hasPaidPlanAccess(effectivePlan) ||
+        billingConfig.hasActivePayment ||
+        billingConfig.appSubscriptions.length > 0
+    );
+}
 
 function startOfDay(date: Date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -637,7 +681,7 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { billing, session } = await authenticate.admin(request);
     const url = new URL(request.url);
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
     const filters: VisitorLogFilters = {
@@ -649,15 +693,121 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         to: url.searchParams.get("to") || "",
         dateScope: url.searchParams.get(DATE_SCOPE_PARAM) || "",
     };
+    const visitorLogsData = loadVisitorLogsData(session.shop, filters, page);
+    const [settings, billingConfig, activeIpBlockRules] = await Promise.all([
+        prisma.settings.findUnique({ where: { shop: session.shop } }),
+        checkBillingWithFallback(billing, isBillingTestMode()),
+        prisma.redirectRule.findMany({
+            where: {
+                shop: session.shop,
+                matchType: "ip",
+                ruleType: "block",
+                isActive: true,
+            },
+            select: { ipAddresses: true },
+        }),
+    ]);
 
     return {
+        blockedIps: Array.from(new Set(
+            activeIpBlockRules.flatMap((rule) =>
+                normalizeIPAddresses(rule.ipAddresses),
+            ),
+        )),
         filters,
-        visitorLogsData: loadVisitorLogsData(session.shop, filters, page),
+        hasPaidPlan: hasPaidBillingConfig(billingConfig, settings),
+        visitorLogsData,
     };
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+    const { billing, session } = await authenticate.admin(request);
+    const formData = await request.formData();
+    const intent = String(formData.get("intent") || "");
+
+    if (intent !== "block_ip") {
+        return responseData({ error: "Unsupported action." }, { status: 400 });
+    }
+
+    try {
+        const id = String(formData.get("id") || "");
+        const [billingConfig, settings, log] = await Promise.all([
+            checkBillingWithFallback(billing, isBillingTestMode()),
+            prisma.settings.findUnique({ where: { shop: session.shop } }),
+            prisma.visitorLog.findFirst({
+                where: { id, shop: session.shop },
+                select: { ipAddress: true },
+            }),
+        ]);
+
+        if (!hasPaidBillingConfig(billingConfig, settings)) {
+            return responseData(
+                { error: "IP blocking is available on paid plans only." },
+                { status: 403 },
+            );
+        }
+
+        const clientIp = String(log?.ipAddress || "").trim();
+        if (!clientIp || isIP(clientIp) === 0) {
+            return responseData(
+                { error: "This log does not have a valid IP address to block." },
+                { status: 400 },
+            );
+        }
+
+        const existingRules = await prisma.redirectRule.findMany({
+            where: {
+                shop: session.shop,
+                matchType: "ip",
+                ruleType: "block",
+                isActive: true,
+            },
+            select: { ipAddresses: true },
+        });
+        const alreadyBlocked = existingRules.some((rule) =>
+            normalizeIPAddresses(rule.ipAddresses).includes(clientIp),
+        );
+
+        if (alreadyBlocked) {
+            return responseData({ message: `${clientIp} is already blocked.` });
+        }
+
+        await prisma.redirectRule.create({
+            data: {
+                shop: session.shop,
+                name: "Blocked from Visitor Logs",
+                ipAddresses: clientIp,
+                matchType: "ip",
+                countryCodes: "",
+                targetUrl: "",
+                priority: 0,
+                isActive: true,
+                ruleType: "block",
+                redirectMode: "auto_redirect",
+                pageTargetingType: "all",
+                pagePaths: null,
+            },
+        });
+        invalidateStorefrontConfigCache(session.shop);
+
+        return responseData({
+            message: `${clientIp} was added to IP Rules and blocked.`,
+        });
+    } catch (error) {
+        console.error("[VisitorLogs] Failed to block visitor IP:", error);
+        return responseData(
+            { error: "The IP address could not be blocked. Please try again." },
+            { status: 500 },
+        );
+    }
+};
+
 export default function VisitorLogs() {
-    const { filters, visitorLogsData } = useLoaderData<typeof loader>();
+    const { blockedIps, filters, hasPaidPlan, visitorLogsData } =
+        useLoaderData<typeof loader>();
+    const actionData = useActionData<typeof action>();
+    const shopify = useAppBridge();
+    const navigate = useNavigate();
     const navigation = useNavigation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { smUp } = useBreakpoints();
@@ -697,6 +847,13 @@ export default function VisitorLogs() {
     const [draftDateRange, setDraftDateRange] = useState<DateRangeValue>(currentDateRange);
     const [datePickerMonth, setDatePickerMonth] = useState(currentDateRange.start.getMonth());
     const [datePickerYear, setDatePickerYear] = useState(currentDateRange.start.getFullYear());
+    const [blockTarget, setBlockTarget] = useState<{
+        id: string;
+        ip: string;
+    } | null>(null);
+    const isBlockingIp =
+        navigation.state !== "idle" &&
+        navigation.formData?.get("intent") === "block_ip";
     const isLogsRoutePending =
         navigation.state !== "idle" &&
         navigation.location?.pathname === "/app/logs";
@@ -710,6 +867,18 @@ export default function VisitorLogs() {
     useEffect(() => {
         setQueryDraft(filters.query);
     }, [filters.query]);
+
+    useEffect(() => {
+        if (!actionData) return;
+        if ("message" in actionData && actionData.message) {
+            shopify.toast.show(actionData.message);
+            setBlockTarget(null);
+            return;
+        }
+        if ("error" in actionData && actionData.error) {
+            shopify.toast.show(actionData.error, { isError: true });
+        }
+    }, [actionData, shopify]);
 
     useEffect(() => {
         if (queryDraft === filters.query) return;
@@ -1165,6 +1334,11 @@ export default function VisitorLogs() {
     const renderLogRows = (logs: VisitorLogsData["logs"]) => logs.map((log: any, index: number) => {
             const userAgentDetails = parseVisitorUserAgent(log.userAgent);
             const userAgentTitle = log.userAgent || "";
+            const clientIp = String(log.ipAddress || "").trim();
+            const hasIpAddress =
+                Boolean(clientIp) &&
+                !["unknown", "0.0.0.0"].includes(clientIp.toLowerCase());
+            const isIpBlocked = blockedIps.includes(clientIp);
 
             return (
                 <IndexTable.Row id={log.id} key={log.id} position={index}>
@@ -1231,6 +1405,43 @@ export default function VisitorLogs() {
                     </IndexTable.Cell>
                     <IndexTable.Cell>
                         <VisitorDetailIcon label={userAgentDetails.browser} type="browser" />
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                        <Tooltip
+                            content={
+                                isIpBlocked
+                                    ? "IP already blocked"
+                                    : !hasPaidPlan
+                                        ? "Upgrade to a paid plan to block IPs"
+                                        : hasIpAddress
+                                            ? "Block IP address"
+                                            : "IP address unavailable"
+                            }
+                        >
+                            <Button
+                                size="slim"
+                                variant="tertiary"
+                                icon={LockIcon}
+                                accessibilityLabel={
+                                    isIpBlocked
+                                        ? "IP already blocked"
+                                        : !hasPaidPlan
+                                            ? "Upgrade to block IP address"
+                                            : "Block IP address"
+                                }
+                                disabled={!hasIpAddress || isIpBlocked}
+                                onClick={() => {
+                                    if (!hasPaidPlan) {
+                                        shopify.toast.show(
+                                            "Upgrade to a paid plan to use IP blocking.",
+                                        );
+                                        navigate("/app/pricing");
+                                        return;
+                                    }
+                                    setBlockTarget({ id: log.id, ip: clientIp });
+                                }}
+                            />
+                        </Tooltip>
                     </IndexTable.Cell>
                 </IndexTable.Row>
             );
@@ -1720,9 +1931,17 @@ export default function VisitorLogs() {
                     .visitor-log-table-wrap th:nth-child(11),
                     .visitor-log-table-wrap td:nth-child(11),
                     .visitor-log-table-wrap th:nth-child(12),
-                    .visitor-log-table-wrap td:nth-child(12) {
+                    .visitor-log-table-wrap td:nth-child(12),
+                    .visitor-log-table-wrap th:nth-child(13),
+                    .visitor-log-table-wrap td:nth-child(13) {
                         width: 64px;
                         min-width: 64px;
+                        text-align: center;
+                    }
+                    .visitor-log-table-wrap th:nth-child(14),
+                    .visitor-log-table-wrap td:nth-child(14) {
+                        width: 80px;
+                        min-width: 80px;
                         text-align: center;
                     }
                     @media (max-width: 47.9975em) {
@@ -1805,6 +2024,46 @@ export default function VisitorLogs() {
                     </div>
                 </Layout.Section>
             </Layout>
+            <Modal
+                open={Boolean(blockTarget)}
+                onClose={() => {
+                    if (!isBlockingIp) setBlockTarget(null);
+                }}
+                title="Block this IP address?"
+            >
+                <Modal.Section>
+                    <BlockStack gap="400">
+                        <Text as="p">
+                            This creates an active IP blocking rule for{" "}
+                            <strong>{blockTarget?.ip}</strong>. Future storefront
+                            requests from this IP will be blocked.
+                        </Text>
+                        <InlineStack align="end" gap="200">
+                            <Button
+                                onClick={() => setBlockTarget(null)}
+                                disabled={isBlockingIp}
+                            >
+                                Cancel
+                            </Button>
+                            <Form method="post">
+                                <input type="hidden" name="intent" value="block_ip" />
+                                <input
+                                    type="hidden"
+                                    name="id"
+                                    value={blockTarget?.id || ""}
+                                />
+                                <Button
+                                    submit
+                                    variant="primary"
+                                    loading={isBlockingIp}
+                                >
+                                    Block IP
+                                </Button>
+                            </Form>
+                        </InlineStack>
+                    </BlockStack>
+                </Modal.Section>
+            </Modal>
         </Page>
     );
 }

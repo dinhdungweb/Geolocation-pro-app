@@ -694,17 +694,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     let source: RuleSource | null = null;
     let action: StorefrontAction = "none";
 
-    const ipRisk =
-      hasPaidPlan && settings.blockVpn
-        ? await assessIpRisk({
-            ip: visitorIP,
-            ipHash,
-            userAgent: request.headers.get("user-agent"),
-            userLanguage: request.headers.get("accept-language"),
-          })
-        : null;
+    const ipRisk = hasPaidPlan
+      ? await assessIpRisk({
+          ip: visitorIP,
+          ipHash,
+          userAgent: request.headers.get("user-agent"),
+          userLanguage: request.headers.get("accept-language"),
+        })
+      : null;
 
-    if (ipRisk && shouldBlockIpRisk(ipRisk)) {
+    if (settings.blockVpn && ipRisk && shouldBlockIpRisk(ipRisk)) {
       source = "vpn";
       action = "block";
       selectedRule = {

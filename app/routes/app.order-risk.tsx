@@ -759,14 +759,15 @@ export default function OrderRiskPage() {
         <IndexTable.Cell>
           <div className="order-risk-assessment">
             <span className="order-risk-badge">
-              <Badge tone={riskTone(overallRisk)}>
-                {riskLabel(overallRisk)}
+              <Badge tone={riskTone(record.shopifyRiskLevel)}>
+                {`Shopify: ${riskLabel(record.shopifyRiskLevel)}`}
               </Badge>
             </span>
-            <Text as="span" variant="bodyXs" tone="subdued">
-              Shopify: {riskLabel(record.shopifyRiskLevel)} · Geo:{" "}
-              {riskLabel(record.appRiskLevel)}
-            </Text>
+            <span className="order-risk-badge">
+              <Badge tone={riskTone(record.appRiskLevel)}>
+                {`Geo: ${riskLabel(record.appRiskLevel)}`}
+              </Badge>
+            </span>
           </div>
         </IndexTable.Cell>
         <IndexTable.Cell>
@@ -1357,7 +1358,6 @@ export default function OrderRiskPage() {
                   <Button
                     submit
                     variant="primary"
-                    tone="critical"
                     loading={isBlockingIp}
                   >
                     Block IP

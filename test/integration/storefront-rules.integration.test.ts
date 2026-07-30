@@ -305,6 +305,37 @@ describe("storefront rule resolution integration", () => {
     );
   });
 
+  it("checks paid traffic without blocking when VPN protection is disabled", async () => {
+    await seedSettings("plus");
+    const rule = await seedRule({
+      name: "Country fallback",
+      redirectMode: "auto_redirect",
+    });
+    vi.stubEnv("VPN_CHECK_API_URL", "https://vpn-check.example/lookup");
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        fraud_score: 96,
+        proxy: false,
+        tor: false,
+        vpn: true,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { body } = await loadConfig();
+
+    expect(body).toMatchObject({
+      action: "auto_redirect",
+      enabled: true,
+      rule: {
+        name: "Country fallback",
+        ruleId: rule.id,
+        source: "country",
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("selects a Shopify Market rule before state and country rules", async () => {
     await seedSettings("plus");
     await seedRule({
