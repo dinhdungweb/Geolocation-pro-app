@@ -25,6 +25,10 @@ vi.mock("./maxmind.server", () => ({
   }),
 }));
 
+vi.mock("./ip-risk.server", () => ({
+  getCachedIpRiskByHash: vi.fn().mockResolvedValue(null),
+}));
+
 import {
   getOrderIdFromWebhookPayload,
   hasOrderScope,

@@ -645,7 +645,7 @@ export default function SettingsPage() {
         {
             id: "security" as const,
             label: "Security",
-            description: "VPN and proxy protection",
+            description: "High-risk IP protection",
             icon: LockIcon,
         },
     ];
@@ -1951,7 +1951,7 @@ export default function SettingsPage() {
                                             <div className="settings-secondary-grid">
                                             <SettingsPanel
                                                 title="Anti-fraud protection"
-                                                description="Block connections that mask their real location."
+                                                description="Score IP reputation and block high-risk traffic."
                                             >
                                                     {isFreePlan ? (
                                                         <div style={{ padding: "16px 0" }}>
@@ -1961,11 +1961,11 @@ export default function SettingsPage() {
                                                         </div>
                                                     ) : null}
                                                 <SettingsRow
-                                                    label="Block VPNs, proxies and Tor"
-                                                    description="Overrides other rules and blocks masked connections immediately."
+                                                    label="Block high-risk IPs"
+                                                    description="Blocks confirmed high-risk traffic. VPNs and proxies without abuse signals are logged for review."
                                                 >
                                                     <SettingsToggle
-                                                        label="Block VPNs, proxies and Tor exit nodes"
+                                                        label="Block high-risk IP addresses"
                                                         checked={blockVpn}
                                                         onChange={setBlockVpn}
                                                         disabled={isFreePlan}
@@ -2117,7 +2117,7 @@ export default function SettingsPage() {
                                             </span>
                                             <span className="settings-check-copy">
                                                 <strong>
-                                                    VPN protection{" "}
+                                                    High-risk IP protection{" "}
                                                     {blockVpn
                                                         ? "enabled"
                                                         : "disabled"}

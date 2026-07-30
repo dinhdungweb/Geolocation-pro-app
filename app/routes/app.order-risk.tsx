@@ -105,9 +105,56 @@ function riskWhere(risk: string) {
   if (!["HIGH", "MEDIUM", "LOW", "PENDING", "NONE"].includes(risk)) {
     return {};
   }
+
+  if (risk === "HIGH") {
+    return {
+      OR: [{ shopifyRiskLevel: "HIGH" }, { appRiskLevel: "HIGH" }],
+    };
+  }
+  if (risk === "MEDIUM") {
+    return {
+      AND: [
+        { OR: [{ shopifyRiskLevel: "MEDIUM" }, { appRiskLevel: "MEDIUM" }] },
+        { shopifyRiskLevel: { not: "HIGH" } },
+        { appRiskLevel: { not: "HIGH" } },
+      ],
+    };
+  }
+  if (risk === "LOW") {
+    return {
+      AND: [
+        { OR: [{ shopifyRiskLevel: "LOW" }, { appRiskLevel: "LOW" }] },
+        { shopifyRiskLevel: { notIn: ["HIGH", "MEDIUM"] } },
+        { appRiskLevel: { notIn: ["HIGH", "MEDIUM"] } },
+      ],
+    };
+  }
+  if (risk === "PENDING") {
+    return {
+      AND: [
+        { OR: [{ shopifyRiskLevel: "PENDING" }, { appRiskLevel: "PENDING" }] },
+        { shopifyRiskLevel: { notIn: ["HIGH", "MEDIUM", "LOW"] } },
+        { appRiskLevel: { notIn: ["HIGH", "MEDIUM", "LOW"] } },
+      ],
+    };
+  }
   return {
-    shopifyRiskLevel: risk,
+    AND: [{ shopifyRiskLevel: "NONE" }, { appRiskLevel: "NONE" }],
   };
+}
+
+const RISK_RANK: Record<string, number> = {
+  NONE: 0,
+  PENDING: 1,
+  LOW: 2,
+  MEDIUM: 3,
+  HIGH: 4,
+};
+
+function overallRiskLevel(shopifyLevel: string, appLevel: string) {
+  return (RISK_RANK[appLevel] || 0) > (RISK_RANK[shopifyLevel] || 0)
+    ? appLevel
+    : shopifyLevel;
 }
 
 async function getOfflineScope(shop: string, fallback?: string | null) {
@@ -215,14 +262,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       where: {
         shop: session.shop,
         orderCreatedAt: { gte: periodStart },
-        shopifyRiskLevel: "HIGH",
+        ...riskWhere("HIGH"),
       },
     }),
     prisma.orderRiskRecord.count({
       where: {
         shop: session.shop,
         reviewStatus: "open",
-        shopifyRiskLevel: { in: ["HIGH", "MEDIUM"] },
+        OR: [riskWhere("HIGH"), riskWhere("MEDIUM")],
       },
     }),
     prisma.redirectRule.findMany({
@@ -653,7 +700,10 @@ export default function OrderRiskPage() {
   );
 
   const rows = records.map((record, index) => {
-    const overallRisk = record.shopifyRiskLevel;
+    const overallRisk = overallRiskLevel(
+      record.shopifyRiskLevel,
+      record.appRiskLevel,
+    );
     const signals = record.riskSignals as Array<{
       code?: string;
       label?: string;
@@ -707,11 +757,17 @@ export default function OrderRiskPage() {
           </span>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <span className="order-risk-badge">
-            <Badge tone={riskTone(overallRisk)}>
-              {riskLabel(overallRisk)}
-            </Badge>
-          </span>
+          <div className="order-risk-assessment">
+            <span className="order-risk-badge">
+              <Badge tone={riskTone(overallRisk)}>
+                {riskLabel(overallRisk)}
+              </Badge>
+            </span>
+            <Text as="span" variant="bodyXs" tone="subdued">
+              Shopify: {riskLabel(record.shopifyRiskLevel)} · Geo:{" "}
+              {riskLabel(record.appRiskLevel)}
+            </Text>
+          </div>
         </IndexTable.Cell>
         <IndexTable.Cell>
           <Tooltip

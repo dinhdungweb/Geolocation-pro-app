@@ -84,6 +84,19 @@ async function deleteOrderRiskRecordBatch(cutoff: Date) {
     `;
 }
 
+async function deleteExpiredIpRiskCacheBatch(cutoff: Date) {
+    return prisma.$executeRaw`
+        DELETE FROM "IpRiskCache"
+        WHERE "id" IN (
+            SELECT "id"
+            FROM "IpRiskCache"
+            WHERE "expiresAt" < ${cutoff}
+            ORDER BY "expiresAt" ASC
+            LIMIT ${deleteBatchSize()}
+        )
+    `;
+}
+
 async function deleteBillableUsageActionEventBatch(cutoff: Date) {
     return prisma.$executeRaw`
         DELETE FROM "BillableUsageActionEvent"
@@ -333,9 +346,10 @@ export async function cleanupOldLogs() {
         const failedAnalyticsQueueCutoff = new Date();
         failedAnalyticsQueueCutoff.setDate(failedAnalyticsQueueCutoff.getDate() - FAILED_ANALYTICS_QUEUE_RETENTION_DAYS);
 
-        const [deletedLogs, deletedOrderRiskRecords, deletedBillableEvents, deletedBillableActionEvents, deletedFailedAnalyticsQueue] = await Promise.all([
+        const [deletedLogs, deletedOrderRiskRecords, deletedIpRiskCache, deletedBillableEvents, deletedBillableActionEvents, deletedFailedAnalyticsQueue] = await Promise.all([
             deleteInBatches(() => deleteVisitorLogBatch(logCutoff)),
             deleteInBatches(() => deleteOrderRiskRecordBatch(orderRiskCutoff)),
+            deleteInBatches(() => deleteExpiredIpRiskCacheBatch(new Date())),
             deleteInBatches(() => deleteBillableUsageEventBatch(billableCutoff)),
             deleteInBatches(() => deleteBillableUsageActionEventBatch(billableCutoff)),
             deleteInBatches(() => deleteFailedAnalyticsQueueBatch(failedAnalyticsQueueCutoff)),
@@ -348,6 +362,9 @@ export async function cleanupOldLogs() {
         }
         if (deletedOrderRiskRecords > 0) {
             console.log(`[Cleanup] Deleted ${deletedOrderRiskRecords} order risk records older than ${ORDER_RISK_RETENTION_DAYS} days`);
+        }
+        if (deletedIpRiskCache > 0) {
+            console.log(`[Cleanup] Deleted ${deletedIpRiskCache} expired IP risk cache records`);
         }
         if (deletedBillableEvents > 0) {
             console.log(`[Cleanup] Deleted ${deletedBillableEvents} billable events older than ${BILLABLE_EVENT_RETENTION_DAYS} days`);

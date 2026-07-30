@@ -94,6 +94,12 @@ export default function PrivacyPolicy() {
                     blocks.
                   </li>
                   <li>
+                    When anti-fraud protection is enabled: normalized IP
+                    reputation score, risk level, provider, and detected risk
+                    signals such as recent abuse, automation, VPN, proxy, Tor,
+                    or hosting usage.
+                  </li>
+                  <li>
                     When Order Risk is enabled: order ID, order number,
                     timestamps, amount, currency, fulfillment and financial
                     status, checkout IP address, and Shopify risk assessment.
@@ -140,7 +146,9 @@ export default function PrivacyPolicy() {
                   Storefront visitor logs, including raw IP addresses, are
                   retained for up to 7 days. Order Risk records are retained for
                   up to 60 days. Operational billing-event records may be
-                  retained for up to 35 days. Data is automatically deleted
+                  retained for up to 35 days. IP reputation cache entries use
+                  keyed IP hashes rather than raw IP addresses and expire
+                  automatically based on their short cache lifetime. Data is automatically deleted
                   after the applicable period unless a shorter period is
                   required by a verified deletion request.
                 </p>

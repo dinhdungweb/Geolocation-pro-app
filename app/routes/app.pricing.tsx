@@ -626,7 +626,7 @@ export default function PricingPage() {
                 "Country, state & city blocking",
                 "IP redirects & blocking",
                 "Markets & page targeting",
-                "VPN/proxy/Tor protection",
+                "High-risk IP reputation protection",
             ],
             hasTrial: true,
             ribbon: `${DEFAULT_TRIAL_DAYS}-day free trial`,

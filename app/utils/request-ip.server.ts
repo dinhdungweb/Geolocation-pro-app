@@ -1,8 +1,15 @@
+import { isIP } from "node:net";
+
 function normalizeIP(value: string | null | undefined) {
-  return value?.trim().replace(/^\[|\]$/g, "");
+  const normalized = value?.trim().replace(/^\[|\]$/g, "") || "";
+  return normalized.startsWith("::ffff:") && isIP(normalized.slice(7)) === 4
+    ? normalized.slice(7)
+    : normalized;
 }
 
 function isPrivateOrLocalIP(ip: string) {
+  if (!isIP(ip)) return true;
+
   if (
     ip === "0.0.0.0" ||
     ip === "127.0.0.1" ||
@@ -37,13 +44,19 @@ function firstPublicForwardedIP(value: string | null) {
 }
 
 export function getVisitorIP(request: Request): string {
+  const fallbackHeaders = [
+    "cf-connecting-ip",
+    "true-client-ip",
+    "x-shopify-client-ip",
+    "x-real-ip",
+  ];
+  const fallbackIp = fallbackHeaders
+    .map((header) => normalizeIP(request.headers.get(header)))
+    .find((ip) => Boolean(ip && !isPrivateOrLocalIP(ip)));
+
   return (
     firstPublicForwardedIP(request.headers.get("x-forwarded-for")) ||
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("true-client-ip") ||
-    request.headers.get("x-client-ip") ||
-    request.headers.get("x-shopify-client-ip") ||
-    request.headers.get("x-real-ip") ||
+    fallbackIp ||
     "0.0.0.0"
   );
 }

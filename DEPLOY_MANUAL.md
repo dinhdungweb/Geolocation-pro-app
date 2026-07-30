@@ -71,6 +71,19 @@ ADMIN_SESSION_SECRET=replace_with_at_least_32_random_characters
 APP_ENCRYPTION_KEY=replace_with_at_least_32_random_characters
 
 MAXMIND_LICENSE_KEY=your_maxmind_license_key
+IP_RISK_API_URL=https://proxycheck.io/v2/{ip}?vpn=1&risk=1
+IP_RISK_PROVIDER=proxycheck
+IP_RISK_API_KEY=replace_with_proxycheck_api_key
+IP_RISK_FALLBACK_API_URL=https://api.abuseipdb.com/api/v2/check?ipAddress={ip}&maxAgeInDays=30
+IP_RISK_FALLBACK_PROVIDER=abuseipdb
+IP_RISK_FALLBACK_API_KEY=replace_with_abuseipdb_api_key
+IP_RISK_BLOCK_MEDIUM=false
+IP_RISK_TIMEOUT_MS=1200
+IP_RISK_TOTAL_TIMEOUT_MS=2500
+IP_RISK_CLEAN_TTL_MS=86400000
+IP_RISK_RISK_TTL_MS=3600000
+IP_RISK_FAILURE_TTL_MS=60000
+# Backward-compatible fallback only:
 VPN_CHECK_API_URL=
 RESEND_API_KEY=
 SENDER_EMAIL=

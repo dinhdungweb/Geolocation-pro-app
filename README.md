@@ -7,7 +7,7 @@ GeoPro là ứng dụng Shopify embedded giúp cửa hàng điều hướng, hi�
 - Tạo rule theo quốc gia, bang/tỉnh và Shopify Market.
 - Hỗ trợ popup gợi ý, tự động redirect và trang chặn tùy chỉnh.
 - Tạo allow/block rule cho từng IP hoặc dải IP.
-- Phát hiện VPN/proxy/hosting khi được cấu hình.
+- Chấm điểm IP reputation và phát hiện VPN/proxy/hosting khi được cấu hình.
 - Theme app embed để chạy logic trên storefront.
 - App Proxy có xác thực chữ ký cho config và analytics.
 - Dashboard thống kê lượt truy cập, redirect, popup và block.
@@ -87,7 +87,15 @@ File [.env.example](./.env.example) chứa toàn bộ cấu hình mẫu. Các nh
 | `ADMIN_SESSION_SECRET` | Production | Khóa ký admin session |
 | `APP_ENCRYPTION_KEY` | Production | Khóa mã hóa secret lưu trong database |
 | `MAXMIND_LICENSE_KEY` | Khuyến nghị | Tự động tải/cập nhật GeoLite2 |
-| `VPN_CHECK_API_URL` | Tùy chọn | Provider phát hiện VPN/proxy |
+| `IP_RISK_API_URL` | Khuyến nghị | HTTPS endpoint chấm điểm IP reputation (`{ip}` được hỗ trợ) |
+| `IP_RISK_PROVIDER` | Tùy chọn | Provider chính; khuyến nghị `proxycheck` |
+| `IP_RISK_API_KEY` | Tùy chọn | API key provider chính, không đặt trực tiếp trong source code |
+| `IP_RISK_FALLBACK_API_URL` | Tùy chọn | HTTPS endpoint dự phòng khi provider chính lỗi hoặc hết quota |
+| `IP_RISK_FALLBACK_PROVIDER` | Tùy chọn | Provider dự phòng; khuyến nghị `abuseipdb` |
+| `IP_RISK_FALLBACK_API_KEY` | Tùy chọn | API key provider dự phòng |
+| `IP_RISK_TOTAL_TIMEOUT_MS` | Tùy chọn | Tổng thời gian tối đa cho cả provider chính và dự phòng |
+| `IP_RISK_BLOCK_MEDIUM` | Tùy chọn | `false` mặc định; chỉ bật nếu muốn block cả VPN/proxy chưa có abuse signal |
+| `VPN_CHECK_API_URL` | Tùy chọn | Biến tương thích ngược khi chưa chuyển sang `IP_RISK_API_URL` |
 | `RESEND_API_KEY` | Tùy chọn | Gửi email qua Resend |
 | `ALERT_WEBHOOK_URL` | Tùy chọn | Slack-compatible webhook nhận cảnh báo health |
 

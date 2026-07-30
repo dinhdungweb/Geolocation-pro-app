@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import prisma from "../db.server";
+import { getCachedIpRiskByHash } from "./ip-risk.server";
 import { getGeoFromIP } from "./maxmind.server";
 import {
   encryptProtectedData,
@@ -266,18 +267,50 @@ async function getVisitorContext(
 
 function buildRiskSignals({
   blockedBeforeOrder,
+  ipRiskLevel,
+  ipRiskScore,
+  ipRiskSignals,
   orderCount24Hours,
   orderCount30Days,
   vpnDetected,
 }: {
   blockedBeforeOrder: boolean;
+  ipRiskLevel: string | null;
+  ipRiskScore: number | null;
+  ipRiskSignals: string[];
   orderCount24Hours: number;
   orderCount30Days: number;
   vpnDetected: boolean;
 }) {
   const signals: RiskSignal[] = [];
 
-  if (vpnDetected) {
+  if (ipRiskLevel === "HIGH") {
+    signals.push({
+      code: "high_ip_reputation",
+      label: "High-risk IP reputation",
+      detail: `IP reputation is high risk${ipRiskScore === null ? "" : ` (score ${ipRiskScore})`}${ipRiskSignals.length > 0 ? `: ${ipRiskSignals.slice(0, 3).join(", ")}` : "."}`,
+      weight: 50,
+      severity: "high",
+    });
+  } else if (ipRiskLevel === "MEDIUM") {
+    signals.push({
+      code: "suspicious_ip_reputation",
+      label: "Suspicious IP reputation",
+      detail: `IP reputation requires review${ipRiskScore === null ? "" : ` (score ${ipRiskScore})`}${ipRiskSignals.length > 0 ? `: ${ipRiskSignals.slice(0, 3).join(", ")}` : "."}`,
+      weight: 25,
+      severity: "medium",
+    });
+  } else if (ipRiskLevel === "LOW") {
+    signals.push({
+      code: "low_ip_reputation",
+      label: "Low IP reputation signal",
+      detail: `IP reputation returned a low-risk signal${ipRiskScore === null ? "" : ` (score ${ipRiskScore})`}.`,
+      weight: 10,
+      severity: "low",
+    });
+  }
+
+  if (vpnDetected && ipRiskLevel !== "HIGH") {
     signals.push({
       code: "vpn_or_proxy",
       label: "VPN or proxy detected",
@@ -422,8 +455,14 @@ export async function syncOrderRisk({
   const ipCity = String(
     visitorContext.lastLog?.city || fallbackGeo.city || "",
   );
+  const ipRisk = clientIpHash
+    ? await getCachedIpRiskByHash(clientIpHash)
+    : null;
   const signals = buildRiskSignals({
     blockedBeforeOrder: visitorContext.blockedBeforeOrder,
+    ipRiskLevel: ipRisk?.level || null,
+    ipRiskScore: ipRisk?.score ?? null,
+    ipRiskSignals: ipRisk?.signals || [],
     orderCount24Hours: visitorContext.orderCount24Hours,
     orderCount30Days: visitorContext.orderCount30Days,
     vpnDetected: visitorContext.vpnDetected,

@@ -114,6 +114,7 @@ type DateRangeValue = {
 const logTableHeadings: [{ title: string }, ...Array<{ title: string }>] = [
     { title: "Timestamp" },
     { title: "IP Address" },
+    { title: "IP Risk" },
     { title: "Country" },
     { title: "Region" },
     { title: "City" },
@@ -404,6 +405,7 @@ type VisitorLogFilters = {
     query: string;
     action: string;
     country: string;
+    risk: string;
     from: string;
     to: string;
     dateScope: string;
@@ -574,6 +576,10 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
         where.countryCode = filters.country;
     }
 
+    if (filters.risk) {
+        where.ipRiskLevel = filters.risk;
+    }
+
     if (fromDate || toDate) {
         where.timestamp = {
             ...(fromDate ? { gte: fromDate } : {}),
@@ -591,6 +597,12 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
                 id: true,
                 shop: true,
                 ipAddress: true,
+                ipRiskScore: true,
+                ipRiskLevel: true,
+                ipRiskSignals: true,
+                ipRiskProvider: true,
+                ipRiskStatus: true,
+                ipRiskCheckedAt: true,
                 countryCode: true,
                 regionCode: true,
                 regionName: true,
@@ -632,6 +644,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         query: (url.searchParams.get("q") || "").trim(),
         action: url.searchParams.get("action") || "",
         country: (url.searchParams.get("country") || "").trim().toUpperCase(),
+        risk: (url.searchParams.get("risk") || "").trim().toUpperCase(),
         from: url.searchParams.get("from") || "",
         to: url.searchParams.get("to") || "",
         dateScope: url.searchParams.get(DATE_SCOPE_PARAM) || "",
@@ -661,6 +674,7 @@ export default function VisitorLogs() {
         filters.query ||
         filters.action ||
         filters.country ||
+        filters.risk ||
         filters.from ||
         filters.to ||
         filters.dateScope === DATE_SCOPE_ALL
@@ -668,6 +682,7 @@ export default function VisitorLogs() {
     const hasFilterMenuValues = Boolean(
         filters.action ||
         filters.country ||
+        filters.risk ||
         filters.from ||
         filters.to ||
         filters.dateScope === DATE_SCOPE_ALL
@@ -808,7 +823,7 @@ export default function VisitorLogs() {
 
     const clearFilters = () => {
         const nextParams = new URLSearchParams(searchParams);
-        ["q", "action", "country", "from", "to", DATE_SCOPE_PARAM, "page"].forEach((key) => nextParams.delete(key));
+        ["q", "action", "country", "risk", "from", "to", DATE_SCOPE_PARAM, "page"].forEach((key) => nextParams.delete(key));
         setSearchParams(nextParams);
     };
 
@@ -860,6 +875,33 @@ export default function VisitorLogs() {
         }
     };
 
+    const getRiskBadge = (log: any) => {
+        const level = String(log.ipRiskLevel || "UNKNOWN").toUpperCase();
+        const score = typeof log.ipRiskScore === "number" ? ` ${log.ipRiskScore}` : "";
+        const signals = Array.isArray(log.ipRiskSignals)
+            ? log.ipRiskSignals.filter((value: unknown) => typeof value === "string").join(", ")
+            : "";
+        const title = [
+            log.ipRiskProvider ? `Provider: ${log.ipRiskProvider}` : "",
+            signals ? `Signals: ${signals}` : "",
+            log.ipRiskStatus === "failed" ? "Provider check failed" : "",
+        ].filter(Boolean).join(" · ");
+
+        if (level === "HIGH") {
+            return <span title={title}><Badge tone="critical">{`High${score}`}</Badge></span>;
+        }
+        if (level === "MEDIUM") {
+            return <span title={title}><Badge tone="warning">{`Medium${score}`}</Badge></span>;
+        }
+        if (level === "LOW") {
+            return <span title={title}><Badge tone="info">{`Low${score}`}</Badge></span>;
+        }
+        if (level === "NONE") {
+            return <span title={title}><Badge tone="success">No risk</Badge></span>;
+        }
+        return <span title={title || "IP reputation was not checked"}><Badge tone="attention">Unknown</Badge></span>;
+    };
+
     const getVisitorTypeBadge = (visitorType: string) => {
         switch (visitorType) {
             case "Bot":
@@ -902,6 +944,14 @@ export default function VisitorLogs() {
                 label: countryCode,
                 value: countryCode,
             })),
+        ];
+        const riskOptions = [
+            { label: "All risk levels", value: "all" },
+            { label: "High", value: "HIGH" },
+            { label: "Medium", value: "MEDIUM" },
+            { label: "Low", value: "LOW" },
+            { label: "No risk", value: "NONE" },
+            { label: "Unknown / not checked", value: "UNKNOWN" },
         ];
 
         return (
@@ -1083,6 +1133,14 @@ export default function VisitorLogs() {
                             onChange={(value) => updateSearchParam("action", value)}
                         />
                     </div>
+                    <div className="visitor-log-filter-select">
+                        <Select
+                            label="IP risk"
+                            options={riskOptions}
+                            value={filters.risk || "all"}
+                            onChange={(value) => updateSearchParam("risk", value)}
+                        />
+                    </div>
                     </div>
                     <div className="visitor-log-filter-popover-footer">
                         {hasFilters && (
@@ -1116,6 +1174,7 @@ export default function VisitorLogs() {
                         </Text>
                     </IndexTable.Cell>
                     <IndexTable.Cell>{log.ipAddress}</IndexTable.Cell>
+                    <IndexTable.Cell>{getRiskBadge(log)}</IndexTable.Cell>
                     <IndexTable.Cell>
                         {log.countryCode ? (
                             <div className="visitor-log-country">

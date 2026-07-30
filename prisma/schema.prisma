@@ -257,24 +257,60 @@ model BillableUsageActionEvent {
 }
 
 model VisitorLog {
-  id          String   @id @default(uuid())
-  shop        String
-  ipAddress   String
-  countryCode String?
-  regionCode  String?
-  regionName  String?
-  city        String?
-  action      String
-  ruleName    String?
-  targetUrl   String?
-  userAgent   String?
-  timestamp   DateTime @default(now())
-  path        String?
+  id              String   @id @default(uuid())
+  shop            String
+  ipAddress       String
+  ipHash          String?
+  countryCode     String?
+  regionCode      String?
+  regionName      String?
+  city            String?
+  action          String
+  ruleName        String?
+  targetUrl       String?
+  userAgent       String?
+  timestamp       DateTime @default(now())
+  path            String?
+  ipRiskScore     Int?
+  ipRiskLevel     String   @default("UNKNOWN")
+  ipRiskSignals   Json?
+  ipRiskProvider  String?
+  ipRiskStatus    String   @default("skipped")
+  ipRiskCheckedAt DateTime?
 
   @@index([shop, timestamp])
   @@index([shop, action, timestamp])
   @@index([shop, countryCode, timestamp])
+  @@index([shop, ipRiskLevel, timestamp])
+  @@index([shop, ipHash, timestamp])
   @@index([timestamp])
+}
+
+model IpRiskCache {
+  id               String   @id @default(uuid())
+  provider         String
+  providerVersion  String   @default("v1")
+  ipHash           String
+  score            Int?
+  level            String
+  signals          Json
+  status           String
+  isProxy          Boolean  @default(false)
+  isVpn            Boolean  @default(false)
+  isTor            Boolean  @default(false)
+  isResidential    Boolean  @default(false)
+  isHosting        Boolean  @default(false)
+  hasRecentAbuse   Boolean  @default(false)
+  isBot            Boolean  @default(false)
+  requestId        String?
+  lastError        String?
+  checkedAt        DateTime @default(now())
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([provider, providerVersion, ipHash])
+  @@index([expiresAt])
 }
 
 model OrderRiskRecord {

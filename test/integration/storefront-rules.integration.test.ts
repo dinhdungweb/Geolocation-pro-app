@@ -178,6 +178,7 @@ afterEach(async () => {
   invalidateStorefrontConfigCache(SHOP);
   vi.clearAllMocks();
   await prisma.storefrontAnalyticsEventQueue.deleteMany({ where: { shop: SHOP } });
+  await prisma.ipRiskCache.deleteMany();
   await prisma.billableUsageActionEvent.deleteMany({ where: { shop: SHOP } });
   await prisma.billableUsageEvent.deleteMany({ where: { shop: SHOP } });
   await prisma.monthlyUsage.deleteMany({ where: { shop: SHOP } });
@@ -275,6 +276,7 @@ describe("storefront rule resolution integration", () => {
     vi.stubEnv("VPN_CHECK_API_URL", "https://vpn-check.example/lookup");
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
+        fraud_score: 96,
         proxy: false,
         tor: false,
         vpn: true,
@@ -289,7 +291,7 @@ describe("storefront rule resolution integration", () => {
       analyticsEvent: "vpn_blocked",
       enabled: true,
       rule: {
-        name: "Anti-Fraud Shield",
+        name: "High-Risk IP Shield",
         ruleId: "vpn-shield",
         source: "vpn",
       },

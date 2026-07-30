@@ -2,9 +2,11 @@ import { randomUUID } from "crypto";
 import type { Prisma } from "@prisma/client";
 import prisma from "../db.server";
 import {
+  hashIP,
   isBillableAnalyticsEvent,
   type AnalyticsTokenPayload,
 } from "./analytics-token.server";
+import { getCachedIpRiskByHash } from "./ip-risk.server";
 import { getVisitorIP } from "./request-ip.server";
 
 export type RecordStorefrontAnalyticsEventInput = {
@@ -480,16 +482,37 @@ export async function recordStorefrontAnalyticsDetails(
     ruleName,
     shop,
     targetUrl,
+    tokenPayload,
     type,
     userAgent,
   }: RecordStorefrontAnalyticsEventInput,
   options: { retryableLogErrors?: boolean } = {},
 ) {
   try {
+    const resolvedIp = getInputIP({
+      request,
+      ipAddress,
+      countryCode,
+      path,
+      ruleId,
+      ruleName,
+      shop,
+      targetUrl,
+      tokenPayload,
+      type,
+    });
+    const ipHash =
+      tokenPayload?.ipHash ||
+      (resolvedIp && !["unknown", "0.0.0.0"].includes(resolvedIp)
+        ? hashIP(resolvedIp)
+        : null);
+    const ipRisk = ipHash ? await getCachedIpRiskByHash(ipHash) : null;
+
     await prisma.visitorLog.create({
       data: {
         shop,
-        ipAddress: getInputIP({ request, ipAddress, countryCode, path, ruleId, ruleName, shop, targetUrl, type }),
+        ipAddress: resolvedIp,
+        ipHash,
         countryCode,
         regionCode,
         regionName,
@@ -499,6 +522,12 @@ export async function recordStorefrontAnalyticsDetails(
         targetUrl,
         userAgent: getInputUserAgent({ request, userAgent, countryCode, path, ruleId, ruleName, shop, targetUrl, type }),
         path,
+        ipRiskScore: ipRisk?.score ?? null,
+        ipRiskLevel: ipRisk?.level || "UNKNOWN",
+        ipRiskSignals: ipRisk?.signals || undefined,
+        ipRiskProvider: ipRisk?.provider || null,
+        ipRiskStatus: ipRisk?.status || "skipped",
+        ipRiskCheckedAt: ipRisk?.checkedAt || null,
       },
     });
   } catch (logError) {
