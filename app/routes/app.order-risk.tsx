@@ -1614,7 +1614,7 @@ export default function OrderRiskPage() {
           }
           .order-risk-table-card th:nth-child(1),
           .order-risk-table-card td:nth-child(1) {
-            width: 3.5%;
+            width: 44px;
           }
           .order-risk-table-card th:nth-child(2),
           .order-risk-table-card td:nth-child(2) {
@@ -1714,7 +1714,8 @@ export default function OrderRiskPage() {
             flex-wrap: nowrap;
             gap: 8px;
             justify-content: flex-end;
-            min-width: 128px;
+            min-width: 0;
+            width: 100%;
           }
           .order-risk-actions form {
             display: inline-flex;
