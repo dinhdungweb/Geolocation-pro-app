@@ -1668,8 +1668,8 @@ export default function OrderRiskPage() {
           .order-risk-ip {
             color: var(--p-color-text, #303030);
             display: block;
-            font-family: var(--p-font-family-mono, ui-monospace, monospace);
-            font-size: 12px;
+            font-family: inherit;
+            font-size: inherit;
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;

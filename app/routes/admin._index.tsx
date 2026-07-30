@@ -198,6 +198,14 @@ function getFullYearTrends(monthlyTrends: any[]) {
   return fullYear;
 }
 
+function formatCompactCount(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 export default function AdminDashboard() {
   const { stats, countries, distributions, trends } = useLoaderData<AdminDashboardLoaderData>();
   const fullYearTrends = getFullYearTrends(trends);
@@ -260,7 +268,7 @@ export default function AdminDashboard() {
 
               return (
                 <div className="ed-trend-column" key={trend.yearMonth}>
-                  <span>{visitors > 1000 ? `${(visitors / 1000).toFixed(1)}k` : visitors || ""}</span>
+                  <span>{visitors > 0 ? formatCompactCount(visitors) : ""}</span>
                   <div
                     className="ed-trend-bar"
                     style={{ height: `${(percentage / 100) * 180}px` }}
