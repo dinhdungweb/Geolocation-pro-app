@@ -4,6 +4,7 @@ import {
   Form,
   data as responseData,
   useActionData,
+  useFetcher,
   useLoaderData,
   useNavigate,
   useNavigation,
@@ -23,8 +24,10 @@ import {
   Page,
   Pagination,
   Popover,
+  Spinner,
   Text,
   Tooltip,
+  useIndexResourceState,
 } from "@shopify/polaris";
 import {
   AlertTriangleIcon,
@@ -355,7 +358,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { billing, session } = await authenticate.admin(request);
+  const { admin, billing, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
 
@@ -405,6 +408,135 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  if (intent === "load_risk_details") {
+    const id = String(formData.get("id") || "");
+    try {
+      const record = await prisma.orderRiskRecord.findFirst({
+        where: { id, shop: session.shop },
+        select: {
+          legacyOrderId: true,
+          legacyOrderIdEncrypted: true,
+        },
+      });
+      const decryptedLegacyId = decryptProtectedData(
+        record?.legacyOrderIdEncrypted,
+      );
+      const legacyOrderId =
+        decryptedLegacyId ||
+        (/^\d+$/.test(record?.legacyOrderId || "")
+          ? record?.legacyOrderId || ""
+          : "");
+      if (!legacyOrderId) {
+        return responseData(
+          {
+            error: "The Shopify order ID is unavailable for this record.",
+            recordId: id,
+          },
+          { status: 400 },
+        );
+      }
+
+      const response = await admin.graphql(
+        `#graphql
+          query GeoOrderRiskDetails($id: ID!) {
+            order(id: $id) {
+              risk {
+                recommendation
+                assessments {
+                  riskLevel
+                  provider {
+                    title
+                  }
+                  facts {
+                    description
+                    sentiment
+                  }
+                }
+              }
+            }
+          }
+        `,
+        {
+          variables: {
+            id: `gid://shopify/Order/${legacyOrderId}`,
+          },
+        },
+      );
+      const body: any = await response.json();
+      if (body?.errors?.length) {
+        throw new Error(
+          body.errors
+            .map((error: any) => error?.message)
+            .filter(Boolean)
+            .join("; ") || "Shopify risk details query failed",
+        );
+      }
+      const order = body?.data?.order;
+      if (!order) {
+        return responseData(
+          { error: "Shopify order not found.", recordId: id },
+          { status: 404 },
+        );
+      }
+
+      const assessments = Array.isArray(order.risk?.assessments)
+        ? order.risk.assessments
+            .map((assessment: any) => ({
+              facts: Array.isArray(assessment?.facts)
+                ? assessment.facts
+                    .filter(
+                      (fact: any) =>
+                        typeof fact?.description === "string" &&
+                        fact.description.trim(),
+                    )
+                    .slice(0, 50)
+                    .map((fact: any) => ({
+                      description: fact.description.trim().slice(0, 1000),
+                      sentiment: ["POSITIVE", "NEGATIVE", "NEUTRAL"].includes(
+                        String(fact.sentiment || "").toUpperCase(),
+                      )
+                        ? String(fact.sentiment).toUpperCase()
+                        : "NEUTRAL",
+                    }))
+                : [],
+              providerTitle:
+                typeof assessment?.provider?.title === "string"
+                  ? assessment.provider.title
+                  : null,
+              riskLevel: normalizeFilter(
+                assessment?.riskLevel,
+                "NONE",
+              ).toUpperCase(),
+            }))
+            .slice(0, 20)
+        : [];
+
+      return responseData({
+        recordId: id,
+        riskDetails: {
+          assessments,
+          recommendation: normalizeFilter(
+            order.risk?.recommendation,
+            "NONE",
+          ).toUpperCase(),
+        },
+      });
+    } catch (error) {
+      console.error("[OrderRisk] Failed to load Shopify risk details:", error);
+      const message =
+        error instanceof Error ? error.message : "Shopify request failed";
+      return responseData(
+        {
+          error: /access denied|permission|scope/i.test(message)
+            ? "Shopify denied access to order risk details. Reapprove the read_orders permission."
+            : "Shopify risk details could not be loaded. Please try again.",
+          recordId: id,
+        },
+        { status: /access denied|permission|scope/i.test(message) ? 403 : 502 },
+      );
+    }
+  }
+
   if (intent === "set_review_status") {
     const id = String(formData.get("id") || "");
     const reviewStatus =
@@ -424,6 +556,154 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           ? "Order marked as reviewed."
           : "Order returned to the review queue.",
     });
+  }
+
+  if (intent === "bulk_mark_reviewed") {
+    const ids = Array.from(
+      new Set(
+        formData
+          .getAll("ids")
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 100);
+    if (ids.length === 0) {
+      return responseData(
+        { error: "Select at least one order to mark as reviewed." },
+        { status: 400 },
+      );
+    }
+
+    const updated = await prisma.orderRiskRecord.updateMany({
+      where: {
+        id: { in: ids },
+        shop: session.shop,
+      },
+      data: { reviewStatus: "reviewed" },
+    });
+    if (updated.count === 0) {
+      return responseData(
+        { error: "No matching order risk records were found." },
+        { status: 404 },
+      );
+    }
+
+    return responseData({
+      message: `${updated.count} selected order${
+        updated.count === 1 ? "" : "s"
+      } marked as reviewed.`,
+    });
+  }
+
+  if (intent === "bulk_block_ips") {
+    try {
+      const ids = Array.from(
+        new Set(
+          formData
+            .getAll("ids")
+            .map((value) => String(value).trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, 100);
+      if (ids.length === 0) {
+        return responseData(
+          { error: "Select at least one order with an IP address to block." },
+          { status: 400 },
+        );
+      }
+
+      const [billingConfig, settings, records] = await Promise.all([
+        checkBillingWithFallback(billing, isBillingTestMode()),
+        prisma.settings.findUnique({ where: { shop: session.shop } }),
+        prisma.orderRiskRecord.findMany({
+          where: {
+            id: { in: ids },
+            shop: session.shop,
+          },
+          select: { clientIp: true },
+        }),
+      ]);
+
+      if (!hasPaidBillingConfig(billingConfig, settings)) {
+        return responseData(
+          { error: "IP blocking is available on paid plans only." },
+          { status: 403 },
+        );
+      }
+
+      const selectedIps = Array.from(
+        new Set(
+          records
+            .map((record) => decryptProtectedData(record.clientIp))
+            .map((ip) => ip.trim())
+            .filter(Boolean),
+        ),
+      );
+      if (selectedIps.length === 0) {
+        return responseData(
+          { error: "The selected orders do not have IP addresses to block." },
+          { status: 400 },
+        );
+      }
+
+      const existingRules = await prisma.redirectRule.findMany({
+        where: {
+          shop: session.shop,
+          matchType: "ip",
+          ruleType: "block",
+          isActive: true,
+        },
+        select: { ipAddresses: true },
+      });
+      const blockedIps = new Set(
+        existingRules.flatMap((rule) =>
+          normalizeIPAddresses(rule.ipAddresses).map((ip) => ip.toLowerCase()),
+        ),
+      );
+      const newIps = selectedIps.filter(
+        (ip) => !blockedIps.has(ip.toLowerCase()),
+      );
+
+      if (newIps.length === 0) {
+        return responseData({
+          message: "All selected IP addresses are already blocked.",
+        });
+      }
+
+      await prisma.redirectRule.create({
+        data: {
+          shop: session.shop,
+          name: "Blocked from Order Risk (bulk)",
+          ipAddresses: newIps.join(","),
+          matchType: "ip",
+          countryCodes: "",
+          targetUrl: "",
+          priority: 0,
+          isActive: true,
+          ruleType: "block",
+          redirectMode: "auto_redirect",
+          pageTargetingType: "all",
+          pagePaths: null,
+        },
+      });
+      invalidateStorefrontConfigCache(session.shop);
+
+      const skippedCount = selectedIps.length - newIps.length;
+      return responseData({
+        message: `${newIps.length} IP address${
+          newIps.length === 1 ? "" : "es"
+        } blocked${skippedCount ? `; ${skippedCount} already blocked` : ""}.`,
+      });
+    } catch (error) {
+      console.error("[OrderRisk] Failed to bulk block order IPs:", error);
+      return responseData(
+        {
+          error:
+            "The selected IP addresses could not be blocked. Please try again.",
+        },
+        { status: 500 },
+      );
+    }
   }
 
   if (intent === "block_ip") {
@@ -590,6 +870,8 @@ export default function OrderRiskPage() {
     totalPages,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const riskDetailFetcher = useFetcher<typeof action>();
+  const bulkActionFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const navigation = useNavigation();
   const navigate = useNavigate();
@@ -603,15 +885,37 @@ export default function OrderRiskPage() {
     id: string;
     ip: string;
   } | null>(null);
+  const [bulkBlockModalOpen, setBulkBlockModalOpen] = useState(false);
   const [riskDetailTarget, setRiskDetailTarget] = useState<
     (typeof records)[number] | null
   >(null);
+  const {
+    selectedResources,
+    allResourcesSelected,
+    handleSelectionChange,
+    clearSelection,
+  } = useIndexResourceState(records);
+  const selectedRecords = records.filter((record) =>
+    selectedResources.includes(record.id),
+  );
+  const selectedBlockableRecords = selectedRecords.filter(
+    (record) => record.clientIp && !record.isIpBlocked,
+  );
+  const selectedBlockableIpCount = new Set(
+    selectedBlockableRecords.map((record) =>
+      String(record.clientIp).toLowerCase(),
+    ),
+  ).size;
   const isSyncing =
     navigation.state !== "idle" &&
     navigation.formData?.get("intent") === "sync_orders";
   const isBlockingIp =
     navigation.state !== "idle" &&
     navigation.formData?.get("intent") === "block_ip";
+  const isBulkActionRunning = bulkActionFetcher.state !== "idle";
+  const isBulkBlocking =
+    isBulkActionRunning &&
+    bulkActionFetcher.formData?.get("intent") === "bulk_block_ips";
   const metricsList = [
     {
       label: "Orders · 30 days",
@@ -661,41 +965,64 @@ export default function OrderRiskPage() {
     label?: string;
     severity?: string;
   }>;
-  const riskDetailItems: Array<{
+  const riskDetailResponse = riskDetailFetcher.data as
+    | {
+        error?: string;
+        recordId?: string;
+        riskDetails?: {
+          assessments?: Array<{
+            facts?: Array<{
+              description?: string;
+              sentiment?: string;
+            }>;
+            providerTitle?: string | null;
+            riskLevel?: string;
+          }>;
+          recommendation?: string;
+        };
+      }
+    | undefined;
+  const activeShopifyRiskDetails =
+    riskDetailTarget &&
+    riskDetailResponse?.recordId === riskDetailTarget.id
+      ? riskDetailResponse.riskDetails
+      : undefined;
+  const activeRiskDetailError =
+    riskDetailTarget &&
+    riskDetailResponse?.recordId === riskDetailTarget.id
+      ? riskDetailResponse.error
+      : undefined;
+  const isLoadingRiskDetails =
+    Boolean(riskDetailTarget) &&
+    riskDetailFetcher.state !== "idle" &&
+    riskDetailFetcher.formData?.get("intent") === "load_risk_details";
+  const shopifyRiskDetailItems: Array<{
+    text: string;
+    tone: "success" | "warning" | "subdued";
+  }> = [];
+  for (const assessment of activeShopifyRiskDetails?.assessments || []) {
+    for (const fact of assessment.facts || []) {
+      if (!fact.description) continue;
+      const providerPrefix = assessment.providerTitle
+        ? `${assessment.providerTitle}: `
+        : "";
+      shopifyRiskDetailItems.push({
+        text: `${providerPrefix}${fact.description}`,
+        tone:
+          fact.sentiment === "POSITIVE"
+            ? "success"
+            : fact.sentiment === "NEGATIVE"
+              ? "warning"
+              : "subdued",
+      });
+    }
+  }
+  const appRiskDetailItems: Array<{
     text: string;
     tone: "success" | "warning" | "subdued";
   }> = [];
   if (riskDetailTarget) {
-    const overallLevel = overallRiskLevel(
-      riskDetailTarget.shopifyRiskLevel,
-      riskDetailTarget.appRiskLevel,
-    );
-    riskDetailItems.push({
-      text:
-        overallLevel === "HIGH"
-          ? "This order has high-risk indicators and should be reviewed."
-          : overallLevel === "MEDIUM"
-            ? "This order has signals that require review."
-            : overallLevel === "LOW"
-              ? "This order has only low-risk indicators."
-              : "No high-risk indicators were found for this order.",
-      tone:
-        overallLevel === "HIGH" || overallLevel === "MEDIUM"
-          ? "warning"
-          : overallLevel === "NONE"
-            ? "success"
-            : "subdued",
-    });
-    riskDetailItems.push({
-      text: `Shopify risk assessment: ${riskLabel(riskDetailTarget.shopifyRiskLevel)}.`,
-      tone:
-        riskDetailTarget.shopifyRiskLevel === "NONE"
-          ? "success"
-          : ["HIGH", "MEDIUM"].includes(riskDetailTarget.shopifyRiskLevel)
-            ? "warning"
-            : "subdued",
-    });
-    riskDetailItems.push({
+    appRiskDetailItems.push({
       text: `Geo risk assessment: ${riskLabel(riskDetailTarget.appRiskLevel)} (score ${riskDetailTarget.appRiskScore}/100).`,
       tone:
         riskDetailTarget.appRiskLevel === "NONE"
@@ -704,35 +1031,18 @@ export default function OrderRiskPage() {
             ? "warning"
             : "subdued",
     });
-    riskDetailItems.push({
-      text:
-        riskDetailTarget.shopifyRecommendation &&
-        riskDetailTarget.shopifyRecommendation !== "NONE"
-          ? `Shopify recommendation: ${humanizeStatus(riskDetailTarget.shopifyRecommendation)}.`
-          : "Shopify did not provide an accept, review, or cancel recommendation.",
-      tone: "subdued",
-    });
-    riskDetailItems.push({
+    appRiskDetailItems.push({
       text: riskDetailTarget.clientIp
         ? `This order was placed from IP address ${riskDetailTarget.clientIp}.`
         : "The IP address used to place this order is unavailable.",
       tone: riskDetailTarget.clientIp ? "success" : "subdued",
     });
-    riskDetailItems.push({
+    appRiskDetailItems.push({
       text: `IP location: ${formatLocation(riskDetailTarget)}.`,
       tone: "subdued",
     });
-    riskDetailItems.push({
-      text: `Payment status: ${humanizeStatus(riskDetailTarget.financialStatus)}.`,
-      tone:
-        riskDetailTarget.financialStatus === "PAID" ? "success" : "subdued",
-    });
-    riskDetailItems.push({
-      text: `Fulfillment status: ${humanizeStatus(riskDetailTarget.fulfillmentStatus)}.`,
-      tone: "subdued",
-    });
     for (const signal of riskDetailSignals) {
-      riskDetailItems.push({
+      appRiskDetailItems.push({
         text: signal.detail || signal.label || signal.code || "Risk signal detected.",
         tone:
           signal.severity === "high" || signal.severity === "medium"
@@ -741,7 +1051,7 @@ export default function OrderRiskPage() {
       });
     }
     if (riskDetailSignals.length === 0) {
-      riskDetailItems.push({
+      appRiskDetailItems.push({
         text: "No suspicious IP reputation or order-velocity signals were detected.",
         tone: "success",
       });
@@ -762,6 +1072,27 @@ export default function OrderRiskPage() {
     shopify.toast.show(actionData.message);
     setBlockTarget(null);
   }, [actionData, shopify]);
+
+  useEffect(() => {
+    if (bulkActionFetcher.state !== "idle" || !bulkActionFetcher.data) return;
+    const result = bulkActionFetcher.data as {
+      error?: string;
+      message?: string;
+    };
+    if (result.error) {
+      shopify.toast.show(result.error, { isError: true });
+      return;
+    }
+    if (!result.message) return;
+    shopify.toast.show(result.message);
+    setBulkBlockModalOpen(false);
+    clearSelection();
+  }, [
+    bulkActionFetcher.data,
+    bulkActionFetcher.state,
+    clearSelection,
+    shopify,
+  ]);
 
   const applyFilters = (next: {
     query?: string;
@@ -798,6 +1129,43 @@ export default function OrderRiskPage() {
     applyFilters({ risk: value });
   };
 
+  const submitBulkAction = (intent: "bulk_block_ips" | "bulk_mark_reviewed") => {
+    if (selectedResources.length === 0 || isBulkActionRunning) return;
+    const formData = new FormData();
+    formData.append("intent", intent);
+    for (const id of selectedResources) formData.append("ids", id);
+    bulkActionFetcher.submit(formData, { method: "post" });
+  };
+
+  const handleBulkBlock = () => {
+    if (!hasPaidPlan) {
+      shopify.toast.show("Upgrade to a paid plan to use IP blocking.");
+      navigate("/app/pricing");
+      return;
+    }
+    if (selectedBlockableRecords.length === 0) {
+      shopify.toast.show(
+        "The selected orders do not have any unblocked IP addresses.",
+        { isError: true },
+      );
+      return;
+    }
+    setBulkBlockModalOpen(true);
+  };
+
+  const promotedBulkActions = [
+    {
+      content: "Mark reviewed",
+      disabled: isBulkActionRunning,
+      onAction: () => submitBulkAction("bulk_mark_reviewed"),
+    },
+    {
+      content: "Block IPs",
+      disabled: isBulkActionRunning,
+      onAction: handleBulkBlock,
+    },
+  ];
+
   const paginationUrl = useMemo(
     () => (page: number) => {
       const params = new URLSearchParams(searchParams);
@@ -822,7 +1190,12 @@ export default function OrderRiskPage() {
       overallRisk === "HIGH" || overallRisk === "MEDIUM";
 
     return (
-      <IndexTable.Row id={record.id} key={record.id} position={index}>
+      <IndexTable.Row
+        id={record.id}
+        key={record.id}
+        position={index}
+        selected={selectedResources.includes(record.id)}
+      >
         <IndexTable.Cell>
           <div className="order-risk-order">
             {orderUrl ? (
@@ -937,7 +1310,7 @@ export default function OrderRiskPage() {
                   icon={
                     record.reviewStatus === "reviewed"
                       ? UndoIcon
-                      : ClipboardChecklistIcon
+                      : CheckIcon
                   }
                   accessibilityLabel={
                     record.reviewStatus === "reviewed"
@@ -989,7 +1362,16 @@ export default function OrderRiskPage() {
                 variant="tertiary"
                 icon={ViewIcon}
                 accessibilityLabel="View risk details"
-                onClick={() => setRiskDetailTarget(record)}
+                onClick={() => {
+                  setRiskDetailTarget(record);
+                  riskDetailFetcher.submit(
+                    {
+                      id: record.id,
+                      intent: "load_risk_details",
+                    },
+                    { method: "post" },
+                  );
+                }}
               />
             </Tooltip>
           </div>
@@ -1213,12 +1595,18 @@ export default function OrderRiskPage() {
             align-items: center;
             display: flex;
             flex-wrap: nowrap;
-            gap: 4px;
-            min-width: 108px;
+            gap: 8px;
+            justify-content: flex-end;
+            min-width: 128px;
           }
           .order-risk-actions form {
             display: inline-flex;
             margin: 0;
+          }
+          .order-risk-table-card th:last-child,
+          .order-risk-table-card td:last-child {
+            min-width: 144px;
+            text-align: right;
           }
           .order-risk-detail-list {
             display: grid;
@@ -1466,7 +1854,11 @@ export default function OrderRiskPage() {
           <IndexTable
             resourceName={{ singular: "order", plural: "orders" }}
             itemCount={records.length}
-            selectable={false}
+            selectedItemsCount={
+              allResourcesSelected ? "All" : selectedResources.length
+            }
+            onSelectionChange={handleSelectionChange}
+            promotedBulkActions={promotedBulkActions}
             headings={[
               { title: "Order" },
               { title: "IP address" },
@@ -1475,7 +1867,7 @@ export default function OrderRiskPage() {
               { title: "Risk assessment" },
               { title: "IP context" },
               { title: "Review status" },
-              { title: "Action" },
+              { title: "Action", alignment: "end" },
             ]}
             emptyState={
               <div style={{ padding: 32, textAlign: "center" }}>
@@ -1516,33 +1908,97 @@ export default function OrderRiskPage() {
                   {riskDetailTarget?.orderName || "Order"}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Shopify fraud assessment and Geo IP context
+                  Shopify fraud analysis with additional Geo IP context
                 </Text>
               </BlockStack>
-              <ul className="order-risk-detail-list">
-                {riskDetailItems.map((item, index) => (
-                  <li
-                    className="order-risk-detail-item"
-                    key={`${index}-${item.text}`}
-                  >
-                    <Icon
-                      source={
-                        item.tone === "success"
-                          ? CheckCircleIcon
-                          : item.tone === "warning"
-                            ? AlertTriangleIcon
-                            : InfoIcon
-                      }
-                      tone={item.tone}
-                    />
-                    <span className="order-risk-detail-copy">{item.text}</span>
-                  </li>
-                ))}
-              </ul>
+              <BlockStack gap="300">
+                <BlockStack gap="100">
+                  <Text as="h3" variant="headingSm">
+                    Shopify fraud analysis
+                  </Text>
+                  {activeShopifyRiskDetails ? (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Recommendation:{" "}
+                      {humanizeStatus(
+                        activeShopifyRiskDetails.recommendation,
+                      )}
+                    </Text>
+                  ) : null}
+                </BlockStack>
+                {isLoadingRiskDetails ? (
+                  <InlineStack align="center" gap="200">
+                    <Spinner size="small" accessibilityLabel="Loading Shopify risk details" />
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      Loading the latest fraud facts from Shopify…
+                    </Text>
+                  </InlineStack>
+                ) : activeRiskDetailError ? (
+                  <Banner tone="warning" title="Shopify details unavailable">
+                    <p>{activeRiskDetailError}</p>
+                  </Banner>
+                ) : (
+                  <ul className="order-risk-detail-list">
+                    {(shopifyRiskDetailItems.length > 0
+                      ? shopifyRiskDetailItems
+                      : [
+                          {
+                            text: "Shopify returned no detailed fraud facts for this order.",
+                            tone: "subdued" as const,
+                          },
+                        ]
+                    ).map((item, index) => (
+                      <li
+                        className="order-risk-detail-item"
+                        key={`shopify-${index}-${item.text}`}
+                      >
+                        <Icon
+                          source={
+                            item.tone === "success"
+                              ? CheckCircleIcon
+                              : item.tone === "warning"
+                                ? AlertTriangleIcon
+                                : InfoIcon
+                          }
+                          tone={item.tone}
+                        />
+                        <span className="order-risk-detail-copy">
+                          {item.text}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </BlockStack>
+              <BlockStack gap="300">
+                <Text as="h3" variant="headingSm">
+                  Geo risk analysis
+                </Text>
+                <ul className="order-risk-detail-list">
+                  {appRiskDetailItems.map((item, index) => (
+                    <li
+                      className="order-risk-detail-item"
+                      key={`geo-${index}-${item.text}`}
+                    >
+                      <Icon
+                        source={
+                          item.tone === "success"
+                            ? CheckCircleIcon
+                            : item.tone === "warning"
+                              ? AlertTriangleIcon
+                              : InfoIcon
+                        }
+                        tone={item.tone}
+                      />
+                      <span className="order-risk-detail-copy">
+                        {item.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </BlockStack>
               <div className="order-risk-detail-note">
-                Billing-address, CVV, postal-code and payment-attempt checks are
-                controlled by Shopify and are not included in the app&apos;s
-                current order-risk data.{" "}
+                Shopify facts are loaded live from the Admin GraphQL API.
+                Geo findings are calculated separately by this app.{" "}
                 {riskDetailTarget &&
                 adminOrderUrl(shop, riskDetailTarget.legacyOrderId) ? (
                   <a
@@ -1557,6 +2013,43 @@ export default function OrderRiskPage() {
                   </a>
                 ) : null}
               </div>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
+
+        <Modal
+          open={bulkBlockModalOpen}
+          onClose={() => {
+            if (!isBulkBlocking) setBulkBlockModalOpen(false);
+          }}
+          title="Block selected IP addresses?"
+        >
+          <Modal.Section>
+            <BlockStack gap="400">
+              <Text as="p">
+                This creates an active IP blocking rule for{" "}
+                <strong>
+                  {selectedBlockableIpCount} unique selected order IP
+                  {selectedBlockableIpCount === 1 ? "" : "s"}
+                </strong>
+                . Orders without an IP address and IPs already blocked will be
+                skipped.
+              </Text>
+              <InlineStack align="end" gap="200">
+                <Button
+                  onClick={() => setBulkBlockModalOpen(false)}
+                  disabled={isBulkBlocking}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  loading={isBulkBlocking}
+                  onClick={() => submitBulkAction("bulk_block_ips")}
+                >
+                  Block selected IPs
+                </Button>
+              </InlineStack>
             </BlockStack>
           </Modal.Section>
         </Modal>
