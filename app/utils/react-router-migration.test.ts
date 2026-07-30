@@ -57,4 +57,21 @@ describe("React Router migration", () => {
     expect(packages["@remix-run/react"]).toBeUndefined();
     expect(packages["@remix-run/node"]).toBeUndefined();
   });
+
+  it("keeps Support page navigation inside the React Router app", () => {
+    const supportRoutePath = fileURLToPath(
+      new URL("../routes/app.support.tsx", import.meta.url),
+    );
+    const supportRoute = readFileSync(supportRoutePath, "utf8");
+
+    expect(supportRoute).toContain("const navigate = useNavigate()");
+    expect(supportRoute).toContain("onClick={() => navigate(item.url)}");
+    expect(supportRoute).toContain(
+      'onClick={() => navigate("/app/logs")}',
+    );
+    expect(supportRoute).not.toContain("<Button url={item.url}>");
+    expect(supportRoute).not.toContain(
+      '<Button url="/app/logs"',
+    );
+  });
 });

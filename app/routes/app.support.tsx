@@ -17,6 +17,7 @@ import {
     SettingsIcon,
 } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { useNavigate } from "react-router";
 
 const supportEmail = "support@bluepeaks.top";
 const appStoreUrl = "https://apps.shopify.com/geo-redirect-country-block";
@@ -69,6 +70,8 @@ const faqItems = [
 ];
 
 export default function Support() {
+    const navigate = useNavigate();
+
     return (
         <Page fullWidth>
             <TitleBar title="Support" />
@@ -228,7 +231,11 @@ export default function Support() {
                                                 <Text as="p" variant="bodySm" tone="subdued">{item.description}</Text>
                                             </BlockStack>
                                         </BlockStack>
-                                        <InlineStack><Button url={item.url}>{item.action}</Button></InlineStack>
+                                        <InlineStack>
+                                            <Button onClick={() => navigate(item.url)}>
+                                                {item.action}
+                                            </Button>
+                                        </InlineStack>
                                     </div>
                                 </Card>
                             ))}
@@ -255,7 +262,9 @@ export default function Support() {
                     </Card>
 
                     <div className="support-footer-action">
-                        <Button url="/app/logs" icon={SearchListIcon}>View visitor logs</Button>
+                        <Button onClick={() => navigate("/app/logs")} icon={SearchListIcon}>
+                            View visitor logs
+                        </Button>
                     </div>
                 </BlockStack>
             </div>
