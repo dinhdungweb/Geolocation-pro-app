@@ -1272,7 +1272,7 @@ export default function OrderRiskPage() {
         position={index}
         selected={selectedResources.includes(record.id)}
       >
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-order-column">
           <div
             className="order-risk-order"
             onClick={(event) => event.stopPropagation()}
@@ -1296,7 +1296,7 @@ export default function OrderRiskPage() {
             </Text>
           </div>
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-ip-column">
           <span
             className="order-risk-ip"
             title={record.clientIp || "Unavailable"}
@@ -1304,14 +1304,14 @@ export default function OrderRiskPage() {
             {record.clientIp || "Unavailable"}
           </span>
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-location-column">
           <BlockStack gap="100">
             <Text as="span" fontWeight="medium">
               {formatLocation(record)}
             </Text>
           </BlockStack>
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-total-column">
           <span
             className="order-risk-money"
             title={`${record.totalAmount.toLocaleString()} ${record.currencyCode}`}
@@ -1319,7 +1319,7 @@ export default function OrderRiskPage() {
             {formatMoney(record.totalAmount, record.currencyCode)}
           </span>
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-assessment-column">
           <div className="order-risk-assessment">
             <span className="order-risk-badge">
               <Badge tone={riskTone(record.shopifyRiskLevel)}>
@@ -1333,7 +1333,7 @@ export default function OrderRiskPage() {
             </span>
           </div>
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-context-column">
           {signals.length > 0 ? (
             <div className="order-risk-signals">
               {signals
@@ -1349,7 +1349,7 @@ export default function OrderRiskPage() {
             </span>
           )}
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-review-column">
           <Badge
             tone={
               record.reviewStatus === "reviewed"
@@ -1366,7 +1366,7 @@ export default function OrderRiskPage() {
                 : "Not reviewed"}
           </Badge>
         </IndexTable.Cell>
-        <IndexTable.Cell>
+        <IndexTable.Cell className="order-risk-action-column">
           <div
             className="order-risk-actions"
             onClick={(event) => event.stopPropagation()}
@@ -1612,51 +1612,32 @@ export default function OrderRiskPage() {
           }
           .order-risk-table-card table {
             min-width: 1280px;
-            table-layout: fixed;
             width: 100%;
           }
-          .order-risk-table-card .Polaris-IndexTable__TableHeading--first,
-          .order-risk-table-card .Polaris-IndexTable__TableCell--first {
-            box-sizing: border-box;
-            padding-left: 12px !important;
-            padding-right: 0 !important;
-            width: 36px !important;
+          .order-risk-order-column {
+            min-width: 160px;
           }
-          .order-risk-table-card th:nth-child(2),
-          .order-risk-table-card td:nth-child(2) {
-            width: 11%;
+          .order-risk-ip-column {
+            min-width: 180px;
+            width: 180px;
           }
-          .order-risk-table-card .Polaris-IndexTable__TableHeading--second,
-          .order-risk-table-card .Polaris-IndexTable__TableCell--first + .Polaris-IndexTable__TableCell {
-            padding-left: 4px !important;
+          .order-risk-location-column {
+            min-width: 260px;
           }
-          .order-risk-table-card th:nth-child(3),
-          .order-risk-table-card td:nth-child(3) {
-            width: 10%;
+          .order-risk-total-column {
+            min-width: 120px;
           }
-          .order-risk-table-card th:nth-child(4),
-          .order-risk-table-card td:nth-child(4) {
-            width: 21%;
+          .order-risk-assessment-column {
+            min-width: 135px;
           }
-          .order-risk-table-card th:nth-child(5),
-          .order-risk-table-card td:nth-child(5) {
-            width: 10%;
+          .order-risk-context-column {
+            min-width: 160px;
           }
-          .order-risk-table-card th:nth-child(6),
-          .order-risk-table-card td:nth-child(6) {
-            width: 12%;
+          .order-risk-review-column {
+            min-width: 115px;
           }
-          .order-risk-table-card th:nth-child(7),
-          .order-risk-table-card td:nth-child(7) {
-            width: 15%;
-          }
-          .order-risk-table-card th:nth-child(8),
-          .order-risk-table-card td:nth-child(8) {
-            width: 9%;
-          }
-          .order-risk-table-card th:nth-child(9),
-          .order-risk-table-card td:nth-child(9) {
-            width: 8.5%;
+          .order-risk-action-column {
+            min-width: 112px;
           }
           .order-risk-signals {
             max-width: 260px;
