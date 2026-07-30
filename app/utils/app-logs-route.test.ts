@@ -31,19 +31,19 @@ vi.mock("../db.server", () => ({
     },
 }));
 
-vi.mock("../utils/billing.server", () => ({
+vi.mock("./billing.server", () => ({
     checkBillingWithFallback: mocks.checkBilling,
 }));
 
-vi.mock("../utils/billing-mode.server", () => ({
+vi.mock("./billing-mode.server", () => ({
     isBillingTestMode: () => false,
 }));
 
-vi.mock("../utils/storefront-config-cache.server", () => ({
+vi.mock("./storefront-config-cache.server", () => ({
     invalidateStorefrontConfigCache: mocks.invalidateCache,
 }));
 
-import { action } from "./app.logs";
+import { action } from "../routes/app.logs";
 
 describe("Visitor Logs IP blocking", () => {
     beforeEach(() => {

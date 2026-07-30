@@ -32,10 +32,13 @@ import {
   CheckCircleIcon,
   ClipboardChecklistIcon,
   FilterIcon,
+  InfoIcon,
   LockIcon,
   OrderIcon,
   SearchIcon,
   ShieldCheckMarkIcon,
+  UndoIcon,
+  ViewIcon,
   XIcon,
 } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
@@ -514,6 +517,16 @@ function riskLabel(level: string) {
   return `${level.charAt(0)}${level.slice(1).toLowerCase()}`;
 }
 
+function humanizeStatus(value: string | null | undefined) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "Unavailable";
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function formatMoney(amount: number, currencyCode: string) {
   const normalizedCurrency = String(currencyCode || "").toUpperCase();
 
@@ -590,6 +603,9 @@ export default function OrderRiskPage() {
     id: string;
     ip: string;
   } | null>(null);
+  const [riskDetailTarget, setRiskDetailTarget] = useState<
+    (typeof records)[number] | null
+  >(null);
   const isSyncing =
     navigation.state !== "idle" &&
     navigation.formData?.get("intent") === "sync_orders";
@@ -639,6 +655,98 @@ export default function OrderRiskPage() {
     { label: "Pending", value: "PENDING" },
     { label: "No risk found", value: "NONE" },
   ];
+  const riskDetailSignals = (riskDetailTarget?.riskSignals || []) as Array<{
+    code?: string;
+    detail?: string;
+    label?: string;
+    severity?: string;
+  }>;
+  const riskDetailItems: Array<{
+    text: string;
+    tone: "success" | "warning" | "subdued";
+  }> = [];
+  if (riskDetailTarget) {
+    const overallLevel = overallRiskLevel(
+      riskDetailTarget.shopifyRiskLevel,
+      riskDetailTarget.appRiskLevel,
+    );
+    riskDetailItems.push({
+      text:
+        overallLevel === "HIGH"
+          ? "This order has high-risk indicators and should be reviewed."
+          : overallLevel === "MEDIUM"
+            ? "This order has signals that require review."
+            : overallLevel === "LOW"
+              ? "This order has only low-risk indicators."
+              : "No high-risk indicators were found for this order.",
+      tone:
+        overallLevel === "HIGH" || overallLevel === "MEDIUM"
+          ? "warning"
+          : overallLevel === "NONE"
+            ? "success"
+            : "subdued",
+    });
+    riskDetailItems.push({
+      text: `Shopify risk assessment: ${riskLabel(riskDetailTarget.shopifyRiskLevel)}.`,
+      tone:
+        riskDetailTarget.shopifyRiskLevel === "NONE"
+          ? "success"
+          : ["HIGH", "MEDIUM"].includes(riskDetailTarget.shopifyRiskLevel)
+            ? "warning"
+            : "subdued",
+    });
+    riskDetailItems.push({
+      text: `Geo risk assessment: ${riskLabel(riskDetailTarget.appRiskLevel)} (score ${riskDetailTarget.appRiskScore}/100).`,
+      tone:
+        riskDetailTarget.appRiskLevel === "NONE"
+          ? "success"
+          : ["HIGH", "MEDIUM"].includes(riskDetailTarget.appRiskLevel)
+            ? "warning"
+            : "subdued",
+    });
+    riskDetailItems.push({
+      text:
+        riskDetailTarget.shopifyRecommendation &&
+        riskDetailTarget.shopifyRecommendation !== "NONE"
+          ? `Shopify recommendation: ${humanizeStatus(riskDetailTarget.shopifyRecommendation)}.`
+          : "Shopify did not provide an accept, review, or cancel recommendation.",
+      tone: "subdued",
+    });
+    riskDetailItems.push({
+      text: riskDetailTarget.clientIp
+        ? `This order was placed from IP address ${riskDetailTarget.clientIp}.`
+        : "The IP address used to place this order is unavailable.",
+      tone: riskDetailTarget.clientIp ? "success" : "subdued",
+    });
+    riskDetailItems.push({
+      text: `IP location: ${formatLocation(riskDetailTarget)}.`,
+      tone: "subdued",
+    });
+    riskDetailItems.push({
+      text: `Payment status: ${humanizeStatus(riskDetailTarget.financialStatus)}.`,
+      tone:
+        riskDetailTarget.financialStatus === "PAID" ? "success" : "subdued",
+    });
+    riskDetailItems.push({
+      text: `Fulfillment status: ${humanizeStatus(riskDetailTarget.fulfillmentStatus)}.`,
+      tone: "subdued",
+    });
+    for (const signal of riskDetailSignals) {
+      riskDetailItems.push({
+        text: signal.detail || signal.label || signal.code || "Risk signal detected.",
+        tone:
+          signal.severity === "high" || signal.severity === "medium"
+            ? "warning"
+            : "subdued",
+      });
+    }
+    if (riskDetailSignals.length === 0) {
+      riskDetailItems.push({
+        text: "No suspicious IP reputation or order-velocity signals were detected.",
+        tone: "success",
+      });
+    }
+  }
   const selectedReviewLabel =
     reviewViews.find((view) => view.value === reviewStatus)?.label ||
     "All orders";
@@ -771,43 +879,6 @@ export default function OrderRiskPage() {
           </div>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Tooltip
-            content={
-              record.isIpBlocked
-                ? "IP already blocked"
-                : !hasPaidPlan
-                  ? "Upgrade to a paid plan to block IPs"
-                : record.clientIp
-                  ? "Block IP address"
-                  : "IP address unavailable"
-            }
-          >
-            <Button
-              size="slim"
-              variant="tertiary"
-              icon={LockIcon}
-              accessibilityLabel={
-                record.isIpBlocked
-                  ? "IP already blocked"
-                  : !hasPaidPlan
-                    ? "Upgrade to block IP address"
-                    : "Block IP address"
-              }
-              disabled={!record.clientIp || record.isIpBlocked}
-              onClick={() => {
-                if (!hasPaidPlan) {
-                  shopify.toast.show(
-                    "Upgrade to a paid plan to use IP blocking.",
-                  );
-                  navigate("/app/pricing");
-                  return;
-                }
-                setBlockTarget({ id: record.id, ip: record.clientIp });
-              }}
-            />
-          </Tooltip>
-        </IndexTable.Cell>
-        <IndexTable.Cell>
           {signals.length > 0 ? (
             <div className="order-risk-signals">
               {signals
@@ -842,20 +913,86 @@ export default function OrderRiskPage() {
           </Badge>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Form method="post">
-            <input type="hidden" name="intent" value="set_review_status" />
-            <input type="hidden" name="id" value={record.id} />
-            <input
-              type="hidden"
-              name="reviewStatus"
-              value={record.reviewStatus === "reviewed" ? "open" : "reviewed"}
-            />
-            <Button size="slim" submit>
-              {record.reviewStatus === "reviewed"
-                ? "Reopen"
-                : "Mark reviewed"}
-            </Button>
-          </Form>
+          <div className="order-risk-actions">
+            <Form method="post">
+              <input type="hidden" name="intent" value="set_review_status" />
+              <input type="hidden" name="id" value={record.id} />
+              <input
+                type="hidden"
+                name="reviewStatus"
+                value={
+                  record.reviewStatus === "reviewed" ? "open" : "reviewed"
+                }
+              />
+              <Tooltip
+                content={
+                  record.reviewStatus === "reviewed"
+                    ? "Reopen review"
+                    : "Mark as reviewed"
+                }
+              >
+                <Button
+                  size="slim"
+                  variant="tertiary"
+                  icon={
+                    record.reviewStatus === "reviewed"
+                      ? UndoIcon
+                      : ClipboardChecklistIcon
+                  }
+                  accessibilityLabel={
+                    record.reviewStatus === "reviewed"
+                      ? "Reopen review"
+                      : "Mark as reviewed"
+                  }
+                  submit
+                />
+              </Tooltip>
+            </Form>
+            <Tooltip
+              content={
+                record.isIpBlocked
+                  ? "IP already blocked"
+                  : !hasPaidPlan
+                    ? "Upgrade to a paid plan to block IPs"
+                    : record.clientIp
+                      ? "Block IP address"
+                      : "IP address unavailable"
+              }
+            >
+              <Button
+                size="slim"
+                variant="tertiary"
+                icon={LockIcon}
+                accessibilityLabel={
+                  record.isIpBlocked
+                    ? "IP already blocked"
+                    : !hasPaidPlan
+                      ? "Upgrade to block IP address"
+                      : "Block IP address"
+                }
+                disabled={!record.clientIp || record.isIpBlocked}
+                onClick={() => {
+                  if (!hasPaidPlan) {
+                    shopify.toast.show(
+                      "Upgrade to a paid plan to use IP blocking.",
+                    );
+                    navigate("/app/pricing");
+                    return;
+                  }
+                  setBlockTarget({ id: record.id, ip: record.clientIp });
+                }}
+              />
+            </Tooltip>
+            <Tooltip content="View risk details">
+              <Button
+                size="slim"
+                variant="tertiary"
+                icon={ViewIcon}
+                accessibilityLabel="View risk details"
+                onClick={() => setRiskDetailTarget(record)}
+              />
+            </Tooltip>
+          </div>
         </IndexTable.Cell>
       </IndexTable.Row>
     );
@@ -1071,6 +1208,47 @@ export default function OrderRiskPage() {
           }
           .order-risk-badge .Polaris-Badge {
             width: auto !important;
+          }
+          .order-risk-actions {
+            align-items: center;
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 4px;
+            min-width: 108px;
+          }
+          .order-risk-actions form {
+            display: inline-flex;
+            margin: 0;
+          }
+          .order-risk-detail-list {
+            display: grid;
+            gap: 14px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+          }
+          .order-risk-detail-item {
+            align-items: flex-start;
+            display: grid;
+            gap: 10px;
+            grid-template-columns: 20px minmax(0, 1fr);
+          }
+          .order-risk-detail-item .Polaris-Icon {
+            height: 18px;
+            margin: 1px 0 0;
+            width: 18px;
+          }
+          .order-risk-detail-copy {
+            color: var(--p-color-text, #303030);
+            font-size: 14px;
+            line-height: 20px;
+          }
+          .order-risk-detail-note {
+            border-top: 1px solid var(--p-color-border-secondary, #e1e3e5);
+            color: var(--p-color-text-secondary, #616161);
+            font-size: 13px;
+            line-height: 18px;
+            padding-top: 14px;
           }
           .order-risk-clear-signal {
             align-items: center;
@@ -1295,7 +1473,6 @@ export default function OrderRiskPage() {
               { title: "Location" },
               { title: "Order total", alignment: "end" },
               { title: "Risk assessment" },
-              { title: "IP control" },
               { title: "IP context" },
               { title: "Review status" },
               { title: "Action" },
@@ -1326,6 +1503,63 @@ export default function OrderRiskPage() {
             </div>
           ) : null}
         </div>
+
+        <Modal
+          open={Boolean(riskDetailTarget)}
+          onClose={() => setRiskDetailTarget(null)}
+          title="About this order"
+        >
+          <Modal.Section>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <Text as="p" variant="headingSm">
+                  {riskDetailTarget?.orderName || "Order"}
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Shopify fraud assessment and Geo IP context
+                </Text>
+              </BlockStack>
+              <ul className="order-risk-detail-list">
+                {riskDetailItems.map((item, index) => (
+                  <li
+                    className="order-risk-detail-item"
+                    key={`${index}-${item.text}`}
+                  >
+                    <Icon
+                      source={
+                        item.tone === "success"
+                          ? CheckCircleIcon
+                          : item.tone === "warning"
+                            ? AlertTriangleIcon
+                            : InfoIcon
+                      }
+                      tone={item.tone}
+                    />
+                    <span className="order-risk-detail-copy">{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="order-risk-detail-note">
+                Billing-address, CVV, postal-code and payment-attempt checks are
+                controlled by Shopify and are not included in the app&apos;s
+                current order-risk data.{" "}
+                {riskDetailTarget &&
+                adminOrderUrl(shop, riskDetailTarget.legacyOrderId) ? (
+                  <a
+                    href={adminOrderUrl(
+                      shop,
+                      riskDetailTarget.legacyOrderId,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open the order in Shopify Admin
+                  </a>
+                ) : null}
+              </div>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
 
         <Modal
           open={Boolean(blockTarget)}
