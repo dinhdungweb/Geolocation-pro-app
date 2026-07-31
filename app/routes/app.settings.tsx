@@ -927,7 +927,7 @@ export default function SettingsPage() {
                     }
                     .settings-form-row {
                         display: grid;
-                        grid-template-columns: minmax(180px, 1fr) minmax(240px, 360px);
+                        grid-template-columns: minmax(180px, 1fr) minmax(0, 360px);
                         align-items: center;
                         gap: 24px;
                         min-height: 68px;
@@ -942,7 +942,13 @@ export default function SettingsPage() {
                         gap: 12px;
                     }
                     .settings-form-control {
+                        width: 100%;
+                        max-width: 360px;
                         min-width: 0;
+                        justify-self: end;
+                    }
+                    .settings-form-row.is-stacked .settings-form-control {
+                        max-width: none;
                     }
                     .settings-form-control textarea {
                         field-sizing: content;

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
     Page,
@@ -313,6 +314,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function IPRulesPage() {
+    const navigate = useNavigate();
     const { rules, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const formFetcher = useFetcher<typeof action>();
@@ -375,7 +377,10 @@ export default function IPRulesPage() {
         plural: "IP rules",
     };
 
-    const conflictsByRuleId = conflictSummary?.byRuleId || {};
+    const conflictsByRuleId = useMemo(
+        () => conflictSummary?.byRuleId || {},
+        [conflictSummary?.byRuleId],
+    );
     const filteredRules = useMemo(() => {
         const normalizedQuery = ruleQuery.trim().toLowerCase();
         return rules.filter((rule: IPRule) => {
@@ -550,7 +555,7 @@ export default function IPRulesPage() {
     }, [rules, selectedResources]);
 
     // --- Import Rules ---
-    const handleImportFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImportFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
         setImportFileName(file.name);
@@ -677,7 +682,7 @@ export default function IPRulesPage() {
                     className="ip-rule-actions-cell"
                 >
                     <InlineStack gap="200" wrap={false}>
-                        <Tooltip content="Edit IP rule">
+                        <Tooltip content={<span style={{ whiteSpace: "nowrap" }}>Edit IP rule</span>}>
                             <Button
                                 size="slim"
                                 variant="tertiary"
@@ -687,7 +692,7 @@ export default function IPRulesPage() {
                                 disabled={!hasProPlan}
                             />
                         </Tooltip>
-                        <Tooltip content="Delete IP rule">
+                        <Tooltip content={<span style={{ whiteSpace: "nowrap" }}>Delete IP rule</span>}>
                             <Button
                                 size="slim"
                                 variant="tertiary"
@@ -714,7 +719,7 @@ export default function IPRulesPage() {
             }}
             secondaryAction={!hasProPlan ? {
                 content: "Upgrade to Premium",
-                url: "/app/pricing",
+                onAction: () => navigate("/app/pricing"),
             } : undefined}
             image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
         >

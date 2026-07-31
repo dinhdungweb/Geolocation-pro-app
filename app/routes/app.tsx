@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
+import { Link, Outlet, useBlocker, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
@@ -983,6 +983,27 @@ function NavigationLoadingIndicator() {
   return null;
 }
 
+function SaveBarNavigationGuard() {
+  const blocker = useBlocker(true);
+  const shopify = useAppBridge();
+  const confirmationPendingRef = useRef(false);
+
+  useEffect(() => {
+    if (blocker.state !== "blocked" || confirmationPendingRef.current) return;
+
+    confirmationPendingRef.current = true;
+
+    shopify.saveBar.leaveConfirmation()
+      .then(() => blocker.proceed())
+      .catch(() => blocker.reset())
+      .finally(() => {
+        confirmationPendingRef.current = false;
+      });
+  }, [blocker, shopify]);
+
+  return null;
+}
+
 export default function App() {
   const { apiKey, shop } = useLoaderData<typeof loader>();
   const location = useLocation();
@@ -1096,14 +1117,18 @@ export default function App() {
 
   return (
     <EmbeddedAppProviders apiKey={apiKey}>
+      <SaveBarNavigationGuard />
       <NavigationLoadingIndicator />
       <style>
         {`
-          @media (max-width: 30em) {
-            body:has(.Polaris-Modal-Dialog__Container) .crisp-client,
-            body:has([role="dialog"]) .crisp-client {
+          @media (max-width: 47.9975em) {
+            html body .crisp-client {
               display: none !important;
+              visibility: hidden !important;
+              pointer-events: none !important;
             }
+          }
+          @media (max-width: 30em) {
             .app-route-frame {
               width: 100%;
               min-width: 0;
