@@ -939,7 +939,10 @@ export default function IPRulesPage() {
                         <Banner
                             title="IP Rules requires Premium or higher"
                             tone="warning"
-                            action={{ content: "View plans", url: "/app/pricing" }}
+                            action={{
+                                content: "View plans",
+                                onAction: () => navigate("/app/pricing"),
+                            }}
                         >
                             <p>All IP Rule controls are disabled on the Free plan.</p>
                         </Banner>
