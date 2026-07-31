@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
-import { useFetcher, useLoaderData, useNavigate } from "react-router";
+import { useBlocker, useFetcher, useLoaderData, useNavigate } from "react-router";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import {
     Page,
@@ -488,6 +488,8 @@ export default function SettingsPage() {
         blockedSupportUrl, blockVpn,
     ]);
     const hasUnsavedChanges = JSON.stringify(currentSnapshot) !== JSON.stringify(savedSnapshot);
+    const navigationBlocker = useBlocker(hasUnsavedChanges);
+    const leaveConfirmationPendingRef = useRef(false);
 
     useEffect(() => {
         const saveButton = saveButtonRef.current;
@@ -548,6 +550,19 @@ export default function SettingsPage() {
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
     }, [hasUnsavedChanges]);
+
+    useEffect(() => {
+        if (navigationBlocker.state !== "blocked" || leaveConfirmationPendingRef.current) return;
+
+        leaveConfirmationPendingRef.current = true;
+
+        shopify.saveBar.leaveConfirmation()
+            .then(() => navigationBlocker.proceed())
+            .catch(() => navigationBlocker.reset())
+            .finally(() => {
+                leaveConfirmationPendingRef.current = false;
+            });
+    }, [navigationBlocker, shopify]);
 
     const applySnapshot = useCallback((snapshot: SettingsFormSnapshot) => {
         setIsEnabled(snapshot.isEnabled);
