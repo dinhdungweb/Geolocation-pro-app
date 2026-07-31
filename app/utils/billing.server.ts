@@ -379,13 +379,42 @@ function getBillingErrorStatus(error: any) {
     return error?.response?.code || error?.networkStatusCode || error?.status;
 }
 
-function isRecoverableBillingAuthError(error: any) {
+function getBillingErrorMessageChain(error: any) {
+    const messages: string[] = [];
+    let current = error;
+
+    for (let depth = 0; current && depth < 4; depth += 1) {
+        const message = current?.message || current?.statusText;
+        if (message) messages.push(String(message));
+        current = current?.cause;
+    }
+
+    return messages.join(" ").toLowerCase();
+}
+
+function isRecoverableBillingCheckError(error: any) {
     const statusCode = getBillingErrorStatus(error);
-    const message = String(error?.message || error?.statusText || error).toLowerCase();
+    const message = getBillingErrorMessageChain(error) || String(error).toLowerCase();
+    const isRetryableStatus =
+        statusCode === 408 ||
+        statusCode === 429 ||
+        (typeof statusCode === "number" && statusCode >= 500);
+    const isTransportError =
+        error?.name === "HttpRequestError" ||
+        error?.name === "FetchError" ||
+        message.includes("fetch failed") ||
+        message.includes("no response available") ||
+        message.includes("network error") ||
+        message.includes("socket hang up") ||
+        message.includes("econnreset") ||
+        message.includes("etimedout") ||
+        message.includes("timed out");
 
     return (
         statusCode === 401 ||
         statusCode === 403 ||
+        isRetryableStatus ||
+        isTransportError ||
         error?.name === "SessionNotFoundError" ||
         message.includes("unauthorized") ||
         message.includes("invalid access token") ||
@@ -435,7 +464,7 @@ export async function checkBillingWithFallback(
 
         return billingCheck;
     } catch (error: any) {
-        if (!isRecoverableBillingAuthError(error)) throw error;
+        if (!isRecoverableBillingCheckError(error)) throw error;
 
         const context = options.logContext ? ` for ${options.logContext}` : "";
         console.warn(
