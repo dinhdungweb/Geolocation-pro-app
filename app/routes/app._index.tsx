@@ -896,7 +896,7 @@ export default function Index() {
         .geo-home {
           display: grid;
           gap: 16px;
-          padding-bottom: 32px;
+          padding-bottom: 96px;
           min-width: 0;
           font-size: var(--p-text-body-md-font-size);
           line-height: var(--p-text-body-md-font-line-height);
@@ -1783,6 +1783,11 @@ export default function Index() {
           }
           .geo-metrics-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 47.9975em) {
+          .geo-home {
+            padding-bottom: 32px;
           }
         }
         @media (max-width: 40em) {

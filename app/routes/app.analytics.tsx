@@ -592,7 +592,7 @@ export default function AnalyticsPage() {
           .analytics-v2 {
             display: grid;
             gap: 12px;
-            padding: 4px 0 32px;
+            padding: 4px 0 96px;
           }
           .analytics-v2-header {
             display: flex;
@@ -1038,6 +1038,7 @@ export default function AnalyticsPage() {
           @media (max-width: 47.9975em) {
             .analytics-v2 {
               gap: 10px;
+              padding-bottom: 32px;
             }
             .analytics-v2-actions {
               align-items: stretch;
@@ -1797,7 +1798,7 @@ function LegacyAnalyticsPage() {
           .analytics-page {
             display: grid;
             gap: 16px;
-            padding-bottom: 32px;
+            padding-bottom: 96px;
           }
           .analytics-toolbar {
             display: flex;
@@ -1988,6 +1989,7 @@ function LegacyAnalyticsPage() {
           @media (max-width: 47.9975em) {
             .analytics-page {
               gap: 12px;
+              padding-bottom: 32px;
             }
             .analytics-toolbar {
               justify-content: flex-start;
