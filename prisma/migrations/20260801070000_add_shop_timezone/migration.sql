@@ -1,0 +1,3 @@
+ALTER TABLE "Settings"
+ADD COLUMN "shopTimezone" TEXT NOT NULL DEFAULT 'UTC',
+ADD COLUMN "shopTimezoneSyncedAt" TIMESTAMP(3);

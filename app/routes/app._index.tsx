@@ -63,6 +63,8 @@ import {
 import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { getThemeAppEmbedStatus } from "../utils/theme-app-embed.server";
+import { getAnalyticsDate } from "../utils/shop-timezone";
+import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 export { shopifyBoundaryHeaders as headers };
 
@@ -103,10 +105,7 @@ function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function buildLastDays(days: number) {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-
+function buildLastDays(days: number, today: Date) {
   return Array.from({ length: days }, (_, index) => {
     const date = new Date(today);
     date.setUTCDate(today.getUTCDate() - (days - 1 - index));
@@ -139,6 +138,7 @@ function formatChartPoints(
 async function loadDashboardAnalytics(
   shop: string,
   thirtyDaysAgo: Date,
+  today: Date,
 ) {
   const [countryStats, ruleStats, dailyStats, recentRules] = await Promise.all([
     prisma.analyticsCountry.groupBy({
@@ -278,7 +278,7 @@ async function loadDashboardAnalytics(
     ]),
   );
 
-  const dailySeries = buildLastDays(30).map((date) => ({
+  const dailySeries = buildLastDays(30, today).map((date) => ({
     date: dateKey(date),
     ...(dailyByDate.get(dateKey(date)) || {
       visitors: 0,
@@ -346,11 +346,13 @@ const dashboardAnalyticsCache = createExpiringAsyncCache<
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const loaderStartedAt = performance.now();
-  const { session, billing } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const shop = session.shop;
   const accessToken = session.accessToken || "";
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const shopTimeZone = await ensureShopTimeZone({ admin, shop });
+  const today = getAnalyticsDate(new Date(), shopTimeZone);
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 29);
 
   const dashboardDataPromise = Promise.all([
     prisma.redirectRule.count({ where: { shop } }),
@@ -378,8 +380,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   ]);
 
   const analyticsPromise = dashboardAnalyticsCache.get(
-    shop,
-    () => loadDashboardAnalytics(shop, thirtyDaysAgo),
+    `${shop}:${shopTimeZone}`,
+    () => loadDashboardAnalytics(shop, thirtyDaysAgo, today),
     10_000,
   );
   const settingsAndBillingPromise = Promise.all([

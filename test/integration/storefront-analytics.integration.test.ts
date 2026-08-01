@@ -4,6 +4,7 @@ import {
   enqueueStorefrontAnalyticsEvent,
   processQueuedStorefrontAnalyticsEvents,
   recordBillableUsage,
+  recordStorefrontAnalyticsDetails,
   type RecordStorefrontAnalyticsEventInput,
 } from "../../app/utils/storefront-analytics.server";
 import type { AnalyticsTokenPayload } from "../../app/utils/analytics-token.server";
@@ -45,6 +46,40 @@ afterEach(async () => {
 });
 
 describe("storefront analytics queue integration", () => {
+  it("groups events by the signed Shopify timezone and preserves the UTC timestamp", async () => {
+    const occurredAt = new Date("2026-08-01T05:44:00.000Z");
+    const tokenPayload: AnalyticsTokenPayload = {
+      action: "auto_redirect",
+      billingPeriodKey: "integration:shop-timezone",
+      countryCode: "US",
+      eventKey: "shop-timezone-event",
+      iat: occurredAt.getTime(),
+      ipHash: "integration-timezone-ip-hash",
+      path: "/products/example",
+      ruleId: "rule-1",
+      shop: SHOP,
+      source: "country",
+      timeZone: "America/Los_Angeles",
+      yearMonth: "2026-07",
+    };
+
+    await recordStorefrontAnalyticsDetails(
+      analyticsInput({
+        occurredAt,
+        tokenPayload,
+        type: "auto_redirected",
+      }),
+    );
+
+    const [log, country] = await Promise.all([
+      prisma.visitorLog.findFirstOrThrow({ where: { shop: SHOP } }),
+      prisma.analyticsCountry.findFirstOrThrow({ where: { shop: SHOP } }),
+    ]);
+    expect(log.timestamp.toISOString()).toBe("2026-08-01T05:44:00.000Z");
+    expect(country.date.toISOString()).toBe("2026-07-31T00:00:00.000Z");
+    expect(country.redirected).toBe(1);
+  });
+
   it("persists, processes, and removes a queued visit", async () => {
     await enqueueStorefrontAnalyticsEvent(analyticsInput());
 

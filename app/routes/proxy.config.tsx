@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { isbot } from "isbot";
 import { FREE_PLAN, getPlanLimit } from "../billing.config";
 import prisma from "../db.server";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import {
   createAnalyticsEvent,
   hashIP,
@@ -30,6 +30,7 @@ import {
 import { normalizePagePathPattern, splitPagePathPatterns } from "../utils/page-targeting";
 import { stateCodeMatchesRegion } from "../utils/states";
 import { cityMatchesRule } from "../utils/city-targeting";
+import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 function responseData<T>(payload: T, init?: Parameters<typeof Response.json>[1]) {
   return Response.json(payload, init);
@@ -460,6 +461,27 @@ async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRunt
   });
 }
 
+function scheduleShopTimeZoneSync(shop: string, settings: StorefrontRuntimeConfig["settings"]) {
+  if (process.env.NODE_ENV === "test") return;
+  const syncedAt = settings.shopTimezoneSyncedAt
+    ? new Date(settings.shopTimezoneSyncedAt)
+    : null;
+  const isFresh =
+    syncedAt &&
+    !Number.isNaN(syncedAt.getTime()) &&
+    Date.now() - syncedAt.getTime() < 24 * 60 * 60 * 1000;
+  if (isFresh) return;
+
+  queueMicrotask(async () => {
+    try {
+      const { admin } = await unauthenticated.admin(shop);
+      await ensureShopTimeZone({ admin, shop });
+    } catch (error) {
+      console.warn(`[ShopTimeZone] Background sync failed for ${shop}`, error);
+    }
+  });
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   startStorefrontAnalyticsQueueWorker();
 
@@ -572,6 +594,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       settings,
       usagePeriod,
     } = runtimeConfig;
+    scheduleShopTimeZoneSync(shop, settings);
     const popup = buildPopup(settings);
     const appOrigin = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
     const blocked = buildBlocked(settings, appOrigin);
@@ -587,6 +610,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       regionCode,
       regionName,
       city,
+      timeZone: settings.shopTimezone || "UTC",
       ipHash,
     });
     const visitToken = visitAnalytics.token;
@@ -897,6 +921,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             regionCode,
             regionName,
             city,
+            timeZone: settings.shopTimezone || "UTC",
             ipHash,
           })
         : null;
@@ -916,6 +941,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           runtimeConfig.currentUsage++;
           await enqueueStorefrontAnalyticsEvent({
             countryCode,
+            occurredAt: new Date(),
             path: currentPath,
             regionCode,
             regionName,

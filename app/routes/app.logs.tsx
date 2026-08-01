@@ -10,7 +10,7 @@ import {
     useNavigation,
     useSearchParams,
 } from "react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
     Page,
     Layout,
@@ -72,6 +72,13 @@ import {
 } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { resolveVisitorLogRegionName } from "../utils/visitor-log-region.server";
+import {
+    addDaysToDateKey,
+    dateFromDateKey,
+    getCalendarDateInTimeZone,
+    startOfDateKeyInTimeZone,
+} from "../utils/shop-timezone";
+import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 const LazyDatePicker = lazy(async () => {
     const { DatePicker } = await import("@shopify/polaris");
@@ -110,11 +117,10 @@ function formatActionLabel(action: string) {
     }
 }
 
-function parseDateFilter(value: string | null, endOfDay = false) {
+function parseDateFilter(value: string | null, endOfDay = false, timeZone = "UTC") {
     if (!value) return null;
-
-    const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
-    return Number.isNaN(date.getTime()) ? null : date;
+    const boundaryDateKey = endOfDay ? addDaysToDateKey(value, 1) : value;
+    return startOfDateKeyInTimeZone(boundaryDateKey, timeZone);
 }
 
 type DateRangePreset =
@@ -496,10 +502,12 @@ function getActionFilterActions(action: string) {
 
 async function getVisitorLogFilterOptions(
     shop: string,
-    fromDate: Date | null,
-    toDate: Date | null
+    fromDateKey: string | null,
+    toDateKey: string | null
 ): Promise<VisitorLogFilterOptions> {
     const where: any = { shop };
+    const fromDate = fromDateKey ? dateFromDateKey(fromDateKey) : null;
+    const toDate = toDateKey ? dateFromDateKey(toDateKey) : null;
 
     if (fromDate || toDate) {
         where.date = {
@@ -584,11 +592,20 @@ function VisitorDetailIcon({
     );
 }
 
-async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, page: number): Promise<VisitorLogsData> {
-    const today = startOfDay(new Date());
+async function loadVisitorLogsData(
+    shop: string,
+    filters: VisitorLogFilters,
+    page: number,
+    timeZone: string,
+): Promise<VisitorLogsData> {
+    const today = getCalendarDateInTimeZone(new Date(), timeZone);
     const effectiveDateParams = getEffectiveLogDateParams(filters, today);
-    const fromDate = effectiveDateParams.isAllDates ? null : parseDateFilter(effectiveDateParams.from);
-    const toDate = effectiveDateParams.isAllDates ? null : parseDateFilter(effectiveDateParams.to, true);
+    const fromDate = effectiveDateParams.isAllDates
+        ? null
+        : parseDateFilter(effectiveDateParams.from, false, timeZone);
+    const toDate = effectiveDateParams.isAllDates
+        ? null
+        : parseDateFilter(effectiveDateParams.to, true, timeZone);
     const limit = LOGS_PAGE_SIZE;
     const skip = (page - 1) * limit;
 
@@ -627,7 +644,7 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
     if (fromDate || toDate) {
         where.timestamp = {
             ...(fromDate ? { gte: fromDate } : {}),
-            ...(toDate ? { lte: toDate } : {}),
+            ...(toDate ? { lt: toDate } : {}),
         };
     }
 
@@ -658,7 +675,11 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
                 path: true,
             },
         }),
-        getVisitorLogFilterOptions(shop, fromDate, toDate),
+        getVisitorLogFilterOptions(
+            shop,
+            effectiveDateParams.isAllDates ? null : effectiveDateParams.from,
+            effectiveDateParams.isAllDates ? null : effectiveDateParams.to,
+        ),
     ]);
 
     const hasNextPage = logRows.length > limit;
@@ -681,7 +702,7 @@ async function loadVisitorLogsData(shop: string, filters: VisitorLogFilters, pag
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { billing, session } = await authenticate.admin(request);
+    const { admin, billing, session } = await authenticate.admin(request);
     const url = new URL(request.url);
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
     const filters: VisitorLogFilters = {
@@ -693,7 +714,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         to: url.searchParams.get("to") || "",
         dateScope: url.searchParams.get(DATE_SCOPE_PARAM) || "",
     };
-    const visitorLogsData = loadVisitorLogsData(session.shop, filters, page);
+    const shopTimeZone = await ensureShopTimeZone({ admin, shop: session.shop });
+    const visitorLogsData = loadVisitorLogsData(
+        session.shop,
+        filters,
+        page,
+        shopTimeZone,
+    );
     const [settings, billingConfig, activeIpBlockRules] = await Promise.all([
         prisma.settings.findUnique({ where: { shop: session.shop } }),
         checkBillingWithFallback(billing, isBillingTestMode()),
@@ -716,6 +743,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         )),
         filters,
         hasPaidPlan: hasPaidBillingConfig(billingConfig, settings),
+        shopTimeZone,
         visitorLogsData,
     };
 };
@@ -803,7 +831,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function VisitorLogs() {
-    const { blockedIps, filters, hasPaidPlan, visitorLogsData } =
+    const { blockedIps, filters, hasPaidPlan, shopTimeZone, visitorLogsData } =
         useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const shopify = useAppBridge();
@@ -812,7 +840,20 @@ export default function VisitorLogs() {
     const [searchParams, setSearchParams] = useSearchParams();
     const { smUp } = useBreakpoints();
     const searchParamsString = searchParams.toString();
-    const today = startOfDay(new Date());
+    const today = getCalendarDateInTimeZone(new Date(), shopTimeZone);
+    const timestampFormatter = useMemo(
+        () =>
+            new Intl.DateTimeFormat("en-US", {
+                timeZone: shopTimeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            }),
+        [shopTimeZone],
+    );
     const effectiveDateParams = getEffectiveLogDateParams(filters, today);
     const currentDateRange = effectiveDateParams.isAllDates
         ? getDefaultLogDateRange(today)
@@ -1344,7 +1385,7 @@ export default function VisitorLogs() {
                 <IndexTable.Row id={log.id} key={log.id} position={index}>
                     <IndexTable.Cell>
                         <Text as="span" variant="bodyMd">
-                            {new Date(log.timestamp).toLocaleString()}
+                            {timestampFormatter.format(new Date(log.timestamp))}
                         </Text>
                     </IndexTable.Cell>
                     <IndexTable.Cell>{log.ipAddress}</IndexTable.Cell>
@@ -2003,6 +2044,7 @@ export default function VisitorLogs() {
                                         <Text as="h1" variant="headingLg">Visitor Logs</Text>
                                         <Text as="p" variant="bodyMd" tone="subdued">
                                             Recent visitor activity, redirects, blocks, and popup events.
+                                            {` Times shown in ${shopTimeZone}.`}
                                         </Text>
                                     </BlockStack>
                                 </div>

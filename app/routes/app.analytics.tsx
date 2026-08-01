@@ -36,6 +36,11 @@ import { COUNTRY_MAP } from "../utils/countries";
 import { createExpiringAsyncCache } from "../utils/expiring-async-cache.server";
 import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
+import {
+  getAnalyticsDate,
+  getUtcRangeForDateKey,
+} from "../utils/shop-timezone";
+import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 export { shopifyBoundaryHeaders as headers };
 
@@ -58,9 +63,8 @@ function normalizePeriod(value: string | null): 7 | 30 {
   return value === "7" ? 7 : 30;
 }
 
-function getPeriodStart(days: number) {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
+function getPeriodStart(days: number, timeZone: string) {
+  const start = getAnalyticsDate(new Date(), timeZone);
   start.setUTCDate(start.getUTCDate() - (days - 1));
   return start;
 }
@@ -69,8 +73,8 @@ function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function buildPeriodDates(days: 7 | 30) {
-  const start = getPeriodStart(days);
+function buildPeriodDates(days: 7 | 30, timeZone: string) {
+  const start = getPeriodStart(days, timeZone);
 
   return Array.from({ length: days }, (_, index) => {
     const date = new Date(start);
@@ -79,9 +83,11 @@ function buildPeriodDates(days: 7 | 30) {
   });
 }
 
-async function loadAnalytics(shop: string, days: 7 | 30) {
-  const periodStart = getPeriodStart(days);
-  const previousPeriodStart = getPeriodStart(days * 2);
+async function loadAnalytics(shop: string, days: 7 | 30, timeZone: string) {
+  const periodStart = getPeriodStart(days, timeZone);
+  const previousPeriodStart = getPeriodStart(days * 2, timeZone);
+  const activityPeriodStart =
+    getUtcRangeForDateKey(dateKey(periodStart), timeZone)?.start || periodStart;
   const [countryStats, ruleStats, dailyStats, rules, activityLogs] =
     await Promise.all([
     prisma.analyticsCountry.groupBy({
@@ -144,12 +150,12 @@ async function loadAnalytics(shop: string, days: 7 | 30) {
       Array<{ day: number; hour: number; count: bigint }>
     >`
       SELECT
-        (EXTRACT(ISODOW FROM "timestamp")::int - 1) AS "day",
-        EXTRACT(HOUR FROM "timestamp")::int AS "hour",
+        (EXTRACT(ISODOW FROM ("timestamp" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone}))::int - 1) AS "day",
+        EXTRACT(HOUR FROM ("timestamp" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone}))::int AS "hour",
         COUNT(*)::bigint AS "count"
       FROM "VisitorLog"
       WHERE "shop" = ${shop}
-        AND "timestamp" >= ${periodStart}
+        AND "timestamp" >= ${activityPeriodStart}
       GROUP BY 1, 2
     `,
   ]);
@@ -257,7 +263,7 @@ async function loadAnalytics(shop: string, days: 7 | 30) {
         },
       ]),
   );
-  const dailySeries = buildPeriodDates(days).map((date) => ({
+  const dailySeries = buildPeriodDates(days, timeZone).map((date) => ({
     date: dateKey(date),
     ...(currentDailyStats.get(dateKey(date)) || {
       visitors: 0,
@@ -304,18 +310,20 @@ async function loadAnalytics(shop: string, days: 7 | 30) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const startedAt = performance.now();
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const url = new URL(request.url);
   const period = normalizePeriod(url.searchParams.get("period"));
+  const shopTimeZone = await ensureShopTimeZone({ admin, shop: session.shop });
   const analytics = await analyticsCache.get(
-    `${session.shop}:${period}`,
-    () => loadAnalytics(session.shop, period),
+    `${session.shop}:${period}:${shopTimeZone}`,
+    () => loadAnalytics(session.shop, period, shopTimeZone),
     10_000,
   );
 
   return responseData(
     {
       period,
+      shopTimeZone,
       ...analytics,
     },
     {

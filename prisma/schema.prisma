@@ -111,6 +111,8 @@ model Settings {
   billingSubscriptionId  String?
   billingUsageLineItemId String?
   billingPlanName        String?
+  shopTimezone           String    @default("UTC")
+  shopTimezoneSyncedAt   DateTime?
 }
 
 model AnalyticsCountry {

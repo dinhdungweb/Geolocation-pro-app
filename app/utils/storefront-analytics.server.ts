@@ -8,9 +8,11 @@ import {
 } from "./analytics-token.server";
 import { getCachedIpRiskByHash } from "./ip-risk.server";
 import { getVisitorIP } from "./request-ip.server";
+import { getAnalyticsDate, normalizeShopTimeZone } from "./shop-timezone";
 
 export type RecordStorefrontAnalyticsEventInput = {
   countryCode: string | null;
+  occurredAt?: Date | string | null;
   ipAddress?: string | null;
   path: string | null;
   regionCode?: string | null;
@@ -47,6 +49,7 @@ function snapshotAnalyticsInput(input: RecordStorefrontAnalyticsEventInput): Rec
   return {
     ...input,
     ipAddress: getInputIP(input),
+    occurredAt: resolveAnalyticsEventTime(input).toISOString(),
     request: undefined,
     userAgent: getInputUserAgent(input),
   };
@@ -63,6 +66,7 @@ function fromJsonPayload(value: Prisma.JsonValue): RecordStorefrontAnalyticsEven
 
   return {
     countryCode: typeof payload.countryCode === "string" ? payload.countryCode : null,
+    occurredAt: typeof payload.occurredAt === "string" ? payload.occurredAt : null,
     ipAddress: typeof payload.ipAddress === "string" ? payload.ipAddress : null,
     path: typeof payload.path === "string" ? payload.path : null,
     regionCode: typeof payload.regionCode === "string" ? payload.regionCode : null,
@@ -79,6 +83,12 @@ function fromJsonPayload(value: Prisma.JsonValue): RecordStorefrontAnalyticsEven
     type: payload.type,
     userAgent: typeof payload.userAgent === "string" ? payload.userAgent : null,
   };
+}
+
+function resolveAnalyticsEventTime(input: RecordStorefrontAnalyticsEventInput) {
+  const supplied = input.occurredAt ? new Date(input.occurredAt) : null;
+  if (supplied && !Number.isNaN(supplied.getTime())) return supplied;
+  return new Date();
 }
 
 function queueBatchSize() {
@@ -472,6 +482,7 @@ export async function recordBillableUsage({
 export async function recordStorefrontAnalyticsDetails(
   {
     countryCode,
+    occurredAt,
     ipAddress,
     path,
     regionCode = null,
@@ -488,6 +499,22 @@ export async function recordStorefrontAnalyticsDetails(
   }: RecordStorefrontAnalyticsEventInput,
   options: { retryableLogErrors?: boolean } = {},
 ) {
+  const eventTime = resolveAnalyticsEventTime({
+    countryCode,
+    occurredAt,
+    path,
+    regionCode,
+    regionName,
+    city,
+    request,
+    ruleId,
+    ruleName,
+    shop,
+    targetUrl,
+    tokenPayload,
+    type,
+    userAgent,
+  });
   try {
     const resolvedIp = getInputIP({
       request,
@@ -521,6 +548,7 @@ export async function recordStorefrontAnalyticsDetails(
         ruleName,
         targetUrl,
         userAgent: getInputUserAgent({ request, userAgent, countryCode, path, ruleId, ruleName, shop, targetUrl, type }),
+        timestamp: eventTime,
         path,
         ipRiskScore: ipRisk?.score ?? null,
         ipRiskLevel: ipRisk?.level || "UNKNOWN",
@@ -535,8 +563,8 @@ export async function recordStorefrontAnalyticsDetails(
     if (options.retryableLogErrors) throw logError;
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const analyticsTimeZone = normalizeShopTimeZone(tokenPayload?.timeZone);
+  const today = getAnalyticsDate(eventTime, analyticsTimeZone);
 
   if (countryCode) {
     const updateData: any = {};

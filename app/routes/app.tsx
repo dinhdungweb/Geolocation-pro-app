@@ -10,6 +10,7 @@ import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
+import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -98,11 +99,13 @@ function installShopifyInvalidSessionFetchRetry() {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shopTimeZone = await ensureShopTimeZone({ admin, shop: session.shop });
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     shop: session.shop,
+    shopTimeZone,
   };
 };
 

@@ -15,6 +15,7 @@ export interface AnalyticsTokenPayload {
   regionCode?: string;
   regionName?: string;
   city?: string;
+  timeZone?: string;
   ipHash: string;
   iat: number;
   eventKey: string;

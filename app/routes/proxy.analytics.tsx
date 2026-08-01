@@ -164,6 +164,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const analyticsInput = {
       countryCode,
+      occurredAt: new Date(),
       ipAddress: visitorIP,
       path,
       regionCode,
