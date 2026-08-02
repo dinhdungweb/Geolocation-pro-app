@@ -622,6 +622,9 @@ export default function AnalyticsPage() {
           .analytics-v2-search {
             width: min(330px, 34vw);
           }
+          .analytics-v2-actions > .Polaris-Button {
+            min-height: 34px;
+          }
           .analytics-v2-filters {
             display: flex;
             align-items: flex-end;
