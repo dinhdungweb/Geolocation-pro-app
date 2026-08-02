@@ -1102,7 +1102,8 @@ export default function App() {
       <NavigationLoadingIndicator />
       <style>
         {`
-          body {
+          body,
+          .Polaris-Modal-Dialog__Modal {
             --p-color-input-border: var(--p-color-border, #e3e3e3);
             --p-color-input-border-hover: var(--p-color-border-hover, #cccccc);
             --p-color-input-border-active: var(--p-color-border-focus, #005bd3);
