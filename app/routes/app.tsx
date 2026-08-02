@@ -1107,6 +1107,9 @@ export default function App() {
             --p-color-input-border-hover: var(--p-color-border-hover, #cccccc);
             --p-color-input-border-active: var(--p-color-border-focus, #005bd3);
           }
+          body .Polaris-TextField__Backdrop {
+            border-top-color: var(--p-color-input-border);
+          }
           @media (max-width: 47.9975em) {
             html body .crisp-client {
               display: none !important;
