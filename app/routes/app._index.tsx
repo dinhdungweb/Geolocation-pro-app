@@ -1655,6 +1655,10 @@ export default function Index() {
           background: var(--p-color-bg-surface-success, #e6f5eb);
           color: var(--p-color-icon-success, #29845a);
         }
+        .setup-complete-icon.is-attention {
+          background: var(--p-color-bg-surface-caution, #fff8e6);
+          color: var(--p-color-icon-caution, #b98900);
+        }
         .setup-complete-icon .Polaris-Icon {
           width: 20px;
           height: 20px;
@@ -2277,12 +2281,22 @@ export default function Index() {
                   {setupDismissed ? (
                     <Panel
                       title="Storefront status"
-                      action={<Badge tone="success">Setup complete</Badge>}
+                      action={
+                        appEmbedStatus.state === "enabled" ? (
+                          <Badge tone="success">Setup complete</Badge>
+                        ) : (
+                          <Badge tone="attention">Needs attention</Badge>
+                        )
+                      }
                     >
                       <div className="setup-complete-status">
                         <div className="setup-complete-copy">
                           <span
-                            className="setup-complete-icon"
+                            className={`setup-complete-icon ${
+                              appEmbedStatus.state === "enabled"
+                                ? ""
+                                : "is-attention"
+                            }`}
                             aria-hidden="true"
                           >
                             <Icon source={ShieldCheckMarkIcon} />
@@ -2305,7 +2319,9 @@ export default function Index() {
                         {appEmbedStatus.state === "enabled" ? (
                           <Badge tone="success">Enabled</Badge>
                         ) : (
-                          <Button onClick={handleOpenThemeEditor}>Enable</Button>
+                          <Button onClick={handleOpenThemeEditor}>
+                            Open app embed
+                          </Button>
                         )}
                       </div>
                     </Panel>
