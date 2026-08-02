@@ -697,8 +697,6 @@ export default function Index() {
   const [setupDismissed, setSetupDismissed] = useState(false);
 
   useEffect(() => {
-    if (appEmbedStatus.state !== "missing_scope") return;
-
     const refreshPermissionStatus = () => {
       const now = Date.now();
       if (
@@ -716,13 +714,16 @@ export default function Index() {
       if (document.visibilityState === "visible") refreshPermissionStatus();
     };
 
-    const timer = window.setTimeout(refreshPermissionStatus, 2_500);
+    const timer =
+      appEmbedStatus.state === "missing_scope"
+        ? window.setTimeout(refreshPermissionStatus, 2_500)
+        : null;
     window.addEventListener("focus", refreshPermissionStatus);
     window.addEventListener("pageshow", refreshPermissionStatus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.clearTimeout(timer);
+      if (timer !== null) window.clearTimeout(timer);
       window.removeEventListener("focus", refreshPermissionStatus);
       window.removeEventListener("pageshow", refreshPermissionStatus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -847,17 +848,11 @@ export default function Index() {
     if (setupConfirmed === null) return;
 
     try {
-      if (!isSetupComplete) {
-        localStorage.removeItem(setupDismissedKey);
-        setSetupDismissed(false);
-        return;
-      }
-
       setSetupDismissed(localStorage.getItem(setupDismissedKey) === "true");
     } catch {
       setSetupDismissed(false);
     }
-  }, [isSetupComplete, setupConfirmed, setupDismissedKey]);
+  }, [setupConfirmed, setupDismissedKey]);
 
   const handleConfirmSetup = async () => {
     setSetupConfirmed(true);
@@ -2584,7 +2579,9 @@ export default function Index() {
                 <span>
                   {isAppActive && appEmbedStatus.state === "enabled"
                     ? "Geo: Redirect is active on your live storefront."
-                    : "Complete the Setup guide to activate storefront protection."}
+                    : setupDismissed
+                      ? "Open the theme editor to re-enable storefront protection."
+                      : "Complete the Setup guide to activate storefront protection."}
                 </span>
               </span>
             </div>
