@@ -1178,6 +1178,30 @@ export default function SettingsPage() {
                         gap: 20px;
                         align-items: stretch;
                     }
+                    .settings-content-preview-grid {
+                        gap: 0;
+                        align-items: start;
+                    }
+                    .settings-content-preview-grid > .settings-flat-section {
+                        overflow: visible;
+                        border: 0;
+                        border-radius: 0;
+                        background: transparent;
+                    }
+                    .settings-content-preview-grid > .settings-flat-section:first-child {
+                        padding-right: 20px;
+                    }
+                    .settings-content-preview-grid > .settings-flat-section:last-child {
+                        padding-left: 20px;
+                        border-left: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                    }
+                    .settings-content-preview-grid .settings-flat-section-header {
+                        padding: 0 0 14px;
+                        border-bottom: 0;
+                    }
+                    .settings-content-preview-grid .settings-flat-section-body {
+                        padding: 0;
+                    }
                     .settings-secondary-grid {
                         display: grid;
                         grid-template-columns: minmax(0, 1fr);
@@ -1518,6 +1542,16 @@ export default function SettingsPage() {
                         .settings-section-grid {
                             grid-template-columns: 1fr;
                         }
+                        .settings-content-preview-grid > .settings-flat-section:first-child {
+                            padding-right: 0;
+                            padding-bottom: 20px;
+                        }
+                        .settings-content-preview-grid > .settings-flat-section:last-child {
+                            padding-top: 20px;
+                            padding-left: 0;
+                            border-top: 1px solid var(--p-color-border-secondary, #e3e3e3);
+                            border-left: 0;
+                        }
                     }
                     @media (max-width: 64em) {
                         .settings-workspace {
@@ -1730,7 +1764,7 @@ export default function SettingsPage() {
                                     )}
 
                                         {activeTab === "popup" && isEnabled && (
-                                            <div className="settings-section-grid">
+                                            <div className="settings-section-grid settings-content-preview-grid">
                                             <SettingsPanel
                                                 title="Popup content"
                                                 description="Customize the prompt shown by popup rules."
@@ -1824,7 +1858,7 @@ export default function SettingsPage() {
                                         )}
 
                                         {activeTab === "blocked" && isEnabled && (
-                                            <div className="settings-section-grid">
+                                            <div className="settings-section-grid settings-content-preview-grid">
                                             <SettingsPanel
                                                 title="Blocked page content"
                                                 description="Set the message visitors see when a block rule applies."
