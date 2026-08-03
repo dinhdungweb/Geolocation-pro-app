@@ -932,6 +932,10 @@ export default function SettingsPage() {
                         padding: 16px 20px;
                         border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
                     }
+                    .settings-flat-section-header h3 {
+                        font-size: 16px;
+                        line-height: 22px;
+                    }
                     .settings-flat-section-body {
                         display: grid;
                         gap: 0;
