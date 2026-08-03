@@ -166,8 +166,8 @@ function ColorPickerField({
     const normalizedValue = normalizeHexColor(value, fallback);
 
     return (
-        <BlockStack gap="150">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">{label}</Text>
+        <BlockStack gap="100">
+            <Text as="p" variant="bodySm" fontWeight="semibold">{label}</Text>
             <label className="settings-color-trigger">
                 <input
                     type="color"
@@ -1225,35 +1225,40 @@ export default function SettingsPage() {
                     .settings-color-grid {
                         display: grid;
                         grid-template-columns: repeat(3, minmax(0, 1fr));
-                        gap: 16px;
+                        gap: 12px;
                     }
                     .settings-color-trigger {
                         width: 100%;
-                        min-height: 42px;
-                        padding: 8px 10px;
+                        min-height: 36px;
+                        padding: 5px 8px;
                         border: 1px solid var(--p-color-border, #c9cccf);
-                        border-radius: 8px;
+                        border-radius: 7px;
                         background: var(--p-color-bg-surface, #ffffff);
                         color: var(--p-color-text, #202223);
                         cursor: pointer;
                         display: flex;
                         align-items: center;
-                        gap: 10px;
+                        gap: 8px;
                         font: inherit;
-                        font-size: 13px;
+                        font-size: 12px;
                         font-weight: 600;
+                    }
+                    .settings-color-trigger > span {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
                     }
                     .settings-color-trigger:hover {
                         border-color: var(--p-color-border-hover, #8c9196);
                     }
                     .settings-native-color-input {
-                        width: 28px;
-                        height: 28px;
+                        width: 24px;
+                        height: 24px;
+                        flex: 0 0 24px;
                         border: 0;
                         padding: 0;
                         background: transparent;
                         cursor: pointer;
-                        flex: 0 0 auto;
                     }
                     .settings-native-color-input::-webkit-color-swatch-wrapper {
                         padding: 0;
@@ -1596,6 +1601,10 @@ export default function SettingsPage() {
                             grid-template-columns: 1fr;
                             align-items: start;
                             gap: 10px;
+                        }
+                        .settings-form-control {
+                            max-width: none;
+                            justify-self: stretch;
                         }
                         .settings-side-column {
                             grid-template-columns: 1fr;
