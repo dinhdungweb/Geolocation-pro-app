@@ -197,7 +197,7 @@ function SettingsPanel({
                 <header className="settings-flat-section-header">
                     <BlockStack gap="100">
                         {title ? (
-                            <Text as="h3" variant="headingSm">
+                            <Text as="h3" variant="headingMd">
                                 {title}
                             </Text>
                         ) : null}
