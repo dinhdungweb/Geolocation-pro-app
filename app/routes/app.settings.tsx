@@ -912,6 +912,7 @@ export default function SettingsPage() {
                     .settings-tab-panel {
                         min-width: 0;
                         padding: 0;
+                        container-type: inline-size;
                     }
                     .settings-tab-header {
                         padding: 16px 20px;
@@ -1513,20 +1514,14 @@ export default function SettingsPage() {
                             flex-basis: 180px;
                         }
                     }
+                    @container (max-width: 52.5rem) {
+                        .settings-section-grid {
+                            grid-template-columns: 1fr;
+                        }
+                    }
                     @media (max-width: 64em) {
                         .settings-workspace {
                             grid-template-columns: 1fr;
-                        }
-                        .settings-side-column {
-                            grid-template-columns: repeat(2, minmax(0, 1fr));
-                        }
-                    }
-                    @media (max-width: 47.9975em) {
-                        .Polaris-Page:has(.settings-page-content) > .Polaris-Box {
-                            padding-inline: 0;
-                        }
-                        .settings-page-content {
-                            padding-bottom: 88px;
                         }
                         .settings-main-shell {
                             grid-template-columns: 1fr;
@@ -1550,6 +1545,17 @@ export default function SettingsPage() {
                         }
                         .settings-tab-copy span {
                             display: none;
+                        }
+                        .settings-side-column {
+                            grid-template-columns: repeat(2, minmax(0, 1fr));
+                        }
+                    }
+                    @media (max-width: 47.9975em) {
+                        .Polaris-Page:has(.settings-page-content) > .Polaris-Box {
+                            padding-inline: 0;
+                        }
+                        .settings-page-content {
+                            padding-bottom: 88px;
                         }
                         .settings-tab-header {
                             padding: 14px 16px;
