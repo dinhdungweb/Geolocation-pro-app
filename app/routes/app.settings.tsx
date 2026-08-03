@@ -914,29 +914,28 @@ export default function SettingsPage() {
                         padding: 0;
                         container-type: inline-size;
                     }
-                    .settings-tab-header {
-                        padding: 16px 20px;
-                        border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
-                    }
                     .settings-tab-body {
                         display: grid;
                         gap: 16px;
-                        padding: 20px;
+                        padding: 0;
+                    }
+                    .settings-tab-notice {
+                        padding: 20px 20px 0;
                     }
                     .settings-flat-section {
-                        overflow: hidden;
-                        border: 1px solid var(--p-color-border-secondary, #e3e3e3);
-                        border-radius: 10px;
-                        background: var(--p-color-bg-surface, #ffffff);
+                        overflow: visible;
+                        border: 0;
+                        border-radius: 0;
+                        background: transparent;
                     }
                     .settings-flat-section-header {
-                        padding: 14px 16px;
+                        padding: 16px 20px;
                         border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
                     }
                     .settings-flat-section-body {
                         display: grid;
                         gap: 0;
-                        padding: 0 16px;
+                        padding: 0 20px 20px;
                     }
                     .settings-flat-section-body > .Polaris-BlockStack {
                         padding: 16px 0;
@@ -1180,27 +1179,17 @@ export default function SettingsPage() {
                     }
                     .settings-content-preview-grid {
                         gap: 0;
-                        align-items: start;
+                        align-items: stretch;
                     }
                     .settings-content-preview-grid > .settings-flat-section {
-                        overflow: visible;
-                        border: 0;
-                        border-radius: 0;
-                        background: transparent;
+                        height: 100%;
                     }
                     .settings-content-preview-grid > .settings-flat-section:first-child {
-                        padding-right: 20px;
+                        padding-right: 0;
                     }
                     .settings-content-preview-grid > .settings-flat-section:last-child {
-                        padding-left: 20px;
+                        padding-left: 0;
                         border-left: 1px solid var(--p-color-border-secondary, #e3e3e3);
-                    }
-                    .settings-content-preview-grid .settings-flat-section-header {
-                        padding: 0 0 14px;
-                        border-bottom: 0;
-                    }
-                    .settings-content-preview-grid .settings-flat-section-body {
-                        padding: 0;
                     }
                     .settings-secondary-grid {
                         display: grid;
@@ -1544,10 +1533,10 @@ export default function SettingsPage() {
                         }
                         .settings-content-preview-grid > .settings-flat-section:first-child {
                             padding-right: 0;
-                            padding-bottom: 20px;
+                            padding-bottom: 0;
                         }
                         .settings-content-preview-grid > .settings-flat-section:last-child {
-                            padding-top: 20px;
+                            padding-top: 0;
                             padding-left: 0;
                             border-top: 1px solid var(--p-color-border-secondary, #e3e3e3);
                             border-left: 0;
@@ -1591,11 +1580,17 @@ export default function SettingsPage() {
                         .settings-page-content {
                             padding-bottom: 88px;
                         }
-                        .settings-tab-header {
-                            padding: 14px 16px;
-                        }
                         .settings-tab-body {
+                            padding: 0;
+                        }
+                        .settings-tab-notice {
+                            padding: 14px 14px 0;
+                        }
+                        .settings-flat-section-header {
                             padding: 14px;
+                        }
+                        .settings-flat-section-body {
+                            padding: 0 14px 14px;
                         }
                         .settings-form-row {
                             grid-template-columns: 1fr;
@@ -1681,27 +1676,15 @@ export default function SettingsPage() {
 
                             <section
                                 className="settings-tab-panel"
-                                aria-labelledby={`settings-tab-${activeTab}`}
+                                aria-label={activeTabDetails.label}
                             >
-                                <header className="settings-tab-header">
-                                    <BlockStack gap="100">
-                                        <Text
-                                            as="h2"
-                                            variant="headingMd"
-                                            id={`settings-tab-${activeTab}`}
-                                        >
-                                            {activeTabDetails.label}
-                                        </Text>
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                            {activeTabDetails.description}
-                                        </Text>
-                                    </BlockStack>
-                                </header>
                                 <div className="settings-tab-body">
                                     {activeTab !== "general" && !isEnabled && (
-                                        <Banner tone="warning">
-                                            Enable Geolocation in General before configuring this section.
-                                        </Banner>
+                                        <div className="settings-tab-notice">
+                                            <Banner tone="warning">
+                                                Enable Geolocation in General before configuring this section.
+                                            </Banner>
+                                        </div>
                                     )}
                                     {activeTab === "general" && (
                                         <SettingsPanel
