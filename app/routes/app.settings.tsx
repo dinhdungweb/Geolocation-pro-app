@@ -933,8 +933,8 @@ export default function SettingsPage() {
                         border-bottom: 1px solid var(--p-color-border-secondary, #e3e3e3);
                     }
                     .settings-flat-section-header h3 {
-                        font-size: 16px;
-                        line-height: 22px;
+                        font-size: 15px;
+                        line-height: 21px;
                     }
                     .settings-flat-section-body {
                         display: grid;
