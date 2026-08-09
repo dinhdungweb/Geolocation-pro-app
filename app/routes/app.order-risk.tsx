@@ -1440,7 +1440,11 @@ export default function OrderRiskPage() {
                 }}
               />
             </Tooltip>
-            <Tooltip content="View risk details">
+            <Tooltip
+              content={
+                <span style={{ whiteSpace: "nowrap" }}>View risk details</span>
+              }
+            >
               <Button
                 size="slim"
                 variant="tertiary"
