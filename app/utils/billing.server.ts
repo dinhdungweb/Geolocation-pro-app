@@ -87,9 +87,11 @@ async function reconcilePendingChargeAttempt(shop: string, usagePeriod: {
             shop,
             billingPeriodKey: usagePeriod.key,
             chargedVisitors: { lt: attempt.toChargedVisitors },
-            ...(attempt.manualAdjustmentKey
-                ? { manualChargedVisitorsKey: attempt.manualAdjustmentKey }
-                : {}),
+            // A manual adjustment is an absolute override. Only reconcile an
+            // attempt against the exact adjustment state it was created from;
+            // otherwise an older Shopify charge can restore the pre-adjustment
+            // value during the next worker run.
+            manualChargedVisitorsKey: attempt.manualAdjustmentKey || null,
         },
         data: {
             chargedVisitors: attempt.toChargedVisitors,
@@ -104,6 +106,19 @@ async function reconcilePendingChargeAttempt(shop: string, usagePeriod: {
         const current = await prisma.monthlyUsage.findUnique({
             where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
         });
+
+        if (
+            current?.manualChargedVisitorsKey &&
+            current.manualChargedVisitorsKey !== attempt.manualAdjustmentKey
+        ) {
+            await markChargeAttempt(attempt.idempotencyKey, {
+                status: CHARGE_STATUS.SUCCEEDED,
+                error: null,
+            });
+            console.log(`[Cron Billing] Preserved manual charged visitor override for ${shop}; historical attempt ${attempt.idempotencyKey} was already charged by Shopify.`);
+            return true;
+        }
+
         if (!current || current.chargedVisitors < attempt.toChargedVisitors) {
             console.error(`[Cron Billing] Pending Shopify charge could not be reconciled for ${shop}. Attempt: ${attempt.idempotencyKey}`);
             return false;
@@ -304,15 +319,14 @@ export async function chargeOverageUsageRecord({
 
         const MAX_DB_RETRIES = 3;
         let dbUpdated = false;
+        let supersededByManualOverride = false;
         for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
             const updateResult = await prisma.monthlyUsage.updateMany({
                 where: {
                     shop,
                     billingPeriodKey: usagePeriod.key,
                     chargedVisitors,
-                    ...(manualAdjustmentKey
-                        ? { manualChargedVisitorsKey: manualAdjustmentKey }
-                        : {}),
+                    manualChargedVisitorsKey: manualAdjustmentKey || null,
                 },
                 data: {
                     chargedVisitors: toChargedVisitors,
@@ -331,6 +345,14 @@ export async function chargeOverageUsageRecord({
             const current = await prisma.monthlyUsage.findUnique({
                 where: { shop_billingPeriodKey: { shop, billingPeriodKey: usagePeriod.key } },
             });
+            if (
+                current?.manualChargedVisitorsKey &&
+                current.manualChargedVisitorsKey !== manualAdjustmentKey
+            ) {
+                dbUpdated = true;
+                supersededByManualOverride = true;
+                break;
+            }
             if (current && current.chargedVisitors >= toChargedVisitors) {
                 dbUpdated = true;
                 break;
@@ -357,6 +379,9 @@ export async function chargeOverageUsageRecord({
             error: null,
         });
 
+        if (supersededByManualOverride) {
+            console.log(`[Cron Billing] Preserved a newer manual charged visitor override for ${shop} after Shopify accepted usage record ${usageRecordId}.`);
+        }
         console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
         return { status: "charged" as const, overageVisitors, chargeAmount };
     } catch (error: any) {
