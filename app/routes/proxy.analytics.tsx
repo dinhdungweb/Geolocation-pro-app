@@ -9,6 +9,7 @@ import {
 } from "../utils/analytics-token.server";
 import { getGeoFromIP } from "../utils/maxmind.server";
 import { getVisitorIP } from "../utils/request-ip.server";
+import { hasDuplicateAppProxyAuthParams } from "../utils/app-proxy-auth.server";
 import {
   enqueueStorefrontAnalyticsEvent,
   recordStorefrontAnalyticsEvent,
@@ -87,6 +88,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return responseData({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
   }
 
+  const url = new URL(request.url);
+  if (hasDuplicateAppProxyAuthParams(url.searchParams)) {
+    return responseData({ error: "Unauthorized: Invalid signature" }, { status: 401, headers: corsHeaders });
+  }
+
   try {
     await authenticate.public.appProxy(request);
   } catch {
@@ -94,7 +100,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   try {
-    const url = new URL(request.url);
     const shop = url.searchParams.get("shop");
     const visitorIP = getVisitorIP(request);
     const data = await readJsonBody(request);

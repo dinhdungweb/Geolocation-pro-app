@@ -51,8 +51,8 @@ describe("React Router migration", () => {
       ...packageJson.devDependencies,
     };
 
-    expect(packages["@shopify/shopify-app-react-router"]).toBe("1.2.1");
-    expect(packages["react-router"]).toBe("7.18.1");
+    expect(packages["@shopify/shopify-app-react-router"]).toBe("2.0.0");
+    expect(packages["react-router"]).toBe("7.18.2");
     expect(packages["@shopify/shopify-app-remix"]).toBeUndefined();
     expect(packages["@remix-run/react"]).toBeUndefined();
     expect(packages["@remix-run/node"]).toBeUndefined();

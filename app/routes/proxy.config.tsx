@@ -17,6 +17,7 @@ import {
   shouldBlockIpRisk,
 } from "../utils/ip-risk.server";
 import { getVisitorIP } from "../utils/request-ip.server";
+import { hasDuplicateAppProxyAuthParams } from "../utils/app-proxy-auth.server";
 import {
   enqueueStorefrontAnalyticsEvent,
   recordBillableUsage,
@@ -486,6 +487,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   startStorefrontAnalyticsQueueWorker();
 
   const url = new URL(request.url);
+  if (hasDuplicateAppProxyAuthParams(url.searchParams)) {
+    return responseData({ error: "Unauthorized: Invalid signature", enabled: false, action: "none" }, { status: 401, headers: corsHeaders });
+  }
+
   const shop = url.searchParams.get("shop");
   const currentPath = url.searchParams.get("path") || "/";
   const currentOrigin = url.searchParams.get("origin");
