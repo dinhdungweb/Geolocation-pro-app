@@ -1623,7 +1623,10 @@ export default function VisitorLogs() {
                     .visitor-log-table-wrap .Polaris-IndexTable__ScrollBarContainer {
                         display: none !important;
                     }
-                    .visitor-log-table-wrap .Polaris-IndexTable,
+                    .visitor-log-table-wrap .Polaris-IndexTable {
+                        width: 100%;
+                        min-width: 0;
+                    }
                     .visitor-log-table-wrap .Polaris-IndexTable__Table {
                         width: 100%;
                         min-width: 1000px;
@@ -2007,6 +2010,11 @@ export default function VisitorLogs() {
                         body:has(.visitor-log-date-popover) {
                             max-width: 100%;
                             overflow-x: clip;
+                        }
+                        .Polaris-PositionedOverlay:has(.visitor-log-date-popover) {
+                            right: auto !important;
+                            left: 50% !important;
+                            transform: translateX(-50%) !important;
                         }
                         .visitor-log-page-content {
                             padding-bottom: 88px;
