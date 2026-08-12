@@ -955,8 +955,6 @@ export default function PricingPage() {
                             </Text>
                         </BlockStack>
                     </Card>
-
-                    <Box paddingBlockEnd="800" />
                 </BlockStack>
             </div>
         </Page>

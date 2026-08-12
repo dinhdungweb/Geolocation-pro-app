@@ -1112,10 +1112,22 @@ export default function App() {
             border-top-color: var(--p-color-input-border);
           }
           @media (max-width: 47.9975em) {
-            html body .crisp-client {
-              display: none !important;
-              visibility: hidden !important;
-              pointer-events: none !important;
+            .app-route-frame {
+              box-sizing: border-box;
+              padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+            }
+            .app-route-frame :is(
+              .geo-home,
+              .analytics-v2,
+              .analytics-page,
+              .ip-rules-page,
+              .order-risk-page,
+              .visitor-log-page-content,
+              .pricing-page-content,
+              .settings-page-content,
+              .support-page
+            ) {
+              padding-bottom: 0 !important;
             }
           }
           @media (max-width: 30em) {

@@ -13,7 +13,7 @@ export function EmbeddedAppProviders({
   children,
 }: EmbeddedAppProvidersProps) {
   return (
-    <ShopifyAppProvider apiKey={apiKey}>
+    <ShopifyAppProvider embedded apiKey={apiKey}>
       <PolarisAppProvider i18n={polarisTranslations}>
         {children}
       </PolarisAppProvider>

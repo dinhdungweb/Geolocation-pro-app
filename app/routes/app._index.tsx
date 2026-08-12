@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import {
   Await,
@@ -30,8 +30,6 @@ import {
   GlobeIcon,
   PersonIcon,
   PlusIcon,
-  QuestionCircleIcon,
-  SearchIcon,
   ShieldCheckMarkIcon,
 } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
@@ -50,6 +48,7 @@ import { authenticate } from "../shopify.server";
 import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { isBillingTestMode } from "../utils/billing-mode.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
+import { loadCrisp } from "../utils/crisp";
 import { COUNTRY_MAP } from "../utils/countries";
 import {
   resolveCountryActionTotal,
@@ -60,6 +59,7 @@ import {
   getStableShopifyPlanFromBillingCheck,
   resolveEffectivePlan,
 } from "../utils/effective-plan.server";
+import { getOnboardingStorageKeys } from "../utils/onboarding";
 import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { getThemeAppEmbedStatus } from "../utils/theme-app-embed.server";
@@ -508,6 +508,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isEnabled: settings.isEnabled !== false,
       },
       appEmbedStatus,
+      onboardingInstallId: settings.onboardingInstallAt.toISOString(),
       analytics,
     },
     {
@@ -679,13 +680,13 @@ export default function Index() {
     usagePeriod,
     stats,
     appEmbedStatus,
+    onboardingInstallId,
     analytics,
   } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const lastPermissionRefreshAt = useRef(0);
-  const [searchQuery, setSearchQuery] = useState("");
   const [chartDays, setChartDays] = useState<7 | 30>(30);
   const [selectedMapCountryCode, setSelectedMapCountryCode] = useState<
     string | null
@@ -772,10 +773,10 @@ export default function Index() {
     );
   };
 
-  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const query = searchQuery.trim();
-    navigate(query ? `/app/logs?q=${encodeURIComponent(query)}` : "/app/logs");
+  const handleOpenSupportChat = () => {
+    if (!loadCrisp({ shop, open: true })) {
+      navigate("/app/support");
+    }
   };
 
   const setupSteps: Array<{
@@ -831,8 +832,9 @@ export default function Index() {
   ];
   const completedSetupSteps = setupSteps.filter((step) => step.completed).length;
   const isSetupComplete = completedSetupSteps === setupSteps.length;
-  const setupConfirmedKey = `geo_dashboard_setup_confirmed:${shop}`;
-  const setupDismissedKey = `geo_dashboard_setup_dismissed:${shop}`;
+  const setupStorageKeys = getOnboardingStorageKeys(shop, onboardingInstallId);
+  const setupConfirmedKey = setupStorageKeys.confirmed;
+  const setupDismissedKey = setupStorageKeys.dismissed;
 
   useEffect(() => {
     try {
@@ -934,40 +936,12 @@ export default function Index() {
           gap: 8px;
           min-width: 0;
         }
-        .geo-home-search {
-          position: relative;
-          width: min(330px, 34vw);
-          min-width: 220px;
-        }
-        .geo-home-search .Polaris-Icon {
-          position: absolute;
-          top: 50%;
-          left: 10px;
-          width: 16px;
-          height: 16px;
-          transform: translateY(-50%);
-          pointer-events: none;
-        }
-        .geo-home-search input {
-          width: 100%;
-          height: 34px;
-          padding: 6px 34px;
-          border: 1px solid var(--p-color-border, #8a8a8a);
-          border-radius: 8px;
-          background: var(--p-color-bg-surface, #ffffff);
-          color: var(--p-color-text, #303030);
-          font: inherit;
-          font-size: var(--p-text-body-md-font-size);
-          line-height: var(--p-text-body-md-font-line-height);
-          outline: none;
-        }
-        .geo-home-search input:focus {
-          border-color: var(--p-color-border-focus, #005bd3);
-          box-shadow: 0 0 0 1px var(--p-color-border-focus, #005bd3);
-        }
         .geo-alerts {
           display: grid;
           gap: 8px;
+        }
+        .geo-alerts:empty {
+          display: none;
         }
         .geo-metrics-grid {
           display: grid;
@@ -1772,10 +1746,6 @@ export default function Index() {
           .geo-home-actions {
             justify-content: flex-start;
           }
-          .geo-home-search {
-            flex: 1;
-            width: auto;
-          }
           .geo-analytics-grid {
             grid-template-columns: 1fr;
           }
@@ -1786,21 +1756,12 @@ export default function Index() {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
-        @media (max-width: 47.9975em) {
-          .geo-home {
-            padding-bottom: 32px;
-          }
-        }
         @media (max-width: 40em) {
           .geo-home {
             gap: 12px;
           }
           .geo-home-actions {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto auto;
-          }
-          .geo-home-search {
-            min-width: 0;
+            display: flex;
           }
           .geo-metrics-grid,
           .geo-lower-grid {
@@ -1873,22 +1834,6 @@ export default function Index() {
             </Text>
           </div>
           <div className="geo-home-actions">
-            <form className="geo-home-search" onSubmit={handleSearch}>
-              <Icon source={SearchIcon} tone="subdued" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.currentTarget.value)}
-                placeholder="Search visitors, IPs, rules..."
-                aria-label="Search visitor logs"
-              />
-            </form>
-            <Button
-              variant="tertiary"
-              icon={QuestionCircleIcon}
-              onClick={() => navigate("/app/support")}
-              accessibilityLabel="Open support"
-            />
             <Button
               variant="primary"
               icon={PlusIcon}
@@ -2050,133 +1995,6 @@ export default function Index() {
                       </Text>
                     </div>
                   </Card>
-                </div>
-
-                <div className="geo-analytics-grid">
-                  <Panel
-                    title="Actions by country"
-                    action={<Badge>{`${totalCountries} countries`}</Badge>}
-                  >
-                    {topCountries.length > 0 ? (
-                      <div className="geo-country-content">
-                        <div className="geo-map-column">
-                          <div className="geo-world-map">
-                            <Suspense fallback={<div className="geo-map-loading" />}>
-                              <WorldTrafficMap
-                                countries={countryTraffic}
-                                selectedCountry={
-                                  topCountries.find(
-                                    (item) =>
-                                      item.code === selectedMapCountryCode,
-                                  ) || null
-                                }
-                              />
-                            </Suspense>
-                          </div>
-                          <div className="geo-map-footer">
-                            <div className="geo-map-legend" aria-hidden="true">
-                              <span>Fewer</span>
-                              <span className="geo-map-legend-bar" />
-                              <span>More actions</span>
-                            </div>
-                            <Button
-                              variant="plain"
-                              size="slim"
-                              onClick={() => navigate("/app/logs")}
-                            >
-                              View full report
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="geo-country-list">
-                          {topCountries.map((item) =>
-                            item.code === "OTHER" ? (
-                            <div className="geo-country-row" key={item.code}>
-                              <div className="geo-country-name">
-                                <span
-                                  className="geo-country-other-icon"
-                                  aria-hidden="true"
-                                >
-                                  <Icon source={GlobeIcon} />
-                                </span>
-                                <span>{item.country}</span>
-                              </div>
-                              <span className="geo-country-share">
-                                {item.share}%
-                              </span>
-                            </div>
-                            ) : (
-                              <button
-                                type="button"
-                                className={`geo-country-row${
-                                  selectedMapCountryCode === item.code
-                                    ? " is-selected"
-                                    : ""
-                                }`}
-                                key={item.code}
-                                aria-pressed={
-                                  selectedMapCountryCode === item.code
-                                }
-                                onClick={() =>
-                                  setSelectedMapCountryCode((current) =>
-                                    current === item.code ? null : item.code,
-                                  )
-                                }
-                              >
-                                <div className="geo-country-name">
-                                  <img
-                                    src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
-                                    srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
-                                    width="22"
-                                    height="15"
-                                    alt=""
-                                    loading="lazy"
-                                    decoding="async"
-                                  />
-                                  <span>{item.country}</span>
-                                </div>
-                                <span className="geo-country-share">
-                                  {item.share}%
-                                </span>
-                              </button>
-                            ),
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="geo-empty">No country actions yet</div>
-                    )}
-                  </Panel>
-
-                  <Panel
-                    title="Redirects vs blocked visits"
-                    action={
-                      <label className="geo-chart-range">
-                        <select
-                          aria-label="Chart date range"
-                          value={chartDays}
-                          onChange={(event) =>
-                            setChartDays(
-                              event.currentTarget.value === "7" ? 7 : 30,
-                            )
-                          }
-                        >
-                          <option value={7}>Last 7 days</option>
-                          <option value={30}>Last 30 days</option>
-                        </select>
-                        <span
-                          className="geo-chart-range-icon"
-                          aria-hidden="true"
-                        >
-                          <Icon source={ChevronDownIcon} />
-                        </span>
-                      </label>
-                    }
-                  >
-                    <DeferredTrafficChart
-                      points={formatChartPoints(dailySeries, chartDays)}
-                    />
-                  </Panel>
                 </div>
 
                 <div className="geo-lower-grid">
@@ -2555,9 +2373,7 @@ export default function Index() {
                                                 : "Yes, it’s working"}
                                             </Button>
                                             <Button
-                                              onClick={() =>
-                                                navigate("/app/support")
-                                              }
+                                              onClick={handleOpenSupportChat}
                                             >
                                               Contact support
                                             </Button>
@@ -2574,6 +2390,133 @@ export default function Index() {
                     </div>
                     </Panel>
                   )}
+                </div>
+
+                <div className="geo-analytics-grid">
+                  <Panel
+                    title="Actions by country"
+                    action={<Badge>{`${totalCountries} countries`}</Badge>}
+                  >
+                    {topCountries.length > 0 ? (
+                      <div className="geo-country-content">
+                        <div className="geo-map-column">
+                          <div className="geo-world-map">
+                            <Suspense fallback={<div className="geo-map-loading" />}>
+                              <WorldTrafficMap
+                                countries={countryTraffic}
+                                selectedCountry={
+                                  topCountries.find(
+                                    (item) =>
+                                      item.code === selectedMapCountryCode,
+                                  ) || null
+                                }
+                              />
+                            </Suspense>
+                          </div>
+                          <div className="geo-map-footer">
+                            <div className="geo-map-legend" aria-hidden="true">
+                              <span>Fewer</span>
+                              <span className="geo-map-legend-bar" />
+                              <span>More actions</span>
+                            </div>
+                            <Button
+                              variant="plain"
+                              size="slim"
+                              onClick={() => navigate("/app/logs")}
+                            >
+                              View full report
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="geo-country-list">
+                          {topCountries.map((item) =>
+                            item.code === "OTHER" ? (
+                            <div className="geo-country-row" key={item.code}>
+                              <div className="geo-country-name">
+                                <span
+                                  className="geo-country-other-icon"
+                                  aria-hidden="true"
+                                >
+                                  <Icon source={GlobeIcon} />
+                                </span>
+                                <span>{item.country}</span>
+                              </div>
+                              <span className="geo-country-share">
+                                {item.share}%
+                              </span>
+                            </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`geo-country-row${
+                                  selectedMapCountryCode === item.code
+                                    ? " is-selected"
+                                    : ""
+                                }`}
+                                key={item.code}
+                                aria-pressed={
+                                  selectedMapCountryCode === item.code
+                                }
+                                onClick={() =>
+                                  setSelectedMapCountryCode((current) =>
+                                    current === item.code ? null : item.code,
+                                  )
+                                }
+                              >
+                                <div className="geo-country-name">
+                                  <img
+                                    src={`https://flagcdn.com/w40/${item.code.toLowerCase()}.png`}
+                                    srcSet={`https://flagcdn.com/w80/${item.code.toLowerCase()}.png 2x`}
+                                    width="22"
+                                    height="15"
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                  <span>{item.country}</span>
+                                </div>
+                                <span className="geo-country-share">
+                                  {item.share}%
+                                </span>
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="geo-empty">No country actions yet</div>
+                    )}
+                  </Panel>
+
+                  <Panel
+                    title="Redirects vs blocked visits"
+                    action={
+                      <label className="geo-chart-range">
+                        <select
+                          aria-label="Chart date range"
+                          value={chartDays}
+                          onChange={(event) =>
+                            setChartDays(
+                              event.currentTarget.value === "7" ? 7 : 30,
+                            )
+                          }
+                        >
+                          <option value={7}>Last 7 days</option>
+                          <option value={30}>Last 30 days</option>
+                        </select>
+                        <span
+                          className="geo-chart-range-icon"
+                          aria-hidden="true"
+                        >
+                          <Icon source={ChevronDownIcon} />
+                        </span>
+                      </label>
+                    }
+                  >
+                    <DeferredTrafficChart
+                      points={formatChartPoints(dailySeries, chartDays)}
+                    />
+                  </Panel>
                 </div>
               </>
             )}
@@ -2609,9 +2552,9 @@ export default function Index() {
               </span>
               <Button
                 icon={ChatIcon}
-                onClick={() => navigate("/app/support")}
+                onClick={handleOpenSupportChat}
               >
-                Contact support
+                Open support chat
               </Button>
             </div>
           </footer>
