@@ -1112,6 +1112,9 @@ export default function App() {
             border-top-color: var(--p-color-input-border);
           }
           @media (max-width: 47.9975em) {
+            body:has(.Polaris-Modal-Dialog__Modal) .crisp-client {
+              display: none !important;
+            }
             .app-route-frame {
               box-sizing: border-box;
               padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px));
