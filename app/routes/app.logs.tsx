@@ -1628,6 +1628,23 @@ export default function VisitorLogs() {
                         width: 100%;
                         min-width: 1000px;
                     }
+                    .visitor-log-table-wrap .Polaris-IndexTable__StickyTable {
+                        z-index: 40;
+                    }
+                    .visitor-log-table-wrap .Polaris-IndexTable__StickyTableHeader--isSticky {
+                        z-index: 1;
+                        overflow: hidden;
+                        isolation: isolate;
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    .visitor-log-table-wrap .Polaris-IndexTable__StickyTableHeadings,
+                    .visitor-log-table-wrap .Polaris-IndexTable__StickyTableHeadings .Polaris-IndexTable__TableHeading {
+                        background: var(--p-color-bg-surface-secondary, #f7f7f7);
+                    }
+                    .visitor-log-table-wrap .Polaris-IndexTable__Table > tbody {
+                        position: relative;
+                        z-index: 0;
+                    }
                     .visitor-log-skeleton-table {
                         width: 100%;
                         min-width: 1000px;
@@ -1986,6 +2003,11 @@ export default function VisitorLogs() {
                         text-align: center;
                     }
                     @media (max-width: 47.9975em) {
+                        html:has(.visitor-log-date-popover),
+                        body:has(.visitor-log-date-popover) {
+                            max-width: 100%;
+                            overflow-x: clip;
+                        }
                         .visitor-log-page-content {
                             padding-bottom: 88px;
                         }
@@ -2006,6 +2028,12 @@ export default function VisitorLogs() {
                         .visitor-log-date-popover-body {
                             grid-template-columns: 1fr;
                             gap: 12px;
+                        }
+                        .visitor-log-date-popover {
+                            box-sizing: border-box;
+                            width: min(716px, calc(100vw - 64px));
+                            max-width: calc(100vw - 64px);
+                            overflow-x: hidden;
                         }
                         .visitor-log-date-presets {
                             grid-template-columns: repeat(2, minmax(0, 1fr));
