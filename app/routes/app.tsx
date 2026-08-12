@@ -1112,7 +1112,8 @@ export default function App() {
             border-top-color: var(--p-color-input-border);
           }
           @media (max-width: 47.9975em) {
-            body:has(.Polaris-Modal-Dialog__Modal) .crisp-client {
+            body:has(.Polaris-Modal-Dialog__Modal) .crisp-client,
+            body:has(.Polaris-Popover__PopoverOverlay--open) .crisp-client {
               display: none !important;
             }
             .app-route-frame {
