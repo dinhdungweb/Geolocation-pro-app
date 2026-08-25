@@ -48,7 +48,7 @@ import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-em
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
 import { normalizeCityNamesForStorage, splitCityNames } from "../utils/city-targeting";
-import { validateRuleImportJson } from "../utils/rule-import-validation";
+import { validateRuleImportJson, validateRuleImportValue } from "../utils/rule-import-validation";
 
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -460,6 +460,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }, { status: 400 });
             }
 
+            const importValidation = validateRuleImportValue(
+                importedRules,
+                { singular: "rule", plural: "rules" },
+                "geolocation",
+            );
+            if (!importValidation.isValid) {
+                return responseData({ success: false, message: importValidation.message }, { status: 400 });
+            }
+
             let created = 0;
             for (const rule of importedRules) {
                 const matchType = normalizeOption(rule.matchType, ["country", "market", "state", "city"], "country");
@@ -508,7 +517,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 created++;
             }
 
-            if (created > 0) invalidateStorefrontConfigCache(shop);
+            if (created === 0) {
+                return responseData({
+                    success: false,
+                    message: "No Geolocation rules were imported. Check that each rule has a valid name, target, and destination URL.",
+                }, { status: 400 });
+            }
+            invalidateStorefrontConfigCache(shop);
             return responseData({ success: true, message: `Successfully imported ${created} rule(s)` });
         }
 
@@ -603,7 +618,9 @@ export default function RulesPage() {
     ];
     const selectedCityNames = useMemo(() => splitCityNames(cityNames), [cityNames]);
     const importValidation = useMemo(
-        () => importData ? validateRuleImportJson(importData, { singular: "rule", plural: "rules" }) : null,
+        () => importData
+            ? validateRuleImportJson(importData, { singular: "rule", plural: "rules" }, "geolocation")
+            : null,
         [importData],
     );
     const cityOptions = useMemo(() => {
@@ -1640,31 +1657,27 @@ export default function RulesPage() {
                         </Text>
                     </BlockStack>
                     <InlineStack gap="200" align="end">
-                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
-                                <Button
-                                    icon={!hasProPlan ? LockIcon : ExportIcon}
-                                    onClick={() => handleExportRules(true)}
-                                    disabled={!hasProPlan || rules.length === 0}
-                                >
-                                    Export All
-                                </Button>
-                            </div>
-                        </Tooltip>
-                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
-                                <Button
-                                    icon={!hasProPlan ? LockIcon : ImportIcon}
-                                    onClick={() => {
-                                        setImportError(null);
-                                        setImportModalOpen(true);
-                                    }}
-                                    disabled={!hasProPlan}
-                                >
-                                    Import
-                                </Button>
-                            </div>
-                        </Tooltip>
+                        <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                            <Button
+                                icon={!hasProPlan ? LockIcon : ExportIcon}
+                                onClick={() => handleExportRules(true)}
+                                disabled={!hasProPlan || rules.length === 0}
+                            >
+                                Export All
+                            </Button>
+                        </div>
+                        <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                            <Button
+                                icon={!hasProPlan ? LockIcon : ImportIcon}
+                                onClick={() => {
+                                    setImportError(null);
+                                    setImportModalOpen(true);
+                                }}
+                                disabled={!hasProPlan}
+                            >
+                                Import
+                            </Button>
+                        </div>
                         <Button variant="primary" onClick={() => handleOpenModal()}>
                             Add Rule
                         </Button>

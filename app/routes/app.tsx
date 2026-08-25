@@ -1188,9 +1188,9 @@ export default function App() {
         <Link to="/app/ip-rules">IP Rules</Link>
         <Link to="/app/analytics">Analytics</Link>
         <Link to="/app/order-risk">Order Risk</Link>
-        <Link to="/app/settings">Settings</Link>
         <Link to="/app/logs">Visitor Logs</Link>
         <Link to="/app/pricing">Pricing</Link>
+        <Link to="/app/settings">Settings</Link>
         <Link to="/app/support">Support</Link>
       </NavMenu>
       <div className="app-route-frame">

@@ -42,7 +42,7 @@ import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
-import { validateRuleImportJson } from "../utils/rule-import-validation";
+import { validateRuleImportJson, validateRuleImportValue } from "../utils/rule-import-validation";
 
 interface IPRule {
     id: string;
@@ -277,6 +277,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }, { status: 400 });
             }
 
+            const importValidation = validateRuleImportValue(
+                importedRules,
+                { singular: "IP rule", plural: "IP rules" },
+                "ip",
+            );
+            if (!importValidation.isValid) {
+                return responseData({ success: false, message: importValidation.message }, { status: 400 });
+            }
+
             let created = 0;
             let skipped = 0;
             for (const rule of importedRules) {
@@ -310,7 +319,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             const skippedMessage = skipped > 0 ? ` Skipped ${skipped} invalid IP rule(s).` : "";
-            if (created > 0) invalidateStorefrontConfigCache(shop);
+            if (created === 0) {
+                return responseData({
+                    success: false,
+                    message: "No IP rules were imported. Check that each rule has a valid name, IP address, and destination URL.",
+                }, { status: 400 });
+            }
+            invalidateStorefrontConfigCache(shop);
             return responseData({ success: true, message: `Imported ${created} IP rule(s).${skippedMessage}` });
         }
 
@@ -358,7 +373,9 @@ export default function IPRulesPage() {
 
     const hasNormalizedIPs = normalizeIPAddresses(formIPAddresses).length > 0;
     const importValidation = useMemo(
-        () => importData ? validateRuleImportJson(importData, { singular: "IP rule", plural: "IP rules" }) : null,
+        () => importData
+            ? validateRuleImportJson(importData, { singular: "IP rule", plural: "IP rules" }, "ip")
+            : null,
         [importData],
     );
 
@@ -941,31 +958,27 @@ export default function IPRulesPage() {
                         </Text>
                     </BlockStack>
                     <InlineStack gap="200" align="end">
-                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
-                                <Button
-                                    icon={!hasProPlan ? LockIcon : ExportIcon}
-                                    onClick={() => handleExportRules(true)}
-                                    disabled={!hasProPlan || rules.length === 0}
-                                >
-                                    Export All
-                                </Button>
-                            </div>
-                        </Tooltip>
-                        <Tooltip content={!hasProPlan ? "This feature is available on higher plans. Upgrade to unlock it." : ""}>
-                            <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
-                                <Button
-                                    icon={!hasProPlan ? LockIcon : ImportIcon}
-                                    onClick={() => {
-                                        setImportError(null);
-                                        setImportModalOpen(true);
-                                    }}
-                                    disabled={!hasProPlan}
-                                >
-                                    Import
-                                </Button>
-                            </div>
-                        </Tooltip>
+                        <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                            <Button
+                                icon={!hasProPlan ? LockIcon : ExportIcon}
+                                onClick={() => handleExportRules(true)}
+                                disabled={!hasProPlan || rules.length === 0}
+                            >
+                                Export All
+                            </Button>
+                        </div>
+                        <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
+                            <Button
+                                icon={!hasProPlan ? LockIcon : ImportIcon}
+                                onClick={() => {
+                                    setImportError(null);
+                                    setImportModalOpen(true);
+                                }}
+                                disabled={!hasProPlan}
+                            >
+                                Import
+                            </Button>
+                        </div>
                         <Button variant="primary" onClick={() => handleOpenModal()} disabled={!hasProPlan}>
                             Add IP Rule
                         </Button>
