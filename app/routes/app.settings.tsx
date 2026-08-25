@@ -426,6 +426,7 @@ export default function SettingsPage() {
     const navigate = useNavigate();
     const shopify = useAppBridge();
     const [savedSnapshot, setSavedSnapshot] = useState<SettingsFormSnapshot>(() => getSettingsSnapshot(settings));
+    const [saveError, setSaveError] = useState<string | null>(null);
     const submittedSnapshotRef = useRef<SettingsFormSnapshot | null>(null);
     const saveButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -513,6 +514,7 @@ export default function SettingsPage() {
 
     useEffect(() => {
         if (fetcher.data?.success) {
+            setSaveError(null);
             if (submittedSnapshotRef.current) {
                 setSavedSnapshot(submittedSnapshotRef.current);
                 submittedSnapshotRef.current = null;
@@ -520,7 +522,7 @@ export default function SettingsPage() {
             shopify.toast.show("Settings saved!");
         } else if (fetcher.data?.message) {
             submittedSnapshotRef.current = null;
-            shopify.toast.show(fetcher.data.message, { isError: true });
+            setSaveError(fetcher.data.message);
         }
     }, [fetcher.data, shopify]);
 
@@ -1650,9 +1652,13 @@ export default function SettingsPage() {
                             <p>Upgrade to a paid plan to increase your visitor limit and unlock advanced protection features.</p>
                         </Banner>
                     )}
-                    {fetcher.data && !fetcher.data.success && (
-                        <Banner tone="critical">
-                            <p>{fetcher.data.message || "Failed to save settings"}</p>
+                    {saveError && (
+                        <Banner
+                            tone="critical"
+                            title="Couldn't save settings"
+                            onDismiss={() => setSaveError(null)}
+                        >
+                            <p>{saveError}</p>
                         </Banner>
                     )}
                     <div className="settings-workspace">

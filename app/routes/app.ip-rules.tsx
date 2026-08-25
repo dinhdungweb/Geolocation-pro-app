@@ -33,6 +33,7 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { ImportIcon, ExportIcon, LockIcon, SearchIcon, CheckIcon, XIcon, FilterIcon, EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import { RuleStatusSwitch } from "../components/rule-status-switch";
+import { RuleTypeBadge } from "../components/rule-type-badge";
 import prisma from "../db.server";
 import { detectRuleConflicts } from "../utils/rule-conflicts";
 import { isBillingTestMode } from "../utils/billing-mode.server";
@@ -41,6 +42,7 @@ import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
+import { validateRuleImportJson } from "../utils/rule-import-validation";
 
 interface IPRule {
     id: string;
@@ -263,10 +265,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             try {
                 importedRules = JSON.parse(rulesJson);
                 if (!Array.isArray(importedRules)) {
-                    return responseData({ success: false, message: "Invalid format: expected an array of rules" }, { status: 400 });
+                    return responseData({
+                        success: false,
+                        message: "This file can't be imported because its top-level JSON value isn't an array of IP rules. Use a file created by Export, or wrap the IP rules in a JSON array.",
+                    }, { status: 400 });
                 }
             } catch {
-                return responseData({ success: false, message: "Invalid JSON format" }, { status: 400 });
+                return responseData({
+                    success: false,
+                    message: "This file can't be imported because it isn't valid JSON. Check the file and try again.",
+                }, { status: 400 });
             }
 
             let created = 0;
@@ -326,6 +334,10 @@ export default function IPRulesPage() {
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
+    const [pageError, setPageError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [importError, setImportError] = useState<string | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deletingRule, setDeletingRule] = useState<IPRule | null>(null);
     const [ruleQuery, setRuleQuery] = useState("");
@@ -345,18 +357,28 @@ export default function IPRulesPage() {
     const [pagePaths, setPagePaths] = useState("");
 
     const hasNormalizedIPs = normalizeIPAddresses(formIPAddresses).length > 0;
+    const importValidation = useMemo(
+        () => importData ? validateRuleImportJson(importData, { singular: "IP rule", plural: "IP rules" }) : null,
+        [importData],
+    );
 
     useEffect(() => {
         if (fetcher.state !== "idle" || !fetcher.data?.message) return;
-        shopify.toast.show(fetcher.data.message, {
-            isError: fetcher.data.success === false,
-        });
+        if (fetcher.data.success === false) {
+            setPageError(fetcher.data.message);
+            return;
+        }
+        setPageError(null);
+        shopify.toast.show(fetcher.data.message);
     }, [fetcher.data, fetcher.state, shopify]);
 
     useEffect(() => {
         if (formFetcher.state !== "idle" || !formFetcher.data?.message) return;
-        shopify.toast.show(formFetcher.data.message, { isError: formFetcher.data.success === false });
-        if (formFetcher.data.success) {
+        if (formFetcher.data.success === false) {
+            setFormError(formFetcher.data.message);
+        } else {
+            setFormError(null);
+            shopify.toast.show(formFetcher.data.message);
             setModalOpen(false);
             setEditingRule(null);
         }
@@ -364,8 +386,11 @@ export default function IPRulesPage() {
 
     useEffect(() => {
         if (importFetcher.state !== "idle" || !importFetcher.data?.message) return;
-        shopify.toast.show(importFetcher.data.message, { isError: importFetcher.data.success === false });
-        if (importFetcher.data.success) {
+        if (importFetcher.data.success === false) {
+            setImportError(importFetcher.data.message);
+        } else {
+            setImportError(null);
+            shopify.toast.show(importFetcher.data.message);
             setImportModalOpen(false);
             setImportData("");
             setImportFileName("");
@@ -425,8 +450,11 @@ export default function IPRulesPage() {
 
     useEffect(() => {
         if (deleteFetcher.state !== "idle" || !deleteFetcher.data?.message) return;
-        shopify.toast.show(deleteFetcher.data.message, { isError: deleteFetcher.data.success === false });
-        if (deleteFetcher.data.success) {
+        if (deleteFetcher.data.success === false) {
+            setDeleteError(deleteFetcher.data.message);
+        } else {
+            setDeleteError(null);
+            shopify.toast.show(deleteFetcher.data.message);
             setDeleteModalOpen(false);
             setDeletingRule(null);
             clearSelection();
@@ -458,11 +486,13 @@ export default function IPRulesPage() {
 
     const handleOpenModal = useCallback((rule?: IPRule) => {
         if (!hasProPlan) return;
+        setFormError(null);
         setEditingRule(rule || null);
         setModalOpen(true);
     }, [hasProPlan]);
 
     const handleCloseModal = useCallback(() => {
+        setFormError(null);
         setModalOpen(false);
         setEditingRule(null);
     }, []);
@@ -500,6 +530,7 @@ export default function IPRulesPage() {
 
     const handleBulkDelete = useCallback(() => {
         if (!hasProPlan || selectedResources.length === 0) return;
+        setDeleteError(null);
         setDeletingRule(null);
         setDeleteModalOpen(true);
     }, [hasProPlan, selectedResources]);
@@ -515,12 +546,14 @@ export default function IPRulesPage() {
 
     const handleDeleteRule = useCallback((rule: IPRule) => {
         if (!hasProPlan) return;
+        setDeleteError(null);
         setDeletingRule(rule);
         setDeleteModalOpen(true);
     }, [hasProPlan]);
 
     const handleCloseDeleteModal = useCallback(() => {
         if (deleteFetcher.state !== "idle") return;
+        setDeleteError(null);
         setDeleteModalOpen(false);
         setDeletingRule(null);
     }, [deleteFetcher.state]);
@@ -558,6 +591,7 @@ export default function IPRulesPage() {
     const handleImportFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        setImportError(null);
         setImportFileName(file.name);
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -568,12 +602,12 @@ export default function IPRulesPage() {
     }, []);
 
     const handleImportSubmit = useCallback(() => {
-        if (!importData) return;
+        if (!importData || !importValidation?.isValid) return;
         const formData = new FormData();
         formData.append("intent", "import");
         formData.append("rulesJson", importData);
         importFetcher.submit(formData, { method: "POST" });
-    }, [importData, importFetcher]);
+    }, [importData, importFetcher, importValidation?.isValid]);
 
     const promotedBulkActions = [
         {
@@ -637,10 +671,10 @@ export default function IPRulesPage() {
                 <div className="ip-rule-action-cell">
                     <Text as="span" variant="bodyMd" truncate>
                         {rule.ruleType === "block" ? (
-                            <Badge tone="attention">Block</Badge>
+                            <RuleTypeBadge ruleType="block" />
                         ) : (
                             <>
-                                <Badge tone="warning">Redirect</Badge>
+                                <RuleTypeBadge ruleType="redirect" />
                                 <span style={{ marginLeft: 4 }}>
                                     <Badge tone="info" size="small">
                                         {rule.redirectMode === "popup" ? "Popup" : "Auto"}
@@ -922,7 +956,10 @@ export default function IPRulesPage() {
                             <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
                                 <Button
                                     icon={!hasProPlan ? LockIcon : ImportIcon}
-                                    onClick={() => setImportModalOpen(true)}
+                                    onClick={() => {
+                                        setImportError(null);
+                                        setImportModalOpen(true);
+                                    }}
                                     disabled={!hasProPlan}
                                 >
                                     Import
@@ -934,6 +971,17 @@ export default function IPRulesPage() {
                         </Button>
                     </InlineStack>
                 </div>
+                {pageError && (
+                    <div style={{ marginBottom: "16px" }}>
+                        <Banner
+                            tone="critical"
+                            title="Couldn't update the IP rule"
+                            onDismiss={() => setPageError(null)}
+                        >
+                            {pageError}
+                        </Banner>
+                    </div>
+                )}
                 {!hasProPlan && (
                     <div style={{ marginBottom: "16px" }}>
                         <Banner
@@ -1134,8 +1182,10 @@ export default function IPRulesPage() {
             >
                 <Modal.Section>
                     <BlockStack gap="400">
-                    {formFetcher.state === "idle" && formFetcher.data?.success === false && (
-                        <Banner tone="critical">{formFetcher.data.message}</Banner>
+                    {formError && (
+                        <Banner tone="critical" title="Couldn't save the IP rule" onDismiss={() => setFormError(null)}>
+                            {formError}
+                        </Banner>
                     )}
                     <FormLayout>
                         <TextField
@@ -1242,25 +1292,27 @@ export default function IPRulesPage() {
             {/* Import Modal */}
             <Modal
                 open={importModalOpen}
-                onClose={() => { setImportModalOpen(false); setImportData(""); setImportFileName(""); }}
+                onClose={() => { setImportModalOpen(false); setImportData(""); setImportFileName(""); setImportError(null); }}
                 title="Import IP Rules"
                 primaryAction={{
                     content: "Import",
                     onAction: handleImportSubmit,
                     loading: importFetcher.state !== "idle",
-                    disabled: importFetcher.state !== "idle" || !importData,
+                    disabled: importFetcher.state !== "idle" || !importValidation?.isValid,
                 }}
                 secondaryActions={[
                     {
                         content: "Cancel",
-                        onAction: () => { setImportModalOpen(false); setImportData(""); setImportFileName(""); },
+                        onAction: () => { setImportModalOpen(false); setImportData(""); setImportFileName(""); setImportError(null); },
                     },
                 ]}
             >
                 <Modal.Section>
                     <BlockStack gap="400">
-                        {importFetcher.state === "idle" && importFetcher.data?.success === false && (
-                            <Banner tone="critical">{importFetcher.data.message}</Banner>
+                        {importError && (
+                            <Banner tone="critical" title="Couldn't import IP rules" onDismiss={() => setImportError(null)}>
+                                {importError}
+                            </Banner>
                         )}
                         <Text as="p">
                             Upload a JSON file containing IP rules to import. The file should be in the same format as the exported file.
@@ -1297,18 +1349,12 @@ export default function IPRulesPage() {
                                 )}
                             </BlockStack>
                         </div>
-                        {importData && (
-                            <Banner tone="info">
-                                <p>
-                                    {(() => {
-                                        try {
-                                            const parsed = JSON.parse(importData);
-                                            return `Found ${Array.isArray(parsed) ? parsed.length : 0} IP rule(s) ready to import.`;
-                                        } catch {
-                                            return "Invalid JSON format. Please check the file.";
-                                        }
-                                    })()}
-                                </p>
+                        {importValidation && (
+                            <Banner
+                                tone={importValidation.isValid ? "info" : "critical"}
+                                title={importValidation.isValid ? undefined : "Couldn't import this file"}
+                            >
+                                <p>{importValidation.message}</p>
                             </Banner>
                         )}
                     </BlockStack>
@@ -1331,8 +1377,10 @@ export default function IPRulesPage() {
             >
                 <Modal.Section>
                     <BlockStack gap="300">
-                        {deleteFetcher.state === "idle" && deleteFetcher.data?.success === false && (
-                            <Banner tone="critical">{deleteFetcher.data.message}</Banner>
+                        {deleteError && (
+                            <Banner tone="critical" title="Couldn't delete the IP rule" onDismiss={() => setDeleteError(null)}>
+                                {deleteError}
+                            </Banner>
                         )}
                         <Text as="p">
                             {deletingRule

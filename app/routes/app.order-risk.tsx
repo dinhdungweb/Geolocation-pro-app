@@ -923,6 +923,8 @@ export default function OrderRiskPage() {
     ip: string;
   } | null>(null);
   const [bulkBlockModalOpen, setBulkBlockModalOpen] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [bulkActionError, setBulkActionError] = useState<string | null>(null);
   const [riskDetailTarget, setRiskDetailTarget] = useState<
     (typeof records)[number] | null
   >(null);
@@ -1123,16 +1125,20 @@ export default function OrderRiskPage() {
       message?: string;
     };
     if (result.error) {
-      shopify.toast.show(result.error, { isError: true });
+      if (bulkBlockModalOpen) setBulkActionError(result.error);
+      else setPageError(result.error);
       return;
     }
     if (!result.message) return;
+    setBulkActionError(null);
+    setPageError(null);
     shopify.toast.show(result.message);
     setBulkBlockModalOpen(false);
     clearSelection();
   }, [
     bulkActionFetcher.data,
     bulkActionFetcher.state,
+    bulkBlockModalOpen,
     clearSelection,
     shopify,
   ]);
@@ -1206,12 +1212,11 @@ export default function OrderRiskPage() {
       return;
     }
     if (selectedBlockableRecords.length === 0) {
-      shopify.toast.show(
-        "The selected orders do not have any unblocked IP addresses.",
-        { isError: true },
-      );
+      setPageError("The selected orders do not have any unblocked IP addresses. Select an order with an available IP address and try again.");
       return;
     }
+    setPageError(null);
+    setBulkActionError(null);
     setBulkBlockModalOpen(true);
   };
 
@@ -1831,6 +1836,15 @@ export default function OrderRiskPage() {
             <p>{actionData.error}</p>
           </Banner>
         ) : null}
+        {pageError ? (
+          <Banner
+            tone="critical"
+            title="Couldn't block the selected IP addresses"
+            onDismiss={() => setPageError(null)}
+          >
+            <p>{pageError}</p>
+          </Banner>
+        ) : null}
         <div className="order-risk-metrics">
           {metricsList.map((metric) => (
             <Card key={metric.label} padding="0">
@@ -2132,12 +2146,24 @@ export default function OrderRiskPage() {
         <Modal
           open={bulkBlockModalOpen}
           onClose={() => {
-            if (!isBulkBlocking) setBulkBlockModalOpen(false);
+            if (!isBulkBlocking) {
+              setBulkActionError(null);
+              setBulkBlockModalOpen(false);
+            }
           }}
           title="Block selected IP addresses?"
         >
           <Modal.Section>
             <BlockStack gap="400">
+              {bulkActionError ? (
+                <Banner
+                  tone="critical"
+                  title="Couldn't update the selected orders"
+                  onDismiss={() => setBulkActionError(null)}
+                >
+                  <p>{bulkActionError}</p>
+                </Banner>
+              ) : null}
               <Text as="p">
                 This creates an active IP blocking rule for{" "}
                 <strong>
@@ -2149,7 +2175,10 @@ export default function OrderRiskPage() {
               </Text>
               <InlineStack align="end" gap="200">
                 <Button
-                  onClick={() => setBulkBlockModalOpen(false)}
+                  onClick={() => {
+                    setBulkActionError(null);
+                    setBulkBlockModalOpen(false);
+                  }}
                   disabled={isBulkBlocking}
                 >
                   Cancel

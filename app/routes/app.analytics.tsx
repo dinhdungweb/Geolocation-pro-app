@@ -36,6 +36,7 @@ import { COUNTRY_MAP } from "../utils/countries";
 import { createExpiringAsyncCache } from "../utils/expiring-async-cache.server";
 import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
+import { RuleTypeBadge } from "../components/rule-type-badge";
 import {
   getAnalyticsDate,
   getUtcRangeForDateKey,
@@ -874,18 +875,6 @@ export default function AnalyticsPage() {
             width: 16px;
             height: 16px;
           }
-          .analytics-v2-rule-type {
-            display: inline-flex;
-            padding: 2px 7px;
-            border-radius: 999px;
-            color: #00527c;
-            background: #d9efff;
-            font-size: 11px;
-          }
-          .analytics-v2-rule-type.is-block {
-            color: #8e1f0b;
-            background: #ffe5df;
-          }
           .analytics-v2-insights {
             display: grid;
           }
@@ -1365,13 +1354,7 @@ export default function AnalyticsPage() {
                         <tr key={item.id}>
                           <td>{item.rule}</td>
                           <td>
-                            <span
-                              className={`analytics-v2-rule-type${
-                                item.type === "Block" ? " is-block" : ""
-                              }`}
-                            >
-                              {item.type}
-                            </span>
+                            <RuleTypeBadge ruleType={item.type} label={item.type} />
                           </td>
                           <td className="is-number">
                             {item.triggers.toLocaleString()}

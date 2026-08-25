@@ -35,6 +35,7 @@ import {
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon, ImportIcon, ExportIcon, LockIcon, CheckIcon, XIcon, FilterIcon, EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { RuleStatusSwitch } from "../components/rule-status-switch";
+import { RuleTypeBadge } from "../components/rule-type-badge";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { detectRuleConflicts, detectCrossRuleConflicts } from "../utils/rule-conflicts";
@@ -47,6 +48,7 @@ import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-em
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
 import { normalizeCityNamesForStorage, splitCityNames } from "../utils/city-targeting";
+import { validateRuleImportJson } from "../utils/rule-import-validation";
 
 import { COUNTRY_MAP } from "../utils/countries";
 
@@ -446,10 +448,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             try {
                 importedRules = JSON.parse(rulesJson);
                 if (!Array.isArray(importedRules)) {
-                    return responseData({ success: false, message: "Invalid format: expected an array of rules" }, { status: 400 });
+                    return responseData({
+                        success: false,
+                        message: "This file can't be imported because its top-level JSON value isn't an array of rules. Use a file created by Export, or wrap the rules in a JSON array.",
+                    }, { status: 400 });
                 }
             } catch {
-                return responseData({ success: false, message: "Invalid JSON format" }, { status: 400 });
+                return responseData({
+                    success: false,
+                    message: "This file can't be imported because it isn't valid JSON. Check the file and try again.",
+                }, { status: 400 });
             }
 
             let created = 0;
@@ -536,6 +544,10 @@ export default function RulesPage() {
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importData, setImportData] = useState("");
     const [importFileName, setImportFileName] = useState("");
+    const [pageError, setPageError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [importError, setImportError] = useState<string | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deletingRule, setDeletingRule] = useState<RedirectRule | null>(null);
     const [ruleQuery, setRuleQuery] = useState("");
@@ -590,6 +602,10 @@ export default function RulesPage() {
         })),
     ];
     const selectedCityNames = useMemo(() => splitCityNames(cityNames), [cityNames]);
+    const importValidation = useMemo(
+        () => importData ? validateRuleImportJson(importData, { singular: "rule", plural: "rules" }) : null,
+        [importData],
+    );
     const cityOptions = useMemo(() => {
         const options = citiesFetcher.data?.cities || [];
         const existingValues = new Set(options.map((option) => option.value));
@@ -665,15 +681,21 @@ export default function RulesPage() {
         if (fetcher.state !== "idle") return;
         setTogglingRuleId(null);
         if (!fetcher.data?.message) return;
-        shopify.toast.show(fetcher.data.message, {
-            isError: fetcher.data.success === false,
-        });
+        if (fetcher.data.success === false) {
+            setPageError(fetcher.data.message);
+            return;
+        }
+        setPageError(null);
+        shopify.toast.show(fetcher.data.message);
     }, [fetcher.data, fetcher.state, shopify]);
 
     useEffect(() => {
         if (formFetcher.state !== "idle" || !formFetcher.data?.message) return;
-        shopify.toast.show(formFetcher.data.message, { isError: formFetcher.data.success === false });
-        if (formFetcher.data.success) {
+        if (formFetcher.data.success === false) {
+            setFormError(formFetcher.data.message);
+        } else {
+            setFormError(null);
+            shopify.toast.show(formFetcher.data.message);
             setModalOpen(false);
             setEditingRule(null);
         }
@@ -681,8 +703,11 @@ export default function RulesPage() {
 
     useEffect(() => {
         if (importFetcher.state !== "idle" || !importFetcher.data?.message) return;
-        shopify.toast.show(importFetcher.data.message, { isError: importFetcher.data.success === false });
-        if (importFetcher.data.success) {
+        if (importFetcher.data.success === false) {
+            setImportError(importFetcher.data.message);
+        } else {
+            setImportError(null);
+            shopify.toast.show(importFetcher.data.message);
             setImportModalOpen(false);
             setImportData("");
             setImportFileName("");
@@ -777,8 +802,11 @@ export default function RulesPage() {
 
     useEffect(() => {
         if (deleteFetcher.state !== "idle" || !deleteFetcher.data?.message) return;
-        shopify.toast.show(deleteFetcher.data.message, { isError: deleteFetcher.data.success === false });
-        if (deleteFetcher.data.success) {
+        if (deleteFetcher.data.success === false) {
+            setDeleteError(deleteFetcher.data.message);
+        } else {
+            setDeleteError(null);
+            shopify.toast.show(deleteFetcher.data.message);
             setDeleteModalOpen(false);
             setDeletingRule(null);
             clearSelection();
@@ -880,11 +908,13 @@ export default function RulesPage() {
     }, [editingRule, modalOpen]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
+        setFormError(null);
         setEditingRule(rule || null);
         setModalOpen(true);
     }, []);
 
     const handleCloseModal = useCallback(() => {
+        setFormError(null);
         setModalOpen(false);
         setEditingRule(null);
     }, []);
@@ -944,6 +974,7 @@ export default function RulesPage() {
 
     const handleBulkDelete = useCallback(() => {
         if (selectedResources.length === 0) return;
+        setDeleteError(null);
         setDeletingRule(null);
         setDeleteModalOpen(true);
     }, [selectedResources]);
@@ -958,12 +989,14 @@ export default function RulesPage() {
     }, [deletingRule, selectedResources, deleteFetcher]);
 
     const handleDeleteRule = useCallback((rule: RedirectRule) => {
+        setDeleteError(null);
         setDeletingRule(rule);
         setDeleteModalOpen(true);
     }, []);
 
     const handleCloseDeleteModal = useCallback(() => {
         if (deleteFetcher.state !== "idle") return;
+        setDeleteError(null);
         setDeleteModalOpen(false);
         setDeletingRule(null);
     }, [deleteFetcher.state]);
@@ -1114,6 +1147,7 @@ export default function RulesPage() {
     const handleImportFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setImportError(null);
         setImportFileName(file.name);
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -1124,12 +1158,12 @@ export default function RulesPage() {
     }, []);
 
     const handleImportSubmit = useCallback(() => {
-        if (!importData) return;
+        if (!importData || !importValidation?.isValid) return;
         const formData = new FormData();
         formData.append("intent", "import");
         formData.append("rulesJson", importData);
         importFetcher.submit(formData, { method: "POST" });
-    }, [importData, importFetcher]);
+    }, [importData, importFetcher, importValidation?.isValid]);
 
     const promotedBulkActions = [
         {
@@ -1242,7 +1276,7 @@ export default function RulesPage() {
                 <div className="rule-url-cell">
                     <Text as="span" variant="bodyMd" truncate>
                         {rule.ruleType === "block" ? (
-                            <Badge tone="attention">Access Blocked</Badge>
+                            <RuleTypeBadge ruleType="block" label="Access Blocked" />
                         ) : (
                             rule.targetUrl
                         )}
@@ -1278,13 +1312,12 @@ export default function RulesPage() {
             </IndexTable.Cell>
             <IndexTable.Cell className="rule-method-column">
                 <div className="rule-method-cell">
-                    {rule.ruleType === 'redirect' ? (
-                        <Badge tone={rule.redirectMode === 'auto_redirect' ? 'warning' : 'info'}>
-                            {rule.redirectMode === 'auto_redirect' ? 'Auto Redirect' : 'Popup'}
-                        </Badge>
-                    ) : (
-                        <Badge tone="attention">Block</Badge>
-                    )}
+                    <RuleTypeBadge
+                        ruleType={rule.ruleType}
+                        label={rule.ruleType === "redirect"
+                            ? (rule.redirectMode === "auto_redirect" ? "Auto Redirect" : "Popup")
+                            : "Block"}
+                    />
                 </div>
             </IndexTable.Cell>
             <IndexTable.Cell className="rule-priority-column">{rule.priority}</IndexTable.Cell>
@@ -1622,7 +1655,10 @@ export default function RulesPage() {
                             <div style={{ opacity: !hasProPlan ? 0.6 : 1 }}>
                                 <Button
                                     icon={!hasProPlan ? LockIcon : ImportIcon}
-                                    onClick={() => setImportModalOpen(true)}
+                                    onClick={() => {
+                                        setImportError(null);
+                                        setImportModalOpen(true);
+                                    }}
                                     disabled={!hasProPlan}
                                 >
                                     Import
@@ -1635,6 +1671,15 @@ export default function RulesPage() {
                     </InlineStack>
                 </div>
                 <BlockStack gap="500">
+                {pageError && (
+                    <Banner
+                        tone="critical"
+                        title="Couldn't update the rule"
+                        onDismiss={() => setPageError(null)}
+                    >
+                        {pageError}
+                    </Banner>
+                )}
                 {appEmbedStatus.state !== "enabled" && (
                     <Banner
                         tone="warning"
@@ -1862,8 +1907,10 @@ export default function RulesPage() {
             >
                 <Modal.Section>
                     <BlockStack gap="400">
-                    {formFetcher.state === "idle" && formFetcher.data?.success === false && (
-                        <Banner tone="critical">{formFetcher.data.message}</Banner>
+                    {formError && (
+                        <Banner tone="critical" title="Couldn't save the rule" onDismiss={() => setFormError(null)}>
+                            {formError}
+                        </Banner>
                     )}
                     <FormLayout>
                         <TextField
@@ -2620,25 +2667,27 @@ export default function RulesPage() {
             {/* Import Modal */}
             <Modal
                 open={importModalOpen}
-                onClose={() => { setImportModalOpen(false); setImportData(""); setImportFileName(""); }}
+                onClose={() => { setImportModalOpen(false); setImportData(""); setImportFileName(""); setImportError(null); }}
                 title="Import Rules"
                 primaryAction={{
                     content: "Import",
                     onAction: handleImportSubmit,
                     loading: importFetcher.state !== "idle",
-                    disabled: importFetcher.state !== "idle" || !importData,
+                    disabled: importFetcher.state !== "idle" || !importValidation?.isValid,
                 }}
                 secondaryActions={[
                     {
                         content: "Cancel",
-                        onAction: () => { setImportModalOpen(false); setImportData(""); setImportFileName(""); },
+                        onAction: () => { setImportModalOpen(false); setImportData(""); setImportFileName(""); setImportError(null); },
                     },
                 ]}
             >
                 <Modal.Section>
                     <BlockStack gap="400">
-                        {importFetcher.state === "idle" && importFetcher.data?.success === false && (
-                            <Banner tone="critical">{importFetcher.data.message}</Banner>
+                        {importError && (
+                            <Banner tone="critical" title="Couldn't import rules" onDismiss={() => setImportError(null)}>
+                                {importError}
+                            </Banner>
                         )}
                         <Text as="p">
                             Upload a JSON file containing rules to import. The file should be in the same format as the exported file.
@@ -2675,18 +2724,12 @@ export default function RulesPage() {
                                 )}
                             </BlockStack>
                         </div>
-                        {importData && (
-                            <Banner tone="info">
-                                <p>
-                                    {(() => {
-                                        try {
-                                            const parsed = JSON.parse(importData);
-                                            return `Found ${Array.isArray(parsed) ? parsed.length : 0} rule(s) ready to import.`;
-                                        } catch {
-                                            return "Invalid JSON format. Please check the file.";
-                                        }
-                                    })()}
-                                </p>
+                        {importValidation && (
+                            <Banner
+                                tone={importValidation.isValid ? "info" : "critical"}
+                                title={importValidation.isValid ? undefined : "Couldn't import this file"}
+                            >
+                                <p>{importValidation.message}</p>
                             </Banner>
                         )}
                     </BlockStack>
@@ -2709,8 +2752,10 @@ export default function RulesPage() {
             >
                 <Modal.Section>
                     <BlockStack gap="300">
-                        {deleteFetcher.state === "idle" && deleteFetcher.data?.success === false && (
-                            <Banner tone="critical">{deleteFetcher.data.message}</Banner>
+                        {deleteError && (
+                            <Banner tone="critical" title="Couldn't delete the rule" onDismiss={() => setDeleteError(null)}>
+                                {deleteError}
+                            </Banner>
                         )}
                         <Text as="p">
                             {deletingRule

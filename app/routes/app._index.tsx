@@ -34,6 +34,7 @@ import {
 } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
+import { RuleTypeBadge } from "../components/rule-type-badge";
 import {
   CUSTOM_PLAN,
   FREE_PLAN,
@@ -2077,9 +2078,7 @@ export default function Index() {
                                 <span className="geo-top-rule-name">{rule.name}</span>
                               </td>
                               <td>
-                                <Badge tone={rule.type === "Block" ? "attention" : "info"}>
-                                  {rule.type}
-                                </Badge>
+                                <RuleTypeBadge ruleType={rule.type} label={rule.type} />
                               </td>
                               <td>
                                 {rule.actions.toLocaleString()}

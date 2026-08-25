@@ -28,6 +28,7 @@ import {
     Select,
     TextField,
     Modal,
+    Banner,
     Tooltip,
     useBreakpoints,
 } from "@shopify/polaris";
@@ -892,6 +893,7 @@ export default function VisitorLogs() {
         id: string;
         ip: string;
     } | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
     const isBlockingIp =
         navigation.state !== "idle" &&
         navigation.formData?.get("intent") === "block_ip";
@@ -912,12 +914,13 @@ export default function VisitorLogs() {
     useEffect(() => {
         if (!actionData) return;
         if ("message" in actionData && actionData.message) {
+            setActionError(null);
             shopify.toast.show(actionData.message);
             setBlockTarget(null);
             return;
         }
         if ("error" in actionData && actionData.error) {
-            shopify.toast.show(actionData.error, { isError: true });
+            setActionError(actionData.error);
         }
     }, [actionData, shopify]);
 
@@ -2086,6 +2089,16 @@ export default function VisitorLogs() {
                                 </div>
                             </div>
 
+                            {actionError && !blockTarget && (
+                                <Banner
+                                    tone="critical"
+                                    title="Couldn't update the visitor log"
+                                    onDismiss={() => setActionError(null)}
+                                >
+                                    {actionError}
+                                </Banner>
+                            )}
+
                             <Card padding="0">
                                 <Suspense fallback={renderFilterControls(emptyFilterOptions)}>
                                     <Await resolve={visitorLogsData}>
@@ -2105,12 +2118,24 @@ export default function VisitorLogs() {
             <Modal
                 open={Boolean(blockTarget)}
                 onClose={() => {
-                    if (!isBlockingIp) setBlockTarget(null);
+                    if (!isBlockingIp) {
+                        setActionError(null);
+                        setBlockTarget(null);
+                    }
                 }}
                 title="Block this IP address?"
             >
                 <Modal.Section>
                     <BlockStack gap="400">
+                        {actionError && (
+                            <Banner
+                                tone="critical"
+                                title="Couldn't block this IP address"
+                                onDismiss={() => setActionError(null)}
+                            >
+                                {actionError}
+                            </Banner>
+                        )}
                         <Text as="p">
                             This creates an active IP blocking rule for{" "}
                             <strong>{blockTarget?.ip}</strong>. Future storefront
@@ -2118,7 +2143,10 @@ export default function VisitorLogs() {
                         </Text>
                         <InlineStack align="end" gap="200">
                             <Button
-                                onClick={() => setBlockTarget(null)}
+                                onClick={() => {
+                                    setActionError(null);
+                                    setBlockTarget(null);
+                                }}
                                 disabled={isBlockingIp}
                             >
                                 Cancel
