@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
@@ -35,6 +35,10 @@ import {
 } from "./billing-period.server";
 
 describe("getUsagePeriodForShop cached usage reconciliation", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.billableUsageEvent.count.mockResolvedValue(0);
@@ -55,6 +59,9 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
   });
 
   it("carries usage to a replacement subscription with the same period end", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-01T00:00:00.000Z"));
+
     const billingPeriodEnd = new Date("2026-08-27T13:43:04.000Z");
     const currentKey =
       "shopify:gid://shopify/AppSubscription/new:gid://shopify/AppSubscriptionLineItem/new:2026-08-27";
@@ -67,10 +74,8 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
         billingPeriodKey: currentKey,
         billingPeriodStart: null,
         billingPeriodEnd,
-        billingSubscriptionId:
-          "gid://shopify/AppSubscription/new",
-        billingUsageLineItemId:
-          "gid://shopify/AppSubscriptionLineItem/new",
+        billingSubscriptionId: "gid://shopify/AppSubscription/new",
+        billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/new",
       },
     });
 

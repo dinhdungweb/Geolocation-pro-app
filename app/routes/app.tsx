@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
+import { isRouteErrorResponse, Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
@@ -11,92 +11,16 @@ import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
 import { ensureShopTimeZone } from "../utils/shop-timezone.server";
+import {
+  buildEmbeddedAuthRecoveryUrl,
+  EMBEDDED_AUTH_RECOVERY_PARAM,
+  shouldAttemptEmbeddedAuthRecovery,
+} from "../utils/embedded-auth-recovery";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 const CRISP_BOOT_DELAY_MS = 1500;
 const CRISP_IDLE_TIMEOUT_MS = 1500;
-
-declare global {
-  interface Window {
-    __geoShopifyFetchPatched?: boolean;
-    __geoOriginalFetch?: typeof fetch;
-    shopify?: {
-      idToken?: () => Promise<string>;
-    };
-  }
-}
-
-const SHOPIFY_INVALID_SESSION_RETRY_HEADER = "X-Shopify-Retry-Invalid-Session-Request";
-const GEO_AUTH_RETRY_HEADER = "X-Geo-Auth-Retry";
-
-function shouldRetryInvalidSessionResponse(response: Response) {
-  return (
-    response.status === 401 &&
-    response.headers.get(SHOPIFY_INVALID_SESSION_RETRY_HEADER) === "1"
-  );
-}
-
-function withAuthorizationHeader(headersInit: HeadersInit | undefined, token: string) {
-  const headers = new Headers(headersInit);
-  headers.set("Authorization", `Bearer ${token}`);
-  headers.set(GEO_AUTH_RETRY_HEADER, "1");
-  return headers;
-}
-
-async function retryWithFreshShopifyToken(
-  originalFetch: typeof fetch,
-  input: RequestInfo | URL,
-  init?: RequestInit,
-) {
-  const token = await window.shopify?.idToken?.();
-  if (!token) return null;
-
-  if (input instanceof Request) {
-    const retryHeaders = withAuthorizationHeader(init?.headers ?? input.headers, token);
-    return originalFetch(new Request(input, { ...init, headers: retryHeaders }));
-  }
-
-  return originalFetch(input, {
-    ...init,
-    headers: withAuthorizationHeader(init?.headers, token),
-  });
-}
-
-function installShopifyInvalidSessionFetchRetry() {
-  if (typeof window === "undefined" || window.__geoShopifyFetchPatched) return;
-
-  const originalFetch = window.fetch.bind(window);
-  window.__geoOriginalFetch = originalFetch;
-  window.__geoShopifyFetchPatched = true;
-
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const requestForRetry = input instanceof Request ? input.clone() : input;
-    const requestHeaders = new Headers(
-      init?.headers ?? (input instanceof Request ? input.headers : undefined),
-    );
-
-    const response = await originalFetch(input, init);
-
-    if (
-      !shouldRetryInvalidSessionResponse(response) ||
-      requestHeaders.get(GEO_AUTH_RETRY_HEADER) === "1"
-    ) {
-      return response;
-    }
-
-    try {
-      return (await retryWithFreshShopifyToken(
-        originalFetch,
-        requestForRetry,
-        init,
-      )) || response;
-    } catch (error) {
-      console.warn("[ShopifyAuth] Failed to retry request with fresh id token", error);
-      return response;
-    }
-  };
-}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -996,10 +920,6 @@ export default function App() {
     navigation.location?.pathname.startsWith("/app") &&
     location.pathname !== navigation.location.pathname;
 
-  useEffect(() => {
-    installShopifyInvalidSessionFetchRetry();
-  }, []);
-
   useEffect(() => observeWebVitals(() => window.location.pathname), []);
 
   useEffect(() => {
@@ -1091,9 +1011,13 @@ export default function App() {
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (!url.searchParams.has("id_token")) return;
+    if (
+      !url.searchParams.has("id_token") &&
+      !url.searchParams.has(EMBEDDED_AUTH_RECOVERY_PARAM)
+    ) return;
 
     url.searchParams.delete("id_token");
+    url.searchParams.delete(EMBEDDED_AUTH_RECOVERY_PARAM);
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, [location.pathname, location.search]);
 
@@ -1208,9 +1132,81 @@ export default function App() {
   );
 }
 
+function EmbeddedAuthRecovery() {
+  const location = useLocation();
+  const recoveryStarted = useRef(false);
+  const [showManualRetry, setShowManualRetry] = useState(false);
+
+  useEffect(() => {
+    if (recoveryStarted.current) return;
+    recoveryStarted.current = true;
+
+    const url = new URL(window.location.href);
+    const retryKey = `geo-auth-recovery:${location.pathname}${location.search}`;
+    const lastRecoveryAt =
+      url.searchParams.get(EMBEDDED_AUTH_RECOVERY_PARAM) ||
+      window.sessionStorage.getItem(retryKey);
+
+    if (!shouldAttemptEmbeddedAuthRecovery(lastRecoveryAt)) {
+      setShowManualRetry(true);
+      return;
+    }
+
+    const recoveryStartedAt = Date.now();
+    window.sessionStorage.setItem(retryKey, String(recoveryStartedAt));
+
+    const getIdToken = window.shopify?.idToken;
+    if (!getIdToken) {
+      setShowManualRetry(true);
+      return;
+    }
+
+    void getIdToken()
+      .then((token) => {
+        if (!token) {
+          setShowManualRetry(true);
+          return;
+        }
+
+        window.location.replace(
+          buildEmbeddedAuthRecoveryUrl(
+            window.location.href,
+            token,
+            recoveryStartedAt,
+          ),
+        );
+      })
+      .catch(() => setShowManualRetry(true));
+  }, [location.pathname, location.search]);
+
+  return (
+    <main style={{ maxWidth: 520, margin: "48px auto", padding: 24, textAlign: "center" }}>
+      <h1 style={{ fontSize: 20, marginBottom: 12 }}>
+        {showManualRetry ? "Shopify session expired" : "Reconnecting to Shopify…"}
+      </h1>
+      <p style={{ color: "#616161", marginBottom: 20 }}>
+        {showManualRetry
+          ? "Reload the app to start a fresh Shopify session."
+          : "The app is requesting a fresh session token."}
+      </p>
+      {showManualRetry ? (
+        <button type="button" onClick={() => window.location.reload()}>
+          Retry connection
+        </button>
+      ) : null}
+    </main>
+  );
+}
+
 // Shopify needs React Router to catch thrown responses so their headers are included.
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+
+  if (isRouteErrorResponse(error) && error.status === 401) {
+    return <EmbeddedAuthRecovery />;
+  }
+
+  return boundary.error(error);
 }
 
 export const headers: HeadersFunction = (headersArgs) => {

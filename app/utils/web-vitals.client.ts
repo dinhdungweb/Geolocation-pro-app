@@ -8,6 +8,43 @@ type WebVitalPayload = {
 
 const reportedMetrics = new Set<string>();
 
+type WebVitalTransport = {
+  fetchImpl?: typeof fetch;
+  getIdToken?: () => Promise<string | undefined>;
+};
+
+export async function sendWebVital(
+  { name, value, path }: WebVitalPayload,
+  {
+    fetchImpl = fetch,
+    getIdToken = async () => window.shopify?.idToken?.(),
+  }: WebVitalTransport = {},
+) {
+  try {
+    const token = await getIdToken();
+    if (!token) return false;
+
+    const response = await fetchImpl("/app/performance", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name,
+        path,
+        value: Number(value.toFixed(2)),
+      }),
+      keepalive: true,
+    });
+
+    return response.ok;
+  } catch {
+    // Performance reporting must never affect app navigation.
+    return false;
+  }
+}
+
 export function reportWebVital({ name, value, path }: WebVitalPayload) {
   if (!Number.isFinite(value) || value < 0) return;
 
@@ -15,18 +52,7 @@ export function reportWebVital({ name, value, path }: WebVitalPayload) {
   if (name !== "ROUTE" && reportedMetrics.has(key)) return;
   reportedMetrics.add(key);
 
-  void fetch("/app/performance", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name,
-      path,
-      value: Number(value.toFixed(2)),
-    }),
-    keepalive: true,
-  }).catch(() => {
-    // Performance reporting must never affect app navigation.
-  });
+  void sendWebVital({ name, value, path });
 }
 
 export function observeWebVitals(getPath: () => string) {

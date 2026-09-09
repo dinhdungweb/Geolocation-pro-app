@@ -9,7 +9,10 @@ function sourceFiles(directory: string): string[] {
       const path = `${directory}/${entry.name}`;
 
       if (entry.isDirectory()) return sourceFiles(path);
-      if (!/\.(ts|tsx)$/.test(entry.name) || /\.test\.(ts|tsx)$/.test(entry.name)) {
+      if (
+        !/\.(ts|tsx)$/.test(entry.name) ||
+        /\.test\.(ts|tsx)$/.test(entry.name)
+      ) {
         return [];
       }
 
@@ -66,12 +69,22 @@ describe("React Router migration", () => {
 
     expect(supportRoute).toContain("const navigate = useNavigate()");
     expect(supportRoute).toContain("onClick={() => navigate(item.url)}");
-    expect(supportRoute).toContain(
-      'onClick={() => navigate("/app/logs")}',
-    );
+    expect(supportRoute).toContain('onClick={() => navigate("/app/logs")}');
     expect(supportRoute).not.toContain("<Button url={item.url}>");
-    expect(supportRoute).not.toContain(
-      '<Button url="/app/logs"',
+    expect(supportRoute).not.toContain('<Button url="/app/logs"');
+  });
+
+  it("lets App Bridge own authenticated fetch and keeps a 401 recovery UI", () => {
+    const appRoutePath = fileURLToPath(
+      new URL("../routes/app.tsx", import.meta.url),
     );
+    const appRoute = readFileSync(appRoutePath, "utf8");
+
+    expect(appRoute).not.toContain("window.fetch =");
+    expect(appRoute).not.toContain("__geoShopifyFetchPatched");
+    expect(appRoute).toContain(
+      "isRouteErrorResponse(error) && error.status === 401",
+    );
+    expect(appRoute).toContain("<EmbeddedAuthRecovery />");
   });
 });
