@@ -942,7 +942,7 @@ export default function PricingPage() {
                                         <Text as="p" fontWeight="semibold">Overage</Text>
                                         <Text as="p" tone="subdued">
                                             {canUseCustomPlan && customNoOverage
-                                                ? "Standard paid plans can charge extra visitors when limits are exceeded. Your custom plan has no overage charges."
+                                                ? "Standard paid plans can charge extra visitors when limits are exceeded."
                                                 : "Paid plans can charge extra visitors through Shopify billing when limits are exceeded."}
                                         </Text>
                                     </BlockStack>
