@@ -28,7 +28,6 @@ import {
     ALL_PAID_PLANS,
     PLAN_LIMITS,
     OVERAGE_RATE,
-    OVERAGE_MONTHLY_CAP_AMOUNT,
     CUSTOM_OVERAGE_MONTHLY_CAP_AMOUNT,
     DEFAULT_TRIAL_DAYS,
     getPlanLimit,
@@ -951,7 +950,7 @@ export default function PricingPage() {
                             </div>
                             <Divider />
                             <Text as="p" variant="bodySm" tone="subdued">
-                                Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor and capped at ${OVERAGE_MONTHLY_CAP_AMOUNT.toFixed(2)} per month for standard paid plans.
+                                Payments are handled securely by Shopify. Overage billing is calculated at ${OVERAGE_RATE.toFixed(3)} per visitor for standard paid plans.
                             </Text>
                         </BlockStack>
                     </Card>
