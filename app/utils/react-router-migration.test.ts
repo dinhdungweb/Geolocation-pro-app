@@ -74,7 +74,7 @@ describe("React Router migration", () => {
     expect(supportRoute).not.toContain('<Button url="/app/logs"');
   });
 
-  it("lets App Bridge own authenticated fetch and keeps a 401 recovery UI", () => {
+  it("lets App Bridge own authenticated fetch and authentication recovery", () => {
     const appRoutePath = fileURLToPath(
       new URL("../routes/app.tsx", import.meta.url),
     );
@@ -82,9 +82,18 @@ describe("React Router migration", () => {
 
     expect(appRoute).not.toContain("window.fetch =");
     expect(appRoute).not.toContain("__geoShopifyFetchPatched");
-    expect(appRoute).toContain(
-      "isRouteErrorResponse(error) && error.status === 401",
-    );
-    expect(appRoute).toContain("<EmbeddedAuthRecovery />");
+    expect(appRoute).not.toContain("geo_auth_recovery");
+    expect(appRoute).not.toContain("EmbeddedAuthRecovery");
+    expect(appRoute).not.toContain("window.location.replace(");
+    expect(appRoute).toContain("return boundary.error(useRouteError());");
+  });
+
+  it("keeps a user-friendly root error boundary", () => {
+    const rootRoutePath = fileURLToPath(new URL("../root.tsx", import.meta.url));
+    const rootRoute = readFileSync(rootRoutePath, "utf8");
+
+    expect(rootRoute).toContain("export function ErrorBoundary()");
+    expect(rootRoute).toContain("We couldn't load this page");
+    expect(rootRoute).not.toContain("error.statusText");
   });
 });
