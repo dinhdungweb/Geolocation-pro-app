@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 
-import { authenticate, unauthenticated } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 import {
   getOrderIdFromWebhookPayload,
   syncOrderRisk,
@@ -36,14 +36,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return new Response(null, { status: 200 });
     }
 
-    stage = "load_offline_admin";
-    const adminContext = admin
-      ? { admin, session }
-      : await unauthenticated.admin(shop);
+    if (!admin || !session) {
+      console.warn(
+        "[OrderRisk] Skipping webhook without an offline Admin API session",
+        {
+          ...webhookMeta(request),
+          shop,
+          topic,
+        },
+      );
+      return new Response(null, { status: 200 });
+    }
 
     stage = "sync_order_risk";
     await syncOrderRisk({
-      admin: adminContext.admin,
+      admin,
       orderId,
       publishAssessment: false,
       shop,
