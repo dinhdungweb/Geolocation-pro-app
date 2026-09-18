@@ -7,9 +7,14 @@ import { COUNTRIES_WITH_STATES, getStateCodeByName } from './states';
 
 let reader: Reader<CityResponse> | null = null;
 let initPromise: Promise<void> | null = null;
+let reloadPromise: Promise<void> | null = null;
+let loadedDatabasePath: string | null = null;
+let loadedDatabaseMtimeMs = 0;
+let lastReloadCheckAt = 0;
 
 const DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-City.mmdb');
 const LEGACY_DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-Country.mmdb');
+const DEFAULT_RELOAD_CHECK_INTERVAL_MS = 60_000;
 const IPINFO_PUBLIC_URL = 'https://ipinfo.io';
 const IPINFO_FALLBACK_TIMEOUT_MS = 800;
 const IPINFO_FALLBACK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -45,6 +50,34 @@ const fallbackCache = new Map<string, FallbackCacheEntry>();
 const countriesWithStates = new Set(COUNTRIES_WITH_STATES);
 
 const emptyGeo: GeoLookupResult = { countryCode: '', regionCode: '', regionName: '', city: '' };
+
+function getDatabasePath() {
+    if (fs.existsSync(DB_PATH)) return DB_PATH;
+    if (fs.existsSync(LEGACY_DB_PATH)) return LEGACY_DB_PATH;
+    return null;
+}
+
+function getReloadCheckIntervalMs() {
+    const configured = Number.parseInt(process.env.MAXMIND_RELOAD_CHECK_INTERVAL_MS || '', 10);
+    return Number.isFinite(configured) && configured >= 5_000
+        ? configured
+        : DEFAULT_RELOAD_CHECK_INTERVAL_MS;
+}
+
+async function loadDatabaseReader(dbFile: string, reason: 'initial' | 'updated') {
+    const nextReader = await maxmind.open<CityResponse>(dbFile);
+    const nextMtimeMs = fs.statSync(dbFile).mtimeMs;
+
+    // Keep the existing reader available until the replacement is fully open.
+    reader = nextReader;
+    loadedDatabasePath = dbFile;
+    loadedDatabaseMtimeMs = nextMtimeMs;
+    console.log(
+        reason === 'updated'
+            ? `[MaxMind] Reloaded updated database: ${path.basename(dbFile)}`
+            : `[MaxMind] Database loaded successfully: ${path.basename(dbFile)}`,
+    );
+}
 
 function isPublicLookupCandidate(ip: string) {
     const value = ip.trim();
@@ -155,20 +188,49 @@ async function initReader(): Promise<void> {
 
     // Trigger auto-update check.
     // If the DB file exists, this is just a fast stat() call.
-    // If it's missing, it will download (~5MB) — only happens on first deploy.
+    // If it is missing, the updater downloads the current database before opening it.
     await checkAndRunLiteUpdate().catch(err => console.error('[MaxMind] Update check failed:', err));
 
     try {
-        // Try City DB first, fall back to legacy Country DB
-        const dbFile = fs.existsSync(DB_PATH) ? DB_PATH : LEGACY_DB_PATH;
-        if (!fs.existsSync(dbFile)) {
+        const dbFile = getDatabasePath();
+        if (!dbFile) {
             console.error('[MaxMind] No database file found at', DB_PATH, 'or', LEGACY_DB_PATH);
             return;
         }
-        reader = await maxmind.open<CityResponse>(dbFile);
-        console.log('[MaxMind] Database loaded successfully:', path.basename(dbFile));
+        await loadDatabaseReader(dbFile, 'initial');
     } catch (error) {
         console.error('[MaxMind] Failed to load database:', error);
+    }
+}
+
+async function ensureReaderCurrent() {
+    if (!reader) {
+        if (!initPromise) initPromise = initReader();
+        await initPromise;
+    }
+
+    if (!reader) return;
+
+    const now = Date.now();
+    if (now - lastReloadCheckAt < getReloadCheckIntervalMs()) return;
+    lastReloadCheckAt = now;
+
+    const dbFile = getDatabasePath();
+    if (!dbFile) return;
+
+    try {
+        const currentMtimeMs = fs.statSync(dbFile).mtimeMs;
+        if (dbFile === loadedDatabasePath && currentMtimeMs === loadedDatabaseMtimeMs) return;
+
+        if (!reloadPromise) {
+            reloadPromise = loadDatabaseReader(dbFile, 'updated').finally(() => {
+                reloadPromise = null;
+            });
+        }
+        await reloadPromise;
+    } catch (error) {
+        // Continue serving lookups with the last known-good reader.
+        console.error('[MaxMind] Failed to reload updated database:', error);
     }
 }
 
@@ -179,6 +241,10 @@ async function initReader(): Promise<void> {
 export function invalidateReader(): void {
     reader = null;
     initPromise = null;
+    reloadPromise = null;
+    loadedDatabasePath = null;
+    loadedDatabaseMtimeMs = 0;
+    lastReloadCheckAt = 0;
     console.log('[MaxMind] Reader invalidated — will reload on next lookup');
 }
 
@@ -198,13 +264,7 @@ export function preloadReader(): void {
  * @returns ISO 3166-1 alpha-2 country code (e.g., "US", "VN") or empty string if not found
  */
 export async function getCountryFromIP(ip: string): Promise<string> {
-    // Initialize reader if not done yet (singleton pattern)
-    if (!reader) {
-        if (!initPromise) {
-            initPromise = initReader();
-        }
-        await initPromise;
-    }
+    await ensureReaderCurrent();
 
     if (!reader) {
         return '';
@@ -233,13 +293,7 @@ export async function getGeoFromIP(ip: string, options: GeoLookupOptions = {}): 
     regionName: string;
     city: string;
 }> {
-    // Initialize reader if not done yet
-    if (!reader) {
-        if (!initPromise) {
-            initPromise = initReader();
-        }
-        await initPromise;
-    }
+    await ensureReaderCurrent();
 
     if (!reader) {
         return options.useFreeFallback && isPublicLookupCandidate(ip)

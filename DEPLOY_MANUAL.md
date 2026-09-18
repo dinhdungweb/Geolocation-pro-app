@@ -71,6 +71,8 @@ ADMIN_SESSION_SECRET=replace_with_at_least_32_random_characters
 APP_ENCRYPTION_KEY=replace_with_at_least_32_random_characters
 
 MAXMIND_LICENSE_KEY=your_maxmind_license_key
+MAXMIND_UPDATE_INTERVAL_HOURS=23
+MAXMIND_RELOAD_CHECK_INTERVAL_MS=60000
 IP_RISK_API_URL=https://proxycheck.io/v2/{ip}?vpn=1&risk=1
 IP_RISK_PROVIDER=proxycheck
 IP_RISK_API_KEY=replace_with_proxycheck_api_key

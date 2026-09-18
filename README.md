@@ -87,6 +87,8 @@ File [.env.example](./.env.example) chứa toàn bộ cấu hình mẫu. Các nh
 | `ADMIN_SESSION_SECRET` | Production | Khóa ký admin session |
 | `APP_ENCRYPTION_KEY` | Production | Khóa mã hóa secret lưu trong database |
 | `MAXMIND_LICENSE_KEY` | Khuyến nghị | Tự động tải/cập nhật GeoLite2 |
+| `MAXMIND_UPDATE_INTERVAL_HOURS` | Không | Chu kỳ làm mới GeoLite2 theo giờ; mặc định `23` để cập nhật hằng ngày |
+| `MAXMIND_RELOAD_CHECK_INTERVAL_MS` | Không | Chu kỳ web process kiểm tra và nạp lại GeoLite2 mới; mặc định `60000` ms |
 | `IP_RISK_API_URL` | Khuyến nghị | HTTPS endpoint chấm điểm IP reputation (`{ip}` được hỗ trợ) |
 | `IP_RISK_PROVIDER` | Tùy chọn | Provider chính; khuyến nghị `proxycheck` |
 | `IP_RISK_API_KEY` | Tùy chọn | API key provider chính, không đặt trực tiếp trong source code |

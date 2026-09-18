@@ -13,6 +13,9 @@ node_modules
 /prisma/dev.sqlite-journal
 database.sqlite
 data/*.mmdb
+data/*.meta.json
+data/*.tmp
+data/geoip-update-*
 
 .env
 .env.*
