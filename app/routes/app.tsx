@@ -6,7 +6,6 @@ import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { EmbeddedAppProviders } from "../components/embedded-app-providers";
-import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
@@ -910,10 +909,6 @@ export default function App() {
   const location = useLocation();
   const navigation = useNavigation();
   const routeNavigationStartedAt = useRef<number | null>(null);
-  const isNavigatingToAppRoute =
-    navigation.state !== "idle" &&
-    navigation.location?.pathname.startsWith("/app") &&
-    location.pathname !== navigation.location.pathname;
 
   useEffect(() => observeWebVitals(() => window.location.pathname), []);
 
@@ -1109,15 +1104,7 @@ export default function App() {
         <Link to="/app/support">Support</Link>
       </NavMenu>
       <div className="app-route-frame">
-        {isNavigatingToAppRoute ? (
-          <SimpleLoadingSkeleton
-            label="Loading page"
-            minHeight={520}
-            rows={5}
-          />
-        ) : (
-          <Outlet />
-        )}
+        <Outlet />
       </div>
     </EmbeddedAppProviders>
   );

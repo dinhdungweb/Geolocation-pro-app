@@ -88,6 +88,32 @@ describe("React Router migration", () => {
     expect(appRoute).toContain("return boundary.error(useRouteError());");
   });
 
+  it("keeps the active route mounted while App Bridge shows navigation loading", () => {
+    const appRoutePath = fileURLToPath(
+      new URL("../routes/app.tsx", import.meta.url),
+    );
+    const appRoute = readFileSync(appRoutePath, "utf8");
+
+    expect(appRoute).toContain("<NavigationLoadingIndicator />");
+    expect(appRoute).toContain("<Outlet />");
+    expect(appRoute).not.toContain("isNavigatingToAppRoute");
+  });
+
+  it("does not control the settings save bar after it has unmounted", () => {
+    const settingsRoutePath = fileURLToPath(
+      new URL("../routes/app.settings.tsx", import.meta.url),
+    );
+    const settingsRoute = readFileSync(settingsRoutePath, "utf8");
+
+    expect(settingsRoute).toContain(
+      'await customElements.whenDefined("ui-save-bar")',
+    );
+    expect(settingsRoute).toContain("cancelled = true");
+    expect(settingsRoute).not.toMatch(
+      /return \(\) => \{\s*shopify\.saveBar\.hide\(/,
+    );
+  });
+
   it("keeps a user-friendly root error boundary", () => {
     const rootRoutePath = fileURLToPath(new URL("../root.tsx", import.meta.url));
     const rootRoute = readFileSync(rootRoutePath, "utf8");

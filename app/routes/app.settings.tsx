@@ -36,6 +36,8 @@ import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../u
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 
+const SETTINGS_SAVE_BAR_ID = "settings-save-bar";
+
 interface Settings {
     id: string;
     isEnabled: boolean;
@@ -527,17 +529,38 @@ export default function SettingsPage() {
     }, [fetcher.data, shopify]);
 
     useEffect(() => {
-        const saveBar = (shopify as any).saveBar;
-        if (!saveBar) return;
+        let cancelled = false;
 
-        if (hasUnsavedChanges) {
-            saveBar.show("settings-save-bar");
-        } else {
-            saveBar.hide("settings-save-bar");
-        }
+        const syncSaveBar = async () => {
+            try {
+                await customElements.whenDefined("ui-save-bar");
+
+                if (
+                    cancelled ||
+                    !document.getElementById(SETTINGS_SAVE_BAR_ID)
+                ) {
+                    return;
+                }
+
+                if (hasUnsavedChanges) {
+                    await shopify.saveBar.show(SETTINGS_SAVE_BAR_ID);
+                } else {
+                    await shopify.saveBar.hide(SETTINGS_SAVE_BAR_ID);
+                }
+            } catch (error) {
+                if (
+                    !cancelled &&
+                    document.getElementById(SETTINGS_SAVE_BAR_ID)
+                ) {
+                    console.error("Unable to update the settings save bar", error);
+                }
+            }
+        };
+
+        void syncSaveBar();
 
         return () => {
-            saveBar.hide("settings-save-bar");
+            cancelled = true;
         };
     }, [hasUnsavedChanges, shopify]);
 
@@ -816,7 +839,7 @@ export default function SettingsPage() {
             fullWidth
         >
             <TitleBar title="Settings" />
-            <ui-save-bar id="settings-save-bar">
+            <ui-save-bar id={SETTINGS_SAVE_BAR_ID}>
                 <button
                     ref={saveButtonRef}
                     variant="primary"
