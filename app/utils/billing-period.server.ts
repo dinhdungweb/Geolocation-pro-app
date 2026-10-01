@@ -1,5 +1,12 @@
 import prisma from "../db.server";
-import { FREE_PLAN, OVERAGE_RATE, getPlanLimit, hasUnlimitedUsage, type CustomPlanLimitSettings } from "../billing.config";
+import {
+  FREE_PLAN,
+  OVERAGE_RATE,
+  getBillableOverageVisitors,
+  getPlanLimit,
+  hasUnlimitedUsage,
+  type CustomPlanLimitSettings,
+} from "../billing.config";
 import { unauthenticated } from "../shopify.server";
 import { getYearMonth } from "./analytics-token.server";
 import { normalizePlanName } from "./effective-plan.server";
@@ -304,7 +311,12 @@ export function usagePeriodFromSubscription(
   };
 }
 
-async function seedUsagePeriodRow(shop: string, period: UsagePeriod, planLimit?: number) {
+async function seedUsagePeriodRow(
+  shop: string,
+  period: UsagePeriod,
+  plan?: string,
+  planLimit?: number,
+) {
   if (
     !["shopify", "cached"].includes(period.source) ||
     !period.billingPeriodEnd
@@ -327,13 +339,14 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod, planLimit?:
     usageCounts.totalVisitors,
     carryForwardCounts?.totalVisitors || 0,
   );
-  const hasFreshShopifyBalance = period.source === "shopify" && period.usageBalanceUsed != null;
-  const shouldDiscardHistoricalChargedVisitors = Boolean(
-    hasFreshShopifyBalance &&
-    Number.isFinite(planLimit) &&
-    totalVisitors <= (planLimit as number) &&
-    period.chargedVisitors === 0,
-  );
+  const maxBillableChargedVisitors =
+    period.source === "shopify" && plan && Number.isFinite(planLimit)
+      ? getBillableOverageVisitors(plan, totalVisitors, planLimit as number)
+      : null;
+  const reconcileAutomaticChargedVisitors = (chargedVisitors: number) =>
+    maxBillableChargedVisitors === null
+      ? chargedVisitors
+      : Math.min(chargedVisitors, maxBillableChargedVisitors);
 
   if (existing) {
     // Builds deployed before 2026-07-27 cleared the manual key after Shopify
@@ -366,13 +379,13 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod, planLimit?:
         ? recoveredManualAttempt.toChargedVisitors
         : carryForwardCounts?.manualChargedVisitorsKey
           ? carryForwardCounts.chargedVisitors
-          : shouldDiscardHistoricalChargedVisitors
-            ? 0
-            : Math.max(
+          : reconcileAutomaticChargedVisitors(
+            Math.max(
               existing.chargedVisitors,
               period.chargedVisitors,
               carryForwardCounts?.chargedVisitors || 0,
-            );
+            ),
+          );
     await prisma.monthlyUsage.update({
       where: {
         shop_billingPeriodKey: {
@@ -399,9 +412,9 @@ async function seedUsagePeriodRow(shop: string, period: UsagePeriod, planLimit?:
   const manualChargedVisitorsKey = carryForwardCounts?.manualChargedVisitorsKey || null;
   const chargedVisitors = manualChargedVisitorsKey
     ? carryForwardCounts!.chargedVisitors
-    : shouldDiscardHistoricalChargedVisitors
-      ? 0
-      : Math.max(period.chargedVisitors, carryForwardCounts?.chargedVisitors || 0);
+    : reconcileAutomaticChargedVisitors(
+      Math.max(period.chargedVisitors, carryForwardCounts?.chargedVisitors || 0),
+    );
   const redirected = Math.max(usageCounts.redirected, carryForwardCounts?.redirected || 0);
   const blocked = Math.max(usageCounts.blocked, carryForwardCounts?.blocked || 0);
   const popupShown = Math.max(usageCounts.popupShown, carryForwardCounts?.popupShown || 0);
@@ -460,7 +473,7 @@ export async function syncUsagePeriodForShop(shop: string, plan: string, period:
     },
   });
 
-  await seedUsagePeriodRow(shop, period, planLimit);
+  await seedUsagePeriodRow(shop, period, plan, planLimit);
 }
 
 export async function fetchShopifyUsagePeriod(

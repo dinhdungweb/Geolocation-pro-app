@@ -337,4 +337,56 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
       }),
     );
   });
+
+  it("clamps imported charges to the current plan overage after replacement", async () => {
+    const billingPeriodEnd = new Date("2026-10-24T00:00:00.000Z");
+    const billingPeriodKey =
+      "shopify:gid://shopify/AppSubscription/premium:gid://shopify/AppSubscriptionLineItem/premium-usage:2026-10-24";
+
+    prismaMock.monthlyUsage.findMany.mockResolvedValue([]);
+    prismaMock.monthlyUsage.findUnique.mockResolvedValue({
+      id: "usage-row",
+      shop: "thebasiclook.myshopify.com",
+      yearMonth: "2026-10",
+      billingPeriodKey,
+      billingPeriodStart: new Date("2026-09-24T00:00:00.000Z"),
+      billingPeriodEnd,
+      billingSubscriptionId: "gid://shopify/AppSubscription/premium",
+      billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/premium-usage",
+      totalVisitors: 2_871,
+      redirected: 0,
+      blocked: 0,
+      popupShown: 0,
+      chargedVisitors: 2_290,
+      manualChargedVisitorsKey: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.settings.findUnique.mockResolvedValue({
+      currentPlan: "premium",
+      billingPlanName: "premium",
+    });
+
+    await syncUsagePeriodForShop("thebasiclook.myshopify.com", "premium", {
+      key: billingPeriodKey,
+      yearMonth: "2026-10",
+      billingPeriodStart: new Date("2026-09-24T00:00:00.000Z"),
+      billingPeriodEnd,
+      billingSubscriptionId: "gid://shopify/AppSubscription/premium",
+      billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/premium-usage",
+      chargedVisitors: 2_290,
+      usageBalanceUsed: 4.58,
+      usageCappedAmount: 99.99,
+      source: "shopify",
+    });
+
+    expect(prismaMock.monthlyUsage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalVisitors: 2_871,
+          chargedVisitors: 1_871,
+        }),
+      }),
+    );
+  });
 });
