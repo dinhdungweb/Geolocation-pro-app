@@ -15,6 +15,7 @@ const prismaMock = vi.hoisted(() => ({
     findFirst: vi.fn(),
   },
   settings: {
+    findUnique: vi.fn(),
     upsert: vi.fn(),
   },
 }));
@@ -36,7 +37,7 @@ import {
 } from "./billing-period.server";
 
 describe("usagePeriodFromSubscription Shopify balance", () => {
-  it("uses balanceUsed as the authoritative charged amount", () => {
+  it("keeps balanceUsed separate from current-subscription charged visitors", () => {
     const period = usagePeriodFromSubscription({
       id: "gid://shopify/AppSubscription/current",
       name: "premium",
@@ -65,7 +66,7 @@ describe("usagePeriodFromSubscription Shopify balance", () => {
     });
 
     expect(period).toMatchObject({
-      chargedVisitors: 43_005,
+      chargedVisitors: 500,
       usageBalanceUsed: 86.01,
       usageCappedAmount: 99.99,
     });
@@ -83,6 +84,7 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
     prismaMock.$queryRaw.mockResolvedValue([]);
     prismaMock.monthlyUsage.findUnique.mockResolvedValue(null);
     prismaMock.usageChargeAttempt.findFirst.mockResolvedValue(null);
+    prismaMock.settings.findUnique.mockResolvedValue(null);
     prismaMock.monthlyUsage.findMany.mockResolvedValue([
       {
         totalVisitors: 6,
@@ -279,6 +281,58 @@ describe("getUsagePeriodForShop cached usage reconciliation", () => {
         data: expect.objectContaining({
           chargedVisitors: 1_000,
           manualChargedVisitorsKey: "manual-adjustment-key",
+        }),
+      }),
+    );
+  });
+
+  it("clears a historical balance imported after upgrading above current usage", async () => {
+    const billingPeriodEnd = new Date("2026-10-27T00:00:00.000Z");
+    const billingPeriodKey =
+      "shopify:gid://shopify/AppSubscription/plus:gid://shopify/AppSubscriptionLineItem/plus-usage:2026-10-27";
+
+    prismaMock.monthlyUsage.findMany.mockResolvedValue([]);
+    prismaMock.monthlyUsage.findUnique.mockResolvedValue({
+      id: "usage-row",
+      shop: "heliosjewels-vn.myshopify.com",
+      yearMonth: "2026-10",
+      billingPeriodKey,
+      billingPeriodStart: new Date("2026-09-27T00:00:00.000Z"),
+      billingPeriodEnd,
+      billingSubscriptionId: "gid://shopify/AppSubscription/plus",
+      billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/plus-usage",
+      totalVisitors: 2_324,
+      redirected: 0,
+      blocked: 0,
+      popupShown: 0,
+      chargedVisitors: 545,
+      manualChargedVisitorsKey: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.settings.findUnique.mockResolvedValue({
+      currentPlan: "plus",
+      billingPlanName: "plus",
+    });
+
+    await syncUsagePeriodForShop("heliosjewels-vn.myshopify.com", "plus", {
+      key: billingPeriodKey,
+      yearMonth: "2026-10",
+      billingPeriodStart: new Date("2026-09-27T00:00:00.000Z"),
+      billingPeriodEnd,
+      billingSubscriptionId: "gid://shopify/AppSubscription/plus",
+      billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/plus-usage",
+      chargedVisitors: 0,
+      usageBalanceUsed: 1.09,
+      usageCappedAmount: 99.99,
+      source: "shopify",
+    });
+
+    expect(prismaMock.monthlyUsage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalVisitors: 2_324,
+          chargedVisitors: 0,
         }),
       }),
     );
