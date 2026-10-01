@@ -32,7 +32,45 @@ vi.mock("../shopify.server", () => ({
 import {
   getUsagePeriodForShop,
   syncUsagePeriodForShop,
+  usagePeriodFromSubscription,
 } from "./billing-period.server";
+
+describe("usagePeriodFromSubscription Shopify balance", () => {
+  it("uses balanceUsed as the authoritative charged amount", () => {
+    const period = usagePeriodFromSubscription({
+      id: "gid://shopify/AppSubscription/current",
+      name: "premium",
+      createdAt: "2026-09-22T00:00:00.000Z",
+      currentPeriodEnd: "2026-10-22T00:00:00.000Z",
+      lineItems: [
+        {
+          id: "gid://shopify/AppSubscriptionLineItem/usage",
+          usageRecords: {
+            nodes: [
+              {
+                createdAt: "2026-10-01T00:00:00.000Z",
+                price: { amount: "1.00", currencyCode: "USD" },
+              },
+            ],
+          },
+          plan: {
+            pricingDetails: {
+              __typename: "AppUsagePricing",
+              balanceUsed: { amount: "86.01", currencyCode: "USD" },
+              cappedAmount: { amount: "99.99", currencyCode: "USD" },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(period).toMatchObject({
+      chargedVisitors: 43_005,
+      usageBalanceUsed: 86.01,
+      usageCappedAmount: 99.99,
+    });
+  });
+});
 
 describe("getUsagePeriodForShop cached usage reconciliation", () => {
   afterEach(() => {

@@ -45,7 +45,15 @@ const CHARGE_STATUS = {
 
 function isCappedAmountError(error: unknown) {
     const errorMsg = String((error as any)?.message || error).toLowerCase();
-    return errorMsg.includes("capped") || errorMsg.includes("exceed");
+    return errorMsg.includes("capped amount") ||
+        errorMsg.includes("balance remaining") ||
+        errorMsg.includes("spending limit");
+}
+
+function remainingMoneyAmount(cappedAmount: number, balanceUsed: number) {
+    const cappedCents = Math.round(cappedAmount * 100);
+    const usedCents = Math.round(balanceUsed * 100);
+    return Math.max(0, (cappedCents - usedCents) / 100);
 }
 
 async function markChargeAttempt(
@@ -155,6 +163,8 @@ export async function chargeOverageUsageRecord({
         billingPeriodEnd: Date | null;
         billingSubscriptionId: string | null;
         billingUsageLineItemId: string | null;
+        usageBalanceUsed?: number | null;
+        usageCappedAmount?: number | null;
     };
     usageLineItemId?: string | null;
     planLimit: number;
@@ -201,11 +211,45 @@ export async function chargeOverageUsageRecord({
     );
     if (overageVisitors <= 0) return { status: "already_charged" as const };
 
-    const chargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
-    const isFinalCapCharge = isFinalMonthlyOverageCapCharge(currentPlan, chargedVisitors, overageVisitors);
+    const requestedChargeAmount = Number((overageVisitors * OVERAGE_RATE).toFixed(2));
+    const usageBalanceUsed = Number(usagePeriod.usageBalanceUsed);
+    const usageCappedAmount = Number(usagePeriod.usageCappedAmount);
+    const hasShopifyUsageBalance =
+        usagePeriod.usageBalanceUsed != null &&
+        usagePeriod.usageCappedAmount != null &&
+        Number.isFinite(usageBalanceUsed) &&
+        Number.isFinite(usageCappedAmount) &&
+        usageBalanceUsed >= 0 &&
+        usageCappedAmount >= 0;
+    const remainingShopifyBalance = hasShopifyUsageBalance
+        ? remainingMoneyAmount(usageCappedAmount, usageBalanceUsed)
+        : null;
 
-    if (chargeAmount < minimumChargeAmount && !isFinalCapCharge) {
-        return { status: "below_threshold" as const, overageVisitors, chargeAmount };
+    if (remainingShopifyBalance !== null && remainingShopifyBalance < 0.01) {
+        console.log(`[Billing] Shop ${shop} reached Shopify's usage spending limit.`);
+        return { status: "cap_reached" as const };
+    }
+
+    const chargeAmount = remainingShopifyBalance === null
+        ? requestedChargeAmount
+        : Math.min(requestedChargeAmount, remainingShopifyBalance);
+    const chargedOverageVisitors = chargeAmount < requestedChargeAmount
+        ? Math.min(overageVisitors, Math.floor((chargeAmount + Number.EPSILON) / OVERAGE_RATE))
+        : overageVisitors;
+
+    if (chargedOverageVisitors <= 0 || chargeAmount <= 0) {
+        return { status: "cap_reached" as const };
+    }
+
+    const isFinalCapCharge = isFinalMonthlyOverageCapCharge(
+        currentPlan,
+        chargedVisitors,
+        chargedOverageVisitors,
+    );
+    const isFinalShopifyCapCharge = remainingShopifyBalance !== null && chargeAmount >= remainingShopifyBalance;
+
+    if (chargeAmount < minimumChargeAmount && !isFinalCapCharge && !isFinalShopifyCapCharge) {
+        return { status: "below_threshold" as const, overageVisitors: chargedOverageVisitors, chargeAmount };
     }
 
     const subscriptionLineItemId = usageLineItemId || usagePeriod.billingUsageLineItemId;
@@ -213,7 +257,7 @@ export async function chargeOverageUsageRecord({
         throw new Error("Missing Shopify usage subscription line item id.");
     }
 
-    const toChargedVisitors = chargedVisitors + overageVisitors;
+    const toChargedVisitors = chargedVisitors + chargedOverageVisitors;
     const idempotencyKey = usageChargeIdempotencyKey(
         shop,
         usagePeriod.key,
@@ -228,10 +272,6 @@ export async function chargeOverageUsageRecord({
 
     if (existingAttempt?.status === CHARGE_STATUS.SUCCEEDED) {
         return { status: "already_charged" as const };
-    }
-
-    if (existingAttempt?.status === CHARGE_STATUS.CAPPED) {
-        return { status: "capped" as const };
     }
 
     if (
@@ -261,7 +301,7 @@ export async function chargeOverageUsageRecord({
                 billingUsageLineItemId: subscriptionLineItemId,
                 fromChargedVisitors: chargedVisitors,
                 toChargedVisitors,
-                overageVisitors,
+                overageVisitors: chargedOverageVisitors,
                 amount: chargeAmount,
                 idempotencyKey,
                 manualAdjustmentKey: manualAdjustmentKey || null,
@@ -286,7 +326,7 @@ export async function chargeOverageUsageRecord({
             }
         `, {
             variables: {
-                description: `Overage: ${overageVisitors} visitors beyond ${planLimit} limit`,
+                description: `Overage: ${chargedOverageVisitors} visitors beyond ${planLimit} limit`,
                 price: {
                     amount: chargeAmount.toFixed(2),
                     currencyCode: "USD",
@@ -370,7 +410,7 @@ export async function chargeOverageUsageRecord({
                 error: `DB update failed after ${MAX_DB_RETRIES} retries`,
             });
             console.error(`[Cron Billing] CRITICAL: Shopify charged $${chargeAmount.toFixed(2)} for ${shop} but DB update failed after ${MAX_DB_RETRIES} retries. Attempt: ${idempotencyKey}`);
-            return { status: "db_update_failed" as const, overageVisitors, chargeAmount };
+            return { status: "db_update_failed" as const, overageVisitors: chargedOverageVisitors, chargeAmount };
         }
 
         await markChargeAttempt(idempotencyKey, {
@@ -382,8 +422,8 @@ export async function chargeOverageUsageRecord({
         if (supersededByManualOverride) {
             console.log(`[Cron Billing] Preserved a newer manual charged visitor override for ${shop} after Shopify accepted usage record ${usageRecordId}.`);
         }
-        console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${overageVisitors} overage visitors`);
-        return { status: "charged" as const, overageVisitors, chargeAmount };
+        console.log(`[Cron Billing] Auto-Charged ${shop} $${chargeAmount.toFixed(2)} for ${chargedOverageVisitors} overage visitors`);
+        return { status: "charged" as const, overageVisitors: chargedOverageVisitors, chargeAmount };
     } catch (error: any) {
         const status = isCappedAmountError(error) ? CHARGE_STATUS.CAPPED : CHARGE_STATUS.FAILED;
         await markChargeAttempt(idempotencyKey, {
@@ -393,7 +433,7 @@ export async function chargeOverageUsageRecord({
 
         if (status === CHARGE_STATUS.CAPPED) {
             console.log(`[Cron Billing] Shop ${shop} hit their spending limit. Attempt marked capped.`);
-            return { status: "capped" as const, overageVisitors, chargeAmount };
+            return { status: "capped" as const, overageVisitors: chargedOverageVisitors, chargeAmount };
         }
 
         throw error;
@@ -675,6 +715,16 @@ export async function checkAndChargeOverageBackground(shop: string) {
                             plan {
                                 pricingDetails {
                                     __typename
+                                    ... on AppUsagePricing {
+                                        balanceUsed {
+                                            amount
+                                            currencyCode
+                                        }
+                                        cappedAmount {
+                                            amount
+                                            currencyCode
+                                        }
+                                    }
                                 }
                             }
                         }

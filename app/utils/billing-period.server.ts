@@ -14,6 +14,8 @@ export interface UsagePeriod {
   billingSubscriptionId: string | null;
   billingUsageLineItemId: string | null;
   chargedVisitors: number;
+  usageBalanceUsed?: number | null;
+  usageCappedAmount?: number | null;
   source: UsagePeriodSource;
 }
 
@@ -257,6 +259,12 @@ function getUsageRecordChargedVisitors(usageLineItem: any, periodStart: Date | n
   return Math.max(0, Math.round(chargedAmount / OVERAGE_RATE));
 }
 
+function getUsagePricingAmount(usageLineItem: any, field: "balanceUsed" | "cappedAmount") {
+  const rawAmount = usageLineItem?.plan?.pricingDetails?.[field]?.amount;
+  const amount = Number(rawAmount);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
 function truncateToDay(date: Date): string {
   return date.toISOString().slice(0, 10); // e.g. "2026-06-15"
 }
@@ -276,6 +284,11 @@ export function usagePeriodFromSubscription(
   if (Number.isNaN(billingPeriodEnd.getTime())) return null;
   const key = `shopify:${subscription.id}:${usageLineItem.id}:${truncateToDay(billingPeriodEnd)}`;
   const billingPeriodStart = inferBillingPeriodStart(subscription, key, billingPeriodEnd, settings);
+  const usageBalanceUsed = getUsagePricingAmount(usageLineItem, "balanceUsed");
+  const usageCappedAmount = getUsagePricingAmount(usageLineItem, "cappedAmount");
+  const balanceChargedVisitors = usageBalanceUsed === null
+    ? 0
+    : Math.round(usageBalanceUsed / OVERAGE_RATE);
 
   return {
     key,
@@ -284,7 +297,13 @@ export function usagePeriodFromSubscription(
     billingPeriodEnd,
     billingSubscriptionId: subscription.id,
     billingUsageLineItemId: usageLineItem.id,
-    chargedVisitors: getUsageRecordChargedVisitors(usageLineItem, billingPeriodStart, billingPeriodEnd),
+    // balanceUsed is authoritative and is not limited by usageRecords pagination.
+    chargedVisitors: Math.max(
+      balanceChargedVisitors,
+      getUsageRecordChargedVisitors(usageLineItem, billingPeriodStart, billingPeriodEnd),
+    ),
+    usageBalanceUsed,
+    usageCappedAmount,
     source: "shopify",
   };
 }
@@ -462,6 +481,16 @@ export async function fetchShopifyUsagePeriod(
             plan {
               pricingDetails {
                 __typename
+                ... on AppUsagePricing {
+                  balanceUsed {
+                    amount
+                    currencyCode
+                  }
+                  cappedAmount {
+                    amount
+                    currencyCode
+                  }
+                }
               }
             }
           }

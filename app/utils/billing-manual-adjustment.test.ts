@@ -207,4 +207,149 @@ describe("manual billing adjustments", () => {
       },
     });
   });
+
+  it("charges only the remaining Shopify balance", async () => {
+    const admin = {
+      graphql: vi.fn().mockResolvedValue({
+        json: async () => ({
+          data: {
+            appUsageRecordCreate: {
+              appUsageRecord: {
+                id: "gid://shopify/AppUsageRecord/final-balance",
+              },
+              userErrors: [],
+            },
+          },
+        }),
+      }),
+    };
+
+    const result = await chargeOverageUsageRecord({
+      admin,
+      chargedVisitors: 43_005,
+      currentPlan: "premium",
+      currentUsage: 50_036,
+      planLimit: 1_000,
+      shop: "capped-balance.myshopify.com",
+      usageLineItemId: "gid://shopify/AppSubscriptionLineItem/usage",
+      usagePeriod: {
+        key: "shopify:period",
+        yearMonth: "2026-10",
+        billingPeriodStart: new Date("2026-09-22T00:00:00.000Z"),
+        billingPeriodEnd: new Date("2026-10-22T00:00:00.000Z"),
+        billingSubscriptionId: "gid://shopify/AppSubscription/current",
+        billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/usage",
+        usageBalanceUsed: 90,
+        usageCappedAmount: 99.99,
+      },
+    });
+
+    expect(result).toEqual({
+      status: "charged",
+      overageVisitors: 4_995,
+      chargeAmount: 9.99,
+    });
+    expect(admin.graphql).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          description: "Overage: 4995 visitors beyond 1000 limit",
+          price: {
+            amount: "9.99",
+            currencyCode: "USD",
+          },
+        }),
+      }),
+    );
+    expect(prismaMock.monthlyUsage.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          chargedVisitors: 48_000,
+        }),
+      }),
+    );
+  });
+
+  it("stops without creating a charge when Shopify has no balance remaining", async () => {
+    const admin = { graphql: vi.fn() };
+
+    const result = await chargeOverageUsageRecord({
+      admin,
+      chargedVisitors: 43_005,
+      currentPlan: "premium",
+      currentUsage: 50_036,
+      planLimit: 1_000,
+      shop: "capped-balance.myshopify.com",
+      usageLineItemId: "gid://shopify/AppSubscriptionLineItem/usage",
+      usagePeriod: {
+        key: "shopify:period",
+        yearMonth: "2026-10",
+        billingPeriodStart: new Date("2026-09-22T00:00:00.000Z"),
+        billingPeriodEnd: new Date("2026-10-22T00:00:00.000Z"),
+        billingSubscriptionId: "gid://shopify/AppSubscription/current",
+        billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/usage",
+        usageBalanceUsed: 99.99,
+        usageCappedAmount: 99.99,
+      },
+    });
+
+    expect(result).toEqual({ status: "cap_reached" });
+    expect(admin.graphql).not.toHaveBeenCalled();
+    expect(prismaMock.usageChargeAttempt.create).not.toHaveBeenCalled();
+  });
+
+  it("retries a previously capped attempt after recalculating Shopify balance", async () => {
+    const admin = {
+      graphql: vi.fn().mockResolvedValue({
+        json: async () => ({
+          data: {
+            appUsageRecordCreate: {
+              appUsageRecord: {
+                id: "gid://shopify/AppUsageRecord/retried-cap",
+              },
+              userErrors: [],
+            },
+          },
+        }),
+      }),
+    };
+    prismaMock.usageChargeAttempt.findUnique.mockResolvedValue({
+      status: "capped",
+    });
+
+    const result = await chargeOverageUsageRecord({
+      admin,
+      chargedVisitors: 43_005,
+      currentPlan: "premium",
+      currentUsage: 50_036,
+      planLimit: 1_000,
+      shop: "retry-capped.myshopify.com",
+      usageLineItemId: "gid://shopify/AppSubscriptionLineItem/usage",
+      usagePeriod: {
+        key: "shopify:period",
+        yearMonth: "2026-10",
+        billingPeriodStart: new Date("2026-09-22T00:00:00.000Z"),
+        billingPeriodEnd: new Date("2026-10-22T00:00:00.000Z"),
+        billingSubscriptionId: "gid://shopify/AppSubscription/current",
+        billingUsageLineItemId: "gid://shopify/AppSubscriptionLineItem/usage",
+        usageBalanceUsed: 86.01,
+        usageCappedAmount: 99.99,
+      },
+    });
+
+    expect(result).toEqual({
+      status: "charged",
+      overageVisitors: 6_031,
+      chargeAmount: 12.06,
+    });
+    expect(prismaMock.usageChargeAttempt.update).toHaveBeenCalledWith({
+      where: { idempotencyKey: expect.any(String) },
+      data: expect.objectContaining({
+        status: "pending",
+        amount: 12.06,
+        error: null,
+      }),
+    });
+    expect(admin.graphql).toHaveBeenCalledTimes(1);
+  });
 });

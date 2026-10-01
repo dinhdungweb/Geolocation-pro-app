@@ -159,11 +159,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const overchargedAmount = needsLegacyReview ? 0 : Number((overcharged * OVERAGE_RATE).toFixed(2));
     const chargeReviewAmount = needsLegacyReview ? Number((overcharged * OVERAGE_RATE).toFixed(2)) : 0;
 
-    let status: "ok" | "pending" | "waiting" | "overcharged" | "charge_review" | "free_exceeded" =
+    let status: "ok" | "cap_reached" | "pending" | "waiting" | "overcharged" | "charge_review" | "free_exceeded" =
       "ok";
     if (needsLegacyReview) status = "charge_review";
     else if (overcharged > 0) status = "overcharged";
     else if (plan === FREE_PLAN && totalVisitors > limit) status = "free_exceeded";
+    else if (monthlyUnlimitedReward) status = "cap_reached";
     else if (uncharged > 0 && unchargedAmount >= 1.0) status = "pending";
     else if (uncharged > 0 && unchargedAmount < 1.0) status = "waiting";
 
@@ -199,7 +200,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       pending: 2,
       free_exceeded: 3,
       waiting: 4,
-      ok: 5,
+      cap_reached: 5,
+      ok: 6,
     };
     const diff = (priority[a.status] ?? 5) - (priority[b.status] ?? 5);
     if (diff !== 0) return diff;
@@ -238,6 +240,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 const statusLabel: Record<string, string> = {
   ok: "OK",
+  cap_reached: "Cap Reached",
   waiting: "Waiting (< $1)",
   pending: "Pending Charge",
   overcharged: "Overcharged",
@@ -452,6 +455,7 @@ export default function AdminBilling() {
             <option value="ok">OK</option>
             <option value="waiting">Waiting (&lt; $1)</option>
             <option value="pending">Pending Charge</option>
+            <option value="cap_reached">Cap Reached</option>
             <option value="overcharged">Overcharged</option>
             <option value="charge_review">Review Legacy</option>
             <option value="free_exceeded">Free Exceeded</option>
@@ -959,7 +963,8 @@ export default function AdminBilling() {
           white-space: nowrap;
         }
 
-        .ed-status.ok {
+        .ed-status.ok,
+        .ed-status.cap_reached {
           border-color: #d9e9cd;
           background: #f2f8ee;
           color: #10b981;
