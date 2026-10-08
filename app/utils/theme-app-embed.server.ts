@@ -1,7 +1,11 @@
 import { apiVersion } from "../shopify.server";
+import { createExpiringAsyncCache } from "./expiring-async-cache.server";
 
 const APP_EMBED_BLOCK_HANDLE = "geolocation-popup";
-const THEME_STATUS_TIMEOUT_MS = 8_000;
+const THEME_STATUS_TIMEOUT_MS = 3_000;
+const THEME_STATUS_ENABLED_TTL_MS = 60_000;
+const THEME_STATUS_DISABLED_TTL_MS = 15_000;
+const THEME_STATUS_UNAVAILABLE_TTL_MS = 5_000;
 
 export type AppEmbedStatusState = "enabled" | "disabled" | "missing_scope" | "unavailable";
 
@@ -10,6 +14,17 @@ export interface AppEmbedStatus {
   label: string;
   helpText: string;
   themeName: string | null;
+}
+
+const themeAppEmbedStatusCache = createExpiringAsyncCache<AppEmbedStatus>();
+
+function getThemeStatusTtl(status: AppEmbedStatus) {
+  if (status.state === "enabled" || status.state === "missing_scope") {
+    return THEME_STATUS_ENABLED_TTL_MS;
+  }
+
+  if (status.state === "disabled") return THEME_STATUS_DISABLED_TTL_MS;
+  return THEME_STATUS_UNAVAILABLE_TTL_MS;
 }
 
 export function getThemeEditorUrl(shop: string) {
@@ -150,9 +165,13 @@ export function getThemeAppEmbedStatus(args: {
   accessToken: string;
   scopeString: string | null | undefined;
 }) {
-  return loadThemeAppEmbedStatus(args);
+  return themeAppEmbedStatusCache.get(
+    args.shop,
+    () => loadThemeAppEmbedStatus(args),
+    getThemeStatusTtl,
+  );
 }
 
-export function invalidateThemeAppEmbedStatusCache(_shop?: string) {
-  // Theme status is read live, so there is no process cache to invalidate.
+export function invalidateThemeAppEmbedStatusCache(shop?: string) {
+  themeAppEmbedStatusCache.invalidate(shop);
 }

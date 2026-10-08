@@ -52,7 +52,7 @@ export default function TrafficLineChart({
         }}
         tooltipOptions={{
           valueFormatter: (value) =>
-            typeof value === "number" ? value.toLocaleString() : String(value),
+            typeof value === "number" ? value.toLocaleString("en-US") : String(value),
         }}
       />
     </PolarisVizProvider>

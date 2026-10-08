@@ -357,7 +357,7 @@ function Metric({ icon, tone, label, value, detail }: MetricProps) {
             {label}
           </Text>
           <Text as="strong" variant="headingXl">
-            {typeof value === "number" ? value.toLocaleString() : value}
+            {typeof value === "number" ? value.toLocaleString("en-US") : value}
           </Text>
           <Text as="span" variant="bodySm" tone="subdued">
             {detail}
@@ -1242,7 +1242,7 @@ export default function AnalyticsPage() {
                     i
                   </span>
                 </div>
-                <Badge>{`${totalActions.toLocaleString()} actions`}</Badge>
+                <Badge>{`${totalActions.toLocaleString("en-US")} actions`}</Badge>
               </header>
               <div className="analytics-v2-chart analytics-v2-chart--donut">
                 {actionBreakdown.length > 0 ? (
@@ -1305,10 +1305,10 @@ export default function AnalyticsPage() {
                             </div>
                           </td>
                           <td className="is-number">
-                            {item.visitors.toLocaleString()}
+                            {item.visitors.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
-                            {item.redirected.toLocaleString()}
+                            {item.redirected.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
                             {item.visitors > 0
@@ -1357,7 +1357,7 @@ export default function AnalyticsPage() {
                             <RuleTypeBadge ruleType={item.type} label={item.type} />
                           </td>
                           <td className="is-number">
-                            {item.triggers.toLocaleString()}
+                            {item.triggers.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
                             {`${item.rate.toFixed(1)}%`}
@@ -1395,7 +1395,7 @@ export default function AnalyticsPage() {
                     </Text>
                     <Text as="span" variant="bodySm" tone="subdued">
                       {busiestCountry
-                        ? `${busiestCountry.country} generated ${busiestCountry.visitors.toLocaleString()} visits.`
+                        ? `${busiestCountry.country} generated ${busiestCountry.visitors.toLocaleString("en-US")} visits.`
                         : "No country traffic recorded yet."}
                     </Text>
                   </div>
@@ -1410,7 +1410,7 @@ export default function AnalyticsPage() {
                     </Text>
                     <Text as="span" variant="bodySm" tone="subdued">
                       {topRule
-                        ? `${topRule.rule} recorded ${topRule.actions.toLocaleString()} actions.`
+                        ? `${topRule.rule} recorded ${topRule.actions.toLocaleString("en-US")} actions.`
                         : "No rule activity recorded yet."}
                     </Text>
                   </div>
@@ -1469,7 +1469,7 @@ export default function AnalyticsPage() {
                     <span
                       className="analytics-v2-heat-cell"
                       key={hour}
-                      title={`${value.toLocaleString()} actions`}
+                      title={`${value.toLocaleString("en-US")} actions`}
                       style={
                         {
                           "--heat": `${
@@ -1534,16 +1534,16 @@ export default function AnalyticsPage() {
                           />
                         </td>
                         <td className="is-number">
-                          {item.visitors.toLocaleString()}
+                          {item.visitors.toLocaleString("en-US")}
                         </td>
                         <td className="is-number">
-                          {item.popup.toLocaleString()}
+                          {item.popup.toLocaleString("en-US")}
                         </td>
                         <td className="is-number">
-                          {item.redirected.toLocaleString()}
+                          {item.redirected.toLocaleString("en-US")}
                         </td>
                         <td className="is-number">
-                          {item.blocked.toLocaleString()}
+                          {item.blocked.toLocaleString("en-US")}
                         </td>
                       </tr>
                     ))
@@ -1575,7 +1575,7 @@ export default function AnalyticsPage() {
                 >
                   {filteredBlockedCountries
                     .reduce((sum, item) => sum + item.blocked, 0)
-                    .toLocaleString()}
+                    .toLocaleString("en-US")}
                 </Badge>
               </header>
               <div className="analytics-v2-table-wrap is-full">
@@ -1597,7 +1597,7 @@ export default function AnalyticsPage() {
                             />
                           </td>
                           <td className="is-number">
-                            {item.blocked.toLocaleString()}
+                            {item.blocked.toLocaleString("en-US")}
                           </td>
                         </tr>
                       ))
@@ -1621,7 +1621,7 @@ export default function AnalyticsPage() {
                   </Text>
                 </div>
                 <Badge tone={totalInstantRedirects > 0 ? "success" : undefined}>
-                  {totalInstantRedirects.toLocaleString()}
+                  {totalInstantRedirects.toLocaleString("en-US")}
                 </Badge>
               </header>
               <div className="analytics-v2-table-wrap is-full">
@@ -1638,7 +1638,7 @@ export default function AnalyticsPage() {
                         <tr key={item.id}>
                           <td>{item.rule}</td>
                           <td className="is-number">
-                            {item.redirected.toLocaleString()}
+                            {item.redirected.toLocaleString("en-US")}
                           </td>
                         </tr>
                       ))
@@ -1668,7 +1668,7 @@ export default function AnalyticsPage() {
                 </span>
               </div>
               <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>
-                {`${totalPopupSeen.toLocaleString()} shown`}
+                {`${totalPopupSeen.toLocaleString("en-US")} shown`}
               </Badge>
             </header>
             <div className="analytics-v2-table-wrap is-full">
@@ -1695,16 +1695,16 @@ export default function AnalyticsPage() {
                         <tr key={item.id}>
                           <td>{item.rule}</td>
                           <td className="is-number">
-                            {item.seen.toLocaleString()}
+                            {item.seen.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
-                            {item.clickedYes.toLocaleString()}
+                            {item.clickedYes.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
-                            {item.clickedNo.toLocaleString()}
+                            {item.clickedNo.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
-                            {item.dismissed.toLocaleString()}
+                            {item.dismissed.toLocaleString("en-US")}
                           </td>
                           <td className="is-number">
                             {item.seen > 0 ? `${rate.toFixed(1)}%` : "—"}
@@ -2032,7 +2032,7 @@ function LegacyAnalyticsPage() {
             tone="green"
             label="Visitors tracked"
             value={totals.visitors}
-            detail={`Across ${countries.length.toLocaleString()} countries`}
+            detail={`Across ${countries.length.toLocaleString("en-US")} countries`}
           />
           <Metric
             icon={ChatIcon}
@@ -2046,7 +2046,7 @@ function LegacyAnalyticsPage() {
             tone="purple"
             label="Redirects"
             value={totals.redirected}
-            detail={`${totalInstantRedirects.toLocaleString()} automatic`}
+            detail={`${totalInstantRedirects.toLocaleString("en-US")} automatic`}
           />
           <Metric
             icon={ShieldCheckMarkIcon}
@@ -2094,22 +2094,22 @@ function LegacyAnalyticsPage() {
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.visitors.toLocaleString()}
+                              {item.visitors.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.popup.toLocaleString()}
+                              {item.popup.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.redirected.toLocaleString()}
+                              {item.redirected.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.blocked.toLocaleString()}
+                              {item.blocked.toLocaleString("en-US")}
                             </span>
                           </td>
                         </tr>
@@ -2138,7 +2138,7 @@ function LegacyAnalyticsPage() {
                     </Text>
                   </div>
                   <Badge tone={totals.blocked > 0 ? "attention" : undefined}>
-                    {totals.blocked.toLocaleString()}
+                    {totals.blocked.toLocaleString("en-US")}
                   </Badge>
                 </header>
                 <div className="analytics-table-wrap is-side">
@@ -2161,7 +2161,7 @@ function LegacyAnalyticsPage() {
                             </td>
                             <td className="is-numeric">
                               <span className="analytics-count">
-                                {item.blocked.toLocaleString()}
+                                {item.blocked.toLocaleString("en-US")}
                               </span>
                             </td>
                           </tr>
@@ -2191,7 +2191,7 @@ function LegacyAnalyticsPage() {
                   <Badge
                     tone={totalInstantRedirects > 0 ? "success" : undefined}
                   >
-                    {totalInstantRedirects.toLocaleString()}
+                    {totalInstantRedirects.toLocaleString("en-US")}
                   </Badge>
                 </header>
                 <div className="analytics-table-wrap is-side">
@@ -2209,7 +2209,7 @@ function LegacyAnalyticsPage() {
                             <td>{item.rule}</td>
                             <td className="is-numeric">
                               <span className="analytics-count">
-                                {item.redirected.toLocaleString()}
+                                {item.redirected.toLocaleString("en-US")}
                               </span>
                             </td>
                           </tr>
@@ -2239,7 +2239,7 @@ function LegacyAnalyticsPage() {
                 </Text>
               </div>
               <Badge tone={totalPopupSeen > 0 ? "info" : undefined}>
-                {`${totalPopupSeen.toLocaleString()} seen`}
+                {`${totalPopupSeen.toLocaleString("en-US")} seen`}
               </Badge>
             </header>
             <div className="analytics-table-wrap is-main">
@@ -2267,22 +2267,22 @@ function LegacyAnalyticsPage() {
                           <td>{item.rule}</td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.seen.toLocaleString()}
+                              {item.seen.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.clickedYes.toLocaleString()}
+                              {item.clickedYes.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.clickedNo.toLocaleString()}
+                              {item.clickedNo.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">
                             <span className="analytics-count">
-                              {item.dismissed.toLocaleString()}
+                              {item.dismissed.toLocaleString("en-US")}
                             </span>
                           </td>
                           <td className="is-numeric">

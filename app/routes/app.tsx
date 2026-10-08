@@ -1,6 +1,14 @@
 import { useEffect, useRef } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Link, Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
+import {
+  isRouteErrorResponse,
+  Link,
+  Outlet,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+  useRouteError,
+} from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
@@ -9,7 +17,6 @@ import { EmbeddedAppProviders } from "../components/embedded-app-providers";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
-import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -17,13 +24,11 @@ const CRISP_BOOT_DELAY_MS = 1500;
 const CRISP_IDLE_TIMEOUT_MS = 1500;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
-  const shopTimeZone = await ensureShopTimeZone({ admin, shop: session.shop });
+  const { session } = await authenticate.admin(request);
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     shop: session.shop,
-    shopTimeZone,
   };
 };
 
@@ -1112,7 +1117,63 @@ export default function App() {
 
 // Shopify needs React Router to catch thrown responses so their headers are included.
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+
+  if (isRouteErrorResponse(error)) {
+    return boundary.error(error);
+  }
+
+  return (
+    <main
+      style={{
+        alignItems: "center",
+        background: "#f6f6f7",
+        boxSizing: "border-box",
+        display: "flex",
+        justifyContent: "center",
+        minHeight: "100vh",
+        padding: 24,
+      }}
+    >
+      <section
+        role="alert"
+        style={{
+          background: "#ffffff",
+          border: "1px solid #dedede",
+          borderRadius: 12,
+          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.08)",
+          maxWidth: 520,
+          padding: 32,
+          textAlign: "center",
+          width: "100%",
+        }}
+      >
+        <h1 style={{ color: "#202223", fontSize: 24, margin: "0 0 12px" }}>
+          We couldn&apos;t load this page
+        </h1>
+        <p style={{ color: "#616161", lineHeight: 1.5, margin: "0 0 24px" }}>
+          A temporary app error interrupted this request. Reload the page to try
+          again.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{
+            background: "#303030",
+            border: 0,
+            borderRadius: 8,
+            color: "#ffffff",
+            cursor: "pointer",
+            fontSize: 14,
+            fontWeight: 600,
+            padding: "10px 16px",
+          }}
+        >
+          Reload app
+        </button>
+      </section>
+    </main>
+  );
 }
 
 export const headers: HeadersFunction = (headersArgs) => {

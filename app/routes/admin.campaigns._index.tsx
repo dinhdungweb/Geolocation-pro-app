@@ -69,11 +69,11 @@ export default function AdminCampaigns() {
         </article>
         <article>
           <span>Total Reach</span>
-          <strong>{totalReach.toLocaleString()}</strong>
+          <strong>{totalReach.toLocaleString("en-US")}</strong>
         </article>
         <article>
           <span>Auto Redirects</span>
-          <strong>{totalAuto.toLocaleString()}</strong>
+          <strong>{totalAuto.toLocaleString("en-US")}</strong>
         </article>
       </div>
 
@@ -108,8 +108,8 @@ export default function AdminCampaigns() {
                         <strong>{campaign.name}</strong>
                         <small>{campaign.auto > 0 ? "Auto Redirect" : "Popup Campaign"}</small>
                       </td>
-                      <td>{campaign.seen.toLocaleString()}</td>
-                      <td>{campaign.conversions.toLocaleString()}</td>
+                      <td>{campaign.seen.toLocaleString("en-US")}</td>
+                      <td>{campaign.conversions.toLocaleString("en-US")}</td>
                       <td>
                         <div className="ed-cr-cell">
                           <strong>{campaign.cr}%</strong>
@@ -157,9 +157,9 @@ export default function AdminCampaigns() {
                           <strong>{market.code}</strong>
                         </div>
                       </td>
-                      <td>{market.visitors.toLocaleString()}</td>
+                      <td>{market.visitors.toLocaleString("en-US")}</td>
                       <td>
-                        <strong>{market.engaged.toLocaleString()}</strong>
+                        <strong>{market.engaged.toLocaleString("en-US")}</strong>
                         <small>actions</small>
                       </td>
                     </tr>

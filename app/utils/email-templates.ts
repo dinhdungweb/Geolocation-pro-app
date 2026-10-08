@@ -28,7 +28,7 @@ export const getWelcomeEmailHtml = (shop: string) => `
 type VisitorCountValue = number | string;
 
 function formatVisitorCount(value: VisitorCountValue) {
-    return typeof value === "number" ? value.toLocaleString() : value;
+    return typeof value === "number" ? value.toLocaleString("en-US") : value;
 }
 
 export const getLimit80EmailHtml = (shop: string, usage: VisitorCountValue, limit: VisitorCountValue) => `

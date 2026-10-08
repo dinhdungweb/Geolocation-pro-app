@@ -57,11 +57,11 @@ export default function CampaignsList() {
       <div className="ed-campaign-stats">
         <article>
           <span>Total campaigns</span>
-          <strong>{campaigns.length.toLocaleString()}</strong>
+          <strong>{campaigns.length.toLocaleString("en-US")}</strong>
         </article>
         <article>
           <span>Total sent</span>
-          <strong>{totalSent.toLocaleString()}</strong>
+          <strong>{totalSent.toLocaleString("en-US")}</strong>
         </article>
         <article>
           <span>Deliverability</span>
@@ -127,8 +127,8 @@ export default function CampaignsList() {
                   {campaign.status.toUpperCase()}
                 </mark>
               </span>
-              <span>{campaign.sentCount.toLocaleString()} shops</span>
-              <span>{new Date(campaign.createdAt).toLocaleDateString()}</span>
+              <span>{campaign.sentCount.toLocaleString("en-US")} shops</span>
+              <span>{new Date(campaign.createdAt).toLocaleDateString("en-US")}</span>
               <span className="ed-row-action">
                 <BarChart3 size={18} />
               </span>

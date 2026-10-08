@@ -244,7 +244,7 @@ export default function WorldTrafficMap({
             }}
             tooltipTextFunction={({ countryName, countryValue }) =>
               typeof countryValue === "number"
-                ? `${countryName}: ${countryValue.toLocaleString()} actions — click to view logs`
+                ? `${countryName}: ${countryValue.toLocaleString("en-US")} actions — click to view logs`
                 : `${countryName}: no actions`
             }
           />
@@ -294,7 +294,7 @@ export default function WorldTrafficMap({
           <span className="geo-map-selection-copy">
             <strong>{selectedCountry.country}</strong>
             <span>
-              {selectedCountry.actions.toLocaleString()} actions ·{" "}
+              {selectedCountry.actions.toLocaleString("en-US")} actions ·{" "}
               {selectedCountry.share}%
             </span>
           </span>

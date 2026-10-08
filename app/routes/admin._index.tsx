@@ -215,19 +215,19 @@ export default function AdminDashboard() {
   const cards = [
     {
       label: "Total Installations",
-      value: stats.totalShops.toLocaleString(),
+      value: stats.totalShops.toLocaleString("en-US"),
       note: "All active merchant records",
       icon: <Store size={18} />,
     },
     {
       label: "Global Traffic",
-      value: stats.totalVisitors.toLocaleString(),
+      value: stats.totalVisitors.toLocaleString("en-US"),
       note: "Aggregated visitor events",
       icon: <TrendingUp size={18} />,
     },
     {
       label: "Active Rules",
-      value: stats.activeRules.toLocaleString(),
+      value: stats.activeRules.toLocaleString("en-US"),
       note: "Redirect and block rules",
       icon: <Store size={18} />,
     },
@@ -272,7 +272,7 @@ export default function AdminDashboard() {
                   <div
                     className="ed-trend-bar"
                     style={{ height: `${(percentage / 100) * 180}px` }}
-                    title={`${trend.yearMonth}: ${visitors.toLocaleString()} visitors`}
+                    title={`${trend.yearMonth}: ${visitors.toLocaleString("en-US")} visitors`}
                   />
                   <small>{trend.yearMonth.split("-")[1]}</small>
                 </div>

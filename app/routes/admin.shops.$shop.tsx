@@ -705,7 +705,7 @@ export default function AdminShopDetail() {
     };
 
     const getUsagePeriodOptionLabel = (usage: any) =>
-        `${getUsagePeriodTitle(usage)} - ${usage.totalVisitors.toLocaleString()} views - charged ${usage.chargedVisitors.toLocaleString()}`;
+        `${getUsagePeriodTitle(usage)} - ${usage.totalVisitors.toLocaleString("en-US")} views - charged ${usage.chargedVisitors.toLocaleString("en-US")}`;
 
     const modeColor = (mode: string) => {
         if (mode === "popup") return "#43b9b2";
@@ -768,7 +768,7 @@ export default function AdminShopDetail() {
         if (settings.customPlanNoOverage || !settings.customPlanVisitorLimit) {
             return "Unlimited usage, no overage";
         }
-        return `${settings.customPlanVisitorLimit.toLocaleString()} visitors, overage enabled`;
+        return `${settings.customPlanVisitorLimit.toLocaleString("en-US")} visitors, overage enabled`;
     };
 
     return (
@@ -1501,7 +1501,7 @@ export default function AdminShopDetail() {
                     </div>
                     <div className="stat-info">
                         <div className="label">Period Views</div>
-                        <div className="value">{stats.totalVisitors.toLocaleString()}</div>
+                        <div className="value">{stats.totalVisitors.toLocaleString("en-US")}</div>
                     </div>
                 </div>
                 <div className="ed-shop-stat-card">
@@ -1510,7 +1510,7 @@ export default function AdminShopDetail() {
                     </div>
                     <div className="stat-info">
                         <div className="label">Period Redirects</div>
-                        <div className="value">{stats.totalRedirected.toLocaleString()}</div>
+                        <div className="value">{stats.totalRedirected.toLocaleString("en-US")}</div>
                     </div>
                 </div>
                 <div className="ed-shop-stat-card">
@@ -1519,7 +1519,7 @@ export default function AdminShopDetail() {
                     </div>
                     <div className="stat-info">
                         <div className="label">Period Blocked</div>
-                        <div className="value">{stats.totalBlocked.toLocaleString()}</div>
+                        <div className="value">{stats.totalBlocked.toLocaleString("en-US")}</div>
                     </div>
                 </div>
                 <div className="ed-shop-stat-card">
@@ -1682,9 +1682,9 @@ export default function AdminShopDetail() {
                                                 </div>
                                             </div>
                                             <div className="month-stats">
-                                                <span><b>{u.totalVisitors.toLocaleString()}</b> views</span>
+                                                <span><b>{u.totalVisitors.toLocaleString("en-US")}</b> views</span>
                                                 <span><b>{u.redirected}</b> redirs</span>
-                                                <span>(Charged: <b>{u.chargedVisitors.toLocaleString()}</b>)</span>
+                                                <span>(Charged: <b>{u.chargedVisitors.toLocaleString("en-US")}</b>)</span>
                                             </div>
                                         </div>
                                     );
@@ -1733,7 +1733,7 @@ export default function AdminShopDetail() {
                                                         : attempt.billingPeriodKey}
                                                 </strong>
                                             </td>
-                                            <td><strong>+{attempt.overageVisitors.toLocaleString()}</strong></td>
+                                            <td><strong>+{attempt.overageVisitors.toLocaleString("en-US")}</strong></td>
                                             <td><strong>${Number(attempt.amount).toFixed(2)}</strong></td>
                                             <td>
                                                 {attempt.shopifyUsageRecordId ? (

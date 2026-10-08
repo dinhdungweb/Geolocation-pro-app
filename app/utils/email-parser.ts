@@ -20,13 +20,13 @@ export function replaceEmailVariables(
     };
 
     if (typeof data.usage === "number") {
-        replacements['{usage}'] = data.usage.toLocaleString();
-        replacements['{current_usage}'] = data.usage.toLocaleString();
+        replacements['{usage}'] = data.usage.toLocaleString("en-US");
+        replacements['{current_usage}'] = data.usage.toLocaleString("en-US");
     }
 
     if (typeof data.limit === "number") {
-        replacements['{limit}'] = data.limit.toLocaleString();
-        replacements['{plan_limit}'] = data.limit.toLocaleString();
+        replacements['{limit}'] = data.limit.toLocaleString("en-US");
+        replacements['{plan_limit}'] = data.limit.toLocaleString("en-US");
     }
 
     let result = content;

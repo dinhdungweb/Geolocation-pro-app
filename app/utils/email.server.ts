@@ -328,7 +328,7 @@ function replaceLegacyUsageTemplateValues(
 
     let result = html;
     if (typeof variables.usage === "number") {
-        const usage = variables.usage.toLocaleString();
+        const usage = variables.usage.toLocaleString("en-US");
         result = result.replace(
             /(Current Usage:\s*(?:<\/?[^>]+>)*\s*)(?:8,000|10,000|1,000|25,000)(?=(?:<\/?[^>]+>)*\s*visitors)/gi,
             `$1${usage}`,
@@ -336,7 +336,7 @@ function replaceLegacyUsageTemplateValues(
     }
 
     if (typeof variables.limit === "number") {
-        const limit = variables.limit.toLocaleString();
+        const limit = variables.limit.toLocaleString("en-US");
         result = result.replace(
             /((?:Plan Limit|Free Plan Limit):\s*(?:<\/?[^>]+>)*\s*)(?:10,000|1,000)(?=(?:<\/?[^>]+>)*\s*visitors)/gi,
             `$1${limit}`,

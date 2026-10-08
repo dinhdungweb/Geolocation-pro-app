@@ -75,7 +75,7 @@ export function AnalyticsTrendChart({
         yAxisOptions={{ integersOnly: true }}
         tooltipOptions={{
           valueFormatter: (value) =>
-            typeof value === "number" ? value.toLocaleString() : String(value),
+            typeof value === "number" ? value.toLocaleString("en-US") : String(value),
         }}
       />
     </PolarisVizProvider>
@@ -104,7 +104,7 @@ export function AnalyticsBreakdownChart({
         maxSeries={5}
         tooltipOptions={{
           valueFormatter: (value) =>
-            typeof value === "number" ? value.toLocaleString() : String(value),
+            typeof value === "number" ? value.toLocaleString("en-US") : String(value),
         }}
       />
     </PolarisVizProvider>

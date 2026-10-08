@@ -92,7 +92,7 @@ export default function AutomationsList() {
 
       <div className="ed-automation-summary">
         <div>
-          <strong>{totalSentCount.toLocaleString()}</strong>
+          <strong>{totalSentCount.toLocaleString("en-US")}</strong>
           <span>Automated emails sent</span>
         </div>
         <Link to="/admin/emails/settings">Review settings</Link>
@@ -101,15 +101,15 @@ export default function AutomationsList() {
       <div className="ed-automation-metrics">
         <article>
           <span>Total flows</span>
-          <strong>{automations.length.toLocaleString()}</strong>
+          <strong>{automations.length.toLocaleString("en-US")}</strong>
         </article>
         <article>
           <span>Active</span>
-          <strong>{activeCount.toLocaleString()}</strong>
+          <strong>{activeCount.toLocaleString("en-US")}</strong>
         </article>
         <article>
           <span>Inactive</span>
-          <strong>{inactiveCount.toLocaleString()}</strong>
+          <strong>{inactiveCount.toLocaleString("en-US")}</strong>
         </article>
         <article>
           <span>Open rate</span>
@@ -174,7 +174,7 @@ export default function AutomationsList() {
                   {automation.status}
                 </mark>
               </span>
-              <span>{automation.sent === 0 ? "-" : automation.sent.toLocaleString()}</span>
+              <span>{automation.sent === 0 ? "-" : automation.sent.toLocaleString("en-US")}</span>
               <span>-</span>
               <span>-</span>
               <span className="ed-row-action">

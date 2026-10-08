@@ -1319,7 +1319,7 @@ export default function OrderRiskPage() {
         <IndexTable.Cell className="order-risk-total-column">
           <span
             className="order-risk-money"
-            title={`${record.totalAmount.toLocaleString()} ${record.currencyCode}`}
+            title={`${record.totalAmount.toLocaleString("en-US")} ${record.currencyCode}`}
           >
             {formatMoney(record.totalAmount, record.currencyCode)}
           </span>
@@ -1860,7 +1860,7 @@ export default function OrderRiskPage() {
                     {metric.label}
                   </Text>
                   <Text as="p" variant="headingXl">
-                    {metric.value.toLocaleString()}
+                    {metric.value.toLocaleString("en-US")}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
                     {metric.detail}

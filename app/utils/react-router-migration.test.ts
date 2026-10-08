@@ -85,7 +85,9 @@ describe("React Router migration", () => {
     expect(appRoute).not.toContain("geo_auth_recovery");
     expect(appRoute).not.toContain("EmbeddedAuthRecovery");
     expect(appRoute).not.toContain("window.location.replace(");
-    expect(appRoute).toContain("return boundary.error(useRouteError());");
+    expect(appRoute).toContain("if (isRouteErrorResponse(error))");
+    expect(appRoute).toContain("return boundary.error(error);");
+    expect(appRoute).toContain("A temporary app error interrupted this request");
   });
 
   it("keeps the active route mounted while App Bridge shows navigation loading", () => {

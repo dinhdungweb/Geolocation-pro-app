@@ -78,7 +78,7 @@ export default function EmailBlacklist() {
             <span className="ed-eyebrow">Email controls</span>
             <h2>Blacklisted stores</h2>
           </div>
-          <span className="ed-count">{blacklist.length.toLocaleString()} blocked</span>
+          <span className="ed-count">{blacklist.length.toLocaleString("en-US")} blocked</span>
         </header>
 
         {blacklist.length > 0 ? (

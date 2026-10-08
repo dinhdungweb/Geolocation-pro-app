@@ -402,13 +402,13 @@ export default function AdminBilling() {
     },
     {
       label: "Paid Shops",
-      value: summary.paidShops.toLocaleString(),
+      value: summary.paidShops.toLocaleString("en-US"),
       icon: <Users size={18} />,
       tone: "neutral",
     },
     {
       label: "Issues",
-      value: summary.issueCount.toLocaleString(),
+      value: summary.issueCount.toLocaleString("en-US"),
       icon: <AlertTriangle size={18} />,
       tone: "danger",
     },
@@ -534,17 +534,17 @@ export default function AdminBilling() {
                         <strong>{periodEndLabel || (shop.plan === FREE_PLAN ? "Calendar month" : "Sync pending")}</strong>
                         <small>{periodEndLabel ? "Shopify period" : shop.billingPeriodKey}</small>
                       </td>
-                      <td className="ed-number">{isUnlimited ? "Unlimited" : shop.limit.toLocaleString()}</td>
+                      <td className="ed-number">{isUnlimited ? "Unlimited" : shop.limit.toLocaleString("en-US")}</td>
                       <td className="ed-number">
-                        <strong>{shop.totalVisitors.toLocaleString()}</strong>
-                        {shop.prevTotal > 0 ? <small>prev: {shop.prevTotal.toLocaleString()}</small> : null}
+                        <strong>{shop.totalVisitors.toLocaleString("en-US")}</strong>
+                        {shop.prevTotal > 0 ? <small>prev: {shop.prevTotal.toLocaleString("en-US")}</small> : null}
                       </td>
                       <td className="ed-number">
-                        {shop.overage > 0 ? <span className="ed-danger">+{shop.overage.toLocaleString()}</span> : "0"}
+                        {shop.overage > 0 ? <span className="ed-danger">+{shop.overage.toLocaleString("en-US")}</span> : "0"}
                       </td>
-                      <td className="ed-number">{shop.chargedVisitors.toLocaleString()}</td>
+                      <td className="ed-number">{shop.chargedVisitors.toLocaleString("en-US")}</td>
                       <td className="ed-number">
-                        {shop.uncharged > 0 ? <span className="ed-warning">{shop.uncharged.toLocaleString()}</span> : "0"}
+                        {shop.uncharged > 0 ? <span className="ed-warning">{shop.uncharged.toLocaleString("en-US")}</span> : "0"}
                       </td>
                       <td className="ed-number">
                         <strong>${shop.chargedAmount.toFixed(2)}</strong>
@@ -640,7 +640,7 @@ export default function AdminBilling() {
                             : attempt.billingPeriodKey}
                         </span>
                       </td>
-                      <td className="ed-number"><strong>+{attempt.overageVisitors.toLocaleString()}</strong></td>
+                      <td className="ed-number"><strong>+{attempt.overageVisitors.toLocaleString("en-US")}</strong></td>
                       <td className="ed-number">
                         <strong>${Number(attempt.amount).toFixed(2)}</strong>
                       </td>

@@ -316,6 +316,9 @@ async function loadDashboardAnalytics(
 const dashboardAnalyticsCache = createExpiringAsyncCache<
   Awaited<ReturnType<typeof loadDashboardAnalytics>>
 >();
+const dashboardBillingCache = createExpiringAsyncCache<
+  Awaited<ReturnType<typeof checkBillingWithFallback>>
+>();
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const loaderStartedAt = performance.now();
@@ -357,14 +360,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     () => loadDashboardAnalytics(shop, thirtyDaysAgo, today),
     10_000,
   );
-  const settingsAndBillingPromise = Promise.all([
-    prisma.settings.upsert({
+  const settingsAndBillingPromise = prisma.settings
+    .upsert({
       where: { shop },
       update: {},
       create: { shop },
-    }),
-    checkBillingWithFallback(billing, isBillingTestMode()),
-  ]);
+    })
+    .then(async (settings) => {
+      const isTest = isBillingTestMode();
+      const billingConfig = await dashboardBillingCache.get(
+        `${shop}:${isTest ? "test" : "live"}`,
+        () =>
+          checkBillingWithFallback(billing, isTest, {
+            fallbackPlan: settings.currentPlan,
+            logContext: `dashboard:${shop}`,
+          }),
+        30_000,
+      );
+
+      return [settings, billingConfig] as const;
+    });
 
   const planAndUsagePromise = settingsAndBillingPromise.then(
     async ([settings, billingConfig]) => {
@@ -411,11 +426,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       usagePeriod,
       monthlyUsage,
     },
-    analytics,
   ] = await Promise.all([
     dashboardDataPromise,
     planAndUsagePromise,
-    analyticsPromise,
   ]);
 
   const planLimit = getPlanLimit(currentPlan, settings);
@@ -482,7 +495,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
       appEmbedStatus,
       onboardingInstallId: settings.onboardingInstallAt.toISOString(),
-      analytics,
+      analytics: analyticsPromise,
     },
     {
       headers: {
@@ -881,12 +894,15 @@ export default function Index() {
   };
 
   return (
-    <Page>
+    <Page fullWidth>
       <TitleBar title="Home" />
       <style>{`
         .geo-home {
           display: grid;
           gap: 16px;
+          width: 100%;
+          max-width: 1200px;
+          margin: 0 auto;
           padding-bottom: 96px;
           min-width: 0;
           font-size: var(--p-text-body-md-font-size);
@@ -980,15 +996,15 @@ export default function Index() {
           display: flex;
           align-items: center;
           flex: 0 0 auto;
-          gap: 4px;
+          gap: 1px;
         }
         .geo-review-star {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 32px;
-          padding: 2px;
+          width: 34px;
+          height: 36px;
+          padding: 0;
           border: 0;
           border-radius: 6px;
           background: transparent;
@@ -1006,8 +1022,8 @@ export default function Index() {
           outline-offset: 2px;
         }
         .geo-review-star .Polaris-Icon {
-          width: 26px;
-          height: 26px;
+          width: 32px;
+          height: 32px;
         }
         .geo-metrics-grid {
           display: grid;
@@ -1964,7 +1980,7 @@ export default function Index() {
                 onAction: () => navigate("/app/order-risk"),
               }}
             >
-              {stats.openOrderRiskCount.toLocaleString()} order
+              {stats.openOrderRiskCount.toLocaleString("en-US")} order
               {stats.openOrderRiskCount === 1 ? "" : "s"} need risk review.
             </Banner>
           )}
@@ -1993,21 +2009,21 @@ export default function Index() {
                     icon={PersonIcon}
                     tone="green"
                     label="Visitors tracked"
-                    value={totals.visitors.toLocaleString()}
-                    detail={`Across ${totalCountries.toLocaleString()} countries in 30 days`}
+                    value={totals.visitors.toLocaleString("en-US")}
+                    detail={`Across ${totalCountries.toLocaleString("en-US")} countries in 30 days`}
                   />
                   <MetricCard
                     icon={ChartLineIcon}
                     tone="purple"
                     label="Redirects"
-                    value={totals.redirects.toLocaleString()}
+                    value={totals.redirects.toLocaleString("en-US")}
                     detail="Completed in the last 30 days"
                   />
                   <MetricCard
                     icon={ShieldCheckMarkIcon}
                     tone="orange"
                     label="Traffic blocked"
-                    value={totals.blocked.toLocaleString()}
+                    value={totals.blocked.toLocaleString("en-US")}
                     detail="Blocked visits in the last 30 days"
                   />
                   <Card padding="0">
@@ -2042,16 +2058,16 @@ export default function Index() {
                       </div>
                       <div className="geo-plan-meta">
                         <span>
-                          {currentUsage.toLocaleString()} /{" "}
+                          {currentUsage.toLocaleString("en-US")} /{" "}
                           {isUnlimitedPlan
                             ? "Unlimited"
-                            : planLimit.toLocaleString()}{" "}
+                            : planLimit.toLocaleString("en-US")}{" "}
                           visitors
                         </span>
                         <span>
                           {remainingVisitors === null
                             ? "No monthly limit"
-                            : `${remainingVisitors.toLocaleString()} remaining`}
+                            : `${remainingVisitors.toLocaleString("en-US")} remaining`}
                         </span>
                       </div>
                       <Text
@@ -2116,7 +2132,7 @@ export default function Index() {
                                 {rule.isActive ? "Active" : "Inactive"}
                               </Badge>
                               <span className="geo-rule-actions">
-                                {rule.actions.toLocaleString()}
+                                {rule.actions.toLocaleString("en-US")}
                               </span>
                             </div>
                           );

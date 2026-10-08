@@ -536,7 +536,7 @@ function PlanCard({
                                     Monthly usage
                                 </Text>
                                 <ul className="pricing-feature-list">
-                                    <li>{visitorLimitLabel || `${visitorLimit?.toLocaleString()} visitors included`}</li>
+                                    <li>{visitorLimitLabel || `${visitorLimit?.toLocaleString("en-US")} visitors included`}</li>
                                     <li>Redirects, blocks and popups included</li>
                                     {!isFree && noOverage && (
                                         <li>No overage charges</li>
@@ -683,7 +683,7 @@ export default function PricingPage() {
             visitorLimit: customLimit,
             visitorLimitLabel: customLimit >= Number.MAX_SAFE_INTEGER
                 ? "Unlimited visitors included"
-                : `${customLimit.toLocaleString()} visitors included`,
+                : `${customLimit.toLocaleString("en-US")} visitors included`,
             features: [
                 "All advanced features",
                 customLimit >= Number.MAX_SAFE_INTEGER ? "Unlimited visitors" : "Custom visitor limit",

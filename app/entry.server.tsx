@@ -132,5 +132,26 @@ export function handleError(error: unknown, { request }: { request: Request }) {
   }
 
   // Vẫn log các lỗi thực tế khác của hệ thống
-  console.error(error);
+  const requestPath = (() => {
+    try {
+      return new URL(request.url).pathname;
+    } catch {
+      return "unknown";
+    }
+  })();
+  const errorDetails =
+    error instanceof Error
+      ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        }
+      : { name: "UnknownError", message: String(error) };
+
+  // Never log the query string because embedded app URLs can contain ID tokens.
+  console.error("[RequestError]", {
+    method: request.method,
+    path: requestPath,
+    ...errorDetails,
+  });
 }

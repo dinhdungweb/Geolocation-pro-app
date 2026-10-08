@@ -35,7 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return responseData({
     stats: {
       email: {
-        sent: totalSent.toLocaleString(),
+        sent: totalSent.toLocaleString("en-US"),
         sentChange: 0,
         open: "0%",
         openChange: 0,

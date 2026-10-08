@@ -313,8 +313,8 @@ export default function AdminShops() {
                         <strong>{shop.ruleCount}</strong> active
                       </td>
                       <td>
-                        <strong>{shop.latestUsage?.totalVisitors?.toLocaleString() || 0}</strong>
-                        <small>{periodActions.toLocaleString()} actions</small>
+                        <strong>{shop.latestUsage?.totalVisitors?.toLocaleString("en-US") || 0}</strong>
+                        <small>{periodActions.toLocaleString("en-US")} actions</small>
                       </td>
                       <td>{new Date(shop.createdAt).toLocaleDateString("en-GB")}</td>
                       <td>
