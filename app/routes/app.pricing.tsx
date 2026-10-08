@@ -537,7 +537,7 @@ function PlanCard({
                                 </Text>
                                 <ul className="pricing-feature-list">
                                     <li>{visitorLimitLabel || `${visitorLimit?.toLocaleString()} visitors included`}</li>
-                                    <li>{isFree ? "Redirects and popups included" : "Redirects, blocks and popups included"}</li>
+                                    <li>Redirects, blocks and popups included</li>
                                     {!isFree && noOverage && (
                                         <li>No overage charges</li>
                                     )}
@@ -606,6 +606,7 @@ export default function PricingPage() {
             visitorLimit: PLAN_LIMITS[FREE_PLAN],
             features: [
                 "Country redirects",
+                "Country blocking",
                 "Unlimited redirect rules",
                 "Scheduled redirects",
                 "Analytics dashboard",
@@ -622,7 +623,7 @@ export default function PricingPage() {
             features: [
                 "Everything in Free",
                 "State & city redirects",
-                "Country, state & city blocking",
+                "State & city blocking",
                 "IP redirects & blocking",
                 "Markets & page targeting",
                 "High-risk IP reputation protection",

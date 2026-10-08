@@ -16,6 +16,7 @@ import {
   Card,
   Icon,
   InlineStack,
+  Modal,
   Page,
   ProgressBar,
   Text,
@@ -31,10 +32,11 @@ import {
   PersonIcon,
   PlusIcon,
   ShieldCheckMarkIcon,
+  StarFilledIcon,
+  StarIcon,
 } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
-import { RuleTypeBadge } from "../components/rule-type-badge";
 import {
   CUSTOM_PLAN,
   FREE_PLAN,
@@ -288,35 +290,6 @@ async function loadDashboardAnalytics(
     }),
   }));
 
-  const totalRuleActions = ruleStats.reduce(
-    (sum, item) =>
-      sum +
-      (item._sum.clickedYes || 0) +
-      (item._sum.autoRedirected || 0) +
-      (item._sum.blocked || 0),
-    0,
-  );
-
-  const topRules = ruleStats
-    .map((item) => {
-      const redirects =
-        (item._sum.clickedYes || 0) + (item._sum.autoRedirected || 0);
-      const blocked = item._sum.blocked || 0;
-      const actions = redirects + blocked;
-
-      return {
-        id: item.ruleId,
-        name: item.ruleName || "Unknown rule",
-        type: blocked > redirects ? "Block" : "Redirect",
-        actions,
-        share: totalRuleActions > 0
-          ? Math.round((actions / totalRuleActions) * 1000) / 10
-          : 0,
-      };
-    })
-    .sort((left, right) => right.actions - left.actions)
-    .slice(0, 5);
-
   const actionsByRule = new Map(
     ruleStats.map((item) => [
       item.ruleId,
@@ -332,7 +305,6 @@ async function loadDashboardAnalytics(
     topCountries,
     countryTraffic,
     dailySeries,
-    topRules,
     recentRules: recentRules.map((rule) => ({
       ...rule,
       updatedAt: rule.updatedAt.toISOString(),
@@ -697,6 +669,10 @@ export default function Index() {
   >([]);
   const [setupConfirmed, setSetupConfirmed] = useState<boolean | null>(null);
   const [setupDismissed, setSetupDismissed] = useState(false);
+  const [reviewPromptDismissed, setReviewPromptDismissed] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewHoveredRating, setReviewHoveredRating] = useState(0);
 
   useEffect(() => {
     const refreshPermissionStatus = () => {
@@ -857,6 +833,21 @@ export default function Index() {
     }
   }, [setupConfirmed, setupDismissedKey]);
 
+  const dismissReviewPrompt = () => {
+    setReviewPromptDismissed(true);
+  };
+
+  const handleSelectReviewRating = (rating: number) => {
+    setReviewRating(rating);
+    setReviewModalOpen(true);
+  };
+
+  const handleOpenReviewPage = () => {
+    window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
+    setReviewModalOpen(false);
+    dismissReviewPrompt();
+  };
+
   const handleConfirmSetup = async () => {
     setSetupConfirmed(true);
     try {
@@ -890,7 +881,7 @@ export default function Index() {
   };
 
   return (
-    <Page fullWidth>
+    <Page>
       <TitleBar title="Home" />
       <style>{`
         .geo-home {
@@ -944,9 +935,83 @@ export default function Index() {
         .geo-alerts:empty {
           display: none;
         }
+        .geo-review-prompt {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+          padding: 18px 20px;
+          border-radius: 12px;
+          background: #1677a3;
+          color: #ffffff;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+        }
+        .geo-review-prompt-copy {
+          display: grid;
+          gap: 10px;
+          min-width: 0;
+        }
+        .geo-review-prompt-title {
+          margin: 0;
+          color: inherit;
+          font-size: 16px;
+          font-weight: 650;
+          line-height: 1.35;
+        }
+        .geo-review-prompt-description {
+          margin: 0;
+          color: inherit;
+          font-size: 14px;
+          line-height: 1.4;
+        }
+        .geo-review-dismiss {
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          text-decoration: underline;
+          cursor: pointer;
+        }
+        .geo-review-dismiss:hover {
+          text-decoration-thickness: 2px;
+        }
+        .geo-review-stars {
+          display: flex;
+          align-items: center;
+          flex: 0 0 auto;
+          gap: 4px;
+        }
+        .geo-review-star {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 32px;
+          padding: 2px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: #d5f4ff;
+          cursor: pointer;
+        }
+        .geo-review-star:hover,
+        .geo-review-star:focus-visible,
+        .geo-review-star.is-active {
+          color: #ffffff;
+          transform: translateY(-1px);
+        }
+        .geo-review-star:focus-visible {
+          outline: 2px solid #ffffff;
+          outline-offset: 2px;
+        }
+        .geo-review-star .Polaris-Icon {
+          width: 26px;
+          height: 26px;
+        }
         .geo-metrics-grid {
           display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 12px;
         }
         .geo-metric {
@@ -1051,7 +1116,7 @@ export default function Index() {
         }
         .geo-lower-grid {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(270px, 0.9fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
           align-items: stretch;
         }
@@ -1495,39 +1560,6 @@ export default function Index() {
           line-height: var(--p-text-body-sm-font-line-height);
           font-variant-numeric: tabular-nums;
         }
-        .geo-top-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: var(--p-text-body-sm-font-size);
-          line-height: var(--p-text-body-sm-font-line-height);
-        }
-        .geo-top-table th,
-        .geo-top-table td {
-          padding: 9px 12px;
-          border-bottom: 1px solid var(--p-color-border-secondary, #eeeeee);
-          text-align: left;
-          vertical-align: middle;
-        }
-        .geo-top-table th {
-          color: var(--p-color-text-secondary, #616161);
-          font-weight: 500;
-          background: var(--p-color-bg-surface-secondary, #fafafa);
-        }
-        .geo-top-table th:last-child,
-        .geo-top-table td:last-child {
-          text-align: right;
-        }
-        .geo-top-table tbody tr:last-child td {
-          border-bottom: 0;
-        }
-        .geo-top-rule-name {
-          display: block;
-          max-width: 160px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          font-weight: 600;
-        }
         .setup-guide-card {
           padding: 16px;
         }
@@ -1733,7 +1765,7 @@ export default function Index() {
         }
         @media (max-width: 72em) {
           .geo-metrics-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
           .geo-lower-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1760,6 +1792,11 @@ export default function Index() {
         @media (max-width: 40em) {
           .geo-home {
             gap: 12px;
+          }
+          .geo-review-prompt {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 14px;
           }
           .geo-home-actions {
             display: flex;
@@ -1845,6 +1882,50 @@ export default function Index() {
           </div>
         </header>
 
+        {!reviewPromptDismissed && (
+          <section className="geo-review-prompt" aria-labelledby="geo-review-prompt-title">
+            <div className="geo-review-prompt-copy">
+              <h2 className="geo-review-prompt-title" id="geo-review-prompt-title">
+                How's your experience with Geo: Redirect?
+              </h2>
+              <p className="geo-review-prompt-description">
+                Rate us by clicking on the stars. {" "}
+                <button
+                  type="button"
+                  className="geo-review-dismiss"
+                  onClick={dismissReviewPrompt}
+                >
+                  Dismiss
+                </button>
+              </p>
+            </div>
+            <div
+              className="geo-review-stars"
+              role="group"
+              aria-label="Rate your experience"
+              onMouseLeave={() => setReviewHoveredRating(0)}
+            >
+              {[1, 2, 3, 4, 5].map((rating) => {
+                const isActive = rating <= (reviewHoveredRating || reviewRating);
+                return (
+                  <button
+                    type="button"
+                    className={`geo-review-star${isActive ? " is-active" : ""}`}
+                    key={rating}
+                    aria-label={`${rating} star${rating === 1 ? "" : "s"}`}
+                    onMouseEnter={() => setReviewHoveredRating(rating)}
+                    onFocus={() => setReviewHoveredRating(rating)}
+                    onBlur={() => setReviewHoveredRating(0)}
+                    onClick={() => handleSelectReviewRating(rating)}
+                  >
+                    <Icon source={isActive ? StarFilledIcon : StarIcon} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <div className="geo-alerts">
           {!isAppActive && (
             <Banner
@@ -1903,23 +1984,11 @@ export default function Index() {
               topCountries,
               countryTraffic,
               dailySeries,
-              topRules,
               recentRules,
               totalCountries,
             }) => (
               <>
                 <div className="geo-metrics-grid">
-                  <MetricCard
-                    icon={GlobeIcon}
-                    tone="blue"
-                    label="Active geolocation rules"
-                    value={stats.activeRules.toLocaleString()}
-                    detail={`${stats.totalRules.toLocaleString()} rules total`}
-                    link={{
-                      label: "View all rules",
-                      onClick: () => navigate("/app/rules"),
-                    }}
-                  />
                   <MetricCard
                     icon={PersonIcon}
                     tone="green"
@@ -2055,43 +2124,6 @@ export default function Index() {
                       </div>
                     ) : (
                       <div className="geo-empty">No rules created yet</div>
-                    )}
-                  </Panel>
-
-                  <Panel
-                    title="Top rules by performance"
-                    action={<Badge>Last 30 days</Badge>}
-                  >
-                    {topRules.length > 0 ? (
-                      <table className="geo-top-table">
-                        <thead>
-                          <tr>
-                            <th>Rule</th>
-                            <th>Type</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {topRules.map((rule) => (
-                            <tr key={rule.id}>
-                              <td>
-                                <span className="geo-top-rule-name">{rule.name}</span>
-                              </td>
-                              <td>
-                                <RuleTypeBadge ruleType={rule.type} label={rule.type} />
-                              </td>
-                              <td>
-                                {rule.actions.toLocaleString()}
-                                <span style={{ color: "#767676", marginLeft: 5 }}>
-                                  {rule.share}%
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="geo-empty">No rule performance data yet</div>
                     )}
                   </Panel>
 
@@ -2559,6 +2591,29 @@ export default function Index() {
           </footer>
         </Card>
       </div>
+
+      <Modal
+        open={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        title="Thanks for your rating!"
+        primaryAction={{
+          content: "Review us on Shopify",
+          onAction: handleOpenReviewPage,
+        }}
+        secondaryActions={[
+          {
+            content: "Cancel",
+            onAction: () => setReviewModalOpen(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text as="p" variant="bodyMd">
+            Your feedback encourages us to keep improving the app. Please take a
+            moment to share your experience with other merchants on Shopify.
+          </Text>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

@@ -466,7 +466,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         if (!r.isActive) return false;
         if (!hasProPlan) {
             if (r.matchType !== "country") return false;
-            if (r.ruleType === "block") return false;
         }
         return true;
     }).length;

@@ -432,15 +432,15 @@ describe("storefront rule resolution integration", () => {
     });
   });
 
-  it("allows a Free country popup but skips paid-only country blocking", async () => {
+  it("allows country blocking on the Free plan", async () => {
     await seedSettings("free");
-    await seedRule({
-      name: "Paid country block",
+    const blockRule = await seedRule({
+      name: "Free country block",
       priority: 100,
       ruleType: "block",
       targetUrl: "",
     });
-    const popupRule = await seedRule({
+    await seedRule({
       name: "Free country popup",
       priority: 10,
     });
@@ -448,12 +448,13 @@ describe("storefront rule resolution integration", () => {
     const { body } = await loadConfig();
 
     expect(body).toMatchObject({
-      action: "popup",
+      action: "block",
+      analyticsEvent: "blocked",
       currentPlan: "free",
       enabled: true,
       rule: {
-        name: "Free country popup",
-        ruleId: popupRule.id,
+        name: "Free country block",
+        ruleId: blockRule.id,
         source: "country",
       },
     });

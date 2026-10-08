@@ -277,7 +277,7 @@ function isMarketMatch(rule: ProxyRule, marketHandle: string, marketId: string, 
 
 function canRunCountryRule(rule: ProxyRule, hasPaidPlan: boolean) {
   if (hasPaidPlan) return true;
-  return rule.ruleType !== "block" && (rule.pageTargetingType || "all") === "all";
+  return (rule.pageTargetingType || "all") === "all";
 }
 
 function isCountryMatch(rule: ProxyRule, countryCode: string) {

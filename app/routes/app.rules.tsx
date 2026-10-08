@@ -120,6 +120,8 @@ interface RedirectRule {
     cityRegionCode: string;
 }
 
+const PAID_PLAN_BADGE_LABEL = "Paid plan";
+
 function normalizeOption(value: string | null, allowed: string[], fallback: string) {
     return value && allowed.includes(value) ? value : fallback;
 }
@@ -139,8 +141,8 @@ function isPaidBillingConfig(billingConfig: any, settings: any) {
     return hasPaidPlanAccess(effectivePlan) || billingConfig.hasActivePayment || billingConfig.appSubscriptions.length > 0;
 }
 
-function isFreePlanFeatureRequest(ruleType: string, pageTargetingType: string, matchType = "country") {
-    return ruleType === "block" || pageTargetingType !== "all" || matchType === "market" || matchType === "state" || matchType === "city";
+function isFreePlanFeatureRequest(pageTargetingType: string, matchType = "country") {
+    return pageTargetingType !== "all" || matchType === "market" || matchType === "state" || matchType === "city";
 }
 
 function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConflicts>[]) {
@@ -244,7 +246,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
-            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType, matchType)) {
+            if (!hasProPlan && isFreePlanFeatureRequest(pageTargetingType, matchType)) {
                 return responseData({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
             }
             if (matchType === "country" && !countryCodes) {
@@ -322,7 +324,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
-            if (!hasProPlan && isFreePlanFeatureRequest(ruleType, pageTargetingType, matchType)) {
+            if (!hasProPlan && isFreePlanFeatureRequest(pageTargetingType, matchType)) {
                 return responseData({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
             }
             if (matchType === "country" && !countryCodes) {
@@ -408,7 +410,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     );
                 }
 
-                if (!hasProPlan && isFreePlanFeatureRequest(rule.ruleType, rule.pageTargetingType || "all", rule.matchType)) {
+                if (!hasProPlan && isFreePlanFeatureRequest(rule.pageTargetingType || "all", rule.matchType)) {
                     return responseData({ success: false, message: "This feature is available on paid plans only" }, { status: 403 });
                 }
             }
@@ -588,8 +590,8 @@ export default function RulesPage() {
     const [formRuleType, setFormRuleType] = useState("redirect");
     const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
     // Scheduling State
-    const [scheduleSectionOpen, setScheduleSectionOpen] = useState(true);
-    const [pageTargetingSectionOpen, setPageTargetingSectionOpen] = useState(true);
+    const [scheduleSectionOpen, setScheduleSectionOpen] = useState(false);
+    const [pageTargetingSectionOpen, setPageTargetingSectionOpen] = useState(false);
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [startTime, setStartTime] = useState("09:00");
     const [endTime, setEndTime] = useState("17:00");
@@ -920,8 +922,8 @@ export default function RulesPage() {
         }
         setInputValue("");
         setStateInputValue("");
-        setScheduleSectionOpen(true);
-        setPageTargetingSectionOpen(true);
+        setScheduleSectionOpen(false);
+        setPageTargetingSectionOpen(false);
     }, [editingRule, modalOpen]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
@@ -1201,7 +1203,7 @@ export default function RulesPage() {
                     ? (cityCountryCode && splitCityNames(cityNames).length > 0 ? splitCityNames(cityNames).length : 0)
                     : selectedCountries.length;
     const isPaidOnlyRule = (rule: any) =>
-        rule.ruleType === "block" || rule.matchType === "market" || rule.matchType === "state" || rule.matchType === "city" || (rule.pageTargetingType || "all") !== "all";
+        rule.matchType === "market" || rule.matchType === "state" || rule.matchType === "city" || (rule.pageTargetingType || "all") !== "all";
     const rowMarkup = paginatedRules.map((rule: any, index: number) => {
         const ruleConflicts = conflictsByRuleId[rule.id] || [];
         const toggleInProgress = fetcher.state !== "idle";
@@ -1958,7 +1960,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>State/Region</span>
-                                                    <Badge tone="warning">Premium</Badge>
+                                                    <Badge tone="warning">{PAID_PLAN_BADGE_LABEL}</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -1982,7 +1984,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>City</span>
-                                                    <Badge tone="warning">Premium</Badge>
+                                                    <Badge tone="warning">{PAID_PLAN_BADGE_LABEL}</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -2006,7 +2008,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>Shopify Market</span>
-                                                    <Badge tone="warning">Premium</Badge>
+                                                    <Badge tone="warning">{PAID_PLAN_BADGE_LABEL}</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -2461,23 +2463,13 @@ export default function RulesPage() {
                                     name="ruleType"
                                     onChange={() => setFormRuleType("redirect")}
                                 />
-                                <div style={{ opacity: !hasProPlan ? 0.65 : 1 }}>
-                                    <RadioButton
-                                        label={
-                                            <InlineStack gap="200">
-                                                <span>Block Access</span>
-                                                {!hasProPlan && <Badge tone="warning">Premium</Badge>}
-                                            </InlineStack>
-                                        }
-                                        checked={formRuleType === "block"}
-                                        id="actionBlock"
-                                        name="ruleType"
-                                        disabled={!hasProPlan}
-                                        onChange={() => {
-                                            if (hasProPlan) setFormRuleType("block");
-                                        }}
-                                    />
-                                </div>
+                                <RadioButton
+                                    label="Block Access"
+                                    checked={formRuleType === "block"}
+                                    id="actionBlock"
+                                    name="ruleType"
+                                    onChange={() => setFormRuleType("block")}
+                                />
                             </InlineStack>
                         </BlockStack>
 
@@ -2623,7 +2615,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>Specific Pages</span>
-                                                    <Badge tone="warning">Premium</Badge>
+                                                    <Badge tone="warning">{PAID_PLAN_BADGE_LABEL}</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
@@ -2647,7 +2639,7 @@ export default function RulesPage() {
                                             label={(
                                                 <InlineStack gap="200">
                                                     <span>Exclude Pages</span>
-                                                    <Badge tone="warning">Premium</Badge>
+                                                    <Badge tone="warning">{PAID_PLAN_BADGE_LABEL}</Badge>
                                                 </InlineStack>
                                             )}
                                             checked={false}
