@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
   useRouteError,
 } from "react-router";
+import { recoverEmbeddedApp } from "./utils/app-recovery";
 
 export default function App() {
   return (
@@ -78,7 +79,7 @@ export function ErrorBoundary() {
             </p>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={recoverEmbeddedApp}
               style={{
                 background: "#303030",
                 border: 0,

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import {
   isRouteErrorResponse,
@@ -16,6 +16,10 @@ import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { EmbeddedAppProviders } from "../components/embedded-app-providers";
 import { authenticate } from "../shopify.server";
 import { loadCrisp, prepareCrisp } from "../utils/crisp";
+import {
+  recoverEmbeddedApp,
+  rememberEmbeddedShop,
+} from "../utils/app-recovery";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
@@ -914,6 +918,15 @@ export default function App() {
   const location = useLocation();
   const navigation = useNavigation();
   const routeNavigationStartedAt = useRef<number | null>(null);
+  const [isClientReady, setIsClientReady] = useState(false);
+
+  useEffect(() => {
+    setIsClientReady(true);
+  }, []);
+
+  useEffect(() => {
+    rememberEmbeddedShop(shop);
+  }, [shop]);
 
   useEffect(() => observeWebVitals(() => window.location.pathname), []);
 
@@ -1108,8 +1121,8 @@ export default function App() {
         <Link to="/app/settings">Settings</Link>
         <Link to="/app/support">Support</Link>
       </NavMenu>
-      <div className="app-route-frame">
-        <Outlet />
+      <div className="app-route-frame" aria-busy={!isClientReady}>
+        {isClientReady ? <Outlet /> : getPendingShellForPath(location.pathname)}
       </div>
     </EmbeddedAppProviders>
   );
@@ -1157,7 +1170,7 @@ export function ErrorBoundary() {
         </p>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={recoverEmbeddedApp}
           style={{
             background: "#303030",
             border: 0,

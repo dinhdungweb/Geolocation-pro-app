@@ -58,6 +58,18 @@ describe("embedded app performance regressions", () => {
     expect(source).toContain("await authenticate.admin(request)");
   });
 
+  it("hydrates an embedded-route shell before mounting route content", () => {
+    const routePath = fileURLToPath(
+      new URL("../routes/app.tsx", import.meta.url),
+    );
+    const source = readFileSync(routePath, "utf8");
+
+    expect(source).toContain("const [isClientReady, setIsClientReady]");
+    expect(source).toContain(
+      "isClientReady ? <Outlet /> : getPendingShellForPath(location.pathname)",
+    );
+  });
+
   it("deduplicates and briefly caches theme app embed checks", () => {
     const utilityPath = fileURLToPath(
       new URL("./theme-app-embed.server.ts", import.meta.url),
