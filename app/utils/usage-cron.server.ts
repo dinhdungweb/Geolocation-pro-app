@@ -445,7 +445,9 @@ export function initUsageCron() {
         }
     });
 
-    cron.schedule('30 2 * * *', () => {
+    // Hourly: each run is time-boxed per table, so retention keeps up with
+    // high-traffic shops without one long daily delete storm.
+    cron.schedule('30 * * * *', () => {
         cleanupOldLogs().catch(err => {
             console.error('[Cron Error] Failed to clean old logs:', err);
         });
@@ -460,7 +462,7 @@ export function initUsageCron() {
     globalAny.__usageCronStarted = true;
     console.log('[Cron] Usage monitoring scheduled (every 6 hours).');
     console.log('[Cron] GeoIP auto-update scheduled (daily at 3:00 AM).');
-    console.log('[Cron] Cleanup scheduled (daily at 2:30 AM).');
+    console.log('[Cron] Retention cleanup scheduled (hourly at :30).');
     console.log('[Cron] Shop cleanup scheduled (every 5 minutes).');
     
     // Run initial check after a short delay to avoid API spam during rolling deploys.

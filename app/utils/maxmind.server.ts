@@ -11,6 +11,7 @@ let reloadPromise: Promise<void> | null = null;
 let loadedDatabasePath: string | null = null;
 let loadedDatabaseMtimeMs = 0;
 let lastReloadCheckAt = 0;
+let lastInitAttemptAt = 0;
 
 const DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-City.mmdb');
 const LEGACY_DB_PATH = path.join(process.cwd(), 'data', 'GeoLite2-Country.mmdb');
@@ -203,9 +204,23 @@ async function initReader(): Promise<void> {
     }
 }
 
+function startInitReader() {
+    lastInitAttemptAt = Date.now();
+    initPromise = initReader().finally(() => {
+        // A failed init (e.g. the .mmdb file was missing at startup) must not
+        // stick forever: clear it so a later lookup can retry.
+        if (!reader) initPromise = null;
+    });
+    return initPromise;
+}
+
 async function ensureReaderCurrent() {
     if (!reader) {
-        if (!initPromise) initPromise = initReader();
+        if (!initPromise) {
+            // Throttle retries so a missing database doesn't stat/download on every lookup.
+            if (Date.now() - lastInitAttemptAt < getReloadCheckIntervalMs()) return;
+            startInitReader();
+        }
         await initPromise;
     }
 
@@ -245,6 +260,7 @@ export function invalidateReader(): void {
     loadedDatabasePath = null;
     loadedDatabaseMtimeMs = 0;
     lastReloadCheckAt = 0;
+    lastInitAttemptAt = 0;
     console.log('[MaxMind] Reader invalidated — will reload on next lookup');
 }
 
@@ -254,7 +270,7 @@ export function invalidateReader(): void {
  */
 export function preloadReader(): void {
     if (!initPromise) {
-        initPromise = initReader();
+        void startInitReader();
     }
 }
 

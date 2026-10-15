@@ -129,6 +129,7 @@ model AnalyticsCountry {
 
   @@unique([shop, date, countryCode])
   @@index([shop, date])
+  @@index([date])
 }
 
 model AnalyticsRule {
@@ -148,6 +149,7 @@ model AnalyticsRule {
 
   @@unique([shop, date, ruleId])
   @@index([shop, date])
+  @@index([date])
 }
 
 model MonthlyUsage {

@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { initUsageCron } from "./utils/usage-cron.server";
 import { backfillMissingMarketRuleCountries } from "./utils/market-rule-backfill.server";
+import { installUnhandledRejectionLogger } from "./utils/process-safety.server";
 
+installUnhandledRejectionLogger("Worker");
 initUsageCron();
 const initialBackfill = setTimeout(() => {
   void backfillMissingMarketRuleCountries();

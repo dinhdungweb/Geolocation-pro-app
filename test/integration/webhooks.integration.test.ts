@@ -161,6 +161,39 @@ describe("Shopify webhook cleanup integration", () => {
     ).toMatchObject({ attempts: 1, status: "completed" });
   });
 
+  it("cancels uninstall cleanup when the shop reinstalls before it runs", async () => {
+    await seedShop(uninstallShop);
+
+    const response = await uninstallAction({
+      context: {},
+      params: {},
+      request: webhookRequest("APP_UNINSTALLED", uninstallShop, {
+        validHmac: true,
+      }),
+    } as never);
+    expect(response.status).toBe(200);
+
+    // Reinstall: OAuth stores a fresh offline session before the job runs.
+    await prisma.session.create({
+      data: {
+        accessToken: "reinstall-token",
+        id: `offline_${uninstallShop}`,
+        isOnline: false,
+        shop: uninstallShop,
+        state: "reinstall-state",
+      },
+    });
+
+    await processPendingShopCleanupJobs();
+
+    expect(await prisma.session.count({ where: { shop: uninstallShop } })).toBe(1);
+    expect(await prisma.settings.count({ where: { shop: uninstallShop } })).toBe(1);
+    expect(await prisma.redirectRule.count({ where: { shop: uninstallShop } })).toBe(1);
+    expect(
+      await prisma.shopCleanupJob.findFirstOrThrow({ where: { shop: uninstallShop } }),
+    ).toMatchObject({ reason: "app_uninstalled", status: "cancelled" });
+  });
+
   it("redacts shop data including email audit history", async () => {
     await seedShop(redactShop);
     await prisma.adminEmailLog.create({

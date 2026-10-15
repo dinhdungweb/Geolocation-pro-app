@@ -4,6 +4,9 @@ import { ServerRouter, type EntryContext } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { installUnhandledRejectionLogger } from "./utils/process-safety.server";
+
+installUnhandledRejectionLogger("Web");
 
 export const streamTimeout = 5000;
 

@@ -131,11 +131,17 @@ export async function enqueueStorefrontAnalyticsEvent(input: RecordStorefrontAna
     },
   });
 
-  queueMicrotask(() => {
-    void processQueuedStorefrontAnalyticsEvents();
-  });
+  queueMicrotask(kickAnalyticsQueue);
 
   return true;
+}
+
+// Fire-and-forget entry point for the queue pump. Always attaches a catch so a
+// DB blip never surfaces as an unhandled rejection (which terminates Node).
+function kickAnalyticsQueue() {
+  processQueuedStorefrontAnalyticsEvents().catch((error) => {
+    console.error("[Analytics Queue] Failed to process queued events:", error);
+  });
 }
 
 export async function processQueuedStorefrontAnalyticsEvents() {
@@ -192,22 +198,42 @@ export async function processQueuedStorefrontAnalyticsEvents() {
       }
 
       try {
-        await recordStorefrontAnalyticsDetails(input, { retryableLogErrors: true });
-        await prisma.storefrontAnalyticsEventQueue.delete({ where: { id: row.id } });
-        processed++;
+        // Exactly-once: the queue row delete and every analytics write commit
+        // together, so a failed step rolls everything back and a retry cannot
+        // double-count. Deleting first also acts as the claim — if another pump
+        // reclaimed this row as stale and already processed it, count is 0.
+        const handled = await prisma.$transaction(
+          async (tx) => {
+            const claimed = await tx.storefrontAnalyticsEventQueue.deleteMany({
+              where: { id: row.id, status: "processing" },
+            });
+            if (claimed.count === 0) return false;
+
+            await recordStorefrontAnalyticsDetails(input, { retryableLogErrors: true, db: tx });
+            return true;
+          },
+          { timeout: 15_000 },
+        );
+        if (handled) processed++;
       } catch (error) {
         const attempts = row.attempts + 1;
         const failed = attempts >= queueMaxAttempts();
-        await prisma.storefrontAnalyticsEventQueue.update({
-          where: { id: row.id },
-          data: {
-            attempts,
-            lastError: String(error instanceof Error ? error.message : error).slice(0, 1000),
-            lockedAt: null,
-            nextAttemptAt: failed ? new Date() : queueNextAttemptAt(attempts),
-            status: failed ? "failed" : "pending",
-          },
-        });
+        try {
+          await prisma.storefrontAnalyticsEventQueue.update({
+            where: { id: row.id },
+            data: {
+              attempts,
+              lastError: String(error instanceof Error ? error.message : error).slice(0, 1000),
+              lockedAt: null,
+              nextAttemptAt: failed ? new Date() : queueNextAttemptAt(attempts),
+              status: failed ? "failed" : "pending",
+            },
+          });
+        } catch (updateError) {
+          // Keep draining the batch; this row stays "processing" and is
+          // reclaimed by the stale-lock check on a later pump.
+          console.error(`[Analytics Queue] Failed to record failure for ${row.id}:`, updateError);
+        }
       }
     }
 
@@ -232,15 +258,9 @@ export function startStorefrontAnalyticsQueueWorker() {
       ? ANALYTICS_QUEUE_INTERVAL_MS
       : 2_500;
 
-  setInterval(() => {
-    processQueuedStorefrontAnalyticsEvents().catch((error) => {
-      console.error("[Analytics Queue] Failed to process queued events:", error);
-    });
-  }, intervalMs).unref?.();
+  setInterval(kickAnalyticsQueue, intervalMs).unref?.();
 
-  queueMicrotask(() => {
-    void processQueuedStorefrontAnalyticsEvents();
-  });
+  queueMicrotask(kickAnalyticsQueue);
 }
 
 function actionFromType(type: string) {
@@ -497,8 +517,9 @@ export async function recordStorefrontAnalyticsDetails(
     type,
     userAgent,
   }: RecordStorefrontAnalyticsEventInput,
-  options: { retryableLogErrors?: boolean } = {},
+  options: { retryableLogErrors?: boolean; db?: Prisma.TransactionClient } = {},
 ) {
+  const db = options.db ?? prisma;
   const eventTime = resolveAnalyticsEventTime({
     countryCode,
     occurredAt,
@@ -535,7 +556,7 @@ export async function recordStorefrontAnalyticsDetails(
         : null);
     const ipRisk = ipHash ? await getCachedIpRiskByHash(ipHash) : null;
 
-    await prisma.visitorLog.create({
+    await db.visitorLog.create({
       data: {
         shop,
         ipAddress: resolvedIp,
@@ -578,7 +599,7 @@ export async function recordStorefrontAnalyticsDetails(
     }
 
     if (Object.keys(updateData).length > 0) {
-      await prisma.analyticsCountry.upsert({
+      await db.analyticsCountry.upsert({
         where: {
           shop_date_countryCode: { shop, date: today, countryCode },
         },
@@ -610,7 +631,7 @@ export async function recordStorefrontAnalyticsDetails(
     }
 
     if (Object.keys(updateRuleData).length > 0) {
-      await prisma.analyticsRule.upsert({
+      await db.analyticsRule.upsert({
         where: { shop_date_ruleId: { shop, date: today, ruleId } },
         update: {
           ...updateRuleData,

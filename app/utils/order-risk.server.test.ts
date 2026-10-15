@@ -39,6 +39,8 @@ import {
   decryptProtectedData,
   hashProtectedData,
 } from "./secret-crypto.server";
+import { hashIP } from "./analytics-token.server";
+import { getCachedIpRiskByHash } from "./ip-risk.server";
 
 function shopifyOrderResponse() {
   return {
@@ -77,6 +79,7 @@ describe("order risk synchronization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("APP_ENCRYPTION_KEY", "order-risk-test-encryption-key");
+    vi.stubEnv("SHOPIFY_API_SECRET", "order-risk-test-api-secret");
     prismaMock.visitorLog.findMany.mockResolvedValue([
       {
         action: "blocked",
@@ -148,6 +151,13 @@ describe("order risk synchronization", () => {
           totalAmount: 0,
           totalAmountEncrypted: expect.stringMatching(/^v1:/),
         }),
+      }),
+    );
+    // IP lookups must use the same hash VisitorLog/IpRiskCache are written with.
+    expect(getCachedIpRiskByHash).toHaveBeenCalledWith(hashIP("203.0.113.10"));
+    expect(prismaMock.visitorLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ ipHash: hashIP("203.0.113.10") }),
       }),
     );
     expect(admin.graphql).toHaveBeenCalledTimes(2);

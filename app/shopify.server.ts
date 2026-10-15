@@ -153,8 +153,23 @@ const shopify = shopifyApp({
       });
 
       if (uninstallCleanup) {
+        // The merchant reinstalled before the uninstall cleanup ran. Cancel it so
+        // it does not delete this new install's session, settings and rules. A job
+        // that is already running notices the new session and aborts itself.
+        await prisma.shopCleanupJob.updateMany({
+          where: {
+            shop,
+            reason: "app_uninstalled",
+            status: { in: ["pending", "running", "failed"] },
+          },
+          data: {
+            status: "cancelled",
+            lockedAt: null,
+            lastError: "Cancelled: shop reinstalled",
+          },
+        });
         console.log(
-          `[AfterAuth] Skipping welcome email for ${shop}; uninstall cleanup is ${uninstallCleanup.status}`,
+          `[AfterAuth] Reinstall detected for ${shop}; cancelled uninstall cleanup (was ${uninstallCleanup.status}) and skipped welcome email`,
         );
         return;
       }

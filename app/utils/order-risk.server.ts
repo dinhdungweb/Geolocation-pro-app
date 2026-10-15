@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import prisma from "../db.server";
+import { hashIP } from "./analytics-token.server";
 import { getCachedIpRiskByHash } from "./ip-risk.server";
 import { getGeoFromIP } from "./maxmind.server";
 import {
@@ -214,7 +215,9 @@ async function getVisitorContext(
     prisma.visitorLog.findMany({
       where: {
         shop,
-        ipAddress: clientIp,
+        // VisitorLog and IpRiskCache key IPs with hashIP (not hashProtectedData);
+        // matching on it also uses the [shop, ipHash, timestamp] index.
+        ipHash: hashIP(clientIp),
         timestamp: {
           gte: contextStart,
           lte: orderCreatedAt,
@@ -455,8 +458,8 @@ export async function syncOrderRisk({
   const ipCity = String(
     visitorContext.lastLog?.city || fallbackGeo.city || "",
   );
-  const ipRisk = clientIpHash
-    ? await getCachedIpRiskByHash(clientIpHash)
+  const ipRisk = clientIp
+    ? await getCachedIpRiskByHash(hashIP(clientIp))
     : null;
   const signals = buildRiskSignals({
     blockedBeforeOrder: visitorContext.blockedBeforeOrder,
