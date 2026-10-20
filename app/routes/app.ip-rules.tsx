@@ -1407,3 +1407,5 @@ export default function IPRulesPage() {
         </Page>
     );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "../components/route-error-boundary";

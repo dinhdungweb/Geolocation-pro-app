@@ -5,9 +5,11 @@ import {
     Form,
     data as responseData,
     useActionData,
+    useAsyncError,
     useLoaderData,
     useNavigate,
     useNavigation,
+    useRevalidator,
     useSearchParams,
 } from "react-router";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -61,6 +63,7 @@ import type { IconType } from "react-icons";
 import { SiSamsung } from "react-icons/si";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
+import { reportClientError } from "../utils/client-error.client";
 import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 import prisma from "../db.server";
@@ -531,6 +534,31 @@ async function getVisitorLogFilterOptions(
                 .filter((countryCode): countryCode is string => Boolean(countryCode))
             .sort(),
     };
+}
+
+function VisitorLogsLoadError() {
+    const error = useAsyncError();
+    const revalidator = useRevalidator();
+
+    useEffect(() => {
+        reportClientError(error, "await");
+    }, [error]);
+
+    return (
+        <div style={{ padding: 16 }}>
+            <Banner
+                tone="warning"
+                title="Visitor logs could not be loaded"
+                action={{
+                    content: "Try again",
+                    loading: revalidator.state !== "idle",
+                    onAction: () => revalidator.revalidate(),
+                }}
+            >
+                Loading took too long or the connection was interrupted. Try a narrower date range or try again.
+            </Banner>
+        </div>
+    );
 }
 
 function VisitorLogsTableSkeleton() {
@@ -2101,12 +2129,15 @@ export default function VisitorLogs() {
 
                             <Card padding="0">
                                 <Suspense fallback={renderFilterControls(emptyFilterOptions)}>
-                                    <Await resolve={visitorLogsData}>
+                                    <Await
+                                        resolve={visitorLogsData}
+                                        errorElement={renderFilterControls(emptyFilterOptions)}
+                                    >
                                         {(data) => renderFilterControls(data.filterOptions)}
                                     </Await>
                                 </Suspense>
                                 <Suspense fallback={<VisitorLogsTableSkeleton />}>
-                                    <Await resolve={visitorLogsData}>
+                                    <Await resolve={visitorLogsData} errorElement={<VisitorLogsLoadError />}>
                                         {(data) => renderLogsTable(data)}
                                     </Await>
                                 </Suspense>
@@ -2173,3 +2204,5 @@ export default function VisitorLogs() {
         </Page>
     );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "../components/route-error-boundary";

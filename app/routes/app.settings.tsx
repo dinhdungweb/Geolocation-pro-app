@@ -2224,3 +2224,5 @@ export default function SettingsPage() {
         </Page>
     );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "../components/route-error-boundary";

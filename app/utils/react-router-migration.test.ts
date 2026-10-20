@@ -116,6 +116,20 @@ describe("React Router migration", () => {
     );
   });
 
+  it("keeps page errors inside the embedded app frame", () => {
+    const routesDirectory = fileURLToPath(new URL("../routes/", import.meta.url));
+    const missingBoundaries = readdirSync(routesDirectory)
+      .filter((file) => /^app\..+\.tsx$/.test(file) && !file.includes(".test."))
+      .filter((file) => {
+        const source = readFileSync(`${routesDirectory}/${file}`, "utf8");
+        return /export default/.test(source) && !source.includes(
+          'export { RouteErrorBoundary as ErrorBoundary } from "../components/route-error-boundary";',
+        );
+      });
+
+    expect(missingBoundaries).toEqual([]);
+  });
+
   it("keeps a user-friendly root error boundary", () => {
     const rootRoutePath = fileURLToPath(new URL("../root.tsx", import.meta.url));
     const rootRoute = readFileSync(rootRoutePath, "utf8");

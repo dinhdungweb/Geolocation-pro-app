@@ -2774,3 +2774,5 @@ export default function RulesPage() {
         </Page >
     );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "../components/route-error-boundary";

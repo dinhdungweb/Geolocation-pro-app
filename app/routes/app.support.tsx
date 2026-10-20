@@ -271,3 +271,5 @@ export default function Support() {
         </Page>
     );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "../components/route-error-boundary";

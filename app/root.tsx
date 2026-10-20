@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -8,6 +9,8 @@ import {
   useRouteError,
 } from "react-router";
 import { recoverEmbeddedApp } from "./utils/app-recovery";
+
+import { reportClientError } from "./utils/client-error.client";
 
 export default function App() {
   return (
@@ -35,6 +38,10 @@ export default function App() {
 export function ErrorBoundary() {
   const error = useRouteError();
   const isNotFound = isRouteErrorResponse(error) && error.status === 404;
+
+  useEffect(() => {
+    if (!isNotFound) reportClientError(error, "root");
+  }, [error, isNotFound]);
 
   return (
     <html lang="en">
