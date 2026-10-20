@@ -9,6 +9,7 @@ import {
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { Banner, BlockStack, Page, Text } from "@shopify/polaris";
 
+import { recoverEmbeddedApp } from "../utils/app-recovery";
 import { reportClientError } from "../utils/client-error.client";
 
 // Shopify auth responses (bounce/redirect/401 retry) must still go through
@@ -47,7 +48,7 @@ function RouteErrorFallback({ error }: { error: unknown }) {
         }}
         secondaryAction={{
           content: "Reload app",
-          onAction: () => window.location.reload(),
+          onAction: recoverEmbeddedApp,
         }}
       >
         <BlockStack gap="200">

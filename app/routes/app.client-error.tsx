@@ -2,7 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 export { shopifyBoundaryHeaders as headers } from "../utils/shopify-boundary.server";
 
-const BOUNDARIES = new Set(["root", "route", "await"]);
+const BOUNDARIES = new Set(["root", "layout", "route", "await"]);
 
 function text(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.slice(0, maxLength) : undefined;

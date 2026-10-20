@@ -8,8 +8,8 @@ import {
   ScrollRestoration,
   useRouteError,
 } from "react-router";
-import { recoverEmbeddedApp } from "./utils/app-recovery";
 
+import { recoverEmbeddedApp } from "./utils/app-recovery";
 import { reportClientError } from "./utils/client-error.client";
 
 export default function App() {

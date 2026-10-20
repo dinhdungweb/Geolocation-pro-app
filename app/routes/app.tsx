@@ -20,6 +20,7 @@ import {
   recoverEmbeddedApp,
   rememberEmbeddedShop,
 } from "../utils/app-recovery";
+import { reportClientError } from "../utils/client-error.client";
 import { observeWebVitals, reportWebVital } from "../utils/web-vitals.client";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
@@ -1131,6 +1132,10 @@ export default function App() {
 // Shopify needs React Router to catch thrown responses so their headers are included.
 export function ErrorBoundary() {
   const error = useRouteError();
+
+  useEffect(() => {
+    if (!isRouteErrorResponse(error)) reportClientError(error, "layout");
+  }, [error]);
 
   if (isRouteErrorResponse(error)) {
     return boundary.error(error);

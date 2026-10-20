@@ -1,5 +1,5 @@
 export type ClientErrorPayload = {
-  boundary: "root" | "route" | "await";
+  boundary: "root" | "layout" | "route" | "await";
   message: string;
   name?: string;
   path: string;
