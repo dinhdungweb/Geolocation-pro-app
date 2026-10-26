@@ -3,6 +3,7 @@ api_version = "2026-07"
 [[extensions]]
 name = "t:name"
 handle = "geo-checkout-validation"
+uid = "cb4998c3-ee3b-8d18-e537-f10a4d1bdf0f3cc41949"
 type = "function"
 description = "t:description"
 

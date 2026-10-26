@@ -17,6 +17,7 @@ import {
     Icon,
 } from "@shopify/polaris";
 import {
+    CartIcon,
     CheckCircleIcon,
     GlobeIcon,
     LockIcon,
@@ -482,7 +483,7 @@ export default function SettingsPage() {
     const [checkoutProtectionEnabled, setCheckoutProtectionEnabled] = useState(settings.checkoutProtectionEnabled);
     const [checkoutProtectionError, setCheckoutProtectionError] = useState(settings.checkoutProtectionError);
     const [activeTab, setActiveTab] = useState<
-        "general" | "popup" | "blocked" | "visitor" | "security"
+        "general" | "popup" | "blocked" | "visitor" | "checkout" | "security"
     >("general");
 
     const isLoading = fetcher.state !== "idle";
@@ -717,6 +718,12 @@ export default function SettingsPage() {
             label: "Visitor controls",
             description: "Bots, IPs and preferences",
             icon: PersonIcon,
+        },
+        {
+            id: "checkout" as const,
+            label: "Checkout protection",
+            description: "Block countries at checkout",
+            icon: CartIcon,
         },
         {
             id: "security" as const,
@@ -2069,7 +2076,7 @@ export default function SettingsPage() {
                                             </div>
                                         )}
 
-                                        {activeTab === "security" && isEnabled && (
+                                        {activeTab === "checkout" && isEnabled && (
                                             <div className="settings-secondary-grid">
                                             <SettingsPanel
                                                 title="Checkout country protection"
@@ -2108,6 +2115,11 @@ export default function SettingsPage() {
                                                     </Banner>
                                                 </div>
                                             </SettingsPanel>
+                                            </div>
+                                        )}
+
+                                        {activeTab === "security" && isEnabled && (
+                                            <div className="settings-secondary-grid">
                                             <SettingsPanel
                                                 title="Anti-fraud protection"
                                                 description="Score IP reputation and block high-risk traffic."
