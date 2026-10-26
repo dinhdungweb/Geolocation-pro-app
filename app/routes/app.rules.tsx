@@ -46,6 +46,7 @@ import { getStableShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffecti
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { syncCheckoutProtectionSafely } from "../utils/checkout-protection.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
 import { normalizeCityNamesForStorage, splitCityNames } from "../utils/city-targeting";
 import { validateRuleImportJson, validateRuleImportValue } from "../utils/rule-import-validation";
@@ -209,7 +210,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // Action: Handle CRUD operations
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { session, billing } = await authenticate.admin(request);
+    const { admin, session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const formData = await request.formData();
     const intent = formData.get("intent") as string;
@@ -295,6 +296,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             invalidateStorefrontConfigCache(shop);
+            await syncCheckoutProtectionSafely({ admin, shop });
             return responseData({ success: true, message: "Rule created successfully" });
         }
 
@@ -372,6 +374,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             invalidateStorefrontConfigCache(shop);
+            await syncCheckoutProtectionSafely({ admin, shop });
             return responseData({ success: true, message: "Rule updated successfully" });
         }
 
@@ -420,6 +423,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 data: { isActive: nextIsActive },
             });
             invalidateStorefrontConfigCache(shop);
+            await syncCheckoutProtectionSafely({ admin, shop });
             return responseData({
                 success: true,
                 message: `Rule ${nextIsActive ? "enabled" : "disabled"} successfully`,
@@ -432,6 +436,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 where: { id: { in: ids }, shop },
             });
             invalidateStorefrontConfigCache(shop);
+            await syncCheckoutProtectionSafely({ admin, shop });
             return responseData({ success: true, message: "Rule(s) deleted successfully" });
         }
 
@@ -526,6 +531,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }, { status: 400 });
             }
             invalidateStorefrontConfigCache(shop);
+            await syncCheckoutProtectionSafely({ admin, shop });
             return responseData({ success: true, message: `Successfully imported ${created} rule(s)` });
         }
 

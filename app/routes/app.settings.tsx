@@ -35,6 +35,7 @@ import { isBillingTestMode } from "../utils/billing-mode.server";
 import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { getCheckoutEligibleRules, syncCheckoutProtectionSafely } from "../utils/checkout-protection.server";
 
 const SETTINGS_SAVE_BAR_ID = "settings-save-bar";
 
@@ -62,6 +63,10 @@ interface Settings {
     blockedSupportUrl: string;
     template: string;
     blockVpn: boolean;
+    checkoutProtectionEnabled: boolean;
+    checkoutValidationId: string | null;
+    checkoutProtectionSyncedAt: string | Date | null;
+    checkoutProtectionError: string | null;
 }
 
 type SettingsFormSnapshot = {
@@ -87,6 +92,7 @@ type SettingsFormSnapshot = {
     blockedSupportText: string;
     blockedSupportUrl: string;
     blockVpn: boolean;
+    checkoutProtectionEnabled: boolean;
 };
 
 const defaultSettings: Omit<Settings, "id"> = {
@@ -112,6 +118,10 @@ const defaultSettings: Omit<Settings, "id"> = {
     blockedSupportText: "Contact support",
     blockedSupportUrl: "",
     blockVpn: false,
+    checkoutProtectionEnabled: false,
+    checkoutValidationId: null,
+    checkoutProtectionSyncedAt: null,
+    checkoutProtectionError: null,
 };
 
 function normalizeOption(value: string | null, allowed: string[], fallback: string) {
@@ -151,6 +161,7 @@ function getSettingsSnapshot(settings: Settings): SettingsFormSnapshot {
         blockedSupportText: settings.blockedSupportText || "Contact support",
         blockedSupportUrl: settings.blockedSupportUrl || "",
         blockVpn: settings.blockVpn,
+        checkoutProtectionEnabled: settings.checkoutProtectionEnabled,
     };
 }
 
@@ -304,18 +315,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
     const isFreePlan = effectivePlan === FREE_PLAN;
+    const checkoutEligibleRuleCount = (await getCheckoutEligibleRules(shop)).length;
 
     return responseData({
         settings,
         shop,
         isFreePlan,
         currentPlan: effectivePlan,
+        checkoutEligibleRuleCount,
     });
 };
 
 // Action: Update settings
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { session, billing } = await authenticate.admin(request);
+    const { admin, session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const formData = await request.formData();
 
@@ -354,6 +367,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const blockedSupportUrl = formData.get("blockedSupportUrl") as string;
         const template = normalizeOption(formData.get("template") as string | null, ["modal", "top_bar", "bottom_bar"], "modal");
         const blockVpn = !isFreePlan && formData.get("blockVpn") === "true";
+        const checkoutProtectionEnabled = formData.get("checkoutProtectionEnabled") === "true";
 
         if ((blockedLogoUrl && isDangerousUrl(blockedLogoUrl)) || (blockedSupportUrl && isDangerousUrl(blockedSupportUrl))) {
             return responseData({ success: false, message: "Blocked page URLs cannot use unsafe protocols" }, { status: 400 });
@@ -384,6 +398,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedSupportText,
                 blockedSupportUrl,
                 blockVpn,
+                checkoutProtectionEnabled,
                 currentPlan: shopifyPlan,
             },
             create: {
@@ -411,10 +426,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedSupportText,
                 blockedSupportUrl,
                 blockVpn,
+                checkoutProtectionEnabled,
             },
         });
 
         invalidateStorefrontConfigCache(shop);
+        const checkoutSync = await syncCheckoutProtectionSafely({ admin, shop });
+        if (checkoutSync.error) {
+            return responseData({
+                success: true,
+                warning: true,
+                message: `Settings saved, but checkout protection could not sync: ${checkoutSync.error}`,
+            });
+        }
         return responseData({ success: true, message: "Settings saved successfully" });
     } catch (error) {
         console.error("Settings save error:", error);
@@ -423,7 +447,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function SettingsPage() {
-    const { settings, shop, isFreePlan, currentPlan } = useLoaderData<typeof loader>();
+    const { settings, shop, isFreePlan, currentPlan, checkoutEligibleRuleCount } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const navigate = useNavigate();
     const shopify = useAppBridge();
@@ -455,11 +479,18 @@ export default function SettingsPage() {
     const [blockedSupportText, setBlockedSupportText] = useState(settings.blockedSupportText || "Contact support");
     const [blockedSupportUrl, setBlockedSupportUrl] = useState(settings.blockedSupportUrl || "");
     const [blockVpn, setBlockVpn] = useState(settings.blockVpn);
+    const [checkoutProtectionEnabled, setCheckoutProtectionEnabled] = useState(settings.checkoutProtectionEnabled);
+    const [checkoutProtectionError, setCheckoutProtectionError] = useState(settings.checkoutProtectionError);
     const [activeTab, setActiveTab] = useState<
         "general" | "popup" | "blocked" | "visitor" | "security"
     >("general");
 
     const isLoading = fetcher.state !== "idle";
+    const hasCheckoutSyncWarning = Boolean(
+        fetcher.data &&
+        "warning" in fetcher.data &&
+        fetcher.data.warning === true,
+    );
     const currentSnapshot = useMemo<SettingsFormSnapshot>(() => ({
         isEnabled,
         mode,
@@ -483,12 +514,13 @@ export default function SettingsPage() {
         blockedSupportText,
         blockedSupportUrl,
         blockVpn,
+        checkoutProtectionEnabled,
     }), [
         isEnabled, mode, template, popupTitle, popupMessage, confirmBtnText,
         cancelBtnText, popupBgColor, popupTextColor, popupBtnColor, excludeBots,
         excludedIPs, cookieDuration, blockedTitle, blockedMessage, blockedLogoUrl,
         blockedBgColor, blockedTextColor, blockedAccentColor, blockedSupportText,
-        blockedSupportUrl, blockVpn,
+        blockedSupportUrl, blockVpn, checkoutProtectionEnabled,
     ]);
     const hasUnsavedChanges = JSON.stringify(currentSnapshot) !== JSON.stringify(savedSnapshot);
     const navigationBlocker = useBlocker(hasUnsavedChanges);
@@ -516,7 +548,9 @@ export default function SettingsPage() {
 
     useEffect(() => {
         if (fetcher.data?.success) {
-            setSaveError(null);
+            const syncError = hasCheckoutSyncWarning ? fetcher.data.message : null;
+            setSaveError(syncError);
+            setCheckoutProtectionError(syncError);
             if (submittedSnapshotRef.current) {
                 setSavedSnapshot(submittedSnapshotRef.current);
                 submittedSnapshotRef.current = null;
@@ -526,7 +560,7 @@ export default function SettingsPage() {
             submittedSnapshotRef.current = null;
             setSaveError(fetcher.data.message);
         }
-    }, [fetcher.data, shopify]);
+    }, [fetcher.data, hasCheckoutSyncWarning, shopify]);
 
     useEffect(() => {
         let cancelled = false;
@@ -611,6 +645,7 @@ export default function SettingsPage() {
         setBlockedSupportText(snapshot.blockedSupportText);
         setBlockedSupportUrl(snapshot.blockedSupportUrl);
         setBlockVpn(snapshot.blockVpn);
+        setCheckoutProtectionEnabled(snapshot.checkoutProtectionEnabled);
     }, []);
 
     const handleDiscard = useCallback(() => {
@@ -642,6 +677,7 @@ export default function SettingsPage() {
         formData.append("blockedSupportText", blockedSupportText);
         formData.append("blockedSupportUrl", blockedSupportUrl);
         formData.append("blockVpn", blockVpn.toString());
+        formData.append("checkoutProtectionEnabled", checkoutProtectionEnabled.toString());
 
         fetcher.submit(formData, { method: "POST" });
     }, [
@@ -649,7 +685,7 @@ export default function SettingsPage() {
         popupBgColor, popupTextColor, popupBtnColor, excludeBots, excludedIPs,
         cookieDuration, fetcher, isEnabled, blockVpn, blockedTitle, blockedMessage,
         blockedLogoUrl, blockedBgColor, blockedTextColor, blockedAccentColor,
-        blockedSupportText, blockedSupportUrl, currentSnapshot
+        blockedSupportText, blockedSupportUrl, checkoutProtectionEnabled, currentSnapshot
     ]);
 
     const templateOptions = [
@@ -1678,7 +1714,7 @@ export default function SettingsPage() {
                     {saveError && (
                         <Banner
                             tone="critical"
-                            title="Couldn't save settings"
+                            title={hasCheckoutSyncWarning ? "Checkout protection needs attention" : "Couldn't save settings"}
                             onDismiss={() => setSaveError(null)}
                         >
                             <p>{saveError}</p>
@@ -2035,6 +2071,43 @@ export default function SettingsPage() {
 
                                         {activeTab === "security" && isEnabled && (
                                             <div className="settings-secondary-grid">
+                                            <SettingsPanel
+                                                title="Checkout country protection"
+                                                description="Enforce country blocks on Shopify's servers during checkout."
+                                            >
+                                                <SettingsRow
+                                                    label="Block restricted countries at checkout"
+                                                    description="Uses active, all-page, unscheduled Block country rules. Checks both shipping and billing addresses, including express checkout."
+                                                >
+                                                    <SettingsToggle
+                                                        label="Block restricted countries at checkout"
+                                                        checked={checkoutProtectionEnabled}
+                                                        onChange={setCheckoutProtectionEnabled}
+                                                    />
+                                                </SettingsRow>
+                                                <SettingsRow
+                                                    label="Rules covered"
+                                                    description="Scheduled and page-specific rules stay storefront-only so checkout is never blocked outside their intended scope."
+                                                >
+                                                    <Badge tone={checkoutEligibleRuleCount > 0 ? "success" : "attention"}>
+                                                        {checkoutEligibleRuleCount === 1
+                                                            ? "1 eligible country rule"
+                                                            : `${checkoutEligibleRuleCount} eligible country rules`}
+                                                    </Badge>
+                                                </SettingsRow>
+                                                {checkoutProtectionError ? (
+                                                    <div style={{ padding: "16px 0" }}>
+                                                        <Banner tone="critical" title="Last checkout sync failed">
+                                                            <p>{checkoutProtectionError}</p>
+                                                        </Banner>
+                                                    </div>
+                                                ) : null}
+                                                <div style={{ padding: "16px 0" }}>
+                                                    <Banner tone="info">
+                                                        <p>Blocked attempts can still appear as “reached checkout” in Shopify Analytics, but the customer cannot complete the order.</p>
+                                                    </Banner>
+                                                </div>
+                                            </SettingsPanel>
                                             <SettingsPanel
                                                 title="Anti-fraud protection"
                                                 description="Score IP reputation and block high-risk traffic."

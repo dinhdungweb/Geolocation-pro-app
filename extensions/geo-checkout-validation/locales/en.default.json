@@ -1,0 +1,4 @@
+{
+  "name": "Checkout country protection",
+  "description": "Blocks checkout for restricted shipping or billing countries."
+}

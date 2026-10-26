@@ -52,6 +52,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           billingPeriodEnd: null,
           billingSubscriptionId: null,
           billingUsageLineItemId: null,
+          // Shopify removes the app's checkout validations on uninstall; keep
+          // the toggle preference but forget the dead validation ID.
+          checkoutValidationId: null,
+          checkoutProtectionSyncedAt: null,
           onboardingInstallAt: new Date(),
         },
       }),

@@ -1,0 +1,17 @@
+query CartValidationsGenerateRunInput {
+  validation {
+    metafield(namespace: "$app:geo-checkout-validation", key: "configuration") {
+      jsonValue
+    }
+  }
+  cart {
+    billingAddress {
+      countryCode
+    }
+    deliveryGroups {
+      deliveryAddress {
+        countryCode
+      }
+    }
+  }
+}

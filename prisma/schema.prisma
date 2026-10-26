@@ -113,6 +113,10 @@ model Settings {
   billingPlanName        String?
   shopTimezone           String    @default("UTC")
   shopTimezoneSyncedAt   DateTime?
+  checkoutProtectionEnabled Boolean @default(false)
+  checkoutValidationId      String?
+  checkoutProtectionSyncedAt DateTime?
+  checkoutProtectionError    String?
 }
 
 model AnalyticsCountry {
