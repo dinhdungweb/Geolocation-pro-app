@@ -2,7 +2,7 @@
 (function() {
   'use strict';
 
-  const APP_VERSION = '2026.07.26.1';
+  const APP_VERSION = '2026.10.27.1';
 
   const GEOLOCATION_CONFIG = window.__GEOLOCATION_CONFIG__;
   if (!GEOLOCATION_CONFIG || !GEOLOCATION_CONFIG.shop) {

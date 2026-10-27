@@ -4,6 +4,7 @@ import { useLoaderData } from "react-router";
 import { Gem, Store, TrendingUp } from "lucide-react";
 import prisma from "../db.server";
 import { requireAdminAuth } from "../utils/admin.session.server";
+import { createExpiringAsyncCache } from "../utils/expiring-async-cache.server";
 
 type CountryDistribution = {
   code: string;
@@ -34,26 +35,63 @@ type AdminDashboardLoaderData = {
   }[];
 };
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await requireAdminAuth(request);
+const DASHBOARD_CACHE_TTL_MS = 60_000;
+const DASHBOARD_WINDOW_MONTHS = 12;
+const dashboardCache = createExpiringAsyncCache<AdminDashboardLoaderData>();
 
-  try {
-    const now = new Date();
-    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const yearStart = new Date(now.getFullYear(), 0, 1);
+const emptyDashboard: AdminDashboardLoaderData = {
+  stats: {
+    totalShops: 0,
+    activeRules: 0,
+    totalVisitors: 0,
+    subscriptionRevenue: 0,
+    overageRevenue: 0,
+    totalRevenue: 0,
+  },
+  countries: [],
+  distributions: { plans: {}, modes: {} },
+  trends: [],
+};
 
-    const [totalShops, activeRules, totalVisitors, countryStats, settings, trendRows] =
-      await Promise.all([
-        prisma.settings.count({ where: { NOT: { shop: "GLOBAL" } } }),
-        prisma.redirectRule.count({ where: { isActive: true } }),
-        prisma.analyticsCountry.aggregate({ _sum: { visitors: true } }),
-        prisma.analyticsCountry.groupBy({
-          by: ["countryCode"],
-          _sum: { visitors: true, redirected: true },
-          orderBy: { _sum: { visitors: "desc" } },
-          take: 5,
-        }),
-        prisma.settings.findMany({
+// First day (UTC) of the month DASHBOARD_WINDOW_MONTHS - 1 months ago, so the
+// window covers the current month plus the 11 before it.
+function dashboardWindowStart(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (DASHBOARD_WINDOW_MONTHS - 1), 1));
+}
+
+async function loadAdminDashboard(): Promise<AdminDashboardLoaderData> {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const since = dashboardWindowStart(now);
+  const inWindow = { date: { gte: since } };
+
+  // Analytics totals are limited to the last 12 months and aggregated in SQL
+  // (the date index keeps these range scans cheap), instead of pulling every
+  // per-shop/day/country row into Node.
+  const [totalShops, activeRules, totalVisitors, countryStats, trendRows, billing] =
+    await Promise.all([
+      prisma.settings.count({ where: { NOT: { shop: "GLOBAL" } } }),
+      prisma.redirectRule.count({ where: { isActive: true } }),
+      prisma.analyticsCountry.aggregate({ where: inWindow, _sum: { visitors: true } }),
+      prisma.analyticsCountry.groupBy({
+        by: ["countryCode"],
+        where: inWindow,
+        _sum: { visitors: true, redirected: true },
+        orderBy: { _sum: { visitors: "desc" } },
+        take: 5,
+      }),
+      prisma.$queryRaw<Array<{ yearMonth: string; visitors: bigint | null; redirected: bigint | null }>>`
+        SELECT to_char(date_trunc('month', "date"), 'YYYY-MM') AS "yearMonth",
+               SUM("visitors") AS "visitors",
+               SUM("redirected") AS "redirected"
+        FROM "AnalyticsCountry"
+        WHERE "date" >= ${since}
+        GROUP BY 1
+        ORDER BY 1
+      `,
+      // Settings and their current-period usage run alongside the analytics queries.
+      prisma.settings
+        .findMany({
           where: { NOT: { shop: "GLOBAL" } },
           select: {
             shop: true,
@@ -62,132 +100,123 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             customPlanPrice: true,
             billingPeriodKey: true,
           },
-        }),
-        prisma.analyticsCountry.findMany({
-          where: { date: { gte: yearStart } },
-          select: { date: true, visitors: true, redirected: true },
-        }),
-      ]);
+        })
+        .then(async (settings) => ({
+          settings,
+          currentPeriodUsage: await prisma.monthlyUsage.findMany({
+            where: {
+              billingPeriodKey: {
+                in: settings.map((setting) => setting.billingPeriodKey || `calendar:${yearMonth}`),
+              },
+            },
+          }),
+        })),
+    ]);
 
-    const trendMap = new Map<string, { totalVisitors: number; redirected: number }>();
+  const { settings, currentPeriodUsage } = billing;
 
-    (trendRows as any[]).forEach((row) => {
-      const rowMonth = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, "0")}`;
-      const current = trendMap.get(rowMonth) || { totalVisitors: 0, redirected: 0 };
-      current.totalVisitors += row.visitors || 0;
-      current.redirected += row.redirected || 0;
-      trendMap.set(rowMonth, current);
-    });
+  const monthlyTrends = trendRows.map((row) => ({
+    yearMonth: row.yearMonth,
+    _sum: {
+      totalVisitors: Number(row.visitors ?? 0),
+      redirected: Number(row.redirected ?? 0),
+    },
+  }));
 
-    const monthlyTrends = Array.from(trendMap.entries())
-      .map(([trendMonth, sums]) => ({
-        yearMonth: trendMonth,
-        _sum: {
-          totalVisitors: sums.totalVisitors,
-          redirected: sums.redirected,
-        },
-      }))
-      .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
+  const planPrices: Record<string, number> = {
+    ELITE: 14.99,
+    PLUS: 7.99,
+    PREMIUM: 4.99,
+    FREE: 0,
+  };
+  const overageRate = 100 / 50000;
 
-    const currentPeriodKeys = settings.map((setting: any) => setting.billingPeriodKey || `calendar:${yearMonth}`);
-    const currentPeriodUsage = await prisma.monthlyUsage.findMany({
-      where: { billingPeriodKey: { in: currentPeriodKeys } },
-    });
+  const subscriptionRevenue = settings.reduce((sum, setting) => {
+    const planKey = (setting.currentPlan || "FREE").toUpperCase();
+    if (planKey === "CUSTOM") return sum + Number(setting.customPlanPrice || 0);
+    return sum + (planPrices[planKey] || 0);
+  }, 0);
 
-    const planPrices: Record<string, number> = {
-      ELITE: 14.99,
-      PLUS: 7.99,
-      PREMIUM: 4.99,
-      FREE: 0,
-    };
-    const overageRate = 100 / 50000;
+  const usageMap = new Map(
+    (currentPeriodUsage as any[]).map((usage) => [`${usage.shop}:${usage.billingPeriodKey}`, usage]),
+  );
 
-    const subscriptionRevenue = settings.reduce((sum, setting) => {
+  const overageRevenue = settings.reduce((sum, setting) => {
+    const planKey = (setting.currentPlan || "FREE").toUpperCase();
+    if (planKey === "FREE") return sum;
+
+    const usage = usageMap.get(`${setting.shop}:${setting.billingPeriodKey || `calendar:${yearMonth}`}`);
+    if (!usage) return sum;
+
+    return sum + (usage.chargedVisitors || 0) * overageRate;
+  }, 0);
+
+  const plans = settings.reduce(
+    (acc: Record<string, number>, setting) => {
       const planKey = (setting.currentPlan || "FREE").toUpperCase();
-      if (planKey === "CUSTOM") return sum + Number(setting.customPlanPrice || 0);
-      return sum + (planPrices[planKey] || 0);
-    }, 0);
-
-    const usageMap = new Map(
-      (currentPeriodUsage as any[]).map((usage) => [`${usage.shop}:${usage.billingPeriodKey}`, usage]),
-    );
-
-    const overageRevenue = settings.reduce((sum, setting) => {
-      const planKey = (setting.currentPlan || "FREE").toUpperCase();
-      if (planKey === "FREE") return sum;
-
-      const usage = usageMap.get(`${setting.shop}:${(setting as any).billingPeriodKey || `calendar:${yearMonth}`}`);
-      if (!usage) return sum;
-
-      return sum + (usage.chargedVisitors || 0) * overageRate;
-    }, 0);
-
-    const plans = settings.reduce(
-      (acc: Record<string, number>, setting) => {
-        const planKey = (setting.currentPlan || "FREE").toUpperCase();
-        acc[planKey] = (acc[planKey] || 0) + 1;
-        return acc;
-      },
-      { FREE: 0, PREMIUM: 0, PLUS: 0, ELITE: 0, CUSTOM: 0 },
-    );
-
-    const modes = settings.reduce((acc: Record<string, number>, setting) => {
-      const modeKey = setting.mode || "popup";
-      acc[modeKey] = (acc[modeKey] || 0) + 1;
+      acc[planKey] = (acc[planKey] || 0) + 1;
       return acc;
-    }, {});
+    },
+    { FREE: 0, PREMIUM: 0, PLUS: 0, ELITE: 0, CUSTOM: 0 },
+  );
 
-    const countries = countryStats.reduce<CountryDistribution[]>((items, country) => {
-      if (!country.countryCode) return items;
+  const modes = settings.reduce((acc: Record<string, number>, setting) => {
+    const modeKey = setting.mode || "popup";
+    acc[modeKey] = (acc[modeKey] || 0) + 1;
+    return acc;
+  }, {});
 
-      items.push({
-        code: country.countryCode,
-        visitors: country._sum.visitors || 0,
-        redirects: country._sum.redirected || 0,
-      });
-      return items;
-    }, []);
+  const countries = countryStats.reduce<CountryDistribution[]>((items, country) => {
+    if (!country.countryCode) return items;
 
-    return responseData<AdminDashboardLoaderData>({
-      stats: {
-        totalShops,
-        activeRules,
-        totalVisitors: totalVisitors._sum.visitors || 0,
-        subscriptionRevenue,
-        overageRevenue,
-        totalRevenue: subscriptionRevenue + overageRevenue,
-      },
-      countries,
-      distributions: { plans, modes },
-      trends: monthlyTrends,
+    items.push({
+      code: country.countryCode,
+      visitors: country._sum.visitors || 0,
+      redirects: country._sum.redirected || 0,
     });
+    return items;
+  }, []);
+
+  return {
+    stats: {
+      totalShops,
+      activeRules,
+      totalVisitors: totalVisitors._sum.visitors || 0,
+      subscriptionRevenue,
+      overageRevenue,
+      totalRevenue: subscriptionRevenue + overageRevenue,
+    },
+    countries,
+    distributions: { plans, modes },
+    trends: monthlyTrends,
+  };
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  await requireAdminAuth(request);
+
+  try {
+    // Cached briefly: logging in and switching back to the dashboard reuse the
+    // same overview instead of recomputing it each time.
+    return responseData(
+      await dashboardCache.get("overview", loadAdminDashboard, DASHBOARD_CACHE_TTL_MS),
+    );
   } catch (error) {
     console.error("Dashboard Loader Error:", error);
-    return responseData<AdminDashboardLoaderData>({
-      stats: {
-        totalShops: 0,
-        activeRules: 0,
-        totalVisitors: 0,
-        subscriptionRevenue: 0,
-        overageRevenue: 0,
-        totalRevenue: 0,
-      },
-      countries: [],
-      distributions: { plans: {}, modes: {} },
-      trends: [],
-    });
+    return responseData(emptyDashboard);
   }
 };
 
-function getFullYearTrends(monthlyTrends: any[]) {
-  const currentYear = new Date().getFullYear();
-  const fullYear: any[] = [];
+function getLast12MonthTrends(monthlyTrends: any[]) {
+  const start = dashboardWindowStart();
+  const months: any[] = [];
 
-  for (let month = 1; month <= 12; month++) {
-    const yearMonth = `${currentYear}-${String(month).padStart(2, "0")}`;
+  for (let offset = 0; offset < DASHBOARD_WINDOW_MONTHS; offset++) {
+    const month = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + offset, 1));
+    const yearMonth = `${month.getUTCFullYear()}-${String(month.getUTCMonth() + 1).padStart(2, "0")}`;
     const existing = monthlyTrends.find((trend) => trend.yearMonth === yearMonth);
 
-    fullYear.push(
+    months.push(
       existing || {
         yearMonth,
         _sum: { totalVisitors: 0, redirected: 0 },
@@ -195,7 +224,7 @@ function getFullYearTrends(monthlyTrends: any[]) {
     );
   }
 
-  return fullYear;
+  return months;
 }
 
 function formatCompactCount(value: number) {
@@ -208,7 +237,7 @@ function formatCompactCount(value: number) {
 
 export default function AdminDashboard() {
   const { stats, countries, distributions, trends } = useLoaderData<AdminDashboardLoaderData>();
-  const fullYearTrends = getFullYearTrends(trends);
+  const fullYearTrends = getLast12MonthTrends(trends);
   const maxTrendVisitors =
     Math.max(...fullYearTrends.map((trend) => trend._sum?.totalVisitors || 0)) || 1;
 
@@ -222,7 +251,7 @@ export default function AdminDashboard() {
     {
       label: "Global Traffic",
       value: stats.totalVisitors.toLocaleString("en-US"),
-      note: "Aggregated visitor events",
+      note: "Visitor events, last 12 months",
       icon: <TrendingUp size={18} />,
     },
     {
@@ -258,7 +287,7 @@ export default function AdminDashboard() {
         <article className="ed-panel">
           <div className="ed-panel-head">
             <h2>Traffic Growth Trend</h2>
-            <p>Monthly visitor volume across the current year.</p>
+            <p>Monthly visitor volume over the last 12 months.</p>
           </div>
 
           <div className="ed-trend-chart" aria-label="Traffic growth by month">
@@ -285,7 +314,7 @@ export default function AdminDashboard() {
           <article className="ed-panel">
             <div className="ed-panel-head">
               <h2>Market Distribution</h2>
-              <p>Top countries by visitor share.</p>
+              <p>Top countries by visitor share, last 12 months.</p>
             </div>
 
             <div className="ed-list">
