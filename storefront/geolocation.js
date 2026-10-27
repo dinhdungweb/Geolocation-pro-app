@@ -1016,7 +1016,14 @@
       (config.action === 'popup' || config.action === 'auto_redirect') &&
       alreadyOnTarget(rule.targetUrl, config.action === 'auto_redirect')
     ) {
-      if (config.action === 'auto_redirect' && isInternalTarget(rule.targetUrl)) {
+      // Arriving on a "once" target counts as the one redirect for this session.
+      // Never mark it for "always" rules: the mark would linger and suppress the
+      // first redirect if the merchant later switches the rule to "once".
+      if (
+        config.action === 'auto_redirect' &&
+        isInternalTarget(rule.targetUrl) &&
+        getRedirectFrequency(rule) === 'once'
+      ) {
         SessionManager.set(getRedirectOnceKey(rule), 'true');
       }
       log('Already on target URL');

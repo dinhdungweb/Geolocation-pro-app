@@ -194,3 +194,19 @@ describe("storefront redirect safety", () => {
     },
   );
 });
+
+describe("switching a rule's frequency", () => {
+  it("always -> once in the same session still redirects once", async () => {
+    const browser = createBrowser();
+    const always: Rule = { ruleId: "vi", targetUrl: "/vi", redirectFrequency: "always" };
+    const once: Rule = { ruleId: "vi", targetUrl: "/vi", redirectFrequency: "once" };
+
+    // While the rule is "always": redirected, then arriving on /vi.
+    expect(await browser.visit("/", always)).toBe("https://mystore.com/vi");
+    expect(await browser.visit("/vi", always)).toBeNull();
+
+    // The merchant switches to "once": the next visit must redirect (once).
+    expect(await browser.visit("/collections/all", once)).toBe("https://mystore.com/vi");
+    expect(await browser.visit("/pages/about", once)).toBeNull();
+  });
+});
