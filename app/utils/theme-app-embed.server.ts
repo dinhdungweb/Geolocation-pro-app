@@ -39,6 +39,57 @@ function hasSessionScope(scopeString: string | null | undefined, requiredScope: 
     .includes(requiredScope);
 }
 
+const MAIN_THEME_SETTINGS_QUERY = `#graphql
+  query GeoMainThemeSettings {
+    themes(first: 1, roles: [MAIN]) {
+      nodes {
+        id
+        name
+        files(filenames: ["config/settings_data.json"], first: 1) {
+          nodes {
+            body {
+              ... on OnlineStoreThemeFileBodyText {
+                content
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+type MainThemeSettingsResponse = {
+  data?: {
+    themes?: {
+      nodes?: Array<{
+        id?: string;
+        name?: string;
+        files?: { nodes?: Array<{ body?: { content?: string } }> };
+      }>;
+    };
+  };
+  errors?: Array<{ message?: string; extensions?: { code?: string } }>;
+};
+
+function missingScopeStatus(sessionHasThemeScope: boolean, themeName: string | null): AppEmbedStatus {
+  return {
+    state: "missing_scope",
+    label: "Permission needed",
+    helpText: sessionHasThemeScope
+      ? "Shopify did not allow theme access. Reapprove the app permissions, then reload this page."
+      : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
+    themeName,
+  };
+}
+
+// settings_data.json often starts with an auto-generated /* ... */ notice.
+function parseThemeSettings(content: string) {
+  return JSON.parse(content.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, "")) as {
+    current?: { blocks?: Record<string, { type?: unknown; disabled?: unknown }> };
+  };
+}
+
 async function loadThemeAppEmbedStatus({
   shop,
   accessToken,
@@ -50,38 +101,38 @@ async function loadThemeAppEmbedStatus({
 }): Promise<AppEmbedStatus> {
   const sessionHasThemeScope = hasSessionScope(scopeString, "read_themes");
 
-  const headers = {
-    "X-Shopify-Access-Token": accessToken,
-    Accept: "application/json",
-  };
-  const signal = AbortSignal.timeout(THEME_STATUS_TIMEOUT_MS);
-
   try {
-    const themesResponse = await fetch(
-      `https://${shop}/admin/api/${apiVersion}/themes.json?role=main`,
-      { headers, signal },
-    );
+    // GraphQL Admin API: public apps may not use the REST Admin API.
+    const response = await fetch(`https://${shop}/admin/api/${apiVersion}/graphql.json`, {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query: MAIN_THEME_SETTINGS_QUERY }),
+      signal: AbortSignal.timeout(THEME_STATUS_TIMEOUT_MS),
+    });
 
-    if (themesResponse.status === 401 || themesResponse.status === 403) {
-      return {
-        state: "missing_scope",
-        label: "Permission needed",
-        helpText: sessionHasThemeScope
-          ? "Shopify did not allow theme access. Reapprove the app permissions, then reload this page."
-          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
-        themeName: null,
-      };
+    if (response.status === 401 || response.status === 403) {
+      return missingScopeStatus(sessionHasThemeScope, null);
+    }
+    if (!response.ok) {
+      throw new Error(`Theme query failed with ${response.status}`);
     }
 
-    if (!themesResponse.ok) {
-      throw new Error(`Theme list request failed with ${themesResponse.status}`);
+    const payload = await response.json() as MainThemeSettingsResponse;
+    if (payload.errors?.length) {
+      const accessDenied = payload.errors.some(
+        (error) =>
+          error.extensions?.code === "ACCESS_DENIED" ||
+          /access denied|read_themes/i.test(error.message || ""),
+      );
+      if (accessDenied) return missingScopeStatus(sessionHasThemeScope, null);
+      throw new Error(payload.errors.map((error) => error.message).join("; "));
     }
 
-    const themesData = await themesResponse.json() as {
-      themes?: Array<{ id: number | string; name?: string; role?: string }>;
-    };
-    const mainTheme = themesData.themes?.find((theme) => theme.role === "main") || themesData.themes?.[0];
-
+    const mainTheme = payload.data?.themes?.nodes?.[0];
     if (!mainTheme?.id) {
       return {
         state: "unavailable",
@@ -91,41 +142,19 @@ async function loadThemeAppEmbedStatus({
       };
     }
 
-    const assetResponse = await fetch(
-      `https://${shop}/admin/api/${apiVersion}/themes/${mainTheme.id}/assets.json?asset[key]=config%2Fsettings_data.json`,
-      { headers, signal },
-    );
-
-    if (assetResponse.status === 401 || assetResponse.status === 403) {
-      return {
-        state: "missing_scope",
-        label: "Permission needed",
-        helpText: sessionHasThemeScope
-          ? "Shopify did not allow theme asset access. Reapprove the app permissions, then reload this page."
-          : "Approve the read_themes permission so the app can read your current theme and show the app embed status.",
-        themeName: mainTheme.name || null,
-      };
-    }
-
-    if (!assetResponse.ok) {
-      throw new Error(`Theme asset request failed with ${assetResponse.status}`);
-    }
-
-    const assetData = await assetResponse.json() as { asset?: { value?: string } };
-    const settingsValue = assetData.asset?.value;
+    const themeName = mainTheme.name || null;
+    const settingsValue = mainTheme.files?.nodes?.[0]?.body?.content;
 
     if (!settingsValue) {
       return {
         state: "disabled",
         label: "Not enabled",
         helpText: "The current theme does not include the app embed yet. Enable it in the theme editor and save.",
-        themeName: mainTheme.name || null,
+        themeName,
       };
     }
 
-    const settingsData = JSON.parse(settingsValue) as {
-      current?: { blocks?: Record<string, { type?: unknown; disabled?: unknown }> };
-    };
+    const settingsData = parseThemeSettings(settingsValue);
     const blocks = settingsData.current?.blocks && typeof settingsData.current.blocks === "object"
       ? Object.values(settingsData.current.blocks)
       : [];
@@ -138,8 +167,8 @@ async function loadThemeAppEmbedStatus({
       return {
         state: "enabled",
         label: "Enabled",
-        helpText: `The app embed is enabled in ${mainTheme.name || "the current theme"}.`,
-        themeName: mainTheme.name || null,
+        helpText: `The app embed is enabled in ${themeName || "the current theme"}.`,
+        themeName,
       };
     }
 
@@ -147,7 +176,7 @@ async function loadThemeAppEmbedStatus({
       state: "disabled",
       label: "Not enabled",
       helpText: "The app embed is not enabled in the current theme. Enable it in the theme editor and save.",
-      themeName: mainTheme.name || null,
+      themeName,
     };
   } catch (error) {
     console.error("[ThemeAppEmbed] Failed to read theme app embed status:", error);

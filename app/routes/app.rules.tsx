@@ -46,7 +46,17 @@ import { getStableShopifyPlanFromBillingCheck, hasPaidPlanAccess, resolveEffecti
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-embed.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
-import { syncCheckoutProtectionSafely } from "../utils/checkout-protection.server";
+import {
+    getShopHostsWithin,
+    syncCheckoutProtectionSafely,
+} from "../utils/checkout-protection.server";
+import {
+    KEEP_LEGACY_REDIRECT_FREQUENCY,
+    defaultRedirectFrequency,
+    effectiveRedirectFrequency,
+    isSafeMerchantUrl,
+    normalizeRedirectFrequency,
+} from "../utils/redirect-target";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
 import { normalizeCityNamesForStorage, splitCityNames } from "../utils/city-targeting";
 import { validateRuleImportJson, validateRuleImportValue } from "../utils/rule-import-validation";
@@ -108,6 +118,7 @@ interface RedirectRule {
     priority: number;
     ruleType: string;
     redirectMode: string;
+    redirectFrequency: string | null;
     scheduleEnabled: boolean;
     startTime: string | null;
     endTime: string | null;
@@ -123,14 +134,13 @@ interface RedirectRule {
 
 const PAID_PLAN_BADGE_LABEL = "Paid plan";
 
+
 function normalizeOption(value: string | null, allowed: string[], fallback: string) {
     return value && allowed.includes(value) ? value : fallback;
 }
 
 function validateUrl(url: string) {
-    if (!url) return true; // Empty is OK (for block rules)
-    const dangerous = /^(javascript|data|vbscript):/i;
-    return !dangerous.test(url.trim());
+    return isSafeMerchantUrl(url); // empty is OK (for block rules)
 }
 
 function isPaidBillingConfig(billingConfig: any, settings: any) {
@@ -162,11 +172,15 @@ function mergeConflictSummaries(...summaries: ReturnType<typeof detectRuleConfli
 // Loader: Fetch all rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const loaderStartedAt = performance.now();
-    const { session, billing } = await authenticate.admin(request);
+    const { admin, session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const accessToken = session.accessToken || "";
 
-    const [rules, billingConfig, settings, appEmbedStatus] = await Promise.all([
+    // ownHosts lets the form tell same-store targets (relative paths and the
+    // store's own domains) from other stores. Cached per shop and capped so a
+    // slow Shopify response never delays the page; it runs alongside the
+    // other loader calls.
+    const [rules, billingConfig, settings, appEmbedStatus, ownHosts] = await Promise.all([
         prisma.redirectRule.findMany({
             where: {
                 shop,
@@ -181,6 +195,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             accessToken,
             scopeString: session.scope,
         }),
+        getShopHostsWithin(admin, shop),
     ]);
     const hasProPlan = isPaidBillingConfig(billingConfig, settings);
 
@@ -195,6 +210,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return responseData({
         rules,
         shop,
+        ownHosts,
         hasProPlan,
         conflictSummary,
         markets: [] as ShopifyMarketOption[],
@@ -207,6 +223,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         },
     });
 };
+
+// The rule change itself succeeded; surface a checkout sync failure as a
+// warning instead of reporting plain success while checkout is out of date.
+async function syncCheckoutAfterRuleChange(
+    admin: Parameters<typeof syncCheckoutProtectionSafely>[0]["admin"],
+    shop: string,
+) {
+    const result = await syncCheckoutProtectionSafely({ admin, shop });
+    return result.error
+        ? { checkoutWarning: `Checkout protection was not updated: ${result.error}` }
+        : {};
+}
 
 // Action: Handle CRUD operations
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -239,6 +267,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
+            const redirectFrequency = normalizeRedirectFrequency(redirectMode, formData.get("redirectFrequency"));
             const daysOfWeek = formData.get("daysOfWeek") as string;
             const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
@@ -281,6 +310,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     isActive: true,
                     ruleType,
                     redirectMode,
+                    redirectFrequency,
                     matchType,
                     stateCodes: matchType === "state" ? stateCodes : "",
                     cityNames: matchType === "city" ? cityNames : "",
@@ -296,8 +326,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             invalidateStorefrontConfigCache(shop);
-            await syncCheckoutProtectionSafely({ admin, shop });
-            return responseData({ success: true, message: "Rule created successfully" });
+            const checkoutSync = await syncCheckoutAfterRuleChange(admin, shop);
+            return responseData({ success: true, message: "Rule created successfully", ...checkoutSync });
         }
 
         if (intent === "update") {
@@ -318,6 +348,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
+            const redirectFrequency = normalizeRedirectFrequency(redirectMode, formData.get("redirectFrequency"));
             const daysOfWeek = formData.get("daysOfWeek") as string;
             const timezone = formData.get("timezone") as string;
             const scheduleEnabled = formData.get("scheduleEnabled") === "true";
@@ -364,6 +395,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     ruleType,
                     redirectMode,
+                    redirectFrequency,
                     scheduleEnabled,
                     startTime,
                     endTime,
@@ -374,8 +406,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             invalidateStorefrontConfigCache(shop);
-            await syncCheckoutProtectionSafely({ admin, shop });
-            return responseData({ success: true, message: "Rule updated successfully" });
+            const checkoutSync = await syncCheckoutAfterRuleChange(admin, shop);
+            return responseData({ success: true, message: "Rule updated successfully", ...checkoutSync });
         }
 
         if (intent === "toggle") {
@@ -423,10 +455,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 data: { isActive: nextIsActive },
             });
             invalidateStorefrontConfigCache(shop);
-            await syncCheckoutProtectionSafely({ admin, shop });
+            const checkoutSync = await syncCheckoutAfterRuleChange(admin, shop);
             return responseData({
                 success: true,
                 message: `Rule ${nextIsActive ? "enabled" : "disabled"} successfully`,
+                ...checkoutSync,
             });
         }
 
@@ -436,8 +469,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 where: { id: { in: ids }, shop },
             });
             invalidateStorefrontConfigCache(shop);
-            await syncCheckoutProtectionSafely({ admin, shop });
-            return responseData({ success: true, message: "Rule(s) deleted successfully" });
+            const checkoutSync = await syncCheckoutAfterRuleChange(admin, shop);
+            return responseData({ success: true, message: "Rule(s) deleted successfully", ...checkoutSync });
         }
 
         if (intent === "import") {
@@ -507,6 +540,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         isActive: rule.isActive !== false,
                         ruleType: normalizeOption(rule.ruleType, ["redirect", "block"], "redirect"),
                         redirectMode: normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
+                        // Imports without a frequency keep the legacy behavior (null).
+                        redirectFrequency: rule.redirectFrequency
+                            ? normalizeRedirectFrequency(
+                                normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
+                                rule.redirectFrequency,
+                            )
+                            : null,
                         matchType,
                         stateCodes: matchType === "state" ? stateCodes : "",
                         cityNames: matchType === "city" ? cityNames : "",
@@ -531,8 +571,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }, { status: 400 });
             }
             invalidateStorefrontConfigCache(shop);
-            await syncCheckoutProtectionSafely({ admin, shop });
-            return responseData({ success: true, message: `Successfully imported ${created} rule(s)` });
+            const checkoutSync = await syncCheckoutAfterRuleChange(admin, shop);
+            return responseData({ success: true, message: `Successfully imported ${created} rule(s)`, ...checkoutSync });
         }
 
         return responseData({ success: false, message: "Unknown intent" });
@@ -545,6 +585,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function RulesPage() {
     const {
         rules,
+        shop,
+        ownHosts,
         hasProPlan,
         conflictSummary,
         markets: initialMarkets,
@@ -595,6 +637,18 @@ export default function RulesPage() {
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("redirect");
     const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
+    const [formRedirectFrequency, setFormRedirectFrequency] = useState("always");
+    // Once the merchant picks a frequency themselves, stop deriving it from the URL.
+    const [redirectFrequencyTouched, setRedirectFrequencyTouched] = useState(false);
+    // Editing an auto redirect saved before the frequency option existed: keep
+    // it unset (its real behavior depends on the visitor's domain) unless the
+    // merchant explicitly picks a frequency.
+    const [keepLegacyFrequency, setKeepLegacyFrequency] = useState(false);
+    const handleRedirectFrequencyChange = useCallback((value: string) => {
+        setRedirectFrequencyTouched(true);
+        setKeepLegacyFrequency(false);
+        setFormRedirectFrequency(value);
+    }, []);
     // Scheduling State
     const [scheduleSectionOpen, setScheduleSectionOpen] = useState(false);
     const [pageTargetingSectionOpen, setPageTargetingSectionOpen] = useState(false);
@@ -711,6 +765,15 @@ export default function RulesPage() {
             return;
         }
         setPageError(null);
+        const checkoutWarning =
+            "checkoutWarning" in fetcher.data ? fetcher.data.checkoutWarning : null;
+        if (checkoutWarning) {
+            shopify.toast.show(`${fetcher.data.message}. ${checkoutWarning}`, {
+                isError: true,
+                duration: 8000,
+            });
+            return;
+        }
         shopify.toast.show(fetcher.data.message);
     }, [fetcher.data, fetcher.state, shopify]);
 
@@ -893,6 +956,11 @@ export default function RulesPage() {
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "redirect");
             setFormRedirectMode(editingRule.redirectMode || "popup");
+            setFormRedirectFrequency(effectiveRedirectFrequency(editingRule, shop, ownHosts));
+            setRedirectFrequencyTouched(true);
+            setKeepLegacyFrequency(
+                editingRule.redirectMode === "auto_redirect" && !editingRule.redirectFrequency,
+            );
             setScheduleEnabled(editingRule.scheduleEnabled || false);
             setStartTime(editingRule.startTime || "09:00");
             setEndTime(editingRule.endTime || "17:00");
@@ -916,6 +984,9 @@ export default function RulesPage() {
             setFormPriority("0");
             setFormRuleType("redirect");
             setFormRedirectMode("auto_redirect");
+            setFormRedirectFrequency("always");
+            setRedirectFrequencyTouched(false);
+            setKeepLegacyFrequency(false);
             setScheduleEnabled(false);
             setStartTime("09:00");
             setEndTime("17:00");
@@ -930,7 +1001,15 @@ export default function RulesPage() {
         setStateInputValue("");
         setScheduleSectionOpen(false);
         setPageTargetingSectionOpen(false);
-    }, [editingRule, modalOpen]);
+    }, [editingRule, modalOpen, shop, ownHosts]);
+
+    // New rules: default to "once" for targets on this store (e.g. /en-ca or one
+    // of its own domains) and "always" for another store, until the merchant
+    // chooses explicitly.
+    useEffect(() => {
+        if (redirectFrequencyTouched) return;
+        setFormRedirectFrequency(defaultRedirectFrequency(formTargetUrl, shop, ownHosts));
+    }, [formTargetUrl, ownHosts, redirectFrequencyTouched, shop]);
 
     const handleOpenModal = useCallback((rule?: RedirectRule) => {
         setFormError(null);
@@ -969,6 +1048,10 @@ export default function RulesPage() {
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
         formData.append("redirectMode", formRedirectMode);
+        formData.append(
+            "redirectFrequency",
+            keepLegacyFrequency ? KEEP_LEGACY_REDIRECT_FREQUENCY : formRedirectFrequency,
+        );
         formData.append("scheduleEnabled", scheduleEnabled.toString());
         formData.append("startTime", startTime);
         formData.append("endTime", endTime);
@@ -980,7 +1063,7 @@ export default function RulesPage() {
         formFetcher.submit(formData, { method: "POST" });
     }, [
         editingRule, formName, formMatchType, selectedCountries, selectedMarkets, selectedStates, cityNames, cityCountryCode, cityRegionCode, marketCountryCodesByHandle, formTargetUrl, formPriority,
-        formRuleType, formRedirectMode, scheduleEnabled, startTime, endTime, activeDays, timezone,
+        formRuleType, formRedirectMode, formRedirectFrequency, keepLegacyFrequency, scheduleEnabled, startTime, endTime, activeDays, timezone,
         pageTargetingType, pagePaths,
         formFetcher
     ]);
@@ -1149,6 +1232,7 @@ export default function RulesPage() {
             priority: rule.priority,
             ruleType: rule.ruleType,
             redirectMode: rule.redirectMode,
+            redirectFrequency: rule.redirectFrequency,
             scheduleEnabled: rule.scheduleEnabled,
             startTime: rule.startTime,
             endTime: rule.endTime,
@@ -1340,7 +1424,9 @@ export default function RulesPage() {
                     <RuleTypeBadge
                         ruleType={rule.ruleType}
                         label={rule.ruleType === "redirect"
-                            ? (rule.redirectMode === "auto_redirect" ? "Auto Redirect" : "Popup")
+                            ? (rule.redirectMode === "auto_redirect"
+                                ? (effectiveRedirectFrequency(rule, shop, ownHosts) === "once" ? "Auto Redirect · Once" : "Auto Redirect")
+                                : "Popup")
                             : "Block"}
                     />
                 </div>
@@ -2500,6 +2586,23 @@ export default function RulesPage() {
                                     onChange={setFormRedirectMode}
                                     helpText="Choose how matching visitors are redirected."
                                 />
+
+                                {formRedirectMode === "auto_redirect" && (
+                                    <Select
+                                        label="Redirect frequency"
+                                        options={[
+                                            { label: "Always redirect", value: "always" },
+                                            { label: "Redirect once", value: "once" },
+                                        ]}
+                                        value={formRedirectFrequency}
+                                        onChange={handleRedirectFrequencyChange}
+                                        helpText={keepLegacyFrequency
+                                            ? "This rule was created before this option existed. Saving keeps its current behavior until you choose a frequency."
+                                            : formRedirectFrequency === "always"
+                                                ? "Visitors are redirected on every visit and cannot stay on this page."
+                                                : "Visitors are redirected the first time in a browser session. If they come back during the same session, they can stay. Not enforced at checkout."}
+                                    />
+                                )}
                             </BlockStack>
                         )}
                         <TextField

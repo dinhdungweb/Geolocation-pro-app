@@ -45,10 +45,17 @@
         return parsed.href;
       }
     } catch {
-      // Invalid merchant-provided URLs are rejected below.
+      // Unparseable values are rejected: returning them raw would let markup
+      // through, since callers interpolate the result into HTML attributes.
     }
-    if (raw.startsWith('/')) return raw;
     return '';
+  };
+
+  // Navigation targets: same rules as links, minus mailto. Blocks javascript:
+  // and data: even when disguised with tabs or control characters.
+  const safeNavigationUrl = (value) => {
+    const url = safeUrl(value);
+    return url && !url.toLowerCase().startsWith('mailto:') ? url : '';
   };
 
   const CookieManager = {
@@ -96,6 +103,7 @@
   };
 
   const CONFIG_CACHE_TTL_MS = 10_000;
+  const CONFIG_FETCH_TIMEOUT_MS = 3_000;
   const configCacheKey = [
     'geo_config',
     GEOLOCATION_CONFIG.shop,
@@ -122,11 +130,21 @@
 
     inFlightConfig = (async () => {
       const apiUrl = `${GEOLOCATION_CONFIG.proxyUrl}?shop=${GEOLOCATION_CONFIG.shop}&path=${encodeURIComponent(window.location.pathname)}&origin=${encodeURIComponent(window.location.origin)}&country=${encodeURIComponent(GEOLOCATION_CONFIG.visitorCountry || '')}&market_handle=${encodeURIComponent(GEOLOCATION_CONFIG.marketHandle || '')}&market_id=${encodeURIComponent(GEOLOCATION_CONFIG.marketId || '')}&_geo_ts=${Date.now()}${DEBUG ? '&debug=true' : ''}`;
-      const response = await fetch(apiUrl, {
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
+      // A hung app server must not trigger a block or redirect long after the
+      // visitor started browsing: give up and fail open (init() catches this).
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timeout = controller ? setTimeout(() => controller.abort(), CONFIG_FETCH_TIMEOUT_MS) : null;
+      let response;
+      try {
+        response = await fetch(apiUrl, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { 'Cache-Control': 'no-cache' },
+          signal: controller ? controller.signal : undefined
+        });
+      } finally {
+        if (timeout) clearTimeout(timeout);
+      }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const config = await response.json();
@@ -220,7 +238,7 @@
     }
   };
 
-  const alreadyOnTarget = (targetUrl) => {
+  const alreadyOnTarget = (targetUrl, includeSection = false) => {
     if (!targetUrl) return true;
     try {
       const current = new URL(window.location.href);
@@ -228,7 +246,15 @@
       if (current.origin !== target.origin) return false;
 
       const normalizePath = (path) => path.replace(/\/+$/, '') || '/';
-      return normalizePath(current.pathname) === normalizePath(target.pathname);
+      const currentPath = normalizePath(current.pathname);
+      const targetPath = normalizePath(target.pathname);
+      if (currentPath === targetPath) return true;
+      // Auto redirects: anywhere inside the target section counts as arrived
+      // (e.g. /en-ca/products/x for a /en-ca target), otherwise an "always"
+      // redirect within the same store would bounce visitors back on every
+      // page. A "/" target stays exact, or the whole store would match.
+      // Popups keep the exact-page check they always had.
+      return includeSection && targetPath !== '/' && currentPath.startsWith(`${targetPath}/`);
     } catch {
       return window.location.href.includes(targetUrl);
     }
@@ -248,9 +274,22 @@
     return Boolean(target && target.origin === window.location.origin);
   };
 
-  const getInternalRedirectKey = (rule) => {
+  // Session key marking that a "redirect once" rule already ran. The prefix
+  // predates the frequency option; keeping it preserves in-flight sessions.
+  const getRedirectOnceKey = (rule) => {
     const keySource = rule.ruleId || rule.name || rule.targetUrl || 'unknown';
     return `geo_internal_redirected:${GEOLOCATION_CONFIG.shop}:${keySource}`;
+  };
+
+  // "always": redirect on every visit. "once": redirect the first time in a
+  // browser session, then let the visitor stay until the session ends. Rules
+  // saved before this option existed keep their old behavior: once within the
+  // same store, always when sending visitors to another store.
+  const getRedirectFrequency = (rule) => {
+    if (rule.redirectFrequency === 'always' || rule.redirectFrequency === 'once') {
+      return rule.redirectFrequency;
+    }
+    return isInternalTarget(rule.targetUrl) ? 'once' : 'always';
   };
 
   const showPopup = (config) => {
@@ -461,8 +500,10 @@
 
     document.getElementById('geo-confirm-btn').addEventListener('click', () => {
       CookieManager.set('geo_choice', 'redirected', config.popup?.cookieDuration || 7);
+      const destination = safeNavigationUrl(rule.targetUrl);
+      if (!destination) return;
       trackEvent('redirected', config);
-      window.location.href = rule.targetUrl;
+      window.location.href = destination;
     });
 
     document.getElementById('geo-cancel-btn').addEventListener('click', () => {
@@ -952,8 +993,9 @@
   };
 
   const init = async () => {
+    // Only the theme editor is exempt. URL markers such as ?preview_theme_id=
+    // are visitor-controlled and must not switch blocking or redirects off.
     if (window.Shopify && window.Shopify.designMode) return;
-    if (window.location.search.includes('preview_theme_id') || window.location.pathname.includes('/editor')) return;
     let config;
     try {
       config = await fetchConfig();
@@ -970,9 +1012,12 @@
     }
 
     const rule = config.rule || {};
-    if ((config.action === 'popup' || config.action === 'auto_redirect') && alreadyOnTarget(rule.targetUrl)) {
+    if (
+      (config.action === 'popup' || config.action === 'auto_redirect') &&
+      alreadyOnTarget(rule.targetUrl, config.action === 'auto_redirect')
+    ) {
       if (config.action === 'auto_redirect' && isInternalTarget(rule.targetUrl)) {
-        SessionManager.set(getInternalRedirectKey(rule), 'true');
+        SessionManager.set(getRedirectOnceKey(rule), 'true');
       }
       log('Already on target URL');
       return;
@@ -986,18 +1031,26 @@
     }
 
     if (config.action === 'auto_redirect') {
-      if (isInternalTarget(rule.targetUrl)) {
-        const internalRedirectKey = getInternalRedirectKey(rule);
-        if (SessionManager.has(internalRedirectKey)) {
-          log('Internal redirect already handled for this session');
+      if (getRedirectFrequency(rule) === 'once') {
+        const onceKey = getRedirectOnceKey(rule);
+        if (SessionManager.has(onceKey)) {
+          log('Redirect already happened once in this session');
           return;
         }
-        SessionManager.set(internalRedirectKey, 'true');
+        SessionManager.set(onceKey, 'true');
+      }
+
+      const destination = safeNavigationUrl(rule.targetUrl);
+      if (!destination) {
+        log('Ignoring redirect with an unsafe or invalid target URL');
+        return;
       }
 
       CookieManager.remove('geo_choice');
       trackEvent(config.analyticsEvent || 'auto_redirected', config);
-      window.location.href = rule.targetUrl;
+      // replace(): the redirected page must not stay in history, otherwise Back
+      // lands on it and the rule immediately redirects again.
+      window.location.replace(destination);
       return;
     }
 

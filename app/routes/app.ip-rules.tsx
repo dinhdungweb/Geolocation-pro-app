@@ -43,6 +43,14 @@ import { getThemeAppEmbedStatus, getThemeEditorUrl } from "../utils/theme-app-em
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePagePathPatterns } from "../utils/page-targeting";
 import { validateRuleImportJson, validateRuleImportValue } from "../utils/rule-import-validation";
+import { getShopHostsWithin } from "../utils/checkout-protection.server";
+import {
+    KEEP_LEGACY_REDIRECT_FREQUENCY,
+    defaultRedirectFrequency,
+    effectiveRedirectFrequency,
+    isSafeMerchantUrl,
+    normalizeRedirectFrequency,
+} from "../utils/redirect-target";
 
 interface IPRule {
     id: string;
@@ -53,6 +61,7 @@ interface IPRule {
     priority: number;
     ruleType: string;
     redirectMode: string;
+    redirectFrequency: string | null;
     pageTargetingType: string;
     pagePaths: string | null;
 }
@@ -62,9 +71,7 @@ function normalizeOption(value: string | null, allowed: string[], fallback: stri
 }
 
 function validateUrl(url: string) {
-    if (!url) return true;
-    const dangerous = /^(javascript|data|vbscript):/i;
-    return !dangerous.test(url.trim());
+    return isSafeMerchantUrl(url);
 }
 
 const IP_REQUIRED_MESSAGE = "Please enter at least one IP address before saving this rule.";
@@ -88,7 +95,7 @@ function isPaidBillingConfig(billingConfig: any, settings: any) {
 
 // Loader: Fetch all IP rules for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session, billing } = await authenticate.admin(request);
+    const { admin, session, billing } = await authenticate.admin(request);
     const shop = session.shop;
     const accessToken = session.accessToken || "";
 
@@ -101,7 +108,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     // Check for active subscription (IP Rules is a Pro feature)
-    const [billingConfig, settings, appEmbedStatus] = await Promise.all([
+    const [billingConfig, settings, appEmbedStatus, ownHosts] = await Promise.all([
         checkBillingWithFallback(billing, isBillingTestMode()),
         prisma.settings.findUnique({ where: { shop } }),
         getThemeAppEmbedStatus({
@@ -109,6 +116,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             accessToken,
             scopeString: session.scope,
         }),
+        // Same-store vs. other-store targets for the redirect frequency default.
+        getShopHostsWithin(admin, shop),
     ]);
     const hasProPlan = isPaidBillingConfig(billingConfig, settings);
 
@@ -118,6 +127,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return responseData({
         rules,
         shop,
+        ownHosts,
         hasProPlan,
         canCreateRule,
         conflictSummary,
@@ -157,6 +167,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
+            const redirectFrequency = normalizeRedirectFrequency(redirectMode, formData.get("redirectFrequency"));
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
@@ -172,6 +183,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     isActive: true,
                     ruleType,
                     redirectMode,
+                    redirectFrequency: ruleType === "redirect" ? redirectFrequency : null,
                     pageTargetingType,
                     pagePaths,
                 },
@@ -198,6 +210,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const priority = parseInt(formData.get("priority") as string) || 0;
             const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "block");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
+            const redirectFrequency = normalizeRedirectFrequency(redirectMode, formData.get("redirectFrequency"));
             const pageTargetingType = normalizeOption(formData.get("pageTargetingType") as string | null, ["all", "include", "exclude"], "all");
             const pagePaths = normalizePagePathPatterns(formData.get("pagePaths") as string | null);
 
@@ -210,6 +223,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     priority,
                     ruleType,
                     redirectMode,
+                    redirectFrequency: ruleType === "redirect" ? redirectFrequency : null,
                     pageTargetingType,
                     pagePaths,
                 },
@@ -310,6 +324,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         isActive: rule.isActive !== false,
                         ruleType: normalizeOption(rule.ruleType, ["redirect", "block"], "block"),
                         redirectMode: normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
+                        // Imports without a frequency keep the legacy behavior (null).
+                        redirectFrequency: rule.redirectFrequency
+                            ? normalizeRedirectFrequency(
+                                normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
+                                rule.redirectFrequency,
+                            )
+                            : null,
                         matchType: "ip",
                         pageTargetingType: normalizeOption(rule.pageTargetingType, ["all", "include", "exclude"], "all"),
                         pagePaths: rule.pagePaths || null,
@@ -338,7 +359,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function IPRulesPage() {
     const navigate = useNavigate();
-    const { rules, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
+    const { rules, shop, ownHosts, hasProPlan, conflictSummary, appEmbedStatus, themeEditorUrl } = useLoaderData<typeof loader>();
     const fetcher = useFetcher<typeof action>();
     const formFetcher = useFetcher<typeof action>();
     const importFetcher = useFetcher<typeof action>();
@@ -368,6 +389,16 @@ export default function IPRulesPage() {
     const [formPriority, setFormPriority] = useState("0");
     const [formRuleType, setFormRuleType] = useState("block");
     const [formRedirectMode, setFormRedirectMode] = useState("auto_redirect");
+    const [formRedirectFrequency, setFormRedirectFrequency] = useState("always");
+    // Same behavior as the country rules form: derive the default from the
+    // target until the merchant picks, and keep legacy rules unset on edit.
+    const [redirectFrequencyTouched, setRedirectFrequencyTouched] = useState(false);
+    const [keepLegacyFrequency, setKeepLegacyFrequency] = useState(false);
+    const handleRedirectFrequencyChange = useCallback((value: string) => {
+        setRedirectFrequencyTouched(true);
+        setKeepLegacyFrequency(false);
+        setFormRedirectFrequency(value);
+    }, []);
     const [pageTargetingType, setPageTargetingType] = useState<string[]>(["all"]);
     const [pagePaths, setPagePaths] = useState("");
 
@@ -487,6 +518,11 @@ export default function IPRulesPage() {
             setFormPriority(editingRule.priority.toString());
             setFormRuleType(editingRule.ruleType || "block");
             setFormRedirectMode(editingRule.redirectMode || "auto_redirect");
+            setFormRedirectFrequency(effectiveRedirectFrequency(editingRule, shop, ownHosts));
+            setRedirectFrequencyTouched(true);
+            setKeepLegacyFrequency(
+                editingRule.redirectMode === "auto_redirect" && !editingRule.redirectFrequency,
+            );
             setPageTargetingType([editingRule.pageTargetingType || "all"]);
             setPagePaths(editingRule.pagePaths || "");
         } else {
@@ -496,10 +532,18 @@ export default function IPRulesPage() {
             setFormPriority("0");
             setFormRuleType("block");
             setFormRedirectMode("auto_redirect");
+            setFormRedirectFrequency("always");
+            setRedirectFrequencyTouched(false);
+            setKeepLegacyFrequency(false);
             setPageTargetingType(["all"]);
             setPagePaths("");
         }
-    }, [editingRule, modalOpen]);
+    }, [editingRule, modalOpen, shop, ownHosts]);
+
+    useEffect(() => {
+        if (redirectFrequencyTouched) return;
+        setFormRedirectFrequency(defaultRedirectFrequency(formTargetUrl, shop, ownHosts));
+    }, [formTargetUrl, ownHosts, redirectFrequencyTouched, shop]);
 
     const handleOpenModal = useCallback((rule?: IPRule) => {
         if (!hasProPlan) return;
@@ -525,13 +569,18 @@ export default function IPRulesPage() {
         formData.append("priority", formPriority);
         formData.append("ruleType", formRuleType);
         formData.append("redirectMode", formRedirectMode);
+        formData.append(
+            "redirectFrequency",
+            keepLegacyFrequency ? KEEP_LEGACY_REDIRECT_FREQUENCY : formRedirectFrequency,
+        );
         formData.append("pageTargetingType", pageTargetingType[0]);
         formData.append("pagePaths", pagePaths);
 
         formFetcher.submit(formData, { method: "POST" });
     }, [
         editingRule, formName, formIPAddresses, formTargetUrl, formPriority,
-        formRuleType, formRedirectMode, pageTargetingType, pagePaths, formFetcher
+        formRuleType, formRedirectMode, formRedirectFrequency, keepLegacyFrequency,
+        pageTargetingType, pagePaths, formFetcher
     ]);
 
     const handleToggle = useCallback(
@@ -589,6 +638,7 @@ export default function IPRulesPage() {
             priority: rule.priority,
             ruleType: rule.ruleType,
             redirectMode: rule.redirectMode,
+            redirectFrequency: rule.redirectFrequency,
             pageTargetingType: rule.pageTargetingType,
             pagePaths: rule.pagePaths,
         }));
@@ -694,7 +744,11 @@ export default function IPRulesPage() {
                                 <RuleTypeBadge ruleType="redirect" />
                                 <span style={{ marginLeft: 4 }}>
                                     <Badge tone="info" size="small">
-                                        {rule.redirectMode === "popup" ? "Popup" : "Auto"}
+                                        {rule.redirectMode === "popup"
+                                            ? "Popup"
+                                            : effectiveRedirectFrequency(rule, shop, ownHosts) === "once"
+                                                ? "Auto · Once"
+                                                : "Auto"}
                                     </Badge>
                                 </span>
                                 <span style={{ marginLeft: 8 }}>{rule.targetUrl}</span>
@@ -1259,6 +1313,22 @@ export default function IPRulesPage() {
                                     onChange={setFormRedirectMode}
                                     helpText="Choose how matching visitors are redirected."
                                 />
+                                {formRedirectMode === "auto_redirect" && (
+                                    <Select
+                                        label="Redirect frequency"
+                                        options={[
+                                            { label: "Always redirect", value: "always" },
+                                            { label: "Redirect once", value: "once" },
+                                        ]}
+                                        value={formRedirectFrequency}
+                                        onChange={handleRedirectFrequencyChange}
+                                        helpText={keepLegacyFrequency
+                                            ? "This rule was created before this option existed. Saving keeps its current behavior until you choose a frequency."
+                                            : formRedirectFrequency === "always"
+                                                ? "Visitors are redirected on every visit and cannot stay on this page."
+                                                : "Visitors are redirected the first time in a browser session. If they come back during the same session, they can stay."}
+                                    />
+                                )}
                             </BlockStack>
                         )}
 

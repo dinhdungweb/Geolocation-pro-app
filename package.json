@@ -81,7 +81,7 @@
     "eslint-plugin-react-hooks": "4.6.2",
     "prettier": "^3.2.4",
     "typescript": "^5.2.2",
-    "vite": "6.4.2",
+    "vite": "6.4.5",
     "vite-tsconfig-paths": "^5.0.1",
     "vitest": "3.2.7"
   },
@@ -97,7 +97,7 @@
     "@graphql-codegen/typescript-operations": "4.5.0",
     "minimatch": "9.0.7",
     "svix": "1.92.2",
-    "vite": "6.4.2"
+    "vite": "6.4.5"
   },
   "overrides": {
     "anymatch": {
@@ -110,10 +110,10 @@
     "readdirp": {
       "picomatch": "2.3.2"
     },
-    "shell-quote": "1.10.0",
+    "shell-quote": "1.12.0",
     "svix": "1.92.2",
     "tar": "7.5.22",
-    "vite": "6.4.2"
+    "vite": "6.4.5"
   },
   "author": "admin",
   "description": "Geo Redirect & Country Blocker with 401 VPS fix"

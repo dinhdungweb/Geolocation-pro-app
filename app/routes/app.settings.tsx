@@ -37,6 +37,7 @@ import { getStableShopifyPlanFromBillingCheck, resolveEffectivePlan } from "../u
 import { checkBillingWithFallback } from "../utils/billing.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { getCheckoutEligibleRules, syncCheckoutProtectionSafely } from "../utils/checkout-protection.server";
+import { isSafeMerchantUrl } from "../utils/redirect-target";
 
 const SETTINGS_SAVE_BAR_ID = "settings-save-bar";
 
@@ -134,8 +135,8 @@ function normalizeHexColor(value: string, fallback: string) {
     return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed : fallback;
 }
 
-function isDangerousUrl(value: string) {
-    return /^(javascript|data|vbscript):/i.test(value.trim());
+function isDangerousUrl(value: string, options?: { allowMailto?: boolean }) {
+    return !isSafeMerchantUrl(value, options);
 }
 
 function getSettingsSnapshot(settings: Settings): SettingsFormSnapshot {
@@ -281,7 +282,7 @@ function SettingsToggle({
 
 // Loader: Fetch settings for the current shop
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session, billing } = await authenticate.admin(request);
+    const { admin, session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
     let settings = await prisma.settings.findUnique({
@@ -316,7 +317,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { effectivePlan } = resolveEffectivePlan({ settings, shopifyPlan });
     const isFreePlan = effectivePlan === FREE_PLAN;
-    const checkoutEligibleRuleCount = (await getCheckoutEligibleRules(shop)).length;
+    const checkoutEligibleRuleCount = (await getCheckoutEligibleRules(shop, admin, { hostLookupTimeoutMs: 2_500 })).length;
 
     return responseData({
         settings,
@@ -370,7 +371,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const blockVpn = !isFreePlan && formData.get("blockVpn") === "true";
         const checkoutProtectionEnabled = formData.get("checkoutProtectionEnabled") === "true";
 
-        if ((blockedLogoUrl && isDangerousUrl(blockedLogoUrl)) || (blockedSupportUrl && isDangerousUrl(blockedSupportUrl))) {
+        if ((blockedLogoUrl && isDangerousUrl(blockedLogoUrl)) || (blockedSupportUrl && isDangerousUrl(blockedSupportUrl, { allowMailto: true }))) {
             return responseData({ success: false, message: "Blocked page URLs cannot use unsafe protocols" }, { status: 400 });
         }
 
@@ -399,7 +400,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedSupportText,
                 blockedSupportUrl,
                 blockVpn,
-                checkoutProtectionEnabled,
+                // Paid-plan feature: a Free shop can't change it, but keep the
+                // stored choice so it resumes after an upgrade.
+                ...(isFreePlan ? {} : { checkoutProtectionEnabled }),
                 currentPlan: shopifyPlan,
             },
             create: {
@@ -427,7 +430,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 blockedSupportText,
                 blockedSupportUrl,
                 blockVpn,
-                checkoutProtectionEnabled,
+                checkoutProtectionEnabled: !isFreePlan && checkoutProtectionEnabled,
             },
         });
 
@@ -2082,14 +2085,22 @@ export default function SettingsPage() {
                                                 title="Checkout country protection"
                                                 description="Enforce country blocks on Shopify's servers during checkout."
                                             >
+                                                {isFreePlan ? (
+                                                    <div style={{ padding: "16px 0" }}>
+                                                        <Banner tone="warning">
+                                                            <p>Upgrade to a paid plan to block restricted countries at checkout.</p>
+                                                        </Banner>
+                                                    </div>
+                                                ) : null}
                                                 <SettingsRow
                                                     label="Block restricted countries at checkout"
-                                                    description="Uses active, all-page, unscheduled Block country rules. Checks both shipping and billing addresses, including express checkout."
+                                                    description="Uses active, all-page, unscheduled country rules: Block rules, and Redirect rules that always send visitors to another store. Checks both shipping and billing addresses, including express checkout."
                                                 >
                                                     <SettingsToggle
                                                         label="Block restricted countries at checkout"
-                                                        checked={checkoutProtectionEnabled}
+                                                        checked={!isFreePlan && checkoutProtectionEnabled}
                                                         onChange={setCheckoutProtectionEnabled}
+                                                        disabled={isFreePlan}
                                                     />
                                                 </SettingsRow>
                                                 <SettingsRow

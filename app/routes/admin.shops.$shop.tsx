@@ -16,6 +16,7 @@ import {
     hasUnlimitedUsage,
 } from "../billing.config";
 import { issueApplicationCredit } from "../utils/billing.server";
+import { resyncCheckoutProtectionAfterPlanChange } from "../utils/checkout-protection.server";
 import {
     hasPaidPlanAccess,
     normalizeBillingOverridePlan,
@@ -289,6 +290,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                     billingOverrideReason: billingOverrideEnabled ? billingOverrideReason || null : null,
                 },
             });
+            // An override can grant or revoke paid access to checkout protection.
+            await resyncCheckoutProtectionAfterPlanChange(shop);
             return responseData({
                 success: true,
                 message: billingOverrideEnabled

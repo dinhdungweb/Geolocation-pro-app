@@ -28,31 +28,46 @@ async function loadShopIdentity({
   const fallbackName = formatShopFallbackName(shop);
 
   try {
-    const response = await fetch(
-      `https://${shop}/admin/api/${apiVersion}/shop.json?fields=name,shop_owner`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(SHOP_IDENTITY_TIMEOUT_MS),
+    // GraphQL Admin API: public apps may not use the REST Admin API.
+    const response = await fetch(`https://${shop}/admin/api/${apiVersion}/graphql.json`, {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
-    );
+      body: JSON.stringify({
+        query: `#graphql
+          query GeoShopIdentity {
+            shop {
+              name
+              shopOwnerName
+            }
+          }`,
+      }),
+      signal: AbortSignal.timeout(SHOP_IDENTITY_TIMEOUT_MS),
+    });
 
     if (!response.ok) {
       throw new Error(`Shop request failed with ${response.status}`);
     }
 
     const data = await response.json() as {
-      shop?: {
-        name?: string | null;
-        shop_owner?: string | null;
+      data?: {
+        shop?: {
+          name?: string | null;
+          shopOwnerName?: string | null;
+        };
       };
+      errors?: Array<{ message?: string }>;
     };
+    if (data.errors?.length) {
+      throw new Error(data.errors.map((error) => error.message).join("; "));
+    }
 
     return {
-      ownerName: data.shop?.shop_owner || data.shop?.name || fallbackName,
-      shopName: data.shop?.name || fallbackName,
+      ownerName: data.data?.shop?.shopOwnerName || data.data?.shop?.name || fallbackName,
+      shopName: data.data?.shop?.name || fallbackName,
     };
   } catch (error) {
     console.error("[Dashboard] Failed to read shop identity:", error);

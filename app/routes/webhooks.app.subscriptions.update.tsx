@@ -5,6 +5,7 @@ import { FREE_PLAN } from "../billing.config";
 import { fetchShopifyUsagePeriod, syncUsagePeriodForShop } from "../utils/billing-period.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { normalizePlanName } from "../utils/effective-plan.server";
+import { resyncCheckoutProtectionAfterPlanChange } from "../utils/checkout-protection.server";
 
 type WebhookAdmin = {
     graphql: (query: string) => Promise<Response>;
@@ -148,6 +149,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         invalidateStorefrontConfigCache(shop);
+        if (existingSettings?.currentPlan !== currentPlan) {
+            // Runs in the background: Shopify expects a webhook response within
+            // seconds, and the resync can take several Admin API calls. It never throws.
+            void resyncCheckoutProtectionAfterPlanChange(shop, admin);
+        }
         console.log(`[Subscription Update] Successfully synced plan for ${shop}`);
     } catch (error) {
         console.error(`[Subscription Update] Failed to sync plan for ${webhookShop}:`, error);

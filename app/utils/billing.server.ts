@@ -10,6 +10,7 @@ import {
     isFinalMonthlyOverageCapCharge,
 } from "../billing.config";
 import { unauthenticated } from "../shopify.server";
+import { isBillingTestMode } from "./billing-mode.server";
 import {
     syncUsagePeriodForShop,
     usagePeriodFromSubscription,
@@ -573,7 +574,9 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
         }
 
         // 2. Call the Partner API
-        const partnerUrl = `https://partners.shopify.com/${orgId}/api/2024-01/graphql.json`;
+        // Partner API versions follow the quarterly release cadence (~12 months of support).
+        const partnerApiVersion = process.env.SHOPIFY_PARTNER_API_VERSION || "2026-10";
+        const partnerUrl = `https://partners.shopify.com/${orgId}/api/${partnerApiVersion}/graphql.json`;
         const partnerResponse = await fetch(partnerUrl, {
             method: "POST",
             headers: {
@@ -583,7 +586,7 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
             body: JSON.stringify({
                 query: `
                     mutation appCreditCreate($appId: ID!, $shopId: ID!, $amount: MoneyInput!, $description: String!, $test: Boolean!) {
-                        appCreditCreate(appId: $appId, shopId: $shopId, input: {amount: $amount, description: $description, test: $test}) {
+                        appCreditCreate(appId: $appId, shopId: $shopId, amount: $amount, description: $description, test: $test) {
                             appCredit {
                                 id
                                 amount {
@@ -606,7 +609,7 @@ export async function issueApplicationCredit(shop: string, amount: number, descr
                         currencyCode: "USD"
                     },
                     description,
-                    test: process.env.NODE_ENV !== "production"
+                    test: isBillingTestMode()
                 }
             })
         });

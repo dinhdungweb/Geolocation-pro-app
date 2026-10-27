@@ -360,12 +360,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     () => loadDashboardAnalytics(shop, thirtyDaysAgo, today),
     10_000,
   );
+  // Read first; only a shop without settings needs a write here.
   const settingsAndBillingPromise = prisma.settings
-    .upsert({
-      where: { shop },
-      update: {},
-      create: { shop },
-    })
+    .findUnique({ where: { shop } })
+    .then((existing) => existing ?? prisma.settings.create({ data: { shop } }))
     .then(async (settings) => {
       const isTest = isBillingTestMode();
       const billingConfig = await dashboardBillingCache.get(
@@ -457,18 +455,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
       : { currentPlan: shopifyPlan };
 
-  prisma.settings
-    .upsert({
-      where: { shop },
-      update: settingsSyncData,
-      create: { shop, currentPlan: shopifyPlan },
-    })
-    .then(() => {
-      invalidateStorefrontConfigCache(shop);
-    })
-    .catch((error) => {
-      console.error("[Settings] Failed to sync currentPlan:", error);
-    });
+  // Self-heals a plan change that a missed webhook didn't record. Only writes
+  // (and drops the storefront config cache) when something actually differs,
+  // instead of on every dashboard view.
+  const settingsNeedSync = Object.entries(settingsSyncData).some(
+    ([field, value]) => (settings as Record<string, unknown>)[field] !== value,
+  );
+  if (settingsNeedSync) {
+    prisma.settings
+      .update({
+        where: { shop },
+        data: settingsSyncData,
+      })
+      .then(() => {
+        invalidateStorefrontConfigCache(shop);
+      })
+      .catch((error) => {
+        console.error("[Settings] Failed to sync currentPlan:", error);
+      });
+  }
 
   const hasVisitorLogs = Boolean(latestVisitorLog);
 

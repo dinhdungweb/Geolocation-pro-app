@@ -19,8 +19,19 @@ describe("isBillingTestMode", () => {
   });
 
   it.each(["1", "true", "YES", " on "])("accepts %j as an explicit test-mode override", (value) => {
-    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("SHOPIFY_BILLING_TEST", value);
+    expect(isBillingTestMode()).toBe(true);
+  });
+
+  it("ignores a test-mode override in production unless explicitly allowed", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SHOPIFY_BILLING_TEST", "true");
+    vi.stubEnv("SHOPIFY_BILLING_TEST_ALLOW_PRODUCTION", "");
+    expect(isBillingTestMode()).toBe(false);
+
+    vi.stubEnv("SHOPIFY_BILLING_TEST_ALLOW_PRODUCTION", "true");
     expect(isBillingTestMode()).toBe(true);
   });
 

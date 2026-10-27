@@ -56,7 +56,7 @@ export function reportWebVital({ name, value, path }: WebVitalPayload) {
 }
 
 export function observeWebVitals(getPath: () => string) {
-  if (typeof PerformanceObserver === "undefined") return () => {};
+  if (typeof PerformanceObserver === "undefined") return () => { /* nothing to disconnect */ };
 
   const observers: PerformanceObserver[] = [];
   let clsValue = 0;

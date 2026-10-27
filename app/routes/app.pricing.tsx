@@ -39,6 +39,7 @@ import { getUsagePeriodForShop } from "../utils/billing-period.server";
 import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/billing.server";
 import { getStableShopifyPlanFromBillingCheck, normalizePlanName, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { resyncCheckoutProtectionAfterPlanChange } from "../utils/checkout-protection.server";
 
 function getShopifyBillingErrorData(error: unknown) {
     if (!error || typeof error !== "object") return undefined;
@@ -78,7 +79,7 @@ function pricingUrlWithBillingError(request: Request, message: string) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { billing, session } = await authenticate.admin(request);
+    const { admin, billing, session } = await authenticate.admin(request);
     const isTest = isBillingTestMode();
     const existingSettings = await prisma.settings.findUnique({
         where: { shop: session.shop },
@@ -116,6 +117,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         settings,
         shopifyPlan,
     });
+
+    // Merchants land here after confirming a new subscription; re-enable (or
+    // disable) paid-only checkout protection when the plan actually changed.
+    // In the background so the page doesn't wait on Admin API calls; it never
+    // throws, and the cron's drift check covers it if this run fails.
+    if (existingSettings && existingSettings.currentPlan !== shopifyPlan) {
+        void resyncCheckoutProtectionAfterPlanChange(session.shop, admin);
+    }
 
     return responseData({
         canUseUnlimitedPlan: Boolean(settings?.allowUnlimitedPlan) || currentPlan === UNLIMITED_PLAN,
@@ -356,6 +365,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             } catch (err) {
                 console.error("[Settings] Failed to sync currentPlan:", err);
             }
+            // Checkout protection is paid-only: switch the validation off now.
+            await resyncCheckoutProtectionAfterPlanChange(shop, admin);
 
             return null;
         }
@@ -430,6 +441,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             } catch (err) {
                 console.error("[Settings] Failed to sync confirmed currentPlan:", err);
             }
+            await resyncCheckoutProtectionAfterPlanChange(shop, admin);
         }
     }
 

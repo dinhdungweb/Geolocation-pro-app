@@ -49,6 +49,7 @@ type ProxyRule = {
   priority: number;
   ruleType: string;
   redirectMode: string;
+  redirectFrequency?: string | null;
   scheduleEnabled?: boolean;
   startTime?: string | null;
   endTime?: string | null;
@@ -342,6 +343,8 @@ function buildRulePayload(rule: ProxyRule, source: RuleSource) {
     targetUrl: rule.targetUrl,
     ruleType: rule.ruleType,
     redirectMode: rule.redirectMode,
+    // null keeps the legacy behavior; the storefront resolves it per target.
+    redirectFrequency: rule.redirectFrequency ?? null,
     source,
   };
 }
@@ -436,6 +439,7 @@ async function loadStorefrontRuntimeConfig(shop: string): Promise<StorefrontRunt
         priority: true,
         ruleType: true,
         redirectMode: true,
+        redirectFrequency: true,
         scheduleEnabled: true,
         startTime: true,
         endTime: true,
@@ -723,7 +727,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     let source: RuleSource | null = null;
     let action: StorefrontAction = "none";
 
-    const ipRisk = hasPaidPlan
+    // Only when the merchant enabled the high-risk IP shield: the lookup can add
+    // up to the provider timeout to every page view, costs provider quota, and
+    // sends the visitor IP to a third party (the privacy policy promises this
+    // happens only with VPN checking on).
+    const ipRisk = hasPaidPlan && settings.blockVpn
       ? await assessIpRisk({
           ip: visitorIP,
           ipHash,

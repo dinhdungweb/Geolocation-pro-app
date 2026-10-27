@@ -159,7 +159,7 @@ async function moveRuleRow(row) {
 
 async function runBackfill(label, readRows, moveRow) {
   let processed = 0;
-  while (true) {
+  for (;;) {
     const rows = await readRows(batchSize);
     if (rows.length === 0) break;
 

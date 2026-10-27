@@ -195,12 +195,12 @@ export default function AdminEmailAutomations() {
         let initialSubject = "";
         
         if(node.data.isCustom && node.data.customConfig) {
-            try { initialBlocks = JSON.parse(node.data.customConfig); } catch(e) {}
+            try { initialBlocks = JSON.parse(node.data.customConfig); } catch { /* invalid stored config: keep default blocks */ }
             initialSubject = node.data.customSubject || "";
         } else if(node.data.templateId) {
             const tmpl = templates.find((t: any) => t.id === node.data.templateId);
             if(tmpl?.config) {
-                try { initialBlocks = JSON.parse(tmpl.config); } catch(e) {}
+                try { initialBlocks = JSON.parse(tmpl.config); } catch { /* invalid template config: keep default blocks */ }
             }
             initialSubject = tmpl?.subject || "";
         }

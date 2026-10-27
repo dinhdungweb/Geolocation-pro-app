@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { FREE_PLAN } from "../billing.config";
 import { enqueueShopCleanupJob } from "../utils/cleanup.server";
-import { hashProtectedData } from "../utils/secret-crypto.server";
+import { recordCustomerDataRequest, redactCustomerData } from "../utils/gdpr.server";
 
 function responseData<T>(payload: T, status = 200) {
     return Response.json(payload, { status });
@@ -35,34 +35,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         switch (topic) {
             case "CUSTOMERS_DATA_REQUEST":
-            case "customers/data_request":
-                // This app stores visitor IPs and user agents in VisitorLog.
-                // These could be considered personal data under GDPR.
-                console.log(`[GDPR] Customer Data Request received from ${shop}.`);
+            case "customers/data_request": {
+                // Stores an encrypted export of the order risk data and visitor
+                // logs linked to the requested orders, for hand-over to the
+                // merchant within Shopify's 30-day window.
+                stage = "record_data_request";
+                const result = await recordCustomerDataRequest(shop, payload);
+                console.log(
+                    `[GDPR] Customer Data Request from ${shop} recorded: ${result.orders} order(s), ${result.records} order risk record(s), ${result.visitorLogs} visitor log(s).`,
+                );
                 break;
+            }
 
             case "CUSTOMERS_REDACT":
             case "customers/redact":
                 // Order risk records avoid names, email, phone and address fields.
-                // Shopify supplies orders_to_redact when linked order metadata must go.
+                // Shopify supplies orders_to_redact; their records and the visitor
+                // logs of the orders' IP addresses are deleted.
                 {
-                    const orderIds = Array.isArray((payload as any)?.orders_to_redact)
-                        ? (payload as any).orders_to_redact.map((id: unknown) => String(id))
-                        : [];
-                    if (orderIds.length > 0) {
-                        const storedOrderIds = [
-                            ...orderIds,
-                            ...orderIds.map((id: string) => hashProtectedData(id)),
-                        ];
-                        await prisma.orderRiskRecord.deleteMany({
-                            where: {
-                                shop,
-                                legacyOrderId: { in: storedOrderIds },
-                            },
-                        });
-                    }
+                    stage = "redact_customer";
+                    const result = await redactCustomerData(shop, payload);
                     console.log(
-                        `[GDPR] Customer Redact Request received from ${shop}. Redacted ${orderIds.length} linked order(s).`,
+                        `[GDPR] Customer Redact Request from ${shop}: redacted ${result.orders} linked order(s) and ${result.visitorLogs} visitor log(s).`,
                     );
                 }
                 break;

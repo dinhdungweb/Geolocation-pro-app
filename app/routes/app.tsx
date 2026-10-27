@@ -952,6 +952,8 @@ export default function App() {
 
     prepareCrisp(shop);
 
+    // Assigned after the cleanup closures that read it are defined.
+    // eslint-disable-next-line prefer-const
     let delayTimer: number | undefined;
     let idleCallbackId: number | undefined;
     let hasRequestedLoad = false;

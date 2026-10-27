@@ -52,6 +52,8 @@ model RedirectRule {
   cityCountryCode    String   @default("")
   cityRegionCode     String   @default("")
   redirectMode       String   @default("popup")
+  // "always" | "once"; null = legacy (external: always, same store: once per session)
+  redirectFrequency  String?
   pagePaths          String?
   pageTargetingType  String   @default("all")
 
@@ -117,6 +119,9 @@ model Settings {
   checkoutValidationId      String?
   checkoutProtectionSyncedAt DateTime?
   checkoutProtectionError    String?
+  // Whether the Shopify validation was left enabled by the last successful sync.
+  // Compared with the desired state to catch plan changes that skipped a resync.
+  checkoutValidationActive   Boolean   @default(false)
 }
 
 model AnalyticsCountry {
@@ -450,4 +455,21 @@ model EmailBlacklist {
   id        String   @id @default(uuid())
   shop      String   @unique
   createdAt DateTime @default(now())
+}
+
+// customers/data_request webhooks. The export (order risk data and visitor
+// logs linked to the requested orders) is encrypted; status tracks hand-over
+// to the merchant within Shopify's 30-day window.
+model GdprDataRequest {
+  id              String    @id @default(uuid())
+  shop            String
+  customerId      String?
+  ordersRequested String    @default("")
+  exportEncrypted String
+  status          String    @default("pending")
+  fulfilledAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([shop])
+  @@index([status, createdAt])
 }

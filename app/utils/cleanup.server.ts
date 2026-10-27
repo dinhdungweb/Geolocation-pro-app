@@ -378,6 +378,7 @@ async function cleanupShopData(jobId: string, shop: string, reason: ShopCleanupR
 
     if (reason === "shop_redact") {
         await prisma.adminEmailLog.deleteMany({ where: { shop } });
+        await prisma.gdprDataRequest.deleteMany({ where: { shop } });
     }
     await prisma.automation.deleteMany({ where: { shop } });
     await prisma.emailTemplate.deleteMany({ where: { shop } });

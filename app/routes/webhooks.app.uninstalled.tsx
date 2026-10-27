@@ -55,6 +55,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Shopify removes the app's checkout validations on uninstall; keep
           // the toggle preference but forget the dead validation ID.
           checkoutValidationId: null,
+          checkoutValidationActive: false,
           checkoutProtectionSyncedAt: null,
           onboardingInstallAt: new Date(),
         },

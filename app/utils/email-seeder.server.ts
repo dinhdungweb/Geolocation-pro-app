@@ -295,7 +295,7 @@ export async function ensureDefaultEmailAssets() {
       }
 
       // 2. Ensure global Automation exists and points to template
-      let automation = await prisma.automation.findUnique({
+      const automation = await prisma.automation.findUnique({
         where: { shop_type: { shop: "GLOBAL", type: item.type } },
       });
 
@@ -326,7 +326,7 @@ export async function ensureDefaultEmailAssets() {
         });
       } else {
         let needsUpdate = false;
-        let updateData: any = {};
+        const updateData: any = {};
 
         if (!automation.html || automation.html === "") {
           updateData.html = item.html;

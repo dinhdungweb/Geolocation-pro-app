@@ -28,8 +28,9 @@ export function createExpiringAsyncCache<T>() {
 
     const requestGeneration = generation;
     const requestKeyVersion = keyVersions.get(key) || 0;
-    let request!: Promise<T>;
-    request = load()
+    // The .finally() callback reads `request`; it runs asynchronously, after
+    // the assignment below has completed.
+    const request: Promise<T> = load()
       .then((value) => {
         const resolvedTtl = typeof ttl === "function" ? ttl(value) : ttl;
         const cacheIsStillCurrent =

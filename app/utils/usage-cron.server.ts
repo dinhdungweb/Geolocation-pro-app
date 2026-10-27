@@ -9,6 +9,7 @@ import { checkAndChargeOverageBackground, getShopActivePlan } from './billing.se
 import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server';
 import { cleanupOldLogs, processPendingShopCleanupJobs } from './cleanup.server';
 import { resolveEffectivePlan } from './effective-plan.server';
+import { reconcileCheckoutProtectionDrift } from './checkout-protection.server';
 
 const USAGE_JOB_LOCK_KEY = 'usage-cron:check-all-shops';
 const USAGE_JOB_LOCK_TTL_MS = 5 * 60 * 60 * 1000;
@@ -304,6 +305,14 @@ export async function checkAllShopsUsage() {
             } catch (error) {
                 console.error(`[Cron] Failed to check usage for ${shop}:`, error);
             }
+        }
+
+        // After plans are synced above: bring checkout protection in line with
+        // each shop's plan/toggle, whichever code path changed them.
+        try {
+            await reconcileCheckoutProtectionDrift();
+        } catch (error) {
+            console.error('[Cron] Failed to reconcile checkout protection:', error);
         }
 
         console.log('[Cron] Usage check completed.');
