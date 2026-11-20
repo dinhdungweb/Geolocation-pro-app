@@ -2566,13 +2566,17 @@ export default function RulesPage() {
                                 />
                                 <RadioButton
                                     label="Allow Access"
-                                    helpText="Matching visitors skip all lower rules (e.g. allow some cities, then block their country)"
                                     checked={formRuleType === "allow"}
                                     id="actionAllow"
                                     name="ruleType"
                                     onChange={() => setFormRuleType("allow")}
                                 />
                             </InlineStack>
+                            {formRuleType === "allow" && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Matching visitors can access the store and skip all lower rules. Example: allow some cities, then block their country.
+                                </Text>
+                            )}
                         </BlockStack>
 
                         {formRuleType === "redirect" && (
