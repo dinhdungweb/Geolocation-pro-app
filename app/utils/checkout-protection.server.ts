@@ -4,6 +4,7 @@ import { unauthenticated } from "../shopify.server";
 import { resolveEffectivePlan } from "./effective-plan.server";
 import { createExpiringAsyncCache } from "./expiring-async-cache.server";
 import { isExternalRedirectTarget, normalizeHost } from "./redirect-target";
+import { normalizeCityName, splitCityNames } from "./city-targeting";
 
 export const CHECKOUT_VALIDATION_FUNCTION_HANDLE = "geo-checkout-validation";
 export const CHECKOUT_VALIDATION_METAFIELD_NAMESPACE =
@@ -146,7 +147,8 @@ type EligibleRuleRow = CheckoutRule & {
  *   store (e.g. a market subfolder) send them somewhere they should be able to
  *   buy. A legacy rule without a frequency always redirects to another store.
  * Rules resolving to no concrete country (the "*" wildcard) are skipped:
- * enforcing them would reject every order.
+ * enforcing them would reject every order. Countries an Allow rule lets in are
+ * removed; see resolveCheckoutRules for the state/city ones.
  */
 export async function getCheckoutEligibleRules(
   shop: string,
@@ -154,7 +156,22 @@ export async function getCheckoutEligibleRules(
   // Page loaders pass a cap so a slow Shopify response can't stall the page.
   options: { hostLookupTimeoutMs?: number } = {},
 ) {
-  const rules: EligibleRuleRow[] = await prisma.redirectRule.findMany({
+  return (await resolveCheckoutRules(shop, admin, options)).rules;
+}
+
+/**
+ * Checkout only sees the address, so Allow rules are mapped onto it:
+ * - a country or market Allow lets the whole country through;
+ * - a state or city Allow turns that country, if otherwise blocked, into a
+ *   restricted one: only addresses in an allowed state or city may order.
+ * IP Allow rules carry no location and change nothing here.
+ */
+async function resolveCheckoutRules(
+  shop: string,
+  admin: ShopifyAdmin,
+  options: { hostLookupTimeoutMs?: number } = {},
+) {
+  const rows: EligibleRuleRow[] = await prisma.redirectRule.findMany({
     where: {
       shop,
       isActive: true,
@@ -172,7 +189,7 @@ export async function getCheckoutEligibleRules(
     },
   });
 
-  const withCountries = rules.filter((rule) => countryCodesOf(rule).length > 0);
+  const withCountries = rows.filter((rule) => countryCodesOf(rule).length > 0);
   const blockRules = withCountries.filter((rule) => rule.ruleType === "block");
   const redirectRules = withCountries.filter(
     (rule) =>
@@ -180,15 +197,120 @@ export async function getCheckoutEligibleRules(
       rule.redirectMode === "auto_redirect" &&
       (rule.redirectFrequency ?? "always") === "always",
   );
-  if (redirectRules.length === 0) return blockRules;
 
-  const ownHosts = options.hostLookupTimeoutMs
-    ? await getShopHostsWithin(admin, shop, options.hostLookupTimeoutMs)
-    : await getShopHosts(admin, shop);
-  return [
-    ...blockRules,
-    ...redirectRules.filter((rule) => isExternalRedirectTarget(rule.targetUrl, shop, ownHosts)),
-  ];
+  let enforced: EligibleRuleRow[] = blockRules;
+  if (redirectRules.length > 0) {
+    const ownHosts = options.hostLookupTimeoutMs
+      ? await getShopHostsWithin(admin, shop, options.hostLookupTimeoutMs)
+      : await getShopHosts(admin, shop);
+    enforced = [
+      ...blockRules,
+      ...redirectRules.filter((rule) => isExternalRedirectTarget(rule.targetUrl, shop, ownHosts)),
+    ];
+  }
+
+  const allow = buildCheckoutAllowPolicy(await getAllowRules(shop));
+  const restrictedCountries: Record<string, RestrictedCountryPolicy> = {};
+  for (const code of normalizeCheckoutCountryCodes(enforced)) {
+    if (!allow.fullyAllowed.has(code) && allow.partial[code]) {
+      restrictedCountries[code] = allow.partial[code];
+    }
+  }
+
+  // Allowed and restricted countries leave the country-wide block list; the
+  // restricted ones are enforced per address via restrictedCountries.
+  const exempt = new Set([...allow.fullyAllowed, ...Object.keys(allow.partial)]);
+  const rules = enforced
+    .map((rule) => ({
+      ...rule,
+      countryCodes: countryCodesOf(rule)
+        .filter((code) => !exempt.has(code))
+        .join(","),
+    }))
+    .filter((rule) => countryCodesOf(rule).length > 0);
+
+  return { rules, restrictedCountries };
+}
+
+export type AllowRuleRow = {
+  matchType: string;
+  ruleType: string;
+  countryCodes: string;
+  stateCodes: string;
+  cityNames: string;
+  cityCountryCode: string;
+  cityRegionCode: string;
+  marketCountryCodes: string;
+};
+
+export type RestrictedCountryPolicy = {
+  // Province codes without the country prefix ("TX"), as checkout sends them.
+  regions: string[];
+  // Normalized city names; region "" matches the city in any province.
+  cities: Array<{ name: string; region: string }>;
+};
+
+function regionWithoutCountry(code: string, country: string) {
+  const upper = code.trim().toUpperCase();
+  return upper.startsWith(`${country}-`) ? upper.slice(country.length + 1) : upper;
+}
+
+export function buildCheckoutAllowPolicy(rules: AllowRuleRow[]) {
+  const fullyAllowed = new Set<string>();
+  const regions = new Map<string, Set<string>>();
+  const cities = new Map<string, Map<string, { name: string; region: string }>>();
+
+  for (const rule of rules || []) {
+    if (rule.ruleType !== "allow") continue;
+
+    if (rule.matchType === "country" || rule.matchType === "market") {
+      const codes = rule.matchType === "country" ? rule.countryCodes : rule.marketCountryCodes;
+      countryCodesOf({ countryCodes: codes || "" }).forEach((code) => fullyAllowed.add(code));
+    } else if (rule.matchType === "state") {
+      for (const stateCode of String(rule.stateCodes || "").split(/[\s,]+/)) {
+        const country = stateCode.trim().toUpperCase().split("-")[0];
+        if (!stateCode.includes("-") || !/^[A-Z]{2}$/.test(country)) continue;
+        if (!regions.has(country)) regions.set(country, new Set());
+        regions.get(country)!.add(regionWithoutCountry(stateCode, country));
+      }
+    } else if (rule.matchType === "city") {
+      const country = String(rule.cityCountryCode || "").trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(country)) continue;
+      const region = rule.cityRegionCode ? regionWithoutCountry(rule.cityRegionCode, country) : "";
+      if (!cities.has(country)) cities.set(country, new Map());
+      for (const city of splitCityNames(rule.cityNames)) {
+        const name = normalizeCityName(city);
+        if (name) cities.get(country)!.set(`${name}|${region}`, { name, region });
+      }
+    }
+  }
+
+  const partial: Record<string, RestrictedCountryPolicy> = {};
+  for (const country of new Set([...regions.keys(), ...cities.keys()])) {
+    partial[country] = {
+      regions: Array.from(regions.get(country) || []).sort(),
+      cities: Array.from(cities.get(country)?.values() || []),
+    };
+  }
+
+  return { fullyAllowed, partial };
+}
+
+async function getAllowRules(shop: string): Promise<AllowRuleRow[]> {
+  const rules = await prisma.redirectRule.findMany({
+    where: { shop, isActive: true, ruleType: "allow" },
+    select: {
+      matchType: true,
+      ruleType: true,
+      countryCodes: true,
+      stateCodes: true,
+      cityNames: true,
+      cityCountryCode: true,
+      cityRegionCode: true,
+      marketCountryCodes: true,
+    },
+  });
+  return rules || [];
 }
 
 type CheckoutDesiredStateInput = {
@@ -243,24 +365,33 @@ async function getCheckoutConfiguration(
   shop: string,
   settings: Awaited<ReturnType<typeof getCheckoutSettings>>,
 ) {
-  const rules = await getCheckoutEligibleRules(shop, admin);
+  const { rules, restrictedCountries } = await resolveCheckoutRules(shop, admin);
 
   return {
     blockedCountries: normalizeCheckoutCountryCodes(rules),
+    restrictedCountries,
     enabled: isCheckoutProtectionDesired(settings),
     message: normalizeCheckoutMessage(settings.blockedMessage),
     validationId: settings.checkoutValidationId,
   };
 }
 
-function metafieldInput(blockedCountries: string[], message: string) {
+type CheckoutPolicy = {
+  blockedCountries: string[];
+  restrictedCountries: Record<string, RestrictedCountryPolicy>;
+  message: string;
+};
+
+function metafieldInput({ blockedCountries, restrictedCountries, message }: CheckoutPolicy) {
   return {
     namespace: CHECKOUT_VALIDATION_METAFIELD_NAMESPACE,
     key: CHECKOUT_VALIDATION_METAFIELD_KEY,
     type: "json",
     value: JSON.stringify({
-      version: 1,
+      version: 2,
       blockedCountries,
+      // Countries open only to allowed states/cities; read by function v2+.
+      restrictedCountries,
       message,
     }),
   };
@@ -344,12 +475,10 @@ async function listOwnValidations(admin: ShopifyAdmin): Promise<OwnValidation[]>
 
 async function createValidation({
   admin,
-  blockedCountries,
-  message,
+  policy,
 }: {
   admin: ShopifyAdmin;
-  blockedCountries: string[];
-  message: string;
+  policy: CheckoutPolicy;
 }) {
   const payload = await runGraphql(
     admin,
@@ -373,7 +502,7 @@ async function createValidation({
         blockOnFailure: false,
         enable: true,
         functionHandle: CHECKOUT_VALIDATION_FUNCTION_HANDLE,
-        metafields: [metafieldInput(blockedCountries, message)],
+        metafields: [metafieldInput(policy)],
         title: CHECKOUT_VALIDATION_TITLE,
       },
     },
@@ -387,15 +516,13 @@ async function createValidation({
 
 async function updateValidation({
   admin,
-  blockedCountries,
   enabled,
-  message,
+  policy,
   validationId,
 }: {
   admin: ShopifyAdmin;
-  blockedCountries: string[];
   enabled: boolean;
-  message: string;
+  policy: CheckoutPolicy;
   validationId: string;
 }) {
   await runGraphql(
@@ -423,7 +550,7 @@ async function updateValidation({
       validation: {
         blockOnFailure: false,
         enable: enabled,
-        metafields: [metafieldInput(blockedCountries, message)],
+        metafields: [metafieldInput(policy)],
         title: CHECKOUT_VALIDATION_TITLE,
       },
     },
@@ -459,16 +586,16 @@ async function reconcileValidation(
   admin: ShopifyAdmin,
   configuration: Awaited<ReturnType<typeof getCheckoutConfiguration>>,
 ) {
-  const { blockedCountries, enabled, message } = configuration;
+  const { blockedCountries, restrictedCountries, enabled, message } = configuration;
+  const policy: CheckoutPolicy = { blockedCountries, restrictedCountries, message };
 
   // Fast path: one mutation when the stored validation still exists.
   if (configuration.validationId) {
     try {
       await updateValidation({
         admin,
-        blockedCountries,
         enabled,
-        message,
+        policy,
         validationId: configuration.validationId,
       });
       return configuration.validationId;
@@ -487,15 +614,14 @@ async function reconcileValidation(
   if (primary) {
     await updateValidation({
       admin,
-      blockedCountries,
       enabled,
-      message,
+      policy,
       validationId: primary.id,
     });
     return primary.id;
   }
 
-  return enabled ? createValidation({ admin, blockedCountries, message }) : null;
+  return enabled ? createValidation({ admin, policy }) : null;
 }
 
 async function syncCheckoutProtectionUnlocked(

@@ -1806,7 +1806,7 @@ export default function AdminShopDetail() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : '#f2f6ee', color: r.ruleType === 'block' ? '#ef4444' : '#82b440' }}>{r.ruleType.toUpperCase()}</span></td>
+                                    <td><span className="badge-v3" style={{ background: r.ruleType === 'block' ? '#fef2f2' : r.ruleType === 'allow' ? '#ecfdf5' : '#f2f6ee', color: r.ruleType === 'block' ? '#ef4444' : r.ruleType === 'allow' ? '#059669' : '#82b440' }}>{r.ruleType.toUpperCase()}</span></td>
                                     <td>
                                         {r.ruleType === 'redirect' ? (
                                             r.targetUrl ? (

@@ -31,6 +31,7 @@ import {
 import { normalizePagePathPattern, splitPagePathPatterns } from "../utils/page-targeting";
 import { stateCodeMatchesRegion } from "../utils/states";
 import { cityMatchesRule } from "../utils/city-targeting";
+import { getActionForRule } from "../utils/storefront-action";
 import { ensureShopTimeZone } from "../utils/shop-timezone.server";
 
 function responseData<T>(payload: T, init?: Parameters<typeof Response.json>[1]) {
@@ -290,11 +291,6 @@ function isCountryMatch(rule: ProxyRule, countryCode: string) {
     .map((code) => code.trim().toUpperCase())
     .filter(Boolean)
     .some((code) => code === "*" || code === country);
-}
-
-function getActionForRule(rule: ProxyRule): StorefrontAction {
-  if (rule.ruleType === "block") return "block";
-  return rule.redirectMode === "auto_redirect" ? "auto_redirect" : "popup";
 }
 
 function getAnalyticsEvent(action: StorefrontAction, source: RuleSource) {

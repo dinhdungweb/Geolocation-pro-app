@@ -1,9 +1,19 @@
 import { Badge } from "@shopify/polaris";
 
-export type RuleTypeBadgeTone = "attention" | "info";
+export type RuleTypeBadgeTone = "attention" | "info" | "success";
 
 export function getRuleTypeBadgeTone(ruleType: string): RuleTypeBadgeTone {
-  return ruleType.trim().toLowerCase() === "block" ? "attention" : "info";
+  const type = ruleType.trim().toLowerCase();
+  if (type === "block") return "attention";
+  if (type === "allow") return "success";
+  return "info";
+}
+
+function defaultLabel(ruleType: string) {
+  const type = ruleType.trim().toLowerCase();
+  if (type === "block") return "Block";
+  if (type === "allow") return "Allow";
+  return "Redirect";
 }
 
 interface RuleTypeBadgeProps {
@@ -12,11 +22,9 @@ interface RuleTypeBadgeProps {
 }
 
 export function RuleTypeBadge({ ruleType, label }: RuleTypeBadgeProps) {
-  const isBlock = ruleType.trim().toLowerCase() === "block";
-
   return (
     <Badge tone={getRuleTypeBadgeTone(ruleType)}>
-      {label || (isBlock ? "Block" : "Redirect")}
+      {label || defaultLabel(ruleType)}
     </Badge>
   );
 }

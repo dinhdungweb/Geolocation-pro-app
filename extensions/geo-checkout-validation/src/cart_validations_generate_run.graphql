@@ -7,10 +7,14 @@ query CartValidationsGenerateRunInput {
   cart {
     billingAddress {
       countryCode
+      provinceCode
+      city
     }
     deliveryGroups {
       deliveryAddress {
         countryCode
+        provinceCode
+        city
       }
     }
   }

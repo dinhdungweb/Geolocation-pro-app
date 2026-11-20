@@ -7,6 +7,11 @@ describe("getRuleTypeBadgeTone", () => {
     expect(getRuleTypeBadgeTone("Block")).toBe("attention");
   });
 
+  it("uses the success tone for allow rules", () => {
+    expect(getRuleTypeBadgeTone("allow")).toBe("success");
+    expect(getRuleTypeBadgeTone("Allow")).toBe("success");
+  });
+
   it("uses the info tone for redirect rules", () => {
     expect(getRuleTypeBadgeTone("redirect")).toBe("info");
     expect(getRuleTypeBadgeTone("Redirect")).toBe("info");

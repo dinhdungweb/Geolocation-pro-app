@@ -2127,7 +2127,9 @@ export default function Index() {
                                 <span>
                                   {isBlock
                                     ? "Blocks targeted traffic"
-                                    : rule.redirectMode === "auto_redirect"
+                                    : rule.ruleType === "allow"
+                                      ? "Allows targeted traffic"
+                                      : rule.redirectMode === "auto_redirect"
                                       ? "Automatic redirect"
                                       : "Redirect popup"}
                                   {target ? ` · ${target}` : ""}

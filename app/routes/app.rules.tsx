@@ -265,7 +265,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
-            const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
+            const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block", "allow"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "auto_redirect");
             const redirectFrequency = normalizeRedirectFrequency(redirectMode, formData.get("redirectFrequency"));
             const daysOfWeek = formData.get("daysOfWeek") as string;
@@ -346,7 +346,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 return responseData({ success: false, message: "Invalid URL format" }, { status: 400 });
             }
             const priority = parseInt(formData.get("priority") as string) || 0;
-            const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block"], "redirect");
+            const ruleType = normalizeOption(formData.get("ruleType") as string | null, ["redirect", "block", "allow"], "redirect");
             const redirectMode = normalizeOption(formData.get("redirectMode") as string | null, ["popup", "auto_redirect"], "popup");
             const redirectFrequency = normalizeRedirectFrequency(redirectMode, formData.get("redirectFrequency"));
             const daysOfWeek = formData.get("daysOfWeek") as string;
@@ -538,7 +538,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         targetUrl: rule.targetUrl || "",
                         priority: parseInt(rule.priority) || 0,
                         isActive: rule.isActive !== false,
-                        ruleType: normalizeOption(rule.ruleType, ["redirect", "block"], "redirect"),
+                        ruleType: normalizeOption(rule.ruleType, ["redirect", "block", "allow"], "redirect"),
                         redirectMode: normalizeOption(rule.redirectMode, ["popup", "auto_redirect"], "popup"),
                         // Imports without a frequency keep the legacy behavior (null).
                         redirectFrequency: rule.redirectFrequency
@@ -1386,6 +1386,8 @@ export default function RulesPage() {
                     <Text as="span" variant="bodyMd" truncate>
                         {rule.ruleType === "block" ? (
                             <RuleTypeBadge ruleType="block" label="Access Blocked" />
+                        ) : rule.ruleType === "allow" ? (
+                            <RuleTypeBadge ruleType="allow" label="Access Allowed" />
                         ) : (
                             rule.targetUrl
                         )}
@@ -1427,7 +1429,7 @@ export default function RulesPage() {
                             ? (rule.redirectMode === "auto_redirect"
                                 ? (effectiveRedirectFrequency(rule, shop, ownHosts) === "once" ? "Auto Redirect · Once" : "Auto Redirect")
                                 : "Popup")
-                            : "Block"}
+                            : rule.ruleType === "allow" ? "Allow" : "Block"}
                     />
                 </div>
             </IndexTable.Cell>
@@ -2561,6 +2563,14 @@ export default function RulesPage() {
                                     id="actionBlock"
                                     name="ruleType"
                                     onChange={() => setFormRuleType("block")}
+                                />
+                                <RadioButton
+                                    label="Allow Access"
+                                    helpText="Matching visitors skip all lower rules (e.g. allow some cities, then block their country)"
+                                    checked={formRuleType === "allow"}
+                                    id="actionAllow"
+                                    name="ruleType"
+                                    onChange={() => setFormRuleType("allow")}
                                 />
                             </InlineStack>
                         </BlockStack>

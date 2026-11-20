@@ -13,6 +13,7 @@ vi.mock("../shopify.server", () => ({
 }));
 
 import {
+  buildCheckoutAllowPolicy,
   getCheckoutEligibleRules,
   getShopHostsWithin,
   isCheckoutProtectionDesired,
@@ -130,6 +131,101 @@ describe("checkout protection sync", () => {
     // DE: legacy (no frequency) external auto redirect; IT: explicit "always".
     // JP is "redirect once", so the visitor may come back and buy.
     expect(normalizeCheckoutCountryCodes(rules)).toEqual(["CN", "DE", "IT"]);
+  });
+
+  describe("allow rules at checkout", () => {
+    const allowRule = (overrides: Record<string, string>) => ({
+      ruleType: "allow",
+      countryCodes: "",
+      stateCodes: "",
+      cityNames: "",
+      cityCountryCode: "",
+      cityRegionCode: "",
+      marketCountryCodes: "",
+      matchType: "country",
+      ...overrides,
+    });
+    // Merchant: allow a few Texas cities and Ontario, block every country.
+    const texasCities = allowRule({
+      matchType: "city",
+      cityNames: "Houston, San Antonio,houston",
+      cityCountryCode: "US",
+      cityRegionCode: "US-TX",
+    });
+    const ontario = allowRule({ matchType: "state", stateCodes: "CA-ON" });
+
+    it("moves state/city-allowed countries off the country-wide block list", async () => {
+      prismaMock.redirectRule.findMany
+        .mockResolvedValueOnce([blockRule("US, CA, CN"), blockRule("US")])
+        .mockResolvedValueOnce([texasCities, ontario]);
+
+      const rules = await getCheckoutEligibleRules(shop, adminWith().admin);
+
+      expect(normalizeCheckoutCountryCodes(rules)).toEqual(["CN"]);
+      expect(rules).toHaveLength(1);
+    });
+
+    it("writes the allowed states and cities into the validation configuration", async () => {
+      prismaMock.settings.findUnique.mockResolvedValue(
+        settings({ checkoutValidationId: "gid://shopify/Validation/1" }),
+      );
+      prismaMock.redirectRule.findMany
+        .mockResolvedValueOnce([blockRule("US, CA, CN, MX")])
+        .mockResolvedValueOnce([texasCities, ontario, allowRule({ countryCodes: "MX" })]);
+      const { admin, graphql } = adminWith(updateOk);
+
+      const result = await syncCheckoutProtection({ admin, shop });
+
+      expect(result.blockedCountries).toEqual(["CN"]);
+      const metafield = (graphql.mock.calls[0] as any)[1].variables.validation.metafields[0];
+      expect(JSON.parse(metafield.value)).toEqual({
+        version: 2,
+        blockedCountries: ["CN"],
+        restrictedCountries: {
+          CA: { regions: ["ON"], cities: [] },
+          US: {
+            regions: [],
+            cities: [
+              { name: "houston", region: "TX" },
+              { name: "san antonio", region: "TX" },
+            ],
+          },
+        },
+        message: "Not available",
+      });
+    });
+
+    it("does not restrict a country no rule blocks", async () => {
+      prismaMock.settings.findUnique.mockResolvedValue(
+        settings({ checkoutValidationId: "gid://shopify/Validation/1" }),
+      );
+      prismaMock.redirectRule.findMany
+        .mockResolvedValueOnce([blockRule("CN")])
+        .mockResolvedValueOnce([texasCities]);
+      const { admin, graphql } = adminWith(updateOk);
+
+      await syncCheckoutProtection({ admin, shop });
+
+      const metafield = (graphql.mock.calls[0] as any)[1].variables.validation.metafields[0];
+      expect(JSON.parse(metafield.value).restrictedCountries).toEqual({});
+    });
+
+    it("builds the policy from every Allow rule type", () => {
+      const policy = buildCheckoutAllowPolicy([
+        allowRule({ countryCodes: "us, gb" }),
+        allowRule({ matchType: "market", marketCountryCodes: "DE,FR" }),
+        allowRule({ matchType: "state", stateCodes: "US-TX, US-OK, bogus" }),
+        allowRule({ matchType: "city", cityNames: "Zürich", cityCountryCode: "ch" }),
+        allowRule({ matchType: "ip", countryCodes: "JP" }),
+        { ...allowRule({ countryCodes: "IT" }), ruleType: "block" },
+      ]);
+
+      expect(Array.from(policy.fullyAllowed).sort()).toEqual(["DE", "FR", "GB", "US"]);
+      expect(policy.partial).toEqual({
+        US: { regions: ["OK", "TX"], cities: [] },
+        CH: { regions: [], cities: [{ name: "zurich", region: "" }] },
+      });
+    });
   });
 
   it("skips the domain lookup when there are no redirect rules", async () => {
