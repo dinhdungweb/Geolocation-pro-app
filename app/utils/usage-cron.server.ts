@@ -10,6 +10,8 @@ import { getUsagePeriodForShop, type UsagePeriod } from './billing-period.server
 import { cleanupOldLogs, processPendingShopCleanupJobs } from './cleanup.server';
 import { resolveEffectivePlan } from './effective-plan.server';
 import { reconcileCheckoutProtectionDrift } from './checkout-protection.server';
+import { REVIEW_STATUS_REVIEWED, hasReachedReviewEmailAge, shouldSendReviewEmail } from './review-prompt';
+import { getLifetimeReviewActionTotals } from './review-prompt.server';
 
 const USAGE_JOB_LOCK_KEY = 'usage-cron:check-all-shops';
 const USAGE_JOB_LOCK_TTL_MS = 5 * 60 * 60 * 1000;
@@ -291,15 +293,24 @@ export async function checkAllShopsUsage() {
                     orderBy: { createdAt: 'asc' },
                 });
                 const installDate = welcomeLog ? welcomeLog.createdAt : settings.createdAt;
-                const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
-                if (installDate && (Date.now() - installDate.getTime()) >= threeDaysMs) {
-                    console.log(`[Cron] Sending 3-day app review request email to ${shop}`);
-                    await sendAdminEmail({
-                        shop,
-                        type: 'review_3_days',
-                        subject: `How is your experience with Geo: Redirect & Country Block?`,
-                        html: getReview3DaysEmailHtml(shop),
-                    });
+                const isAppEnabled = settings.isEnabled !== false && settings.mode !== 'disabled';
+                // Only ask once the app is live and has redirected/blocked real
+                // visitors; until then a review request would be premature.
+                if (
+                    settings.reviewPromptStatus !== REVIEW_STATUS_REVIEWED &&
+                    isAppEnabled &&
+                    hasReachedReviewEmailAge(installDate)
+                ) {
+                    const totals = await getLifetimeReviewActionTotals(shop);
+                    if (shouldSendReviewEmail({ installedAt: installDate, isAppEnabled, totals })) {
+                        console.log(`[Cron] Sending app review request email to ${shop}`);
+                        await sendAdminEmail({
+                            shop,
+                            type: 'review_3_days',
+                            subject: `How is your experience with Geo: Redirect & Country Block?`,
+                            html: getReview3DaysEmailHtml(shop, totals),
+                        });
+                    }
                 }
             }
             } catch (error) {

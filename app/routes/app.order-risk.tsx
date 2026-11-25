@@ -67,6 +67,7 @@ import {
 } from "../utils/secret-crypto.server";
 import { shopifyBoundaryHeaders } from "../utils/shopify-boundary.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
+import { requestReviewAtMilestone } from "../utils/review-request.client";
 
 export { shopifyBoundaryHeaders as headers };
 
@@ -555,6 +556,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         reviewStatus === "reviewed"
           ? "Order marked as reviewed."
           : "Order returned to the review queue.",
+      reviewMilestone: reviewStatus === "reviewed",
     });
   }
 
@@ -592,6 +594,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       message: `${updated.count} selected order${
         updated.count === 1 ? "" : "s"
       } marked as reviewed.`,
+      reviewMilestone: true,
     });
   }
 
@@ -1116,6 +1119,9 @@ export default function OrderRiskPage() {
     if (!actionData || !("message" in actionData) || !actionData.message) return;
     shopify.toast.show(actionData.message);
     setBlockTarget(null);
+    if ("reviewMilestone" in actionData && actionData.reviewMilestone) {
+      void requestReviewAtMilestone("order_risk_reviewed");
+    }
   }, [actionData, shopify]);
 
   useEffect(() => {
@@ -1123,6 +1129,7 @@ export default function OrderRiskPage() {
     const result = bulkActionFetcher.data as {
       error?: string;
       message?: string;
+      reviewMilestone?: boolean;
     };
     if (result.error) {
       if (bulkBlockModalOpen) setBulkActionError(result.error);
@@ -1135,6 +1142,9 @@ export default function OrderRiskPage() {
     shopify.toast.show(result.message);
     setBulkBlockModalOpen(false);
     clearSelection();
+    if (result.reviewMilestone) {
+      void requestReviewAtMilestone("order_risk_reviewed");
+    }
   }, [
     bulkActionFetcher.data,
     bulkActionFetcher.state,

@@ -35,7 +35,7 @@ import {
   StarFilledIcon,
   StarIcon,
 } from "@shopify/polaris-icons";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { SimpleLoadingSkeleton } from "../components/simple-loading-skeleton";
 import {
   CUSTOM_PLAN,
@@ -68,6 +68,13 @@ import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cach
 import { getThemeAppEmbedStatus } from "../utils/theme-app-embed.server";
 import { getAnalyticsDate } from "../utils/shop-timezone";
 import { ensureShopTimeZone } from "../utils/shop-timezone.server";
+import { shouldShowReviewBanner } from "../utils/review-prompt";
+import { getLifetimeReviewActionTotals } from "../utils/review-prompt.server";
+import {
+  requestReviewAtMilestone,
+  saveReviewPromptDismissed,
+  saveReviewPromptReviewed,
+} from "../utils/review-request.client";
 
 export { shopifyBoundaryHeaders as headers };
 
@@ -90,6 +97,16 @@ function formatPlanLabel(planName: string) {
   if (!planName) return "Current";
   if (planName === PREMIUM_PLAN) return "Premium";
   return planName.charAt(0).toUpperCase() + planName.slice(1);
+}
+
+function formatReviewImpact(redirects: number, blocked: number) {
+  const count = new Intl.NumberFormat("en");
+  const parts = [
+    redirects > 0 ? `redirected ${count.format(redirects)}` : null,
+    blocked > 0 ? `blocked ${count.format(blocked)}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return "";
+  return `Geo: Redirect has ${parts.join(" and ")} visits for your store so far.`;
 }
 
 function formatUsagePeriodEnd(value: string | null) {
@@ -353,6 +370,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       accessToken,
       scopeString: session.scope,
     }),
+    getLifetimeReviewActionTotals(shop),
   ]);
 
   const analyticsPromise = dashboardAnalyticsCache.get(
@@ -415,7 +433,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   );
   const [
-    [rulesCount, activeRulesCount, latestVisitorLog, openOrderRiskCount, appEmbedStatus],
+    [
+      rulesCount,
+      activeRulesCount,
+      latestVisitorLog,
+      openOrderRiskCount,
+      appEmbedStatus,
+      lifetimeActionTotals,
+    ],
     {
       settings,
       shopifyPlan,
@@ -476,6 +501,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const hasVisitorLogs = Boolean(latestVisitorLog);
+  const showReviewBanner = shouldShowReviewBanner({
+    state: settings,
+    totals: lifetimeActionTotals,
+    isAppActive: settings.isEnabled !== false && settings.mode !== "disabled",
+    isEmbedEnabled: appEmbedStatus.state === "enabled",
+    activeRules: activeRulesCount,
+  });
 
   return responseData(
     {
@@ -499,6 +531,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isEnabled: settings.isEnabled !== false,
       },
       appEmbedStatus,
+      reviewPrompt: {
+        visible: showReviewBanner,
+        redirects: lifetimeActionTotals.redirects,
+        blocked: lifetimeActionTotals.blocked,
+      },
       onboardingInstallId: settings.onboardingInstallAt.toISOString(),
       analytics: analyticsPromise,
     },
@@ -671,12 +708,12 @@ export default function Index() {
     usagePeriod,
     stats,
     appEmbedStatus,
+    reviewPrompt,
     onboardingInstallId,
     analytics,
   } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const shopify = useAppBridge();
   const lastPermissionRefreshAt = useRef(0);
   const [chartDays, setChartDays] = useState<7 | 30>(30);
   const [selectedMapCountryCode, setSelectedMapCountryCode] = useState<
@@ -851,8 +888,10 @@ export default function Index() {
     }
   }, [setupConfirmed, setupDismissedKey]);
 
+  // Hiding is immediate; the server snoozes the banner for 30 days.
   const dismissReviewPrompt = () => {
     setReviewPromptDismissed(true);
+    void saveReviewPromptDismissed();
   };
 
   const handleSelectReviewRating = (rating: number) => {
@@ -863,7 +902,8 @@ export default function Index() {
   const handleOpenReviewPage = () => {
     window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
     setReviewModalOpen(false);
-    dismissReviewPrompt();
+    setReviewPromptDismissed(true);
+    void saveReviewPromptReviewed();
   };
 
   const handleConfirmSetup = async () => {
@@ -874,19 +914,8 @@ export default function Index() {
       // Continue when browser storage is unavailable.
     }
 
-    try {
-      if (
-        shopify.reviews &&
-        typeof shopify.reviews.request === "function"
-      ) {
-        await shopify.reviews.request();
-        return;
-      }
-    } catch {
-      // Fall back to the Shopify App Store review page below.
-    }
-
-    window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
+    // Only asks once the app has already redirected/blocked real visitors.
+    await requestReviewAtMilestone("setup_confirmed");
   };
 
   const handleFinishSetup = () => {
@@ -1903,13 +1932,14 @@ export default function Index() {
           </div>
         </header>
 
-        {!reviewPromptDismissed && (
+        {reviewPrompt.visible && !reviewPromptDismissed && (
           <section className="geo-review-prompt" aria-labelledby="geo-review-prompt-title">
             <div className="geo-review-prompt-copy">
               <h2 className="geo-review-prompt-title" id="geo-review-prompt-title">
                 How's your experience with Geo: Redirect?
               </h2>
               <p className="geo-review-prompt-description">
+                {formatReviewImpact(reviewPrompt.redirects, reviewPrompt.blocked)}{" "}
                 Rate us by clicking on the stars. {" "}
                 <button
                   type="button"

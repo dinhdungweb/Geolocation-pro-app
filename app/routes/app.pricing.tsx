@@ -10,6 +10,7 @@ import {
     InlineStack,
     Badge,
 } from "@shopify/polaris";
+import { useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { data as responseData } from "react-router";
 import { Link, useLoaderData, useNavigation, useSearchParams, useSubmit } from "react-router";
@@ -40,6 +41,7 @@ import { chargeOverageUsageRecord, checkBillingWithFallback } from "../utils/bil
 import { getStableShopifyPlanFromBillingCheck, normalizePlanName, resolveEffectivePlan } from "../utils/effective-plan.server";
 import { invalidateStorefrontConfigCache } from "../utils/storefront-config-cache.server";
 import { resyncCheckoutProtectionAfterPlanChange } from "../utils/checkout-protection.server";
+import { requestReviewAtMilestone } from "../utils/review-request.client";
 
 function getShopifyBillingErrorData(error: unknown) {
     if (!error || typeof error !== "object") return undefined;
@@ -122,9 +124,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // disable) paid-only checkout protection when the plan actually changed.
     // In the background so the page doesn't wait on Admin API calls; it never
     // throws, and the cron's drift check covers it if this run fails.
-    if (existingSettings && existingSettings.currentPlan !== shopifyPlan) {
+    const planChanged = Boolean(existingSettings && existingSettings.currentPlan !== shopifyPlan);
+    if (planChanged) {
         void resyncCheckoutProtectionAfterPlanChange(session.shop, admin);
     }
+    // Shopify appends charge_id to the return URL after a subscription is
+    // approved; the webhook may already have synced the plan by then.
+    const justSubscribed =
+        shopifyPlan !== FREE_PLAN &&
+        (planChanged || new URL(request.url).searchParams.has("charge_id"));
 
     return responseData({
         canUseUnlimitedPlan: Boolean(settings?.allowUnlimitedPlan) || currentPlan === UNLIMITED_PLAN,
@@ -141,6 +149,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         currentPlan,
         shopifyPlan,
         isBillingOverridden,
+        justSubscribed,
         shop: session.shop,
     });
 };
@@ -592,8 +601,12 @@ function PlanCard({
 }
 
 export default function PricingPage() {
-    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan } = useLoaderData<typeof loader>();
+    const { canUseUnlimitedPlan, canUseCustomPlan, customPlan, currentPlan, justSubscribed } = useLoaderData<typeof loader>();
     const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        if (justSubscribed) void requestReviewAtMilestone("plan_upgraded");
+    }, [justSubscribed]);
     const submit = useSubmit();
     const navigation = useNavigation();
     const submittingPlan = navigation.state !== "idle" ? navigation.formData?.get("plan")?.toString() : null;

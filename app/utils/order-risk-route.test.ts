@@ -218,6 +218,7 @@ describe("Order Risk Shopify detail API", () => {
     });
     expect(response.data).toEqual({
       message: "2 selected orders marked as reviewed.",
+      reviewMilestone: true,
     });
   });
 

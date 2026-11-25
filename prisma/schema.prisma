@@ -122,6 +122,11 @@ model Settings {
   // Whether the Shopify validation was left enabled by the last successful sync.
   // Compared with the desired state to catch plan changes that skipped a resync.
   checkoutValidationActive   Boolean   @default(false)
+  // App Store review prompt: "pending" | "reviewed". A dismissal only snoozes it.
+  reviewPromptStatus         String    @default("pending")
+  reviewPromptSnoozedUntil   DateTime?
+  // Milestones where Shopify's native review modal was already shown.
+  reviewRequestedMilestones  String[]  @default([])
 }
 
 model AnalyticsCountry {

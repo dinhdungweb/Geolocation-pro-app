@@ -125,7 +125,21 @@ export const getLimitFreeReminderEmailHtml = (shop: string, usage: VisitorCountV
 </div>
 `;
 
-export const getReview3DaysEmailHtml = (shop: string) => `
+function formatReviewEmailImpact(totals?: { redirects: number; blocked: number }) {
+    if (!totals) return "";
+    const count = new Intl.NumberFormat("en");
+    const parts = [
+        totals.redirects > 0 ? `redirected <strong>${count.format(totals.redirects)}</strong>` : "",
+        totals.blocked > 0 ? `blocked <strong>${count.format(totals.blocked)}</strong>` : "",
+    ].filter(Boolean);
+    if (parts.length === 0) return "";
+    return `<p>So far the app has ${parts.join(" and ")} visits for your store.</p>`;
+}
+
+export const getReview3DaysEmailHtml = (
+    shop: string,
+    totals?: { redirects: number; blocked: number },
+) => `
 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
     <div style="background: linear-gradient(135deg, #6366f1, #4f46e5); padding: 28px 20px; text-align: center;">
         <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">We Value Your Feedback!</h1>
@@ -133,6 +147,7 @@ export const getReview3DaysEmailHtml = (shop: string) => `
     <div style="padding: 32px 30px; line-height: 1.6; color: #334155; font-size: 15px;">
         <p style="margin-top: 0;">Hi there,</p>
         <p>You have been using <strong>Geo: Redirect & Country Block</strong> on <strong>${shop}</strong> for a few days now, and we hope the app is helping you deliver a seamless, localized experience to your shoppers around the globe!</p>
+        ${formatReviewEmailImpact(totals)}
         <p>We are constantly striving to improve and provide the best possible support for merchants like you. We would love to hear your thoughts:</p>
         <div style="background: #f8fafc; border-left: 4px solid #6366f1; padding: 18px 20px; border-radius: 0 6px 6px 0; margin: 24px 0;">
             <p style="margin: 0; font-style: italic; color: #1e293b;">"How has your experience been with Geo: Redirect so far? Do you have any feature suggestions or need assistance with setting up rules?"</p>
